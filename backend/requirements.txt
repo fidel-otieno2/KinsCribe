@@ -1,0 +1,12 @@
+flask
+flask-restful
+flask-jwt-extended
+flask-sqlalchemy
+flask-bcrypt
+flask-mail
+flask-cors
+python-dotenv
+cloudinary
+celery
+redis
+openai
