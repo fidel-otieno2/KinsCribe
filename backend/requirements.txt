@@ -13,7 +13,7 @@ celery==5.6.3
 redis==7.4.0
 openai==2.30.0
 gunicorn==21.2.0
-psycopg2-binary==2.9.9
+psycopg2-binary==2.9.10
 itsdangerous==2.2.0
 click==8.3.2
 Jinja2==3.1.6
