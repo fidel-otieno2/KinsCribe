@@ -1,226 +1,160 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  FlatList,
-  TouchableOpacity,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
+  View, Text, TextInput, FlatList, TouchableOpacity,
+  StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import GlassCard from '../components/GlassCard';
-import { colors } from '../theme';
+import { colors, radius } from '../theme';
 import api from '../api/axios';
 
-const s = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bg,
-  },
-  header: {
-    padding: 20,
-    alignItems: 'center',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '800',
-    backgroundColor: 'linear-gradient(135deg, #7c3aed 0%, #3b82f6 50%, #10b981 100%)',
-    backgroundClip: 'text',
-    color: 'transparent',
-  },
-  subtitle: {
-    fontSize: 14,
-    color: colors.muted,
-    textAlign: 'center',
-    marginTop: 4,
-  },
-  messages: {
-    flex: 1,
-    paddingHorizontal: 16,
-  },
-  message: {
-    marginBottom: 16,
-    maxWidth: '80%',
-  },
-  userMessage: {
-    alignSelf: 'flex-end',
-  },
-  aiMessage: {
-    alignSelf: 'flex-start',
-  },
-  messageBubble: {
-    padding: 14,
-    borderRadius: 20,
-    maxWidth: '90%',
-  },
-  userBubble: {
-    backgroundColor: '#7c3aed',
-    color: '#fff',
-  },
-  aiBubble: {
-    backgroundColor: 'rgba(30,41,59,0.8)',
-    color: colors.text,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    padding: 16,
-    gap: 12,
-    alignItems: 'flex-end',
-  },
-  input: {
-    flex: 1,
-    backgroundColor: 'rgba(30,41,59,0.6)',
-    borderRadius: 24,
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    fontSize: 16,
-    color: colors.text,
-    borderWidth: 1,
-    borderColor: colors.border2,
-  },
-  sendBtn: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sendGradient: {
-    flex: 1,
-    borderRadius: 26,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  typing: {
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(30,41,59,0.8)',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginBottom: 16,
-  },
-});
+const QUICK_PROMPTS = [
+  { label: '💡 Story Idea', message: 'Give me a family story idea I can record today' },
+  { label: '📅 Timeline', message: 'Help me create a family timeline structure' },
+  { label: '🎙️ Interview', message: 'Give me 5 questions to ask an elderly family member' },
+  { label: '✍️ Enhance', message: 'How can I make my family stories more engaging?' },
+];
 
 export default function FeedAI({ navigation }) {
   const [messages, setMessages] = useState([
     {
-      id: '1',
-      role: 'ai',
-      text: "Hi! I'm KinsCribe AI 👋\n\nI can:\n• Summarize family stories\n• Generate story ideas\n• Answer family questions\n• Create timelines\n• Suggest family activities\n\nWhat family moment would you like to explore?",
+      id: '1', role: 'ai',
+      text: "Hi! I'm KinsCribe AI 👋\n\nI can help you:\n• Generate story ideas\n• Enhance your writing\n• Create interview questions\n• Build family timelines\n• Summarize memories\n\nWhat would you like to explore?",
     },
   ]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const flatListRef = useRef(null);
 
-  const scrollToEnd = () => {
-    flatListRef.current?.scrollToEnd({ animated: true });
-  };
-
-  const sendMessage = async () => {
-    if (!input.trim() || isTyping) return;
-
-    const userMsg = { id: Date.now().toString(), role: 'user', text: input };
-    setMessages(prev => [...prev, userMsg]);
+  const sendMessage = async (text) => {
+    const msg = text || input.trim();
+    if (!msg || isTyping) return;
     setInput('');
-    setIsTyping(true);
 
-    scrollToEnd();
+    const userMsg = { id: Date.now().toString(), role: 'user', text: msg };
+    setMessages(prev => [...prev, userMsg]);
+    setIsTyping(true);
+    setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
 
     try {
-      const res = await api.post('/ai/chat', { message: input });
-      const aiMsg = { 
-        id: (Date.now() + 1).toString(), 
-        role: 'ai', 
-        text: res.data.response 
-      };
-      setTimeout(() => {
-        setMessages(prev => [...prev, aiMsg]);
-        setIsTyping(false);
-        scrollToEnd();
-      }, 1500);
-    } catch (error) {
-      const errorMsg = { 
-        id: (Date.now() + 1).toString(), 
-        role: 'ai', 
-        text: "Sorry, I'm having trouble connecting. Try again?" 
-      };
-      setTimeout(() => {
-        setMessages(prev => [...prev, errorMsg]);
-        setIsTyping(false);
-        scrollToEnd();
-      }, 1000);
+      const { data } = await api.post('/ai/chat', { message: msg });
+      setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'ai', text: data.response }]);
+    } catch {
+      setMessages(prev => [...prev, {
+        id: (Date.now() + 1).toString(), role: 'ai',
+        text: "Sorry, I'm having trouble connecting right now. Please try again in a moment."
+      }]);
+    } finally {
+      setIsTyping(false);
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
     }
   };
 
   const renderMessage = ({ item }) => (
-    <View style={[s.message, item.role === 'user' ? s.userMessage : s.aiMessage]}>
-      <View style={[s.messageBubble, item.role === 'user' ? s.userBubble : s.aiBubble]}>
-        <Text style={{ lineHeight: 22, fontSize: 15 }}>
-          {item.text.split('\n').map((line, i) => (
-            <Text key={i}>
-              {line}
-              {'\n'}
-            </Text>
-          ))}
+    <View style={[s.msgWrap, item.role === 'user' ? s.userWrap : s.aiWrap]}>
+      {item.role === 'ai' && (
+        <LinearGradient colors={['#7c3aed', '#3b82f6']} style={s.aiAvatar}>
+          <Ionicons name="sparkles" size={14} color="#fff" />
+        </LinearGradient>
+      )}
+      <View style={[s.bubble, item.role === 'user' ? s.userBubble : s.aiBubble]}>
+        <Text style={[s.bubbleText, item.role === 'user' ? s.userText : s.aiText]}>
+          {item.text}
         </Text>
       </View>
     </View>
   );
 
   return (
-    <KeyboardAvoidingView 
-      style={s.container} 
+    <KeyboardAvoidingView style={s.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-    >
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
+      <LinearGradient colors={['#0f172a', '#1e1040', '#0f172a']} style={StyleSheet.absoluteFill} />
+
+      {/* Header */}
       <View style={s.header}>
-        <Text style={s.title}>Feed AI</Text>
-        <Text style={s.subtitle}>Meta AI for your family memories ✨</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
+          <Ionicons name="arrow-back" size={22} color={colors.text} />
+        </TouchableOpacity>
+        <View style={s.headerCenter}>
+          <LinearGradient colors={['#7c3aed', '#3b82f6']} style={s.headerIcon}>
+            <Ionicons name="sparkles" size={16} color="#fff" />
+          </LinearGradient>
+          <View>
+            <Text style={s.headerTitle}>KinsCribe AI</Text>
+            <Text style={s.headerSub}>Family memory assistant</Text>
+          </View>
+        </View>
       </View>
 
-      <FlatList
-        ref={flatListRef}
-        data={messages}
-        renderItem={renderMessage}
-        style={s.messages}
-        contentContainerStyle={{ paddingBottom: 20 }}
-        showsVerticalScrollIndicator={false}
-        onContentSizeChange={scrollToEnd}
-      />
+      {/* Quick prompts */}
+      <View style={s.quickRow}>
+        {QUICK_PROMPTS.map(q => (
+          <TouchableOpacity key={q.label} style={s.quickBtn} onPress={() => sendMessage(q.message)}>
+            <Text style={s.quickText}>{q.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
 
+      {/* Messages */}
+      <FlatList ref={flatListRef} data={messages} renderItem={renderMessage}
+        keyExtractor={i => i.id} style={s.messages}
+        contentContainerStyle={{ padding: 16, paddingBottom: 8 }}
+        showsVerticalScrollIndicator={false}
+        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })} />
+
+      {/* Typing indicator */}
       {isTyping && (
-        <View style={s.typing}>
-          <Text style={{ color: colors.muted, fontStyle: 'italic' }}>
-            KinsCribe AI is typing...
-          </Text>
+        <View style={s.typingWrap}>
+          <LinearGradient colors={['#7c3aed', '#3b82f6']} style={s.aiAvatar}>
+            <Ionicons name="sparkles" size={14} color="#fff" />
+          </LinearGradient>
+          <View style={[s.bubble, s.aiBubble, { paddingVertical: 12 }]}>
+            <ActivityIndicator size="small" color="#7c3aed" />
+          </View>
         </View>
       )}
 
-      <View style={s.inputContainer}>
-        <TextInput
-          style={s.input}
-          placeholder="Ask about family stories..."
-          placeholderTextColor={colors.muted}
-          value={input}
-          onChangeText={setInput}
-          multiline
-          maxLength={1000}
-        />
-        <LinearGradient colors={['#7c3aed', '#3b82f6']} style={s.sendGradient}>
-          <TouchableOpacity 
-            style={s.sendBtn}
-            onPress={sendMessage}
-            disabled={!input.trim() || isTyping}
-          >
-            <Ionicons name="send" size={24} color="#fff" />
-          </TouchableOpacity>
-        </LinearGradient>
+      {/* Input */}
+      <View style={s.inputRow}>
+        <TextInput style={s.input} placeholder="Ask about family stories..."
+          placeholderTextColor={colors.muted} value={input}
+          onChangeText={setInput} multiline maxLength={1000}
+          onSubmitEditing={() => sendMessage()} />
+        <TouchableOpacity onPress={() => sendMessage()} disabled={!input.trim() || isTyping} activeOpacity={0.8}>
+          <LinearGradient colors={input.trim() ? ['#7c3aed', '#3b82f6'] : ['#374151', '#374151']} style={s.sendBtn}>
+            <Ionicons name="send" size={20} color="#fff" />
+          </LinearGradient>
+        </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
   );
 }
 
+const s = StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.bg },
+  header: { flexDirection: 'row', alignItems: 'center', paddingTop: 52, paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: colors.border, gap: 12 },
+  backBtn: { padding: 4 },
+  headerCenter: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  headerIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontSize: 16, fontWeight: '800', color: colors.text },
+  headerSub: { fontSize: 11, color: colors.muted },
+  quickRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, padding: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
+  quickBtn: { backgroundColor: 'rgba(124,58,237,0.15)', borderWidth: 1, borderColor: 'rgba(124,58,237,0.3)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.full },
+  quickText: { color: '#a78bfa', fontSize: 12, fontWeight: '600' },
+  messages: { flex: 1 },
+  msgWrap: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, marginBottom: 12 },
+  userWrap: { justifyContent: 'flex-end' },
+  aiWrap: { justifyContent: 'flex-start' },
+  aiAvatar: { width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
+  bubble: { maxWidth: '78%', padding: 12, borderRadius: 18 },
+  userBubble: { backgroundColor: '#7c3aed', borderBottomRightRadius: 4 },
+  aiBubble: { backgroundColor: 'rgba(30,41,59,0.9)', borderWidth: 1, borderColor: colors.border2, borderBottomLeftRadius: 4 },
+  bubbleText: { fontSize: 14, lineHeight: 21 },
+  userText: { color: '#fff' },
+  aiText: { color: colors.text },
+  typingWrap: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, paddingHorizontal: 16, marginBottom: 8 },
+  inputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 10, padding: 12, borderTopWidth: 1, borderTopColor: colors.border },
+  input: { flex: 1, backgroundColor: 'rgba(30,41,59,0.8)', borderWidth: 1, borderColor: colors.border2, borderRadius: 22, paddingHorizontal: 18, paddingVertical: 12, fontSize: 14, color: colors.text, maxHeight: 100 },
+  sendBtn: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center' },
+});

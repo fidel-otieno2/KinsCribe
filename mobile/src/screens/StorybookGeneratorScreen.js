@@ -26,7 +26,8 @@ export default function StorybookGeneratorScreen({ navigation }) {
   useEffect(() => {
     api
       .get("/stories/family?limit=50")
-      .then(({ data }) => setStories(data.stories))
+      .then(({ data }) => setStories(data.stories || []))
+      .catch(() => setStories([]))
       .finally(() => setLoading(false));
   }, []);
 

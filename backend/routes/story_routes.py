@@ -62,14 +62,33 @@ def create_story():
     db.session.add(story)
     db.session.commit()
 
-    if media_url and media_type in ("audio", "video"):
+    # Run AI processing — async if Celery available, else sync in background thread
+    if source_text_available := (media_url and media_type in ("audio", "video")) or story.content:
         try:
             from services.ai_service import process_story_async
             process_story_async.delay(story.id)
         except Exception:
-            pass
+            try:
+                import threading
+                from services.ai_service import process_story
+                threading.Thread(target=process_story, args=(story.id,), daemon=True).start()
+            except Exception:
+                pass
 
     return jsonify({"story": story.to_dict()}), 201
+
+
+@story_bp.route("/family", methods=["GET"])
+@jwt_required()
+def family_stories():
+    user = current_user()
+    err = require_family(user)
+    if err:
+        return err
+    limit = request.args.get('limit', 50, type=int)
+    stories = Story.query.filter_by(family_id=user.family_id)\
+        .order_by(Story.created_at.desc()).limit(limit).all()
+    return jsonify({"stories": [s.to_dict() for s in stories]})
 
 
 @story_bp.route("/feed", methods=["GET"])

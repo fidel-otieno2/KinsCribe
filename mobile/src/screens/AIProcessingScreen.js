@@ -13,18 +13,24 @@ export default function AIProcessingScreen({ route, navigation }) {
   const [polling, setPolling] = useState(true);
 
   useEffect(() => {
-    if (!storyId) return;
+    if (!storyId) {
+      navigation.replace('Feed');
+      return;
+    }
     let attempts = 0;
     const interval = setInterval(async () => {
       try {
         const { data } = await api.get(`/stories/${storyId}`);
         setStory(data.story);
-        if (data.story.ai_processed || attempts > 20) {
+        if (data.story.ai_processed || attempts >= 20) {
           setPolling(false);
           clearInterval(interval);
         }
         attempts++;
-      } catch {} finally { setLoading(false); }
+      } catch {
+        attempts++;
+        if (attempts >= 5) { setPolling(false); clearInterval(interval); }
+      } finally { setLoading(false); }
     }, 3000);
     return () => clearInterval(interval);
   }, [storyId]);

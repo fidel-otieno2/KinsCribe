@@ -34,6 +34,11 @@ export default function FamilyScreen() {
         setFamily(data.family);
         setMembers(data.members);
       })
+      .catch((err) => {
+        if (err.response?.status === 404) {
+          navigation.replace('FamilyGate');
+        }
+      })
       .finally(() => setLoading(false));
   }, []);
 
