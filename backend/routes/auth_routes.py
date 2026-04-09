@@ -152,4 +152,6 @@ def refresh():
 @jwt_required()
 def me():
     user = User.query.get(int(get_jwt_identity()))
+    if not user:
+        return jsonify({"error": "User not found"}), 404
     return jsonify(user.to_dict())
