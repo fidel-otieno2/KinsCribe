@@ -18,7 +18,8 @@ def create_app():
     jwt.init_app(app)
     bcrypt.init_app(app)
     mail.init_app(app)
-    cors.init_app(app, resources={r"/api/*": {"origins": "http://localhost:3000"}})
+    allowed_origins = os.getenv("CORS_ORIGINS", "*")
+    cors.init_app(app, resources={r"/api/*": {"origins": allowed_origins}})
 
     # Register blueprints
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
