@@ -1,0 +1,1 @@
+<parameter name="content">.env&#10;*.env&#10;venv/&#10;__pycache__/&#10;*.pyc&#10;instance/&#10;</parameter>
