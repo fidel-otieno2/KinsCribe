@@ -11,12 +11,14 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     AsyncStorage.getItem('access_token').then((token) => {
       if (token) {
+        // Set a timeout so slow Render cold starts don't hang the app
+        const timeout = setTimeout(() => {
+          setLoading(false);
+        }, 8000);
         api.get('/auth/me')
-          .then(({ data }) => setUser(data))
-          .catch(async () => {
-            await AsyncStorage.clear();
-          })
-          .finally(() => setLoading(false));
+          .then(({ data }) => { setUser(data); })
+          .catch(async () => { await AsyncStorage.clear(); })
+          .finally(() => { clearTimeout(timeout); setLoading(false); });
       } else {
         setLoading(false);
       }
