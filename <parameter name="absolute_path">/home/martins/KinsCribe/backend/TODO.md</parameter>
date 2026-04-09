@@ -1,2 +1,0 @@
-<parameter name="content"># TODO Steps to fix git push secret block&#10;&#10;1. [x] User approved plan.&#10;2. [] Create backend/.gitignore ignoring .env.&#10;3. [] Edit backend/.env to remove/comment OPENAI_API_KEY.&#10;4. [] git add &amp;&amp; git commit &amp;&amp; git push.&#10;5. [] Mark complete.
-</parameter>

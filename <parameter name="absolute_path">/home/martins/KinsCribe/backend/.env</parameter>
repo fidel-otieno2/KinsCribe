@@ -1,1 +1,0 @@
-<parameter name="content"># OpenAI API Key - Set your own key here locally&#10;OPENAI_API_KEY=sk-your-key-here&#10;# Do not commit real keys!&#10;&#10;# Other env vars...&#10;SECRET_KEY=your-secret-key&#10;DATABASE_URL=sqlite:///instance/kinscribe.db</parameter>
