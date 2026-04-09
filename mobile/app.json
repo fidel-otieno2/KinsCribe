@@ -25,6 +25,9 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": ["expo-video", "expo-image-picker", "expo-media-library"]
+    "plugins": ["expo-video", "expo-image-picker", "expo-media-library"],
+    "extra": {
+      "apiUrl": "https://kinscribe-1.onrender.com/api"
+    }
   }
 }
