@@ -241,23 +241,35 @@ export default function MediaEditorScreen({ route, navigation }) {
       fd.append('privacy', form.privacy);
       if (form.story_date) fd.append('story_date', form.story_date);
       if (location) fd.append('location', location);
-      fd.append('file', {
-        uri: filteredUri,
-        name: isVideo ? 'video.mp4' : 'photo.jpg',
-        type: isVideo ? 'video/mp4' : 'image/jpeg',
-      });
-      if (musicFile) {
-        fd.append('music', {
-          uri: musicFile.uri,
-          name: musicFile.name || 'music.mp3',
-          type: musicFile.mimeType || 'audio/mpeg',
+
+      // Attach the media file — handle both web (blob URL) and native (file URI)
+      if (Platform.OS === 'web') {
+        const response = await fetch(filteredUri);
+        const blob = await response.blob();
+        const ext = isVideo ? 'mp4' : 'jpg';
+        const mime = isVideo ? 'video/mp4' : 'image/jpeg';
+        fd.append('file', new File([blob], `media.${ext}`, { type: mime }));
+      } else {
+        fd.append('file', {
+          uri: filteredUri,
+          name: isVideo ? 'video.mp4' : 'photo.jpg',
+          type: isVideo ? 'video/mp4' : 'image/jpeg',
         });
+      }
+
+      if (musicFile) {
+        if (Platform.OS === 'web') {
+          const response = await fetch(musicFile.uri);
+          const blob = await response.blob();
+          fd.append('music', new File([blob], musicFile.name || 'music.mp3', { type: musicFile.mimeType || 'audio/mpeg' }));
+        } else {
+          fd.append('music', { uri: musicFile.uri, name: musicFile.name || 'music.mp3', type: musicFile.mimeType || 'audio/mpeg' });
+        }
       } else if (selectedMusic && selectedMusic.id !== 'local') {
         fd.append('music_url', selectedMusic.uri);
         fd.append('music_name', `${selectedMusic.name} · ${selectedMusic.artist}`);
       }
 
-      // Use native fetch via helper — axios corrupts multipart boundary in React Native
       const data = await multipartPost('/stories/', fd);
       navigation.replace('AIProcessing', { storyId: data.story?.id });
     } catch (err) {
