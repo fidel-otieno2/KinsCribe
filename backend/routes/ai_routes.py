@@ -8,6 +8,15 @@ from services.ai_service import chat_completion
 ai_bp = Blueprint("ai", __name__)
 
 
+@ai_bp.route("/test", methods=["GET"])
+def test_ai():
+    try:
+        result = chat_completion("Say hello in one word")
+        return jsonify({"status": "ok", "response": result})
+    except Exception as e:
+        return jsonify({"status": "error", "error": str(e)}), 500
+
+
 def current_user():
     return User.query.get(int(get_jwt_identity()))
 
