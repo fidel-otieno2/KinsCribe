@@ -207,6 +207,7 @@ export default function StoryCard({ story, onUpdate, isVisible = true }) {
   const isVideo = story.media_type === 'video' && !!story.media_url;
   const isAudio = story.media_type === 'audio' && !!story.media_url;
   const isImage = !!story.media_url && !isVideo && !isAudio;
+
   const isOwner = story.user_id === user?.id;
 
   const toggleLike = async () => {
