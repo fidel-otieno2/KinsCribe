@@ -38,56 +38,70 @@ def create_story():
     media_url = None
     media_type = "text"
 
-    if "file" in request.files:
-        file = request.files["file"]
-        mime = file.content_type
-        resource_type = "video" if "video" in mime else "raw" if "audio" in mime else "image"
-        media_type = "video" if "video" in mime else "audio" if "audio" in mime else "image"
-        result = cloudinary.uploader.upload(file, resource_type=resource_type, folder="kinscribe/stories")
-        media_url = result["secure_url"]
+    try:
+        if "file" in request.files:
+            file = request.files["file"]
+            mime = file.content_type or ""
+            resource_type = "video" if "video" in mime else "raw" if "audio" in mime else "image"
+            media_type = "video" if "video" in mime else "audio" if "audio" in mime else "image"
+            result = cloudinary.uploader.upload(file, resource_type=resource_type, folder="kinscribe/stories")
+            media_url = result["secure_url"]
+    except Exception as e:
+        return jsonify({"error": f"File upload failed: {str(e)}"}), 500
 
     music_url = None
-    if "music" in request.files:
-        music_file = request.files["music"]
-        music_result = cloudinary.uploader.upload(music_file, resource_type="raw", folder="kinscribe/music")
-        music_url = music_result["secure_url"]
+    try:
+        if "music" in request.files:
+            music_file = request.files["music"]
+            music_result = cloudinary.uploader.upload(music_file, resource_type="raw", folder="kinscribe/music")
+            music_url = music_result["secure_url"]
+    except Exception as e:
+        return jsonify({"error": f"Music upload failed: {str(e)}"}), 500
 
     data = request.form if request.files else request.get_json(force=True, silent=True) or {}
 
-    # music_url can come as a form field (iTunes preview URL) when no file is uploaded
     if not music_url:
         music_url = data.get("music_url")
-    story_date = data.get("story_date")
 
-    story = Story(
-        title=data.get("title"),
-        content=data.get("content"),
-        media_url=media_url,
-        media_type=media_type,
-        music_url=music_url,
-        location=data.get("location"),
-        privacy=data.get("privacy", "family"),
-        story_date=datetime.strptime(story_date, "%Y-%m-%d").date() if story_date else None,
-        user_id=user.id,
-        family_id=user.family_id
-    )
-    db.session.add(story)
-    db.session.commit()
-
-    # Run AI processing — async if Celery available, else sync in background thread
-    if source_text_available := (media_url and media_type in ("audio", "video")) or story.content:
+    story_date = data.get("story_date") or None
+    parsed_date = None
+    if story_date:
         try:
-            from services.ai_service import process_story_async
-            process_story_async.delay(story.id)
-        except Exception:
-            try:
-                import threading
-                from services.ai_service import process_story
-                threading.Thread(target=process_story, args=(story.id,), daemon=True).start()
-            except Exception:
-                pass
+            parsed_date = datetime.strptime(story_date, "%Y-%m-%d").date()
+        except ValueError:
+            pass
 
-    return jsonify({"story": story.to_dict()}), 201
+    try:
+        story = Story(
+            title=data.get("title", ""),
+            content=data.get("content", ""),
+            media_url=media_url,
+            media_type=media_type,
+            music_url=music_url,
+            location=data.get("location"),
+            privacy=data.get("privacy", "family"),
+            story_date=parsed_date,
+            user_id=user.id,
+            family_id=user.family_id
+        )
+        db.session.add(story)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": f"Database error: {str(e)}"}), 500
+
+    # Run AI processing in background thread
+    try:
+        import threading
+        from services.ai_service import process_story
+        threading.Thread(target=process_story, args=(story.id,), daemon=True).start()
+    except Exception:
+        pass
+
+    try:
+        return jsonify({"story": story.to_dict()}), 201
+    except Exception as e:
+        return jsonify({"error": f"Serialization error: {str(e)}"}), 500
 
 
 @story_bp.route("/family", methods=["GET"])

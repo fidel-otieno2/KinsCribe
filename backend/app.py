@@ -32,6 +32,12 @@ def create_app():
     with app.app_context():
         db.create_all()
 
+    @app.errorhandler(Exception)
+    def handle_exception(e):
+        import traceback
+        print(traceback.format_exc())
+        return {"error": str(e)}, 500
+
     return app
 
 

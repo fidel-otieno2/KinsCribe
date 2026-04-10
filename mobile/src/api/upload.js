@@ -12,11 +12,14 @@ export async function multipartPost(path, formData) {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
-      // DO NOT set Content-Type — fetch sets it automatically with the correct boundary
     },
     body: formData,
   });
   const json = await res.json();
-  if (!res.ok) throw new Error(json.error || `Server error ${res.status}`);
+  if (!res.ok) {
+    // Surface the real server error message so we can debug
+    const msg = json.error || json.message || JSON.stringify(json);
+    throw new Error(`${res.status}: ${msg}`);
+  }
   return json;
 }
