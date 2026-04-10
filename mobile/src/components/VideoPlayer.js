@@ -1,85 +1,66 @@
-import { useEffect, useState, useRef } from 'react';
-import { useVideoPlayer, VideoView } from 'expo-video';
-import { StyleSheet, TouchableOpacity, View, Text, Animated } from 'react-native';
+import { useRef, useState } from 'react';
+import { View, TouchableOpacity, StyleSheet, Text, Animated } from 'react-native';
+import { Video, ResizeMode } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function VideoPlayer({ uri, isVisible }) {
+  const videoRef = useRef(null);
   const [muted, setMuted] = useState(true);
   const [paused, setPaused] = useState(false);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
   const iconAnim = useRef(new Animated.Value(0)).current;
 
-  const player = useVideoPlayer(uri, (p) => {
-    p.loop = true;
-    p.muted = true;
-  });
-
-  // auto-play / pause based on visibility
-  useEffect(() => {
-    if (!player) return;
-    const t = setTimeout(() => {
-      try {
-        player.muted = muted;
-        if (isVisible && !paused) player.play();
-        else player.pause();
-      } catch {}
-    }, 300);
-    return () => clearTimeout(t);
-  }, [isVisible, player]);
-
-  // sync mute
-  useEffect(() => {
-    if (!player) return;
-    try { player.muted = muted; } catch {}
-  }, [muted, player]);
-
-  // poll progress
-  useEffect(() => {
-    if (!player) return;
-    const id = setInterval(() => {
-      try {
-        const pos = player.currentTime ?? 0;
-        const dur = player.duration ?? 0;
-        setProgress(pos);
-        setDuration(dur);
-      } catch {}
-    }, 500);
-    return () => clearInterval(id);
-  }, [player]);
-
   const flashIcon = () => {
     iconAnim.setValue(1);
     Animated.timing(iconAnim, { toValue: 0, duration: 600, useNativeDriver: true }).start();
   };
 
-  const togglePlay = () => {
-    if (!player) return;
-    try {
-      if (paused) { player.play(); setPaused(false); }
-      else { player.pause(); setPaused(true); }
-      flashIcon();
-    } catch {}
+  const togglePlay = async () => {
+    if (!videoRef.current) return;
+    if (paused) {
+      await videoRef.current.playAsync();
+      setPaused(false);
+    } else {
+      await videoRef.current.pauseAsync();
+      setPaused(true);
+    }
+    flashIcon();
+  };
+
+  const onPlaybackUpdate = (status) => {
+    if (status.isLoaded) {
+      setProgress(status.positionMillis || 0);
+      setDuration(status.durationMillis || 0);
+    }
   };
 
   const pct = duration > 0 ? (progress / duration) * 100 : 0;
-  const fmt = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+  const fmt = (ms) => {
+    const s = Math.floor(ms / 1000);
+    return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+  };
 
   return (
     <View style={s.wrap}>
-      <VideoView player={player} style={s.media} contentFit="cover" nativeControls={false} />
+      <Video
+        ref={videoRef}
+        source={{ uri }}
+        style={s.media}
+        resizeMode={ResizeMode.COVER}
+        shouldPlay={isVisible && !paused}
+        isLooping
+        isMuted={muted}
+        onPlaybackStatusUpdate={onPlaybackUpdate}
+      />
 
-      {/* tap overlay */}
       <TouchableOpacity style={StyleSheet.absoluteFill} onPress={togglePlay} activeOpacity={1} />
 
-      {/* flash icon */}
       <Animated.View style={[s.flashIcon, { opacity: iconAnim }]} pointerEvents="none">
         <Ionicons name={paused ? 'play' : 'pause'} size={40} color="#fff" />
       </Animated.View>
 
-      {/* bottom controls */}
       <View style={s.controls}>
-        {/* progress bar */}
         <View style={s.progressTrack}>
           <View style={[s.progressFill, { width: `${pct}%` }]} />
         </View>

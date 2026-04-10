@@ -36,13 +36,13 @@
       ]
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "bundler": "metro",
+      "output": "single"
     },
     "updates": {
       "enabled": false
     },
     "plugins": [
-      "expo-video",
       "expo-image-picker",
       "expo-media-library"
     ],

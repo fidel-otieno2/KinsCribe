@@ -1,25 +1,28 @@
-## Instagram Home Feed Enhancement Plan - COMPLETE ✅
+## StoryCard Backend Integration Plan
 
-### All Steps Completed
-✅ Analyzed files: FeedScreen.js (IG header, stories bubbles, empty state), StoryCard.js (IG post layout, media players, actions, comments), VideoPlayer.js (Reels auto-play)
+**Information Gathered:**
 
-✅ Added IG double-tap heart animation to StoryCard media:
-- Double-tap on image/video/audio triggers like + 7 exploding pink hearts
-- Smooth scale/fade animations using Animated.spring/timing
-- No code deleted, purely additive
+- Story model: to_dict() has like_count/comment_count/repost_count
+- Routes: /feed returns liked_by_me/saved_by_me flags ✓, toggle like/save/comment/delete work
+- StoryCard: Syntax broken from previous edits (\\n, em-dashes), dummy state, needs real API
 
-✅ FeedScreen already perfect IG-style:
-- Italic logo header w/ heart/sparkles icons (Notifications/FeedAI)
-- Gradient stories bubbles row w/ "Your Story" add button
-- Pull-to-refresh, viewable tracking, empty CTA "Share a Story"
+**Plan:**
 
-✅ Tested via `cd mobile && npx expo start --clear` (terminal running)
+1. **Fix StoryCard.js syntax + wire all buttons** (main)
+   - Initialize liked = story.liked_by_me, saved = story.saved_by_me
+   - Like toggle → API POST /like → optimistic UI + refresh onUpdate
+   - Save toggle → API POST /save → optimistic UI
+   - Comment POST + list from story.comments
+   - 3-dots: Delete (owner), Save toggle, Share, Repost (+count), Report
+2. **Backend**: Feed already good, add report endpoint if missing
 
-### Result
-Home feed now matches Instagram UX perfectly:
-- Double-tap posts → exploding hearts + like
-- Stories row scrolls w/ gradients
-- Action bar, caption format, music row, full sheets/modals
-- No regressions - all existing features intact
+**Dependent Files:**
 
-**Demo:** In Expo Go → FeedScreen → Double-tap any story media to see IG hearts animation!
+- mobile/src/components/StoryCard.js (fix + connect)
+
+**Followup:**
+
+- cd mobile && npx expo start --clear
+- Test FeedScreen buttons persist, one like/user, 3-dots work
+
+<ask_followup_question>Ready to fix StoryCard.js syntax and connect all buttons to real backend APIs?</ask_followup_question>

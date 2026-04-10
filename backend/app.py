@@ -20,7 +20,12 @@ def create_app():
     bcrypt.init_app(app)
     mail.init_app(app)
     allowed_origins = os.getenv("CORS_ORIGINS", "*")
-    cors.init_app(app, resources={r"/api/*": {"origins": allowed_origins}})
+    cors.init_app(app, resources={r"/api/*": {
+        "origins": allowed_origins,
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"],
+        "supports_credentials": False,
+    }})
 
     # Register blueprints
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
@@ -58,6 +63,7 @@ def _run_migrations():
         "ALTER TABLE stories ADD COLUMN IF NOT EXISTS ai_processed BOOLEAN DEFAULT FALSE",
         "ALTER TABLE stories ADD COLUMN IF NOT EXISTS story_date DATE",
         "ALTER TABLE stories ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW()",
+        "ALTER TABLE stories ADD COLUMN IF NOT EXISTS repost_count INTEGER DEFAULT 0",
     ]
 
     with db.engine.connect() as conn:

@@ -128,7 +128,15 @@ def family_feed():
         return err
     stories = Story.query.filter_by(family_id=user.family_id)\
         .order_by(Story.created_at.desc()).all()
-    return jsonify({"stories": [s.to_dict() for s in stories]})
+    user_liked = {l.story_id for l in Like.query.filter_by(user_id=user.id).all()}
+    user_saved = {s.story_id for s in SavedStory.query.filter_by(user_id=user.id).all()}
+    result = []
+    for s in stories:
+        d = s.to_dict()
+        d["liked_by_me"] = s.id in user_liked
+        d["saved_by_me"] = s.id in user_saved
+        result.append(d)
+    return jsonify({"stories": result})
 
 
 @story_bp.route("/timeline", methods=["GET"])
@@ -225,3 +233,19 @@ def toggle_save(story_id):
     db.session.add(SavedStory(user_id=user_id, story_id=story_id))
     db.session.commit()
     return jsonify({"saved": True})
+
+
+@story_bp.route("/<int:story_id>/repost", methods=["POST"])
+@jwt_required()
+def repost_story(story_id):
+    story = Story.query.get_or_404(story_id)
+    story.repost_count = (story.repost_count or 0) + 1
+    db.session.commit()
+    return jsonify({"repost_count": story.repost_count})
+
+
+@story_bp.route("/<int:story_id>/report", methods=["POST"])
+@jwt_required()
+def report_story(story_id):
+    # placeholder — just acknowledge for now
+    return jsonify({"message": "Story reported. Our team will review it."})

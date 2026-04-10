@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, Image, TouchableOpacity,
   TextInput, Alert, ActivityIndicator, ScrollView
 } from 'react-native';
-import { Video } from 'expo-av';
+import { Video, ResizeMode } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import api from '../api/axios';
@@ -12,12 +12,12 @@ import { colors, radius } from '../theme';
 export default function MediaEditor({ route, navigation }) {
   const { mediaFile, mediaType } = route.params;
 
+  const videoRef = useRef(null);
   const [caption, setCaption] = useState('');
   const [location, setLocation] = useState('');
-  const [music, setMusic] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  // 🎵 Fake music picker (replace later with real list)
+  const [music, setMusic] = useState(null);
   const pickMusic = () => {
     setMusic("default-music.mp3");
     Alert.alert("Music Added", "Sample music attached 🎵");
@@ -28,33 +28,24 @@ export default function MediaEditor({ route, navigation }) {
     if (!mediaFile) return Alert.alert("Error", "No media selected");
 
     const formData = new FormData();
-
     formData.append("file", {
       uri: mediaFile.uri,
       name: mediaType === "image" ? "photo.jpg" : "video.mp4",
       type: mediaType === "image" ? "image/jpeg" : "video/mp4",
     });
-
-    formData.append("caption", caption);
+    formData.append("title", caption || "Untitled");
+    formData.append("content", caption || "");
     formData.append("location", location);
-    formData.append("music", music || "");
-    formData.append("type", mediaType);
+    formData.append("media_type", mediaType);
 
     setLoading(true);
-
     try {
-      await api.post("/stories/upload", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      });
-
+      await api.post("/stories/", formData);
       Alert.alert("Success", "Story posted successfully 🎉");
-      navigation.navigate("Feed");
-
+      navigation.navigate("Main", { screen: "Feed" });
     } catch (err) {
       console.log(err.response?.data || err.message);
-      Alert.alert("Upload Failed", "Something went wrong");
+      Alert.alert("Upload Failed", err.response?.data?.error || "Something went wrong");
     } finally {
       setLoading(false);
     }
@@ -81,10 +72,11 @@ export default function MediaEditor({ route, navigation }) {
             <Image source={{ uri: mediaFile.uri }} style={s.media} />
           ) : (
             <Video
+              ref={videoRef}
               source={{ uri: mediaFile.uri }}
               style={s.media}
+              resizeMode={ResizeMode.COVER}
               useNativeControls
-              resizeMode="cover"
               isLooping
             />
           )}
