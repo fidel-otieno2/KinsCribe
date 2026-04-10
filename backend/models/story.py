@@ -10,6 +10,7 @@ class Story(db.Model):
     media_url = db.Column(db.String(300), nullable=True)  # Cloudinary URL
     media_type = db.Column(db.String(20), nullable=True)  # text | audio | video
     music_url = db.Column(db.String(300), nullable=True)   # background music
+    music_name = db.Column(db.String(200), nullable=True)  # song name for display
     location = db.Column(db.String(200), nullable=True)    # location tag
 
     # AI-generated fields
@@ -42,6 +43,7 @@ class Story(db.Model):
             "media_url": self.media_url,
             "media_type": self.media_type,
             "music_url": self.music_url,
+            "music_name": self.music_name,
             "location": self.location,
             "transcript": self.transcript,
             "enhanced_text": self.enhanced_text,

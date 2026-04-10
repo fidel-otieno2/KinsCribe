@@ -298,7 +298,24 @@ export default function StoryCard({ story, onUpdate, isVisible = true }) {
 
         {isImage && (
           <View style={s.imageWrap}>
-            <Image source={{ uri: story.media_url }} style={s.media} resizeMode="cover" />
+            <Image
+              source={{ uri: story.media_url }}
+              style={s.media}
+              resizeMode="cover"
+              onError={(e) => console.log('Image load error:', story.media_url, e.nativeEvent.error)}
+            />
+            {story.music_url && <PhotoMusicBtn musicUrl={story.music_url} />}
+          </View>
+        )}
+
+        {/* fallback: if media_url exists but media_type is wrong, still show image */}
+        {!isVideo && !isImage && !isAudio && story.media_url && (
+          <View style={s.imageWrap}>
+            <Image
+              source={{ uri: story.media_url }}
+              style={s.media}
+              resizeMode="cover"
+            />
             {story.music_url && <PhotoMusicBtn musicUrl={story.music_url} />}
           </View>
         )}
@@ -325,6 +342,11 @@ export default function StoryCard({ story, onUpdate, isVisible = true }) {
           </TouchableOpacity>
         </View>
 
+        {/* Likes count */}
+        {likeCount > 0 && (
+          <Text style={s.likesCount}>{likeCount.toLocaleString()} {likeCount === 1 ? 'like' : 'likes'}</Text>
+        )}
+
         {/* Caption */}
         <View style={s.captionWrap}>
           <Text style={s.caption}>
@@ -334,11 +356,25 @@ export default function StoryCard({ story, onUpdate, isVisible = true }) {
           {story.content ? <Text style={s.captionBody}>{story.content}</Text> : null}
         </View>
 
-        {/* Music tag on image posts */}
-        {isImage && story.music_url && (
-          <View style={s.musicTag}>
-            <Ionicons name="musical-notes" size={11} color="#a78bfa" />
-            <Text style={s.musicTagText}>Music added</Text>
+        {/* Music row — shows song name like IG */}
+        {story.music_url && (
+          <View style={s.musicRow}>
+            <View style={s.musicRowLeft}>
+              <LinearGradient colors={['#7c3aed', '#3b82f6']} style={s.musicNote}>
+                <Ionicons name="musical-notes" size={10} color="#fff" />
+              </LinearGradient>
+              <Text style={s.musicRowText} numberOfLines={1}>
+                {story.music_name || 'Original Audio'}
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* Location row */}
+        {story.location && (
+          <View style={s.locationRow}>
+            <Ionicons name="location-outline" size={12} color={colors.muted} />
+            <Text style={s.locationText}>{story.location}</Text>
           </View>
         )}
 
@@ -465,19 +501,24 @@ const s = StyleSheet.create({
   username: { fontSize: 13, fontWeight: '700', color: colors.text },
   subRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   subtext: { fontSize: 11, color: colors.muted },
-  imageWrap: { position: 'relative' },
-  media: { width: '100%', height: 400 },
+  imageWrap: { position: 'relative', backgroundColor: '#000' },
+  media: { width: '100%', aspectRatio: 1, minHeight: 300 },
   actions: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 8 },
   actionsLeft: { flexDirection: 'row', gap: 2 },
   actionBtn: { padding: 5, flexDirection: 'row', alignItems: 'center', gap: 4 },
   actionCount: { fontSize: 13, color: colors.text, fontWeight: '600' },
-  captionWrap: { paddingHorizontal: 14, marginBottom: 4 },
+  likesCount: { paddingHorizontal: 14, fontSize: 13, fontWeight: '700', color: colors.text, marginBottom: 4 },
+  captionWrap: { paddingHorizontal: 14, marginBottom: 6 },
   caption: { fontSize: 13, color: colors.text, lineHeight: 18 },
   captionUser: { fontWeight: '700' },
   captionText: { fontWeight: '400' },
   captionBody: { fontSize: 13, color: '#bbb', marginTop: 3, lineHeight: 18 },
-  musicTag: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, marginBottom: 4 },
-  musicTagText: { fontSize: 11, color: '#a78bfa' },
+  musicRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, marginBottom: 6 },
+  musicRowLeft: { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 },
+  musicNote: { width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  musicRowText: { fontSize: 12, color: colors.muted, flex: 1 },
+  locationRow: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, marginBottom: 6 },
+  locationText: { fontSize: 12, color: colors.muted },
   aiBox: { flexDirection: 'row', marginHorizontal: 14, marginBottom: 6, backgroundColor: '#1a0a2e', padding: 8, borderRadius: 8 },
   aiText: { fontSize: 12, color: '#ccc', flex: 1 },
   tagsRow: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 14, marginBottom: 4 },

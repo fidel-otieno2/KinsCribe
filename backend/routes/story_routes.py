@@ -62,6 +62,7 @@ def create_story():
 
     if not music_url:
         music_url = data.get("music_url")
+    music_name = data.get("music_name")
 
     story_date = data.get("story_date") or None
     parsed_date = None
@@ -78,6 +79,7 @@ def create_story():
             media_url=media_url,
             media_type=media_type,
             music_url=music_url,
+            music_name=music_name,
             location=data.get("location"),
             privacy=data.get("privacy", "family"),
             story_date=parsed_date,

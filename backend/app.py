@@ -49,6 +49,7 @@ def _run_migrations():
 
     migrations = [
         "ALTER TABLE stories ADD COLUMN IF NOT EXISTS music_url VARCHAR(300)",
+        "ALTER TABLE stories ADD COLUMN IF NOT EXISTS music_name VARCHAR(200)",
         "ALTER TABLE stories ADD COLUMN IF NOT EXISTS location VARCHAR(200)",
         "ALTER TABLE stories ADD COLUMN IF NOT EXISTS transcript TEXT",
         "ALTER TABLE stories ADD COLUMN IF NOT EXISTS enhanced_text TEXT",

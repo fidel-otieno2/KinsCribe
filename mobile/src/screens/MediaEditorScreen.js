@@ -254,6 +254,7 @@ export default function MediaEditorScreen({ route, navigation }) {
         });
       } else if (selectedMusic && selectedMusic.id !== 'local') {
         fd.append('music_url', selectedMusic.uri);
+        fd.append('music_name', `${selectedMusic.name} · ${selectedMusic.artist}`);
       }
 
       // Use native fetch via helper — axios corrupts multipart boundary in React Native
