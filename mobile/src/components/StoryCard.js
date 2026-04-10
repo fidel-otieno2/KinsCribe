@@ -206,7 +206,7 @@ export default function StoryCard({ story, onUpdate, isVisible = true }) {
 
   const isVideo = story.media_type === 'video' && !!story.media_url;
   const isAudio = story.media_type === 'audio' && !!story.media_url;
-  const isImage = story.media_type === 'image' && !!story.media_url;
+  const isImage = !!story.media_url && !isVideo && !isAudio;
   const isOwner = story.user_id === user?.id;
 
   const toggleLike = async () => {
@@ -303,18 +303,6 @@ export default function StoryCard({ story, onUpdate, isVisible = true }) {
               style={s.media}
               resizeMode="cover"
               onError={(e) => console.log('Image load error:', story.media_url, e.nativeEvent.error)}
-            />
-            {story.music_url && <PhotoMusicBtn musicUrl={story.music_url} />}
-          </View>
-        )}
-
-        {/* fallback: if media_url exists but media_type is wrong, still show image */}
-        {!isVideo && !isImage && !isAudio && story.media_url && (
-          <View style={s.imageWrap}>
-            <Image
-              source={{ uri: story.media_url }}
-              style={s.media}
-              resizeMode="cover"
             />
             {story.music_url && <PhotoMusicBtn musicUrl={story.music_url} />}
           </View>
@@ -501,8 +489,8 @@ const s = StyleSheet.create({
   username: { fontSize: 13, fontWeight: '700', color: colors.text },
   subRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   subtext: { fontSize: 11, color: colors.muted },
-  imageWrap: { position: 'relative', backgroundColor: '#000' },
-  media: { width: '100%', aspectRatio: 1, minHeight: 300 },
+  imageWrap: { position: 'relative', backgroundColor: '#000', width: '100%', height: 400 },
+  media: { width: '100%', height: '100%' },
   actions: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 8 },
   actionsLeft: { flexDirection: 'row', gap: 2 },
   actionBtn: { padding: 5, flexDirection: 'row', alignItems: 'center', gap: 4 },
