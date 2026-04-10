@@ -18,6 +18,7 @@ import StoryCard from "../components/StoryCard";
 import { colors, radius, shadows } from "../theme";
 
 import * as ImagePicker from "expo-image-picker";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function ProfileScreen({ navigation }) {
   const { user, refreshUser } = useAuth();
@@ -33,29 +34,32 @@ export default function ProfileScreen({ navigation }) {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaType.image,
-      allowsEditing: false,
-      quality: 0.8,
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.7,
+      base64: true,
     });
 
     if (!result.canceled && result.assets && result.assets.length > 0) {
       setUploading(true);
-      const formData = new FormData();
-      formData.append("file", {
-        uri: result.assets[0].uri,
-        type: "image/jpeg",
-        name: "avatar.jpg",
-      });
-
+      const asset = result.assets[0];
       try {
-        await api.post("/auth/avatar", formData, {
-          headers: { "Content-Type": "multipart/form-data" },
+        const token = await AsyncStorage.getItem("access_token");
+        const res = await fetch("https://kinscribe-1.onrender.com/api/auth/avatar", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ image: asset.base64 }),
         });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || "Upload failed");
         await refreshUser();
         Alert.alert("Success", "Profile picture updated!");
       } catch (err) {
-        console.log("Upload error:", err.response);
-        Alert.alert("Error", err.response?.data?.error || "Upload failed");
+        console.log("Upload error:", err.message);
+        Alert.alert("Error", err.message || "Upload failed");
       } finally {
         setUploading(false);
       }

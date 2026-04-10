@@ -127,15 +127,31 @@ def login():
 @auth_bp.route("/avatar", methods=["POST"])
 @jwt_required()
 def upload_avatar():
+    import base64, re
     user = User.query.get(int(get_jwt_identity()))
-    if "file" not in request.files:
-        return jsonify({"error": "No file provided"}), 400
 
-    result = cloudinary.uploader.upload(
-        request.files["file"],
-        folder="kinscribe/avatars",
-        transformation=[{"width": 300, "height": 300, "crop": "fill", "gravity": "face"}]
-    )
+    # Accept either multipart file OR base64 JSON body
+    if "file" in request.files:
+        file_data = request.files["file"]
+        result = cloudinary.uploader.upload(
+            file_data,
+            folder="kinscribe/avatars",
+            transformation=[{"width": 300, "height": 300, "crop": "fill", "gravity": "face"}]
+        )
+    else:
+        body = request.get_json(silent=True) or {}
+        b64 = body.get("image")
+        if not b64:
+            return jsonify({"error": "No file provided"}), 400
+        # strip data URI prefix if present
+        b64 = re.sub(r"^data:image/[^;]+;base64,", "", b64)
+        file_bytes = base64.b64decode(b64)
+        result = cloudinary.uploader.upload(
+            file_bytes,
+            folder="kinscribe/avatars",
+            transformation=[{"width": 300, "height": 300, "crop": "fill", "gravity": "face"}]
+        )
+
     user.avatar_url = result["secure_url"]
     db.session.commit()
     return jsonify({"avatar_url": user.avatar_url, "user": user.to_dict()})
