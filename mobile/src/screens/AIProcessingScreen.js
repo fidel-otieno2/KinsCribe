@@ -14,7 +14,7 @@ export default function AIProcessingScreen({ route, navigation }) {
 
   useEffect(() => {
     if (!storyId) {
-      navigation.replace('Feed');
+      navigation.navigate('Main', { screen: 'Feed' });
       return;
     }
     let attempts = 0;
@@ -109,7 +109,7 @@ export default function AIProcessingScreen({ route, navigation }) {
         )}
 
         {!polling && (
-          <TouchableOpacity style={s.doneBtn} onPress={() => navigation.navigate('Feed')} activeOpacity={0.85}>
+          <TouchableOpacity style={s.doneBtn} onPress={() => navigation.navigate('Main', { screen: 'Feed' })} activeOpacity={0.85}>
             <LinearGradient colors={['#7c3aed', '#3b82f6']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.doneBtnGrad}>
               <Text style={s.doneBtnText}>View in Feed</Text>
               <Ionicons name="arrow-forward" size={18} color="#fff" />
