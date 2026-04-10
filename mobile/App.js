@@ -31,6 +31,8 @@ import StorybooksScreen from "./src/screens/StorybooksScreen";
 import CreateScreen from "./src/screens/CreateScreen";
 import StorybookGeneratorScreen from "./src/screens/StorybookGeneratorScreen";
 import FeedAI from "./src/screens/FeedAI";
+import MediaEditorScreen from "./src/screens/MediaEditorScreen";
+import VoiceRecorderScreen from "./src/screens/VoiceRecorderScreen";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -212,6 +214,16 @@ function RootNavigator() {
             name="StorybookGenerator"
             component={StorybookGeneratorScreen}
             options={{ animation: "slide_from_right" }}
+          />
+          <Stack.Screen
+            name="MediaEditor"
+            component={MediaEditorScreen}
+            options={{ animation: "slide_from_bottom" }}
+          />
+          <Stack.Screen
+            name="VoiceRecorder"
+            component={VoiceRecorderScreen}
+            options={{ animation: "slide_from_bottom" }}
           />
         </>
       )}

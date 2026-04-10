@@ -7,7 +7,6 @@ import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import * as DocumentPicker from 'expo-document-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, radius } from '../theme';
 
@@ -15,57 +14,66 @@ export default function CreateScreen({ navigation }) {
   const { user } = useAuth();
   const [type, setType] = useState('text');
   const [form, setForm] = useState({ title: '', content: '', privacy: 'family', story_date: '' });
-  const [mediaFile, setMediaFile] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  const pickImage = useCallback(async () => {
+  // ── Photo ──────────────────────────────────────────────────────────────────
+  const pickPhoto = useCallback(async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) return Alert.alert('Permission Required', 'Enable gallery access in settings');
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true, quality: 0.8,
+      allowsEditing: true,
+      quality: 0.9,
     });
-    if (!result.canceled) setMediaFile(result.assets[0]);
-  }, []);
+    if (!result.canceled) {
+      navigation.navigate('MediaEditor', { mediaFile: result.assets[0], mediaType: 'image' });
+    }
+  }, [navigation]);
 
-  const pickVideo = useCallback(async () => {
+  // ── Video ──────────────────────────────────────────────────────────────────
+  const uploadVideo = useCallback(async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) return Alert.alert('Permission Required', 'Enable gallery access in settings');
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+      quality: 0.9,
     });
-    if (!result.canceled) setMediaFile(result.assets[0]);
-  }, []);
+    if (!result.canceled) {
+      navigation.navigate('MediaEditor', { mediaFile: result.assets[0], mediaType: 'video' });
+    }
+  }, [navigation]);
 
-  const pickAudio = useCallback(async () => {
-    const result = await DocumentPicker.getDocumentAsync({ type: 'audio/*', copyToCacheDirectory: true });
-    if (!result.canceled && result.assets?.[0]) setMediaFile(result.assets[0]);
-  }, []);
+  const recordVideo = useCallback(async () => {
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perm.granted) return Alert.alert('Permission Required', 'Enable camera access in settings');
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+      videoMaxDuration: 60,
+      quality: 0.9,
+    });
+    if (!result.canceled) {
+      navigation.navigate('MediaEditor', { mediaFile: result.assets[0], mediaType: 'video' });
+    }
+  }, [navigation]);
 
-  const handlePost = async () => {
+  // ── Voice ──────────────────────────────────────────────────────────────────
+  const goToVoiceRecorder = useCallback(() => {
+    navigation.navigate('VoiceRecorder');
+  }, [navigation]);
+
+  // ── Text post ──────────────────────────────────────────────────────────────
+  const handleTextPost = async () => {
     if (!form.title.trim()) return Alert.alert('Title Required', 'Give your story a title');
-    if (type === 'text' && !form.content.trim()) return Alert.alert('Content Required', 'Write your story');
-    if (type !== 'text' && !mediaFile) return Alert.alert('Media Required', `Pick a ${type} file`);
-
+    if (!form.content.trim()) return Alert.alert('Content Required', 'Write your story');
     setLoading(true);
     try {
-      const fd = new FormData();
-      fd.append('title', form.title);
-      fd.append('content', form.content);
-      fd.append('privacy', form.privacy);
-      if (form.story_date) fd.append('story_date', form.story_date);
-      if (mediaFile) {
-        fd.append('file', {
-          uri: mediaFile.uri,
-          name: mediaFile.fileName || mediaFile.name || 'media',
-          type: mediaFile.mimeType || (type === 'video' ? 'video/mp4' : type === 'audio' ? 'audio/mpeg' : 'image/jpeg'),
-        });
-      }
-      const { data } = await api.post('/stories/', fd, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+      const { data } = await api.post('/stories/', {
+        title: form.title,
+        content: form.content,
+        privacy: form.privacy,
+        story_date: form.story_date || undefined,
       });
       setForm({ title: '', content: '', privacy: 'family', story_date: '' });
-      setMediaFile(null);
       setType('text');
       navigation.navigate('AIProcessing', { storyId: data.story?.id });
     } catch (err) {
@@ -95,100 +103,123 @@ export default function CreateScreen({ navigation }) {
         <View style={s.typeTabs}>
           {types.map(({ key, icon, label }) => (
             <TouchableOpacity key={key} style={[s.typeTab, type === key && s.typeTabActive]}
-              onPress={() => { setType(key); setMediaFile(null); }}>
+              onPress={() => setType(key)}>
               <Ionicons name={icon} size={18} color={type === key ? '#fff' : colors.muted} />
               <Text style={[s.typeTabText, type === key && { color: '#fff' }]}>{label}</Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        {/* Title */}
-        <Text style={s.label}>Title *</Text>
-        <TextInput style={s.input} placeholder="Give your story a title..."
-          placeholderTextColor={colors.dim} value={form.title}
-          onChangeText={v => setForm(f => ({ ...f, title: v }))} />
+        {/* ── PHOTO ── */}
+        {type === 'image' && (
+          <View style={s.mediaSection}>
+            <View style={s.mediaSectionHeader}>
+              <Ionicons name="image" size={22} color="#7c3aed" />
+              <Text style={s.mediaSectionTitle}>Pick a Photo</Text>
+            </View>
+            <Text style={s.mediaSectionSub}>Add effects, music & location in the next step</Text>
 
-        {/* Content by type */}
+            <TouchableOpacity style={s.bigMediaBtn} onPress={pickPhoto} activeOpacity={0.85}>
+              <LinearGradient colors={['#7c3aed', '#3b82f6']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.bigMediaBtnGrad}>
+                <Ionicons name="image-outline" size={32} color="#fff" />
+                <Text style={s.bigMediaBtnText}>Choose from Gallery</Text>
+                <Text style={s.bigMediaBtnSub}>Effects • Music • Location • AI Enhancement</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* ── VIDEO ── */}
+        {type === 'video' && (
+          <View style={s.mediaSection}>
+            <View style={s.mediaSectionHeader}>
+              <Ionicons name="videocam" size={22} color="#3b82f6" />
+              <Text style={s.mediaSectionTitle}>Add a Video</Text>
+            </View>
+            <Text style={s.mediaSectionSub}>Add effects, music & location in the next step</Text>
+
+            <View style={s.videoButtons}>
+              <TouchableOpacity style={s.videoBtn} onPress={recordVideo} activeOpacity={0.85}>
+                <LinearGradient colors={['#e0245e', '#be123c']} style={s.videoBtnGrad}>
+                  <View style={s.videoBtnIcon}>
+                    <Ionicons name="radio-button-on" size={28} color="#fff" />
+                  </View>
+                  <Text style={s.videoBtnTitle}>Record Video</Text>
+                  <Text style={s.videoBtnSub}>Use your camera</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={s.videoBtn} onPress={uploadVideo} activeOpacity={0.85}>
+                <LinearGradient colors={['#7c3aed', '#3b82f6']} style={s.videoBtnGrad}>
+                  <View style={s.videoBtnIcon}>
+                    <Ionicons name="cloud-upload-outline" size={28} color="#fff" />
+                  </View>
+                  <Text style={s.videoBtnTitle}>Upload Video</Text>
+                  <Text style={s.videoBtnSub}>From your gallery</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {/* ── VOICE ── */}
+        {type === 'audio' && (
+          <View style={s.mediaSection}>
+            <View style={s.mediaSectionHeader}>
+              <Ionicons name="mic" size={22} color="#10b981" />
+              <Text style={s.mediaSectionTitle}>Voice Story</Text>
+            </View>
+            <Text style={s.mediaSectionSub}>Record your voice and share a spoken memory</Text>
+
+            <TouchableOpacity style={s.bigMediaBtn} onPress={goToVoiceRecorder} activeOpacity={0.85}>
+              <LinearGradient colors={['#10b981', '#059669']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.bigMediaBtnGrad}>
+                <Ionicons name="mic-outline" size={32} color="#fff" />
+                <Text style={s.bigMediaBtnText}>Open Voice Recorder</Text>
+                <Text style={s.bigMediaBtnSub}>Record • Preview • Post with AI</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* ── TEXT ── */}
         {type === 'text' && (
           <>
+            <Text style={s.label}>Title *</Text>
+            <TextInput style={s.input} placeholder="Give your story a title..."
+              placeholderTextColor={colors.dim} value={form.title}
+              onChangeText={v => setForm(f => ({ ...f, title: v }))} />
+
             <Text style={s.label}>Story *</Text>
             <TextInput style={[s.input, s.textarea]} multiline placeholder="Tell your family story..."
               placeholderTextColor={colors.dim} value={form.content}
               onChangeText={v => setForm(f => ({ ...f, content: v }))} />
+
+            <Text style={s.label}>When did this happen? (optional)</Text>
+            <TextInput style={s.input} placeholder="YYYY-MM-DD e.g. 1995-06-15"
+              placeholderTextColor={colors.dim} value={form.story_date}
+              onChangeText={v => setForm(f => ({ ...f, story_date: v }))} />
+
+            <Text style={s.label}>Privacy</Text>
+            <View style={s.privacyRow}>
+              {['family', 'private', 'public'].map(p => (
+                <TouchableOpacity key={p} style={[s.privacyTab, form.privacy === p && s.privacyTabActive]}
+                  onPress={() => setForm(f => ({ ...f, privacy: p }))}>
+                  <Text style={[s.privacyText, form.privacy === p && { color: '#fff' }]}>
+                    {p === 'family' ? '👨👩👧 Family' : p === 'private' ? '🔒 Private' : '🌍 Public'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <TouchableOpacity style={s.postBtn} onPress={handleTextPost} disabled={loading} activeOpacity={0.85}>
+              <LinearGradient colors={['#7c3aed', '#3b82f6']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.postBtnGrad}>
+                {loading
+                  ? <ActivityIndicator color="#fff" />
+                  : <><Ionicons name="sparkles" size={18} color="#fff" /><Text style={s.postBtnText}>Post & Enhance with AI</Text></>}
+              </LinearGradient>
+            </TouchableOpacity>
           </>
         )}
-
-        {type === 'image' && (
-          <>
-            <TouchableOpacity style={s.mediaBtn} onPress={pickImage}>
-              <Ionicons name="image-outline" size={22} color="#fff" />
-              <Text style={s.mediaBtnText}>{mediaFile ? 'Change Photo' : 'Pick Photo'}</Text>
-            </TouchableOpacity>
-            {mediaFile && <Image source={{ uri: mediaFile.uri }} style={s.preview} />}
-          </>
-        )}
-
-        {type === 'audio' && (
-          <>
-            <TouchableOpacity style={s.mediaBtn} onPress={pickAudio}>
-              <Ionicons name="mic-outline" size={22} color="#fff" />
-              <Text style={s.mediaBtnText}>{mediaFile ? mediaFile.name || 'Audio Selected ✓' : 'Pick Audio File'}</Text>
-            </TouchableOpacity>
-            {mediaFile && (
-              <View style={s.audioPreview}>
-                <Ionicons name="musical-notes" size={32} color="#7c3aed" />
-                <Text style={{ color: colors.muted, marginTop: 6 }}>{mediaFile.name || 'Audio Ready'}</Text>
-              </View>
-            )}
-            <Text style={s.label}>Story Description (optional)</Text>
-            <TextInput style={s.input} placeholder="Describe what this audio is about..."
-              placeholderTextColor={colors.dim} value={form.content}
-              onChangeText={v => setForm(f => ({ ...f, content: v }))} />
-          </>
-        )}
-
-        {type === 'video' && (
-          <>
-            <TouchableOpacity style={s.mediaBtn} onPress={pickVideo}>
-              <Ionicons name="videocam-outline" size={22} color="#fff" />
-              <Text style={s.mediaBtnText}>{mediaFile ? 'Change Video' : 'Pick Video'}</Text>
-            </TouchableOpacity>
-            {mediaFile && (
-              <View style={s.audioPreview}>
-                <Ionicons name="play-circle" size={40} color="#7c3aed" />
-                <Text style={{ color: colors.muted, marginTop: 6 }}>Video Selected ✓</Text>
-              </View>
-            )}
-          </>
-        )}
-
-        {/* Story date */}
-        <Text style={s.label}>When did this happen? (optional)</Text>
-        <TextInput style={s.input} placeholder="YYYY-MM-DD e.g. 1995-06-15"
-          placeholderTextColor={colors.dim} value={form.story_date}
-          onChangeText={v => setForm(f => ({ ...f, story_date: v }))} />
-
-        {/* Privacy */}
-        <Text style={s.label}>Privacy</Text>
-        <View style={s.privacyRow}>
-          {['family', 'private', 'public'].map(p => (
-            <TouchableOpacity key={p} style={[s.privacyTab, form.privacy === p && s.privacyTabActive]}
-              onPress={() => setForm(f => ({ ...f, privacy: p }))}>
-              <Text style={[s.privacyText, form.privacy === p && { color: '#fff' }]}>
-                {p === 'family' ? '👨‍👩‍👧 Family' : p === 'private' ? '🔒 Private' : '🌍 Public'}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Post button */}
-        <TouchableOpacity style={s.postBtn} onPress={handlePost} disabled={loading} activeOpacity={0.85}>
-          <LinearGradient colors={['#7c3aed', '#3b82f6']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.postBtnGrad}>
-            {loading
-              ? <ActivityIndicator color="#fff" />
-              : <><Ionicons name="sparkles" size={18} color="#fff" /><Text style={s.postBtnText}>Post & Enhance with AI</Text></>}
-          </LinearGradient>
-        </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -199,17 +230,27 @@ const s = StyleSheet.create({
   header: { paddingTop: 52, paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
   headerTitle: { fontSize: 24, fontWeight: '800', color: colors.text },
   scroll: { flex: 1 },
-  typeTabs: { flexDirection: 'row', gap: 8, marginBottom: 20 },
+  typeTabs: { flexDirection: 'row', gap: 8, marginBottom: 24 },
   typeTab: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: 'rgba(30,41,59,0.6)', borderRadius: radius.md, paddingVertical: 10, borderWidth: 1, borderColor: colors.border2 },
   typeTabActive: { backgroundColor: '#7c3aed', borderColor: '#7c3aed' },
   typeTabText: { fontSize: 12, fontWeight: '600', color: colors.muted },
+  mediaSection: { gap: 12 },
+  mediaSectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  mediaSectionTitle: { fontSize: 18, fontWeight: '700', color: colors.text },
+  mediaSectionSub: { fontSize: 13, color: colors.muted, marginBottom: 4 },
+  bigMediaBtn: { borderRadius: radius.lg, overflow: 'hidden' },
+  bigMediaBtnGrad: { alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 40, paddingHorizontal: 20 },
+  bigMediaBtnText: { color: '#fff', fontWeight: '700', fontSize: 18 },
+  bigMediaBtnSub: { color: 'rgba(255,255,255,0.7)', fontSize: 12, textAlign: 'center' },
+  videoButtons: { flexDirection: 'row', gap: 12 },
+  videoBtn: { flex: 1, borderRadius: radius.lg, overflow: 'hidden' },
+  videoBtnGrad: { alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 32 },
+  videoBtnIcon: { width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' },
+  videoBtnTitle: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  videoBtnSub: { color: 'rgba(255,255,255,0.7)', fontSize: 11 },
   label: { fontSize: 13, color: colors.muted, marginBottom: 8, fontWeight: '500' },
   input: { backgroundColor: 'rgba(30,41,59,0.8)', borderWidth: 1, borderColor: colors.border2, borderRadius: radius.md, padding: 14, color: colors.text, fontSize: 14, marginBottom: 16 },
   textarea: { height: 140, textAlignVertical: 'top' },
-  mediaBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#7c3aed', borderRadius: radius.md, padding: 16, marginBottom: 12 },
-  mediaBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
-  preview: { width: '100%', height: 200, borderRadius: radius.md, marginBottom: 16 },
-  audioPreview: { alignItems: 'center', padding: 24, backgroundColor: 'rgba(124,58,237,0.1)', borderRadius: radius.md, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(124,58,237,0.3)' },
   privacyRow: { flexDirection: 'row', gap: 8, marginBottom: 24 },
   privacyTab: { flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: radius.md, backgroundColor: 'rgba(30,41,59,0.6)', borderWidth: 1, borderColor: colors.border2 },
   privacyTabActive: { backgroundColor: '#10b981', borderColor: '#10b981' },

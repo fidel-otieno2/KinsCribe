@@ -46,7 +46,17 @@ def create_story():
         result = cloudinary.uploader.upload(file, resource_type=resource_type, folder="kinscribe/stories")
         media_url = result["secure_url"]
 
-    data = request.form if request.files else request.json
+    music_url = None
+    if "music" in request.files:
+        music_file = request.files["music"]
+        music_result = cloudinary.uploader.upload(music_file, resource_type="raw", folder="kinscribe/music")
+        music_url = music_result["secure_url"]
+
+    data = request.form if request.files else request.get_json(force=True, silent=True) or {}
+
+    # music_url can come as a form field (iTunes preview URL) when no file is uploaded
+    if not music_url:
+        music_url = data.get("music_url")
     story_date = data.get("story_date")
 
     story = Story(
@@ -54,6 +64,8 @@ def create_story():
         content=data.get("content"),
         media_url=media_url,
         media_type=media_type,
+        music_url=music_url,
+        location=data.get("location"),
         privacy=data.get("privacy", "family"),
         story_date=datetime.strptime(story_date, "%Y-%m-%d").date() if story_date else None,
         user_id=user.id,
