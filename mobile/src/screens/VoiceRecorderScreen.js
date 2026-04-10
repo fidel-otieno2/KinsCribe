@@ -7,7 +7,7 @@ import { Audio } from 'expo-av';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radius } from '../theme';
-import { multipartPost } from '../api/upload';
+import { multipartPost, buildFileEntry } from '../api/upload';
 
 const BAR_COUNT = 32;
 
@@ -131,13 +131,7 @@ export default function VoiceRecorderScreen({ navigation }) {
       fd.append('content', form.content || '');
       fd.append('privacy', form.privacy);
       if (form.story_date) fd.append('story_date', form.story_date);
-      if (Platform.OS === 'web') {
-        const response = await fetch(recordedUri);
-        const blob = await response.blob();
-        fd.append('file', new File([blob], 'voice.m4a', { type: 'audio/m4a' }));
-      } else {
-        fd.append('file', { uri: recordedUri, name: 'voice.m4a', type: 'audio/m4a' });
-      }
+      fd.append('file', await buildFileEntry(recordedUri, 'voice.m4a', 'audio/m4a'));
       const data = await multipartPost('/stories/', fd);
       navigation.replace('AIProcessing', { storyId: data.story?.id });
     } catch (err) {

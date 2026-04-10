@@ -192,6 +192,7 @@ const pm = StyleSheet.create({
 
 // ── Main StoryCard ────────────────────────────────────────────────────────────
 export default function StoryCard({ story, onUpdate, isVisible = true }) {
+  console.log('STORY DATA:', JSON.stringify(story, null, 2));
   const { user } = useAuth();
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(story.like_count || 0);
