@@ -31,6 +31,7 @@ def create_app():
 
     with app.app_context():
         db.create_all()
+        _run_migrations()
 
     @app.errorhandler(Exception)
     def handle_exception(e):
@@ -39,6 +40,32 @@ def create_app():
         return {"error": str(e)}, 500
 
     return app
+
+
+def _run_migrations():
+    """Add any missing columns to existing tables without dropping data."""
+    from sqlalchemy import text
+    from extensions import db
+
+    migrations = [
+        "ALTER TABLE stories ADD COLUMN IF NOT EXISTS music_url VARCHAR(300)",
+        "ALTER TABLE stories ADD COLUMN IF NOT EXISTS location VARCHAR(200)",
+        "ALTER TABLE stories ADD COLUMN IF NOT EXISTS transcript TEXT",
+        "ALTER TABLE stories ADD COLUMN IF NOT EXISTS enhanced_text TEXT",
+        "ALTER TABLE stories ADD COLUMN IF NOT EXISTS summary TEXT",
+        "ALTER TABLE stories ADD COLUMN IF NOT EXISTS tags VARCHAR(300)",
+        "ALTER TABLE stories ADD COLUMN IF NOT EXISTS ai_processed BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE stories ADD COLUMN IF NOT EXISTS story_date DATE",
+        "ALTER TABLE stories ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW()",
+    ]
+
+    with db.engine.connect() as conn:
+        for sql in migrations:
+            try:
+                conn.execute(text(sql))
+            except Exception as e:
+                print(f"Migration skipped ({sql[:50]}...): {e}")
+        conn.commit()
 
 
 app = create_app()
