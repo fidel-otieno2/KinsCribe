@@ -1,0 +1,1 @@
+<parameter name="content"># Backend Deployment Prep&#10;1. [x] User approved plan&#10;2. [] Edit config.py for DB URL conversion&#10;3. [] Edit app.py for CORS *&#10;4. [] git add/commit/push&#10;5. [] Deploy to Render (user step)&#10;6. [] Test</parameter>
