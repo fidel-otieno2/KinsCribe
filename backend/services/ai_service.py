@@ -1,54 +1,58 @@
 """
-AI Service — handles transcription, enhancement, summarization, and tagging.
-Runs as a Celery background task after story upload.
+AI Service — uses Groq (free, fast) for chat, enhancement, summarization and tagging.
 """
 import os
-from openai import OpenAI
+from groq import Groq
 from extensions import db
 from models.story import Story
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+MODEL = "llama3-8b-8192"
+
+
+def _complete(prompt: str, max_tokens: int = 500) -> str:
+    response = client.chat.completions.create(
+        model=MODEL,
+        messages=[{"role": "user", "content": prompt}],
+        max_tokens=max_tokens,
+        temperature=0.7
+    )
+    return response.choices[0].message.content.strip()
+
+
+def enhance_text(text: str) -> str:
+    return _complete(
+        "Enhance this family story for clarity and readability. "
+        "Fix grammar but preserve the original voice and emotional tone. "
+        "Do not add fictional details.\n\n" + text,
+        max_tokens=1000
+    )
+
+
+def summarize_text(text: str) -> str:
+    return _complete("Summarize this family story in 2-3 sentences:\n\n" + text)
+
+
+def generate_tags(text: str) -> list:
+    result = _complete(
+        "Generate 5 relevant hashtag-style tags for this family story. "
+        "Return only comma-separated tags without # symbol.\n\n" + text
+    )
+    return [t.strip() for t in result.split(",")]
 
 
 def transcribe_audio(media_url: str) -> str:
+    """Download media and transcribe using Groq Whisper."""
     import urllib.request
     import tempfile
     with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp:
         urllib.request.urlretrieve(media_url, tmp.name)
         with open(tmp.name, "rb") as f:
-            result = client.audio.transcriptions.create(model="whisper-1", file=f)
+            result = client.audio.transcriptions.create(
+                model="whisper-large-v3",
+                file=f
+            )
     return result.text
-
-
-def enhance_text(text: str) -> str:
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[{"role": "user", "content": (
-            "Enhance this family story for clarity and readability. "
-            "Fix grammar but preserve the original voice and emotional tone. "
-            "Do not add fictional details.\n\n" + text
-        )}]
-    )
-    return response.choices[0].message.content
-
-
-def summarize_text(text: str) -> str:
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[{"role": "user", "content": "Summarize this family story in 2-3 sentences:\n\n" + text}]
-    )
-    return response.choices[0].message.content
-
-
-def generate_tags(text: str) -> list:
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[{"role": "user", "content": (
-            "Generate 5 relevant hashtag-style tags for this family story. "
-            "Return only comma-separated tags without # symbol.\n\n" + text
-        )}]
-    )
-    return [t.strip() for t in response.choices[0].message.content.split(",")]
 
 
 def process_story(story_id: int):
@@ -56,9 +60,7 @@ def process_story(story_id: int):
     story = Story.query.get(story_id)
     if not story:
         return
-
     try:
-        # Step 1: Transcribe if audio/video
         if story.media_type in ("audio", "video") and story.media_url:
             story.transcript = transcribe_audio(story.media_url)
 
@@ -66,34 +68,20 @@ def process_story(story_id: int):
         if not source_text:
             return
 
-        # Step 2: Enhance
         story.enhanced_text = enhance_text(source_text)
-
-        # Step 3: Summarize
         story.summary = summarize_text(source_text)
-
-        # Step 4: Tag
-        tags = generate_tags(source_text)
-        story.tags = ",".join(tags)
-
+        story.tags = ",".join(generate_tags(source_text))
         story.ai_processed = True
         db.session.commit()
-
     except Exception as e:
         print(f"AI processing failed for story {story_id}: {e}")
 
 
 def chat_completion(prompt: str) -> str:
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[{"role": "user", "content": prompt}],
-        max_tokens=500,
-        temperature=0.7
-    )
-    return response.choices[0].message.content.strip()
+    return _complete(prompt)
 
 
-# Celery task wrapper (only active when Celery is running)
+# Celery task wrapper
 try:
     from celery import Celery
     celery_app = Celery("kinscribe", broker=os.getenv("REDIS_URL", "redis://localhost:6379/0"))
@@ -104,4 +92,3 @@ try:
 
 except ImportError:
     pass
-
