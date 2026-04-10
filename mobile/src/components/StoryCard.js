@@ -302,7 +302,6 @@ export default function StoryCard({ story, onUpdate, isVisible = true }) {
               source={{ uri: story.media_url }}
               style={s.media}
               resizeMode="cover"
-              onError={(e) => console.log('Image load error:', story.media_url, e.nativeEvent.error)}
             />
             {story.music_url && <PhotoMusicBtn musicUrl={story.music_url} />}
           </View>
@@ -489,8 +488,8 @@ const s = StyleSheet.create({
   username: { fontSize: 13, fontWeight: '700', color: colors.text },
   subRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   subtext: { fontSize: 11, color: colors.muted },
-  imageWrap: { position: 'relative', backgroundColor: '#000', width: '100%', height: 400 },
-  media: { width: '100%', height: '100%' },
+  imageWrap: { width: '100%', height: 400, backgroundColor: '#000', position: 'relative', overflow: 'hidden' },
+  media: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%' },
   actions: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 8 },
   actionsLeft: { flexDirection: 'row', gap: 2 },
   actionBtn: { padding: 5, flexDirection: 'row', alignItems: 'center', gap: 4 },
