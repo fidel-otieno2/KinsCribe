@@ -6,12 +6,14 @@ from groq import Groq
 from extensions import db
 from models.story import Story
 
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 MODEL = "llama3-8b-8192"
+
+def _get_client():
+    return Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 
 def _complete(prompt: str, max_tokens: int = 500) -> str:
-    response = client.chat.completions.create(
+    response = _get_client().chat.completions.create(
         model=MODEL,
         messages=[{"role": "user", "content": prompt}],
         max_tokens=max_tokens,
@@ -48,7 +50,7 @@ def transcribe_audio(media_url: str) -> str:
     with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp:
         urllib.request.urlretrieve(media_url, tmp.name)
         with open(tmp.name, "rb") as f:
-            result = client.audio.transcriptions.create(
+            result = _get_client().audio.transcriptions.create(
                 model="whisper-large-v3",
                 file=f
             )
