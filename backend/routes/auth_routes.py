@@ -117,36 +117,71 @@ def google_auth():
 
 @auth_bp.route("/forgot-password", methods=["POST"])
 def forgot_password():
+    import random
+    from datetime import datetime, timedelta
+
     email = request.json.get("email", "").strip().lower()
+    if not email:
+        return jsonify({"error": "Email is required"}), 400
+
     user = User.query.filter_by(email=email).first()
-    # Always return 200 to avoid email enumeration
-    if user:
-        token = secrets.token_urlsafe(32)
-        user.verification_token = token
-        db.session.commit()
-        try:
-            msg = Message("Reset your KinsCribe password", recipients=[user.email])
-            msg.body = (
-                f"Hi {user.name},\n\n"
-                f"Use this code to reset your password:\n\n{token}\n\n"
-                f"This code expires in 1 hour. If you didn't request this, ignore this email."
-            )
-            mail.send(msg)
-        except Exception as e:
-            print(f"Mail error: {e}")
-    return jsonify({"message": "If that email exists, a reset code was sent."}), 200
+    if not user:
+        return jsonify({"error": "No account found with this email address"}), 404
+
+    if user.google_id and not user.password:
+        return jsonify({"error": "This account uses Google Sign-In. No password to reset."}), 400
+
+    # Generate a 6-digit OTP
+    otp = str(random.randint(100000, 999999))
+    user.verification_token = f"otp:{otp}:{(datetime.utcnow() + timedelta(minutes=15)).isoformat()}"
+    db.session.commit()
+
+    try:
+        msg = Message("Your KinsCribe password reset code", recipients=[user.email])
+        msg.html = f"""
+        <div style="font-family:sans-serif;max-width:480px;margin:auto;background:#0f172a;color:#f1f5f9;padding:32px;border-radius:16px">
+          <h2 style="color:#7c3aed;margin-bottom:4px">KinsCribe</h2>
+          <p style="color:#94a3b8;margin-top:0">Password Reset</p>
+          <hr style="border-color:#1e293b;margin:20px 0">
+          <p>Hi <strong>{user.name}</strong>,</p>
+          <p>Use the code below to reset your password. It expires in <strong>15 minutes</strong>.</p>
+          <div style="background:#1e293b;border-radius:12px;padding:24px;text-align:center;margin:24px 0">
+            <span style="font-size:40px;font-weight:900;letter-spacing:12px;color:#7c3aed">{otp}</span>
+          </div>
+          <p style="color:#94a3b8;font-size:13px">If you didn't request this, you can safely ignore this email.</p>
+        </div>
+        """
+        mail.send(msg)
+        return jsonify({"message": "A 6-digit reset code was sent to your email."}), 200
+    except Exception as e:
+        print(f"Mail error: {e}")
+        return jsonify({"error": "Failed to send email. Please try again later."}), 500
 
 
 @auth_bp.route("/reset-password", methods=["POST"])
 def reset_password():
+    from datetime import datetime
     data = request.json
-    token = data.get("token", "").strip()
+    otp = data.get("token", "").strip()
     new_password = data.get("password", "")
-    if not token or not new_password or len(new_password) < 6:
+
+    if not otp or not new_password or len(new_password) < 6:
         return jsonify({"error": "Invalid request"}), 400
-    user = User.query.filter_by(verification_token=token).first()
-    if not user:
-        return jsonify({"error": "Invalid or expired reset code"}), 400
+
+    # Find user with matching OTP token
+    users = User.query.filter(User.verification_token.like(f"otp:{otp}:%")).all()
+    if not users:
+        return jsonify({"error": "Invalid or expired code"}), 400
+
+    user = users[0]
+    # Check expiry
+    try:
+        _, stored_otp, expiry_str = user.verification_token.split(":", 2)
+        if stored_otp != otp or datetime.utcnow() > datetime.fromisoformat(expiry_str):
+            return jsonify({"error": "Code has expired. Please request a new one."}), 400
+    except Exception:
+        return jsonify({"error": "Invalid or expired code"}), 400
+
     user.password = bcrypt.generate_password_hash(new_password).decode("utf-8")
     user.verification_token = None
     db.session.commit()

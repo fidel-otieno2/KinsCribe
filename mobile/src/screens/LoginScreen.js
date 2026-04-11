@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, KeyboardAvoidingView, Platform,
@@ -26,38 +26,54 @@ const HERO_HEIGHT = height * 0.32;
 function ForgotPasswordModal({ visible, onClose }) {
   const [step, setStep] = useState('email');
   const [email, setEmail] = useState('');
-  const [code, setCode] = useState('');
+  const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [newPass, setNewPass] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
+  const inputRefs = useRef([]);
 
   const reset = () => {
-    setStep('email'); setEmail(''); setCode('');
+    setStep('email'); setEmail(''); setOtp(['', '', '', '', '', '']);
     setNewPass(''); setError(''); setInfo('');
   };
 
   const handleClose = () => { reset(); onClose(); };
 
+  const handleOtpChange = (val, idx) => {
+    if (!/^[0-9]?$/.test(val)) return;
+    const next = [...otp];
+    next[idx] = val;
+    setOtp(next);
+    if (val && idx < 5) inputRefs.current[idx + 1]?.focus();
+  };
+
+  const handleOtpKeyPress = (e, idx) => {
+    if (e.nativeEvent.key === 'Backspace' && !otp[idx] && idx > 0) {
+      inputRefs.current[idx - 1]?.focus();
+    }
+  };
+
   const sendCode = async () => {
-    if (!email.trim()) return setError('Enter your email.');
+    if (!email.trim()) return setError('Enter your email address.');
     setError(''); setLoading(true);
     try {
       await api.post('/auth/forgot-password', { email: email.trim().toLowerCase() });
-      setInfo('A reset code was sent to your email.');
+      setInfo(`A 6-digit code was sent to ${email.trim().toLowerCase()}`);
       setStep('code');
-    } catch {
-      setError('Something went wrong. Try again.');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Something went wrong. Try again.');
     } finally { setLoading(false); }
   };
 
   const resetPassword = async () => {
-    if (!code.trim()) return setError('Enter the reset code.');
+    const code = otp.join('');
+    if (code.length < 6) return setError('Enter the full 6-digit code.');
     if (newPass.length < 6) return setError('Password must be at least 6 characters.');
     setError(''); setLoading(true);
     try {
-      await api.post('/auth/reset-password', { token: code.trim(), password: newPass });
+      await api.post('/auth/reset-password', { token: code, password: newPass });
       setStep('done');
     } catch (err) {
       setError(err.response?.data?.error || 'Invalid or expired code.');
@@ -68,7 +84,7 @@ function ForgotPasswordModal({ visible, onClose }) {
     <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose}>
       <KeyboardAvoidingView style={fp.overlay} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <BlurView intensity={20} tint="dark" style={fp.sheet}>
-          <LinearGradient colors={['rgba(124,58,237,0.1)', 'rgba(15,23,42,0.95)']} style={StyleSheet.absoluteFill} />
+          <LinearGradient colors={['rgba(124,58,237,0.1)', 'rgba(15,23,42,0.98)']} style={StyleSheet.absoluteFill} />
           <View style={fp.handle} />
           <View style={fp.inner}>
             <TouchableOpacity style={fp.closeBtn} onPress={handleClose}>
@@ -77,38 +93,38 @@ function ForgotPasswordModal({ visible, onClose }) {
 
             {step === 'done' ? (
               <View style={fp.doneWrap}>
-                <Ionicons name="checkmark-circle" size={60} color="#10b981" />
-                <Text style={fp.title}>Password Reset!</Text>
+                <LinearGradient colors={['#10b981', '#059669']} style={fp.doneIconWrap}>
+                  <Ionicons name="checkmark" size={36} color="#fff" />
+                </LinearGradient>
+                <Text style={fp.title}>Password Updated!</Text>
                 <Text style={fp.sub}>You can now sign in with your new password.</Text>
                 <TouchableOpacity style={fp.doneBtn} onPress={handleClose}>
-                  <Text style={fp.doneBtnText}>Back to Sign In</Text>
+                  <LinearGradient colors={['#7c3aed', '#3b82f6']} style={fp.doneBtnGrad}>
+                    <Text style={fp.doneBtnText}>Back to Sign In</Text>
+                  </LinearGradient>
                 </TouchableOpacity>
               </View>
             ) : (
               <>
                 <View style={fp.iconWrap}>
                   <LinearGradient colors={['#7c3aed', '#3b82f6']} style={fp.iconGrad}>
-                    <Ionicons name="lock-open-outline" size={24} color="#fff" />
+                    <Ionicons name={step === 'email' ? 'mail-outline' : 'keypad-outline'} size={26} color="#fff" />
                   </LinearGradient>
                 </View>
-                <Text style={fp.title}>Forgot Password?</Text>
+
+                <Text style={fp.title}>
+                  {step === 'email' ? 'Forgot Password?' : 'Enter Reset Code'}
+                </Text>
                 <Text style={fp.sub}>
                   {step === 'email'
-                    ? "Enter your email and we'll send you a reset code."
-                    : 'Enter the code from your email and your new password.'}
+                    ? "Enter your registered email and we'll send you a 6-digit reset code."
+                    : info}
                 </Text>
 
                 {error ? (
                   <View style={fp.errorBox}>
                     <Ionicons name="alert-circle" size={14} color="#f87171" />
                     <Text style={fp.errorText}>{error}</Text>
-                  </View>
-                ) : null}
-
-                {info ? (
-                  <View style={fp.infoBox}>
-                    <Ionicons name="mail" size={14} color="#10b981" />
-                    <Text style={fp.infoText}>{info}</Text>
                   </View>
                 ) : null}
 
@@ -124,7 +140,7 @@ function ForgotPasswordModal({ visible, onClose }) {
                         keyboardType="email-address"
                         autoCapitalize="none"
                         value={email}
-                        onChangeText={setEmail}
+                        onChangeText={v => { setEmail(v); setError(''); }}
                       />
                     </View>
                     <TouchableOpacity style={fp.btn} onPress={sendCode} disabled={loading} activeOpacity={0.85}>
@@ -137,18 +153,23 @@ function ForgotPasswordModal({ visible, onClose }) {
                   </>
                 ) : (
                   <>
-                    <Text style={fp.label}>Reset Code</Text>
-                    <View style={fp.inputWrap}>
-                      <Ionicons name="key-outline" size={17} color={colors.muted} />
-                      <TextInput
-                        style={fp.input}
-                        placeholder="Paste code from email"
-                        placeholderTextColor={colors.dim}
-                        autoCapitalize="none"
-                        value={code}
-                        onChangeText={setCode}
-                      />
+                    {/* OTP boxes */}
+                    <View style={fp.otpRow}>
+                      {otp.map((digit, idx) => (
+                        <TextInput
+                          key={idx}
+                          ref={r => inputRefs.current[idx] = r}
+                          style={[fp.otpBox, digit ? fp.otpBoxFilled : null]}
+                          value={digit}
+                          onChangeText={v => handleOtpChange(v, idx)}
+                          onKeyPress={e => handleOtpKeyPress(e, idx)}
+                          keyboardType="number-pad"
+                          maxLength={1}
+                          selectTextOnFocus
+                        />
+                      ))}
                     </View>
+
                     <Text style={fp.label}>New Password</Text>
                     <View style={fp.inputWrap}>
                       <Ionicons name="lock-closed-outline" size={17} color={colors.muted} />
@@ -164,6 +185,7 @@ function ForgotPasswordModal({ visible, onClose }) {
                         <Ionicons name={showPass ? 'eye-off-outline' : 'eye-outline'} size={17} color={colors.muted} />
                       </TouchableOpacity>
                     </View>
+
                     <TouchableOpacity style={fp.btn} onPress={resetPassword} disabled={loading} activeOpacity={0.85}>
                       <LinearGradient colors={['#7c3aed', '#3b82f6']} style={fp.btnGrad}>
                         {loading
@@ -171,8 +193,9 @@ function ForgotPasswordModal({ visible, onClose }) {
                           : <Text style={fp.btnText}>Reset Password</Text>}
                       </LinearGradient>
                     </TouchableOpacity>
-                    <TouchableOpacity style={fp.backLink} onPress={() => { setStep('email'); setError(''); }}>
-                      <Text style={fp.backLinkText}>← Back</Text>
+
+                    <TouchableOpacity style={fp.backLink} onPress={() => { setStep('email'); setError(''); setOtp(['','','','','','']); }}>
+                      <Text style={fp.backLinkText}>← Use a different email</Text>
                     </TouchableOpacity>
                   </>
                 )}
@@ -186,29 +209,32 @@ function ForgotPasswordModal({ visible, onClose }) {
 }
 
 const fp = StyleSheet.create({
-  overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.6)' },
+  overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.7)' },
   sheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, overflow: 'hidden', paddingBottom: 40 },
   handle: { width: 40, height: 4, backgroundColor: colors.border, borderRadius: 2, alignSelf: 'center', marginTop: 12, marginBottom: 4 },
   inner: { padding: 24, paddingTop: 12 },
   closeBtn: { alignSelf: 'flex-end', padding: 4, marginBottom: 8 },
   iconWrap: { alignSelf: 'center', marginBottom: 16 },
-  iconGrad: { width: 56, height: 56, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  iconGrad: { width: 60, height: 60, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   title: { fontSize: 22, fontWeight: '800', color: colors.text, textAlign: 'center', marginBottom: 6, marginTop: 12 },
   sub: { fontSize: 13, color: colors.muted, textAlign: 'center', marginBottom: 20, lineHeight: 19 },
   errorBox: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(248,113,113,0.1)', borderWidth: 1, borderColor: 'rgba(248,113,113,0.3)', borderRadius: radius.sm, padding: 10, marginBottom: 14 },
   errorText: { color: '#f87171', fontSize: 12, flex: 1 },
-  infoBox: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(16,185,129,0.1)', borderWidth: 1, borderColor: 'rgba(16,185,129,0.3)', borderRadius: radius.sm, padding: 10, marginBottom: 14 },
-  infoText: { color: '#10b981', fontSize: 12, flex: 1 },
   label: { fontSize: 11, color: colors.muted, fontWeight: '600', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
   inputWrap: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(30,41,59,0.9)', borderWidth: 1, borderColor: colors.border2, borderRadius: radius.md, paddingHorizontal: 14, marginBottom: 16 },
   input: { flex: 1, paddingVertical: 13, color: colors.text, fontSize: 14 },
+  otpRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24 },
+  otpBox: { width: 46, height: 56, borderRadius: 12, borderWidth: 1.5, borderColor: colors.border2, backgroundColor: 'rgba(30,41,59,0.9)', textAlign: 'center', fontSize: 22, fontWeight: '800', color: colors.text },
+  otpBoxFilled: { borderColor: '#7c3aed', backgroundColor: 'rgba(124,58,237,0.1)' },
   btn: { borderRadius: radius.md, overflow: 'hidden', marginTop: 4 },
   btnGrad: { paddingVertical: 14, alignItems: 'center', justifyContent: 'center' },
   btnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
-  backLink: { alignSelf: 'center', marginTop: 14 },
+  backLink: { alignSelf: 'center', marginTop: 16 },
   backLinkText: { color: colors.muted, fontSize: 13 },
-  doneWrap: { alignItems: 'center', paddingVertical: 20, gap: 8 },
-  doneBtn: { marginTop: 16, backgroundColor: colors.primary, paddingHorizontal: 32, paddingVertical: 12, borderRadius: radius.full },
+  doneWrap: { alignItems: 'center', paddingVertical: 24, gap: 10 },
+  doneIconWrap: { width: 72, height: 72, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+  doneBtn: { marginTop: 16, borderRadius: radius.full, overflow: 'hidden' },
+  doneBtnGrad: { paddingHorizontal: 40, paddingVertical: 14 },
   doneBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
 });
 
