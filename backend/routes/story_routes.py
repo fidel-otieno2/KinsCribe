@@ -221,6 +221,102 @@ def toggle_like(story_id):
     return jsonify({"liked": True})
 
 
+@story_bp.route("/notifications", methods=["GET"])
+@jwt_required()
+def get_notifications():
+    user = current_user()
+    # Get all stories owned by this user
+    my_stories = Story.query.filter_by(user_id=user.id).all()
+    notifs = []
+
+    for story in my_stories:
+        # Likes on this story (exclude self-likes)
+        likes = Like.query.filter(
+            Like.story_id == story.id,
+            Like.user_id != user.id
+        ).order_by(Like.id.desc()).all()
+
+        for like in likes:
+            liker = User.query.get(like.user_id)
+            if liker:
+                notifs.append({
+                    "id": f"like-{like.id}",
+                    "type": "like",
+                    "actor_name": liker.name,
+                    "actor_avatar": liker.avatar_url,
+                    "story_id": story.id,
+                    "story_title": story.title,
+                    "story_media": story.media_url,
+                    "story_media_type": story.media_type,
+                    "created_at": story.created_at.isoformat(),
+                })
+
+        # Comments on this story (exclude own comments)
+        comments = Comment.query.filter(
+            Comment.story_id == story.id,
+            Comment.user_id != user.id
+        ).order_by(Comment.created_at.desc()).all()
+
+        for comment in comments:
+            commenter = User.query.get(comment.user_id)
+            if commenter:
+                notifs.append({
+                    "id": f"comment-{comment.id}",
+                    "type": "comment",
+                    "actor_name": commenter.name,
+                    "actor_avatar": commenter.avatar_url,
+                    "story_id": story.id,
+                    "story_title": story.title,
+                    "story_media": story.media_url,
+                    "story_media_type": story.media_type,
+                    "comment_text": comment.text,
+                    "created_at": comment.created_at.isoformat(),
+                })
+
+    # Also notify about new family stories posted by others
+    if user.family_id:
+        new_stories = Story.query.filter(
+            Story.family_id == user.family_id,
+            Story.user_id != user.id
+        ).order_by(Story.created_at.desc()).limit(10).all()
+
+        for story in new_stories:
+            author = User.query.get(story.user_id)
+            if author:
+                notifs.append({
+                    "id": f"story-{story.id}",
+                    "type": "new_story",
+                    "actor_name": author.name,
+                    "actor_avatar": author.avatar_url,
+                    "story_id": story.id,
+                    "story_title": story.title,
+                    "story_media": story.media_url,
+                    "story_media_type": story.media_type,
+                    "created_at": story.created_at.isoformat(),
+                })
+
+    # Sort by most recent
+    notifs.sort(key=lambda x: x["created_at"], reverse=True)
+    return jsonify({"notifications": notifs[:50]})
+
+
+@story_bp.route("/notifications/count", methods=["GET"])
+@jwt_required()
+def notification_count():
+    user = current_user()
+    my_stories = Story.query.filter_by(user_id=user.id).all()
+    story_ids = [s.id for s in my_stories]
+    likes = Like.query.filter(
+        Like.story_id.in_(story_ids),
+        Like.user_id != user.id
+    ).count() if story_ids else 0
+    comments = Comment.query.filter(
+        Comment.story_id.in_(story_ids),
+        Comment.user_id != user.id
+    ).count() if story_ids else 0
+    return jsonify({"count": likes + comments})
+
+
 @story_bp.route("/<int:story_id>/save", methods=["POST"])
 @jwt_required()
 def toggle_save(story_id):

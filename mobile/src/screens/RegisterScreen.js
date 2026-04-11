@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
-  StyleSheet, KeyboardAvoidingView, Platform, ScrollView
+  StyleSheet, KeyboardAvoidingView, Platform,
+  ScrollView, Image, Dimensions, StatusBar,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -10,6 +11,9 @@ import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
 import { colors, radius, shadows } from '../theme';
 import GradientButton from '../components/GradientButton';
+
+const { width, height } = Dimensions.get('window');
+const HERO_HEIGHT = height * 0.28;
 
 export default function RegisterScreen({ navigation }) {
   const { login } = useAuth();
@@ -36,29 +40,53 @@ export default function RegisterScreen({ navigation }) {
     } finally { setLoading(false); }
   };
 
-  const fields = [
-    { key: 'name', label: 'Full Name', icon: 'person-outline', placeholder: 'Fidel Otieno', secure: false, kb: 'default' },
-    { key: 'email', label: 'Email', icon: 'mail-outline', placeholder: 'you@example.com', secure: false, kb: 'email-address' },
-    { key: 'password', label: 'Password', icon: 'lock-closed-outline', placeholder: 'Min. 6 characters', secure: true, kb: 'default' },
-  ];
-
   return (
     <KeyboardAvoidingView style={s.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <LinearGradient colors={['#0f172a', '#1e1040', '#0f172a']} style={StyleSheet.absoluteFill} />
-      <View style={s.orb1} />
-      <View style={s.orb2} />
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      <LinearGradient colors={['#0f172a', '#1a0a2e', '#0f172a']} style={StyleSheet.absoluteFill} />
 
-      <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
-        <View style={s.logoWrap}>
-          <LinearGradient colors={['#7c3aed', '#3b82f6']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.logoIcon}>
-            <Ionicons name="book" size={28} color="#fff" />
-          </LinearGradient>
-          <Text style={s.logo}>KinsCribe</Text>
-          <Text style={s.tagline}>Create your account</Text>
+      {/* ── HERO BANNER ── */}
+      <View style={s.hero}>
+        <Image
+          source={require('../../assets/kinscribe-logo.png')}
+          style={s.heroImg}
+          resizeMode="cover"
+        />
+        <LinearGradient
+          colors={['rgba(15,23,42,0.05)', 'rgba(15,23,42,0.5)', '#0f172a']}
+          style={StyleSheet.absoluteFill}
+        />
+        <View style={s.glowBlue} />
+
+        {/* Back button */}
+        <TouchableOpacity style={s.backBtn} onPress={() => navigation.goBack()}>
+          <BlurView intensity={40} tint="dark" style={s.backBtnBlur}>
+            <Ionicons name="arrow-back" size={20} color="#fff" />
+          </BlurView>
+        </TouchableOpacity>
+
+        {/* Branding */}
+        <View style={s.heroText}>
+          <Text style={s.appName}>KinsCribe</Text>
+          <Text style={s.heroSub}>Join your family's story ✨</Text>
         </View>
+      </View>
 
-        <BlurView intensity={25} tint="dark" style={s.card}>
+      {/* ── FORM ── */}
+      <ScrollView
+        contentContainerStyle={s.scroll}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <BlurView intensity={20} tint="dark" style={s.card}>
+          <LinearGradient
+            colors={['rgba(59,130,246,0.08)', 'rgba(15,23,42,0.7)']}
+            style={StyleSheet.absoluteFill}
+          />
           <View style={s.cardInner}>
+            <Text style={s.cardTitle}>Create Account</Text>
+            <Text style={s.cardSub}>Start preserving your family memories</Text>
+
             {error ? (
               <View style={s.errorBox}>
                 <Ionicons name="alert-circle" size={16} color="#f87171" />
@@ -66,40 +94,93 @@ export default function RegisterScreen({ navigation }) {
               </View>
             ) : null}
 
-            {/* Username field with @ */}
-            <Text style={s.inputLabel}>Username</Text>
+            {/* Full Name */}
+            <Text style={s.label}>Full Name</Text>
             <View style={s.inputWrap}>
-              <Text style={s.atSign}>@</Text>
-              <TextInput style={[s.input, { flex: 1 }]} placeholder="yourname" placeholderTextColor={colors.dim}
-                autoCapitalize="none" value={form.username}
-                onChangeText={v => set('username')(v.toLowerCase().replace(/\s/g, ''))} />
+              <Ionicons name="person-outline" size={18} color={colors.muted} />
+              <TextInput
+                style={s.input}
+                placeholder="e.g. Fidel Otieno"
+                placeholderTextColor={colors.dim}
+                autoCapitalize="words"
+                value={form.name}
+                onChangeText={set('name')}
+              />
             </View>
 
-            {fields.map(({ key, label, icon, placeholder, secure, kb }) => (
-              <View key={key}>
-                <Text style={s.inputLabel}>{label}</Text>
-                <View style={s.inputWrap}>
-                  <Ionicons name={icon} size={18} color={colors.muted} style={s.inputIcon} />
-                  <TextInput
-                    style={[s.input, { flex: 1 }]}
-                    placeholder={placeholder}
-                    placeholderTextColor={colors.dim}
-                    secureTextEntry={secure && !showPass}
-                    keyboardType={kb}
-                    autoCapitalize={kb === 'email-address' ? 'none' : key === 'name' ? 'words' : 'none'}
-                    value={form[key]}
-                    onChangeText={set(key)}
-                  />
-                  {secure && (
-                    <TouchableOpacity onPress={() => setShowPass(!showPass)} style={{ padding: 4 }}>
-                      <Ionicons name={showPass ? 'eye-off-outline' : 'eye-outline'} size={18} color={colors.muted} />
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
-            ))}
+            {/* Username */}
+            <Text style={s.label}>Username</Text>
+            <View style={s.inputWrap}>
+              <Text style={s.atSign}>@</Text>
+              <TextInput
+                style={[s.input, { flex: 1 }]}
+                placeholder="yourname"
+                placeholderTextColor={colors.dim}
+                autoCapitalize="none"
+                value={form.username}
+                onChangeText={v => set('username')(v.toLowerCase().replace(/\s/g, ''))}
+              />
+            </View>
 
-            <GradientButton label="Create Account" onPress={handleRegister} loading={loading} style={{ marginTop: 8 }} />
+            {/* Email */}
+            <Text style={s.label}>Email</Text>
+            <View style={s.inputWrap}>
+              <Ionicons name="mail-outline" size={18} color={colors.muted} />
+              <TextInput
+                style={s.input}
+                placeholder="you@example.com"
+                placeholderTextColor={colors.dim}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                value={form.email}
+                onChangeText={set('email')}
+              />
+            </View>
+
+            {/* Password */}
+            <Text style={s.label}>Password</Text>
+            <View style={s.inputWrap}>
+              <Ionicons name="lock-closed-outline" size={18} color={colors.muted} />
+              <TextInput
+                style={[s.input, { flex: 1 }]}
+                placeholder="Min. 6 characters"
+                placeholderTextColor={colors.dim}
+                secureTextEntry={!showPass}
+                value={form.password}
+                onChangeText={set('password')}
+              />
+              <TouchableOpacity onPress={() => setShowPass(!showPass)} style={{ padding: 4 }}>
+                <Ionicons name={showPass ? 'eye-off-outline' : 'eye-outline'} size={18} color={colors.muted} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Password strength hint */}
+            {form.password.length > 0 && (
+              <View style={s.strengthRow}>
+                {[1, 2, 3, 4].map(i => (
+                  <View
+                    key={i}
+                    style={[s.strengthBar, {
+                      backgroundColor:
+                        form.password.length >= i * 3
+                          ? form.password.length >= 10 ? '#10b981'
+                          : form.password.length >= 6 ? '#f59e0b' : '#e11d48'
+                          : colors.border,
+                    }]}
+                  />
+                ))}
+                <Text style={s.strengthText}>
+                  {form.password.length < 6 ? 'Too short' : form.password.length < 10 ? 'Good' : 'Strong'}
+                </Text>
+              </View>
+            )}
+
+            <GradientButton
+              label="Create Account"
+              onPress={handleRegister}
+              loading={loading}
+              style={{ marginTop: 12 }}
+            />
 
             <View style={s.dividerRow}>
               <View style={s.dividerLine} />
@@ -107,10 +188,21 @@ export default function RegisterScreen({ navigation }) {
               <View style={s.dividerLine} />
             </View>
 
-            <TouchableOpacity style={s.googleBtn} activeOpacity={0.8} onPress={() => alert('Google Sign-In coming soon')}>
+            <TouchableOpacity
+              style={s.googleBtn}
+              activeOpacity={0.8}
+              onPress={() => alert('Google Sign-In coming soon')}
+            >
               <Text style={s.googleG}>G</Text>
               <Text style={s.googleText}>Continue with Google</Text>
             </TouchableOpacity>
+
+            <Text style={s.terms}>
+              By signing up you agree to our{' '}
+              <Text style={s.termsLink}>Terms of Service</Text>
+              {' '}and{' '}
+              <Text style={s.termsLink}>Privacy Policy</Text>
+            </Text>
           </View>
         </BlurView>
 
@@ -126,29 +218,73 @@ export default function RegisterScreen({ navigation }) {
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  scroll: { flexGrow: 1, padding: 24, paddingTop: 60, paddingBottom: 40 },
-  orb1: { position: 'absolute', width: 300, height: 300, borderRadius: 150, backgroundColor: 'rgba(124,58,237,0.15)', top: -80, right: -80 },
-  orb2: { position: 'absolute', width: 200, height: 200, borderRadius: 100, backgroundColor: 'rgba(59,130,246,0.1)', bottom: 100, left: -60 },
-  logoWrap: { alignItems: 'center', marginBottom: 32 },
-  logoIcon: { width: 60, height: 60, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginBottom: 12, ...shadows.lg },
-  logo: { fontSize: 32, fontWeight: '800', color: colors.text, letterSpacing: -0.5 },
-  tagline: { fontSize: 13, color: colors.muted, marginTop: 4 },
-  card: { borderRadius: radius.xl, overflow: 'hidden', borderWidth: 1, borderColor: colors.border2, ...shadows.lg },
-  cardInner: { backgroundColor: 'rgba(15,23,42,0.6)', padding: 24 },
-  errorBox: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(248,113,113,0.1)', borderWidth: 1, borderColor: 'rgba(248,113,113,0.3)', borderRadius: radius.sm, padding: 12, marginBottom: 16 },
+  container: { flex: 1, backgroundColor: '#0f172a' },
+
+  // hero
+  hero: { width, height: HERO_HEIGHT, position: 'relative', overflow: 'hidden' },
+  heroImg: { width: '100%', height: '100%' },
+  glowBlue: {
+    position: 'absolute', width: 220, height: 220, borderRadius: 110,
+    backgroundColor: 'rgba(59,130,246,0.2)', top: -50, left: -40,
+  },
+  backBtn: { position: 'absolute', top: 52, left: 16 },
+  backBtnBlur: {
+    width: 38, height: 38, borderRadius: 19,
+    overflow: 'hidden', alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)',
+  },
+  heroText: { position: 'absolute', bottom: 22, left: 24 },
+  appName: {
+    fontSize: 36, fontWeight: '900', color: '#fff',
+    letterSpacing: -1.5,
+    textShadowColor: 'rgba(59,130,246,0.9)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 16,
+  },
+  heroSub: { fontSize: 14, color: 'rgba(255,255,255,0.65)', marginTop: 4 },
+
+  // form
+  scroll: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 40 },
+  card: {
+    borderRadius: radius.xl, overflow: 'hidden',
+    borderWidth: 1, borderColor: 'rgba(59,130,246,0.2)',
+    ...shadows.lg,
+  },
+  cardInner: { padding: 24 },
+  cardTitle: { fontSize: 22, fontWeight: '800', color: colors.text, marginBottom: 4 },
+  cardSub: { fontSize: 13, color: colors.muted, marginBottom: 20 },
+  errorBox: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: 'rgba(248,113,113,0.1)',
+    borderWidth: 1, borderColor: 'rgba(248,113,113,0.3)',
+    borderRadius: radius.sm, padding: 12, marginBottom: 16,
+  },
   errorText: { color: '#f87171', fontSize: 13, flex: 1 },
-  inputLabel: { fontSize: 13, color: colors.muted, marginBottom: 8, fontWeight: '500' },
-  inputWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(30,41,59,0.8)', borderWidth: 1, borderColor: colors.border2, borderRadius: radius.md, paddingHorizontal: 14, marginBottom: 16 },
-  inputIcon: { marginRight: 10 },
-  atSign: { color: colors.muted, fontSize: 16, marginRight: 4, fontWeight: '600' },
-  input: { paddingVertical: 14, color: colors.text, fontSize: 14 },
-  dividerRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 20, gap: 12 },
+  label: { fontSize: 12, color: colors.muted, fontWeight: '600', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
+  inputWrap: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: 'rgba(30,41,59,0.8)',
+    borderWidth: 1, borderColor: colors.border2,
+    borderRadius: radius.md, paddingHorizontal: 14, marginBottom: 14,
+  },
+  atSign: { color: colors.muted, fontSize: 16, fontWeight: '600' },
+  input: { flex: 1, paddingVertical: 13, color: colors.text, fontSize: 14 },
+  strengthRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: -8, marginBottom: 14 },
+  strengthBar: { flex: 1, height: 3, borderRadius: 2 },
+  strengthText: { fontSize: 11, color: colors.muted, marginLeft: 4, fontWeight: '600' },
+  dividerRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 16, gap: 12 },
   dividerLine: { flex: 1, height: 1, backgroundColor: colors.border },
-  dividerText: { color: colors.dim, fontSize: 12, fontWeight: '700', letterSpacing: 1 },
-  googleBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: 'rgba(30,41,59,0.8)', borderWidth: 1, borderColor: colors.border2, borderRadius: radius.md, padding: 14 },
+  dividerText: { color: colors.dim, fontSize: 11, fontWeight: '700', letterSpacing: 1 },
+  googleBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
+    backgroundColor: 'rgba(30,41,59,0.8)',
+    borderWidth: 1, borderColor: colors.border2,
+    borderRadius: radius.md, padding: 14,
+  },
   googleG: { fontSize: 18, fontWeight: '800', color: '#4285F4' },
   googleText: { color: colors.text, fontSize: 15, fontWeight: '600' },
+  terms: { fontSize: 11, color: colors.dim, textAlign: 'center', marginTop: 16, lineHeight: 16 },
+  termsLink: { color: '#7c3aed', fontWeight: '600' },
   footer: { flexDirection: 'row', justifyContent: 'center', marginTop: 24 },
   footerText: { color: colors.muted, fontSize: 14 },
   footerLink: { color: '#7c3aed', fontSize: 14, fontWeight: '700' },

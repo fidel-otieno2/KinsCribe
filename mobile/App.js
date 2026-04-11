@@ -33,6 +33,7 @@ import StorybookGeneratorScreen from "./src/screens/StorybookGeneratorScreen";
 import FeedAI from "./src/screens/FeedAI";
 import MediaEditorScreen from "./src/screens/MediaEditorScreen";
 import VoiceRecorderScreen from "./src/screens/VoiceRecorderScreen";
+import UserProfileScreen from "./src/screens/UserProfileScreen";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -65,11 +66,7 @@ function MainTabs() {
         options={{
           tabBarLabel: "Home",
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons
-              name={focused ? "home" : "home-outline"}
-              size={24}
-              color={color}
-            />
+            <Ionicons name={focused ? "home" : "home-outline"} size={24} color={color} />
           ),
         }}
       />
@@ -77,13 +74,9 @@ function MainTabs() {
         name="Search"
         component={SearchScreen}
         options={{
-          tabBarLabel: "Search",
+          tabBarLabel: "Explore",
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons
-              name={focused ? "search" : "search-outline"}
-              size={24}
-              color={color}
-            />
+            <Ionicons name={focused ? "compass" : "compass-outline"} size={24} color={color} />
           ),
         }}
       />
@@ -93,11 +86,7 @@ function MainTabs() {
         options={{
           tabBarLabel: "Create",
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons
-              name={focused ? "add-circle" : "add-circle-outline"}
-              size={24}
-              color={color}
-            />
+            <Ionicons name={focused ? "add-circle" : "add-circle-outline"} size={28} color={color} />
           ),
         }}
       />
@@ -107,11 +96,7 @@ function MainTabs() {
         options={{
           tabBarLabel: "Timeline",
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons
-              name={focused ? "time" : "time-outline"}
-              size={24}
-              color={color}
-            />
+            <Ionicons name={focused ? "git-branch" : "git-branch-outline"} size={24} color={color} />
           ),
         }}
       />
@@ -121,11 +106,7 @@ function MainTabs() {
         options={{
           tabBarLabel: "Family",
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons
-              name={focused ? "people" : "people-outline"}
-              size={24}
-              color={color}
-            />
+            <Ionicons name={focused ? "people-circle" : "people-circle-outline"} size={24} color={color} />
           ),
         }}
       />
@@ -135,11 +116,7 @@ function MainTabs() {
         options={{
           tabBarLabel: "Profile",
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons
-              name={focused ? "person" : "person-outline"}
-              size={24}
-              color={color}
-            />
+            <Ionicons name={focused ? "person-circle" : "person-circle-outline"} size={24} color={color} />
           ),
         }}
       />
@@ -224,6 +201,11 @@ function RootNavigator() {
             name="VoiceRecorder"
             component={VoiceRecorderScreen}
             options={{ animation: "slide_from_bottom" }}
+          />
+          <Stack.Screen
+            name="UserProfile"
+            component={UserProfileScreen}
+            options={{ animation: "slide_from_right" }}
           />
         </>
       )}

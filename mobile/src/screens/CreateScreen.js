@@ -1,13 +1,14 @@
 import { useState, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, ActivityIndicator, Image, Alert, KeyboardAvoidingView, Platform
+  ScrollView, ActivityIndicator, Alert, KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
-import { useAuth } from '../context/AuthContext';
-import api from '../api/axios';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { LinearGradient } from 'expo-linear-gradient';
+import { useAuth } from '../context/AuthContext';
+import api from '../api/axios';
 import { colors, radius } from '../theme';
 
 export default function CreateScreen({ navigation }) {
@@ -16,31 +17,36 @@ export default function CreateScreen({ navigation }) {
   const [form, setForm] = useState({ title: '', content: '', privacy: 'family', story_date: '' });
   const [loading, setLoading] = useState(false);
 
-  // ── Photo ──────────────────────────────────────────────────────────────────
   const pickPhoto = useCallback(async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) return Alert.alert('Permission Required', 'Enable gallery access in settings');
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
+      allowsEditing: false,
       quality: 0.9,
     });
-    if (!result.canceled) {
-      navigation.navigate('MediaEditor', { mediaFile: result.assets[0], mediaType: 'image' });
-    }
+    if (!result.canceled) navigation.navigate('MediaEditor', { mediaFile: result.assets[0], mediaType: 'image' });
   }, [navigation]);
 
-  // ── Video ──────────────────────────────────────────────────────────────────
-  const uploadVideo = useCallback(async () => {
+  const takePhoto = useCallback(async () => {
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perm.granted) return Alert.alert('Permission Required', 'Enable camera access in settings');
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: false,
+      quality: 0.9,
+    });
+    if (!result.canceled) navigation.navigate('MediaEditor', { mediaFile: result.assets[0], mediaType: 'image' });
+  }, [navigation]);
+
+  const pickVideo = useCallback(async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) return Alert.alert('Permission Required', 'Enable gallery access in settings');
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Videos,
       quality: 0.9,
     });
-    if (!result.canceled) {
-      navigation.navigate('MediaEditor', { mediaFile: result.assets[0], mediaType: 'video' });
-    }
+    if (!result.canceled) navigation.navigate('MediaEditor', { mediaFile: result.assets[0], mediaType: 'video' });
   }, [navigation]);
 
   const recordVideo = useCallback(async () => {
@@ -51,17 +57,9 @@ export default function CreateScreen({ navigation }) {
       videoMaxDuration: 60,
       quality: 0.9,
     });
-    if (!result.canceled) {
-      navigation.navigate('MediaEditor', { mediaFile: result.assets[0], mediaType: 'video' });
-    }
+    if (!result.canceled) navigation.navigate('MediaEditor', { mediaFile: result.assets[0], mediaType: 'video' });
   }, [navigation]);
 
-  // ── Voice ──────────────────────────────────────────────────────────────────
-  const goToVoiceRecorder = useCallback(() => {
-    navigation.navigate('VoiceRecorder');
-  }, [navigation]);
-
-  // ── Text post ──────────────────────────────────────────────────────────────
   const handleTextPost = async () => {
     if (!form.title.trim()) return Alert.alert('Title Required', 'Give your story a title');
     if (!form.content.trim()) return Alert.alert('Content Required', 'Write your story');
@@ -74,7 +72,6 @@ export default function CreateScreen({ navigation }) {
         story_date: form.story_date || undefined,
       });
       setForm({ title: '', content: '', privacy: 'family', story_date: '' });
-      setType('text');
       navigation.navigate('AIProcessing', { storyId: data.story?.id });
     } catch (err) {
       Alert.alert('Post Failed', err.response?.data?.error || 'Network error. Try again.');
@@ -83,11 +80,11 @@ export default function CreateScreen({ navigation }) {
     }
   };
 
-  const types = [
-    { key: 'text', icon: 'create-outline', label: 'Text' },
-    { key: 'image', icon: 'image-outline', label: 'Photo' },
-    { key: 'audio', icon: 'mic-outline', label: 'Voice' },
-    { key: 'video', icon: 'videocam-outline', label: 'Video' },
+  const TYPES = [
+    { key: 'text', icon: 'document-text-outline', label: 'Text', color: '#7c3aed' },
+    { key: 'image', icon: 'camera-outline', label: 'Photo', color: '#3b82f6' },
+    { key: 'video', icon: 'film-outline', label: 'Video', color: '#e0245e' },
+    { key: 'audio', icon: 'mic-circle-outline', label: 'Voice', color: '#10b981' },
   ];
 
   return (
@@ -98,14 +95,18 @@ export default function CreateScreen({ navigation }) {
         <Text style={s.headerTitle}>Create Story</Text>
       </View>
 
-      <ScrollView style={s.scroll} contentContainerStyle={{ padding: 16, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
-        {/* Type tabs */}
-        <View style={s.typeTabs}>
-          {types.map(({ key, icon, label }) => (
-            <TouchableOpacity key={key} style={[s.typeTab, type === key && s.typeTabActive]}
-              onPress={() => setType(key)}>
-              <Ionicons name={icon} size={18} color={type === key ? '#fff' : colors.muted} />
-              <Text style={[s.typeTabText, type === key && { color: '#fff' }]}>{label}</Text>
+      <ScrollView style={s.scroll} contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false}>
+
+        {/* Type selector */}
+        <View style={s.typeRow}>
+          {TYPES.map(({ key, icon, label, color }) => (
+            <TouchableOpacity
+              key={key}
+              style={[s.typeBtn, type === key && { borderColor: color, backgroundColor: `${color}22` }]}
+              onPress={() => setType(key)}
+            >
+              <Ionicons name={icon} size={22} color={type === key ? color : colors.muted} />
+              <Text style={[s.typeBtnText, type === key && { color }]}>{label}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -113,49 +114,45 @@ export default function CreateScreen({ navigation }) {
         {/* ── PHOTO ── */}
         {type === 'image' && (
           <View style={s.mediaSection}>
-            <View style={s.mediaSectionHeader}>
-              <Ionicons name="image" size={22} color="#7c3aed" />
-              <Text style={s.mediaSectionTitle}>Pick a Photo</Text>
+            <Text style={s.sectionTitle}>📸 Add a Photo</Text>
+            <Text style={s.sectionSub}>Add music, location & caption in the next step</Text>
+            <View style={s.mediaButtons}>
+              <TouchableOpacity style={s.mediaBtn} onPress={takePhoto} activeOpacity={0.85}>
+                <LinearGradient colors={['#7c3aed', '#3b82f6']} style={s.mediaBtnGrad}>
+                  <Ionicons name="camera" size={28} color="#fff" />
+                  <Text style={s.mediaBtnTitle}>Camera</Text>
+                  <Text style={s.mediaBtnSub}>Take a photo now</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.mediaBtn} onPress={pickPhoto} activeOpacity={0.85}>
+                <LinearGradient colors={['#3b82f6', '#06b6d4']} style={s.mediaBtnGrad}>
+                  <Ionicons name="images" size={28} color="#fff" />
+                  <Text style={s.mediaBtnTitle}>Gallery</Text>
+                  <Text style={s.mediaBtnSub}>Choose from library</Text>
+                </LinearGradient>
+              </TouchableOpacity>
             </View>
-            <Text style={s.mediaSectionSub}>Add effects, music & location in the next step</Text>
-
-            <TouchableOpacity style={s.bigMediaBtn} onPress={pickPhoto} activeOpacity={0.85}>
-              <LinearGradient colors={['#7c3aed', '#3b82f6']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.bigMediaBtnGrad}>
-                <Ionicons name="image-outline" size={32} color="#fff" />
-                <Text style={s.bigMediaBtnText}>Choose from Gallery</Text>
-                <Text style={s.bigMediaBtnSub}>Effects • Music • Location • AI Enhancement</Text>
-              </LinearGradient>
-            </TouchableOpacity>
           </View>
         )}
 
         {/* ── VIDEO ── */}
         {type === 'video' && (
           <View style={s.mediaSection}>
-            <View style={s.mediaSectionHeader}>
-              <Ionicons name="videocam" size={22} color="#3b82f6" />
-              <Text style={s.mediaSectionTitle}>Add a Video</Text>
-            </View>
-            <Text style={s.mediaSectionSub}>Add effects, music & location in the next step</Text>
-
-            <View style={s.videoButtons}>
-              <TouchableOpacity style={s.videoBtn} onPress={recordVideo} activeOpacity={0.85}>
-                <LinearGradient colors={['#e0245e', '#be123c']} style={s.videoBtnGrad}>
-                  <View style={s.videoBtnIcon}>
-                    <Ionicons name="radio-button-on" size={28} color="#fff" />
-                  </View>
-                  <Text style={s.videoBtnTitle}>Record Video</Text>
-                  <Text style={s.videoBtnSub}>Use your camera</Text>
+            <Text style={s.sectionTitle}>🎬 Add a Video</Text>
+            <Text style={s.sectionSub}>Add music, location & caption in the next step</Text>
+            <View style={s.mediaButtons}>
+              <TouchableOpacity style={s.mediaBtn} onPress={recordVideo} activeOpacity={0.85}>
+                <LinearGradient colors={['#e0245e', '#be123c']} style={s.mediaBtnGrad}>
+                  <Ionicons name="videocam" size={28} color="#fff" />
+                  <Text style={s.mediaBtnTitle}>Record</Text>
+                  <Text style={s.mediaBtnSub}>Use your camera</Text>
                 </LinearGradient>
               </TouchableOpacity>
-
-              <TouchableOpacity style={s.videoBtn} onPress={uploadVideo} activeOpacity={0.85}>
-                <LinearGradient colors={['#7c3aed', '#3b82f6']} style={s.videoBtnGrad}>
-                  <View style={s.videoBtnIcon}>
-                    <Ionicons name="cloud-upload-outline" size={28} color="#fff" />
-                  </View>
-                  <Text style={s.videoBtnTitle}>Upload Video</Text>
-                  <Text style={s.videoBtnSub}>From your gallery</Text>
+              <TouchableOpacity style={s.mediaBtn} onPress={pickVideo} activeOpacity={0.85}>
+                <LinearGradient colors={['#7c3aed', '#3b82f6']} style={s.mediaBtnGrad}>
+                  <Ionicons name="cloud-upload-outline" size={28} color="#fff" />
+                  <Text style={s.mediaBtnTitle}>Upload</Text>
+                  <Text style={s.mediaBtnSub}>From your gallery</Text>
                 </LinearGradient>
               </TouchableOpacity>
             </View>
@@ -165,17 +162,13 @@ export default function CreateScreen({ navigation }) {
         {/* ── VOICE ── */}
         {type === 'audio' && (
           <View style={s.mediaSection}>
-            <View style={s.mediaSectionHeader}>
-              <Ionicons name="mic" size={22} color="#10b981" />
-              <Text style={s.mediaSectionTitle}>Voice Story</Text>
-            </View>
-            <Text style={s.mediaSectionSub}>Record your voice and share a spoken memory</Text>
-
-            <TouchableOpacity style={s.bigMediaBtn} onPress={goToVoiceRecorder} activeOpacity={0.85}>
-              <LinearGradient colors={['#10b981', '#059669']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.bigMediaBtnGrad}>
-                <Ionicons name="mic-outline" size={32} color="#fff" />
-                <Text style={s.bigMediaBtnText}>Open Voice Recorder</Text>
-                <Text style={s.bigMediaBtnSub}>Record • Preview • Post with AI</Text>
+            <Text style={s.sectionTitle}>🎙️ Voice Story</Text>
+            <Text style={s.sectionSub}>Record your voice and share a spoken memory</Text>
+            <TouchableOpacity style={s.bigBtn} onPress={() => navigation.navigate('VoiceRecorder')} activeOpacity={0.85}>
+              <LinearGradient colors={['#10b981', '#059669']} style={s.bigBtnGrad}>
+                <Ionicons name="mic" size={36} color="#fff" />
+                <Text style={s.bigBtnTitle}>Open Voice Recorder</Text>
+                <Text style={s.bigBtnSub}>Record · Preview · Post with AI</Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>
@@ -183,42 +176,61 @@ export default function CreateScreen({ navigation }) {
 
         {/* ── TEXT ── */}
         {type === 'text' && (
-          <>
+          <View style={s.textSection}>
             <Text style={s.label}>Title *</Text>
-            <TextInput style={s.input} placeholder="Give your story a title..."
-              placeholderTextColor={colors.dim} value={form.title}
-              onChangeText={v => setForm(f => ({ ...f, title: v }))} />
+            <TextInput
+              style={s.input}
+              placeholder="Give your story a title..."
+              placeholderTextColor={colors.dim}
+              value={form.title}
+              onChangeText={v => setForm(f => ({ ...f, title: v }))}
+            />
 
             <Text style={s.label}>Story *</Text>
-            <TextInput style={[s.input, s.textarea]} multiline placeholder="Tell your family story..."
-              placeholderTextColor={colors.dim} value={form.content}
-              onChangeText={v => setForm(f => ({ ...f, content: v }))} />
+            <TextInput
+              style={[s.input, s.textarea]}
+              multiline
+              placeholder="Tell your family story..."
+              placeholderTextColor={colors.dim}
+              value={form.content}
+              onChangeText={v => setForm(f => ({ ...f, content: v }))}
+            />
 
-            <Text style={s.label}>When did this happen? (optional)</Text>
-            <TextInput style={s.input} placeholder="YYYY-MM-DD e.g. 1995-06-15"
-              placeholderTextColor={colors.dim} value={form.story_date}
-              onChangeText={v => setForm(f => ({ ...f, story_date: v }))} />
+            <Text style={s.label}>When did this happen?</Text>
+            <TextInput
+              style={s.input}
+              placeholder="YYYY-MM-DD  e.g. 1995-06-15"
+              placeholderTextColor={colors.dim}
+              value={form.story_date}
+              onChangeText={v => setForm(f => ({ ...f, story_date: v }))}
+              keyboardType="numeric"
+            />
 
             <Text style={s.label}>Privacy</Text>
             <View style={s.privacyRow}>
-              {['family', 'private', 'public'].map(p => (
-                <TouchableOpacity key={p} style={[s.privacyTab, form.privacy === p && s.privacyTabActive]}
-                  onPress={() => setForm(f => ({ ...f, privacy: p }))}>
-                  <Text style={[s.privacyText, form.privacy === p && { color: '#fff' }]}>
-                    {p === 'family' ? '👨👩👧 Family' : p === 'private' ? '🔒 Private' : '🌍 Public'}
-                  </Text>
+              {[
+                { key: 'family', label: '👨👩👧 Family', color: '#10b981' },
+                { key: 'private', label: '🔒 Private', color: '#6b7280' },
+                { key: 'public', label: '🌍 Public', color: '#3b82f6' },
+              ].map(opt => (
+                <TouchableOpacity
+                  key={opt.key}
+                  style={[s.privacyBtn, form.privacy === opt.key && { borderColor: opt.color, backgroundColor: `${opt.color}22` }]}
+                  onPress={() => setForm(f => ({ ...f, privacy: opt.key }))}
+                >
+                  <Text style={[s.privacyText, form.privacy === opt.key && { color: opt.color }]}>{opt.label}</Text>
                 </TouchableOpacity>
               ))}
             </View>
 
             <TouchableOpacity style={s.postBtn} onPress={handleTextPost} disabled={loading} activeOpacity={0.85}>
-              <LinearGradient colors={['#7c3aed', '#3b82f6']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.postBtnGrad}>
+              <LinearGradient colors={['#7c3aed', '#3b82f6']} style={s.postBtnGrad}>
                 {loading
                   ? <ActivityIndicator color="#fff" />
                   : <><Ionicons name="sparkles" size={18} color="#fff" /><Text style={s.postBtnText}>Post & Enhance with AI</Text></>}
               </LinearGradient>
             </TouchableOpacity>
-          </>
+          </View>
         )}
       </ScrollView>
     </KeyboardAvoidingView>
@@ -227,33 +239,31 @@ export default function CreateScreen({ navigation }) {
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  header: { paddingTop: 52, paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
+  header: { paddingTop: 52, paddingHorizontal: 16, paddingBottom: 14, borderBottomWidth: 0.5, borderBottomColor: colors.border },
   headerTitle: { fontSize: 24, fontWeight: '800', color: colors.text },
   scroll: { flex: 1 },
-  typeTabs: { flexDirection: 'row', gap: 8, marginBottom: 24 },
-  typeTab: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: 'rgba(30,41,59,0.6)', borderRadius: radius.md, paddingVertical: 10, borderWidth: 1, borderColor: colors.border2 },
-  typeTabActive: { backgroundColor: '#7c3aed', borderColor: '#7c3aed' },
-  typeTabText: { fontSize: 12, fontWeight: '600', color: colors.muted },
-  mediaSection: { gap: 12 },
-  mediaSectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  mediaSectionTitle: { fontSize: 18, fontWeight: '700', color: colors.text },
-  mediaSectionSub: { fontSize: 13, color: colors.muted, marginBottom: 4 },
-  bigMediaBtn: { borderRadius: radius.lg, overflow: 'hidden' },
-  bigMediaBtnGrad: { alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 40, paddingHorizontal: 20 },
-  bigMediaBtnText: { color: '#fff', fontWeight: '700', fontSize: 18 },
-  bigMediaBtnSub: { color: 'rgba(255,255,255,0.7)', fontSize: 12, textAlign: 'center' },
-  videoButtons: { flexDirection: 'row', gap: 12 },
-  videoBtn: { flex: 1, borderRadius: radius.lg, overflow: 'hidden' },
-  videoBtnGrad: { alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 32 },
-  videoBtnIcon: { width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' },
-  videoBtnTitle: { color: '#fff', fontWeight: '700', fontSize: 15 },
-  videoBtnSub: { color: 'rgba(255,255,255,0.7)', fontSize: 11 },
-  label: { fontSize: 13, color: colors.muted, marginBottom: 8, fontWeight: '500' },
+  scrollContent: { padding: 16, paddingBottom: 60 },
+  typeRow: { flexDirection: 'row', gap: 8, marginBottom: 24 },
+  typeBtn: { flex: 1, alignItems: 'center', gap: 6, paddingVertical: 14, borderRadius: radius.md, backgroundColor: 'rgba(30,41,59,0.6)', borderWidth: 1, borderColor: colors.border2 },
+  typeBtnText: { fontSize: 12, fontWeight: '600', color: colors.muted },
+  mediaSection: { gap: 10 },
+  sectionTitle: { fontSize: 20, fontWeight: '700', color: colors.text },
+  sectionSub: { fontSize: 13, color: colors.muted },
+  mediaButtons: { flexDirection: 'row', gap: 12, marginTop: 8 },
+  mediaBtn: { flex: 1, borderRadius: radius.lg, overflow: 'hidden' },
+  mediaBtnGrad: { alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 32 },
+  mediaBtnTitle: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  mediaBtnSub: { color: 'rgba(255,255,255,0.7)', fontSize: 11 },
+  bigBtn: { borderRadius: radius.lg, overflow: 'hidden', marginTop: 8 },
+  bigBtnGrad: { alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 48 },
+  bigBtnTitle: { color: '#fff', fontWeight: '700', fontSize: 20 },
+  bigBtnSub: { color: 'rgba(255,255,255,0.7)', fontSize: 13 },
+  textSection: { gap: 0 },
+  label: { fontSize: 12, color: colors.muted, fontWeight: '600', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
   input: { backgroundColor: 'rgba(30,41,59,0.8)', borderWidth: 1, borderColor: colors.border2, borderRadius: radius.md, padding: 14, color: colors.text, fontSize: 14, marginBottom: 16 },
   textarea: { height: 140, textAlignVertical: 'top' },
   privacyRow: { flexDirection: 'row', gap: 8, marginBottom: 24 },
-  privacyTab: { flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: radius.md, backgroundColor: 'rgba(30,41,59,0.6)', borderWidth: 1, borderColor: colors.border2 },
-  privacyTabActive: { backgroundColor: '#10b981', borderColor: '#10b981' },
+  privacyBtn: { flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: radius.md, backgroundColor: 'rgba(30,41,59,0.6)', borderWidth: 1, borderColor: colors.border2 },
   privacyText: { fontSize: 12, fontWeight: '600', color: colors.muted },
   postBtn: { borderRadius: radius.md, overflow: 'hidden' },
   postBtnGrad: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 16 },

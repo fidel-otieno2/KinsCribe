@@ -33,6 +33,13 @@ export function AuthProvider({ children }) {
     return data.user;
   };
 
+  const loginWithGoogle = async (data) => {
+    await AsyncStorage.setItem('access_token', data.access_token);
+    await AsyncStorage.setItem('refresh_token', data.refresh_token);
+    setUser(data.user);
+    return data.user;
+  };
+
   const logout = async () => {
     await AsyncStorage.clear();
     setUser(null);
@@ -44,7 +51,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, refreshUser }}>
+    <AuthContext.Provider value={{ user, loading, login, loginWithGoogle, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

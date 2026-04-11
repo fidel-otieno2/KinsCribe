@@ -72,16 +72,13 @@ export default function SettingsScreen({ navigation }) {
       title: "Account",
       items: [
         {
-          icon: "person-outline",
+          icon: "create-outline",
           label: "Edit Profile",
-
           onPress: () => navigation.navigate("Main", { screen: "Profile" }),
         },
-
-
         { icon: "mail-outline", label: "Email", value: user?.email },
         {
-          icon: "shield-checkmark-outline",
+          icon: "key-outline",
           label: "Change Password",
           onPress: () =>
             Alert.alert("Change Password", "Email link to reset password"),
@@ -136,7 +133,7 @@ export default function SettingsScreen({ navigation }) {
       title: "About",
       items: [
         {
-          icon: "information-circle-outline",
+          icon: "phone-portrait-outline",
           label: "App Version",
           value: "1.0.0",
         },
@@ -150,7 +147,7 @@ export default function SettingsScreen({ navigation }) {
             ),
         },
         {
-          icon: "help-circle-outline",
+          icon: "chatbox-ellipses-outline",
           label: "Help & Support",
           onPress: () =>
             Alert.alert("Help", "Contact support@kinscribe.com for assistance"),

@@ -55,9 +55,13 @@ export default function SearchScreen({ navigation }) {
 
         {/* Tabs */}
         <View style={s.tabs}>
-          {['stories', 'members'].map(t => (
-            <TouchableOpacity key={t} style={[s.tab, tab === t && s.tabActive]} onPress={() => setTab(t)}>
-              <Text style={[s.tabText, tab === t && s.tabTextActive]}>{t === 'stories' ? '📖 Stories' : '👥 Members'}</Text>
+          {[
+            { key: 'stories', icon: 'library-outline', label: 'Stories' },
+            { key: 'members', icon: 'people-outline', label: 'Members' },
+          ].map(t => (
+            <TouchableOpacity key={t.key} style={[s.tab, tab === t.key && s.tabActive]} onPress={() => setTab(t.key)}>
+              <Ionicons name={tab === t.key ? t.icon.replace('-outline', '') : t.icon} size={16} color={tab === t.key ? '#a78bfa' : colors.muted} />
+              <Text style={[s.tabText, tab === t.key && s.tabTextActive]}>{t.label}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -119,7 +123,7 @@ const s = StyleSheet.create({
   searchBar: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: radius.lg, overflow: 'hidden', borderWidth: 1, borderColor: colors.border2, paddingHorizontal: 14, paddingVertical: 2, marginBottom: 14 },
   searchInput: { flex: 1, color: colors.text, fontSize: 15, paddingVertical: 12 },
   tabs: { flexDirection: 'row', gap: 8 },
-  tab: { flex: 1, padding: 10, borderRadius: radius.md, backgroundColor: 'rgba(30,41,59,0.5)', alignItems: 'center', borderWidth: 1, borderColor: colors.border },
+  tab: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, padding: 10, borderRadius: radius.md, backgroundColor: 'rgba(30,41,59,0.5)', borderWidth: 1, borderColor: colors.border },
   tabActive: { backgroundColor: 'rgba(124,58,237,0.2)', borderColor: 'rgba(124,58,237,0.4)' },
   tabText: { color: colors.muted, fontSize: 13, fontWeight: '600' },
   tabTextActive: { color: '#a78bfa' },

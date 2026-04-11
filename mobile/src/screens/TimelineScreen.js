@@ -167,14 +167,14 @@ export default function TimelineScreen() {
           {!loading && stats.total > 0 && (
             <View style={s.statsBar}>
               <View style={s.statItem}>
-                <Ionicons name="book-outline" size={14} color="#7c3aed" />
+                <Ionicons name="library-outline" size={14} color="#7c3aed" />
                 <Text style={s.statText}>{stats.total} stories</Text>
               </View>
               {stats.earliest && (
                 <>
                   <View style={s.statDivider} />
                   <Text style={s.statText}>{stats.earliest}</Text>
-                  <Ionicons name="arrow-forward" size={12} color={colors.muted} />
+                  <Ionicons name="arrow-forward-circle-outline" size={14} color={colors.muted} />
                   <Text style={s.statText}>{stats.latest}</Text>
                 </>
               )}

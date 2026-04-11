@@ -60,30 +60,53 @@ def register():
 
 @auth_bp.route("/google", methods=["POST"])
 def google_auth():
-    """Receive Google ID token from mobile, verify and sign in/up."""
-    from google.oauth2 import id_token
-    from google.auth.transport import requests as grequests
+    """Accept Google access token from mobile, fetch user info and sign in/up."""
+    import requests as http_requests
 
-    credential = request.json.get("id_token")
-    try:
-        info = id_token.verify_oauth2_token(
-            credential,
-            grequests.Request(),
-            os.getenv("GOOGLE_CLIENT_ID")
-        )
-    except Exception:
-        return jsonify({"error": "Invalid Google token"}), 401
+    data = request.json or {}
+    access_token = data.get("id_token")  # expo-auth-session sends access token here
+    user_info_payload = data.get("user_info")  # fallback user info from client
 
-    google_id = info["sub"]
-    email = info["email"]
-    name = info.get("name", "")
-    avatar_url = info.get("picture", "")
+    # Try fetching user info from Google using the access token
+    google_id = None
+    email = None
+    name = ""
+    avatar_url = ""
 
-    user = User.query.filter_by(google_id=google_id).first()
+    if access_token:
+        try:
+            resp = http_requests.get(
+                "https://www.googleapis.com/userinfo/v2/me",
+                headers={"Authorization": f"Bearer {access_token}"},
+                timeout=10
+            )
+            if resp.status_code == 200:
+                info = resp.json()
+                google_id = info.get("id")
+                email = info.get("email")
+                name = info.get("name", "")
+                avatar_url = info.get("picture", "")
+        except Exception as e:
+            print(f"Google userinfo fetch failed: {e}")
+
+    # Fallback to client-provided user_info
+    if not email and user_info_payload:
+        google_id = user_info_payload.get("id")
+        email = user_info_payload.get("email")
+        name = user_info_payload.get("name", "")
+        avatar_url = user_info_payload.get("picture", "")
+
+    if not email:
+        return jsonify({"error": "Could not retrieve Google account info"}), 401
+
+    user = User.query.filter_by(google_id=google_id).first() if google_id else None
     if not user:
         user = User.query.filter_by(email=email).first()
         if user:
-            user.google_id = google_id
+            if google_id:
+                user.google_id = google_id
+            if not user.avatar_url and avatar_url:
+                user.avatar_url = avatar_url
         else:
             user = User(
                 name=name,
@@ -98,7 +121,45 @@ def google_auth():
     return jsonify(_tokens(user))
 
 
-@auth_bp.route("/verify/<token>", methods=["GET"])
+@auth_bp.route("/forgot-password", methods=["POST"])
+def forgot_password():
+    email = request.json.get("email", "").strip().lower()
+    user = User.query.filter_by(email=email).first()
+    # Always return 200 to avoid email enumeration
+    if user:
+        token = secrets.token_urlsafe(32)
+        user.verification_token = token
+        db.session.commit()
+        try:
+            msg = Message("Reset your KinsCribe password", recipients=[user.email])
+            msg.body = (
+                f"Hi {user.name},\n\n"
+                f"Use this code to reset your password:\n\n{token}\n\n"
+                f"This code expires in 1 hour. If you didn't request this, ignore this email."
+            )
+            mail.send(msg)
+        except Exception as e:
+            print(f"Mail error: {e}")
+    return jsonify({"message": "If that email exists, a reset code was sent."}), 200
+
+
+@auth_bp.route("/reset-password", methods=["POST"])
+def reset_password():
+    data = request.json
+    token = data.get("token", "").strip()
+    new_password = data.get("password", "")
+    if not token or not new_password or len(new_password) < 6:
+        return jsonify({"error": "Invalid request"}), 400
+    user = User.query.filter_by(verification_token=token).first()
+    if not user:
+        return jsonify({"error": "Invalid or expired reset code"}), 400
+    user.password = bcrypt.generate_password_hash(new_password).decode("utf-8")
+    user.verification_token = None
+    db.session.commit()
+    return jsonify({"message": "Password reset successfully."})
+
+
+
 def verify_email(token):
     user = User.query.filter_by(verification_token=token).first()
     if not user:
