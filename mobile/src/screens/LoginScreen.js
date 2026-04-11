@@ -63,6 +63,7 @@ function ForgotPasswordModal({ visible, onClose }) {
       setInfo(`A 6-digit code was sent to ${email.trim().toLowerCase()}`);
       setStep('code');
     } catch (err) {
+      console.log('forgot pw error:', JSON.stringify(err.response?.data), err.message);
       setError(err.response?.data?.error || 'Something went wrong. Try again.');
     } finally { setLoading(false); }
   };

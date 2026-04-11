@@ -35,8 +35,11 @@ def create_app():
     app.register_blueprint(ai_bp, url_prefix="/api/ai")
 
     with app.app_context():
-        db.create_all()
-        _run_migrations()
+        try:
+            db.create_all()
+            _run_migrations()
+        except Exception as e:
+            print(f"Startup DB error (non-fatal): {e}")
 
     @app.errorhandler(Exception)
     def handle_exception(e):
