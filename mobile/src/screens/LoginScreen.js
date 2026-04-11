@@ -10,7 +10,7 @@ import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
 import * as WebBrowser from 'expo-web-browser';
-import * as Google from 'expo-auth-session/providers/google';
+import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../context/AuthContext';
 import { colors, radius, shadows } from '../theme';
@@ -222,32 +222,29 @@ export default function LoginScreen({ navigation }) {
   const [showPass, setShowPass] = useState(false);
   const [showForgot, setShowForgot] = useState(false);
 
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    androidClientId: 'YOUR_ANDROID_CLIENT_ID.apps.googleusercontent.com',
-    iosClientId: 'YOUR_IOS_CLIENT_ID.apps.googleusercontent.com',
-    webClientId: 'YOUR_WEB_CLIENT_ID.apps.googleusercontent.com',
-  });
-
   useEffect(() => {
-    if (response?.type === 'success') {
-      handleGoogleToken(response.authentication.accessToken);
-    }
-  }, [response]);
+    GoogleSignin.configure({
+      webClientId: '474767363654-i0sdd1v140399n0mfhf0qreqn9lj30u5.apps.googleusercontent.com',
+    });
+  }, []);
 
-  const handleGoogleToken = async (accessToken) => {
+  const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
     setError('');
     try {
-      const userInfoRes = await fetch('https://www.googleapis.com/userinfo/v2/me', {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      const userInfo = await userInfoRes.json();
-      const { data } = await api.post('/auth/google', { id_token: accessToken, user_info: userInfo });
+      await GoogleSignin.hasPlayServices();
+      const userInfo = await GoogleSignin.signIn();
+      const { idToken } = userInfo;
+      const { data } = await api.post('/auth/google', { id_token: idToken });
       await AsyncStorage.setItem('access_token', data.access_token);
       await AsyncStorage.setItem('refresh_token', data.refresh_token);
       loginWithGoogle(data);
-    } catch {
-      setError('Google sign-in failed. Try again.');
+    } catch (err) {
+      if (err.code === statusCodes.SIGN_IN_CANCELLED) {
+        // user cancelled
+      } else {
+        setError('Google sign-in failed. Try again.');
+      }
     } finally { setGoogleLoading(false); }
   };
 
@@ -343,8 +340,8 @@ export default function LoginScreen({ navigation }) {
 
             <TouchableOpacity
               style={s.googleBtn}
-              onPress={() => promptAsync()}
-              disabled={!request || googleLoading}
+              onPress={handleGoogleSignIn}
+              disabled={googleLoading}
               activeOpacity={0.8}
             >
               {googleLoading ? (

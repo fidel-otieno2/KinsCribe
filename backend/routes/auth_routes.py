@@ -60,44 +60,33 @@ def register():
 
 @auth_bp.route("/google", methods=["POST"])
 def google_auth():
-    """Accept Google access token from mobile, fetch user info and sign in/up."""
+    """Accept Google ID token from native SDK, verify and sign in/up."""
     import requests as http_requests
 
     data = request.json or {}
-    access_token = data.get("id_token")  # expo-auth-session sends access token here
-    user_info_payload = data.get("user_info")  # fallback user info from client
+    id_token_str = data.get("id_token")
 
-    # Try fetching user info from Google using the access token
-    google_id = None
-    email = None
-    name = ""
-    avatar_url = ""
+    if not id_token_str:
+        return jsonify({"error": "No token provided"}), 400
 
-    if access_token:
-        try:
-            resp = http_requests.get(
-                "https://www.googleapis.com/userinfo/v2/me",
-                headers={"Authorization": f"Bearer {access_token}"},
-                timeout=10
-            )
-            if resp.status_code == 200:
-                info = resp.json()
-                google_id = info.get("id")
-                email = info.get("email")
-                name = info.get("name", "")
-                avatar_url = info.get("picture", "")
-        except Exception as e:
-            print(f"Google userinfo fetch failed: {e}")
-
-    # Fallback to client-provided user_info
-    if not email and user_info_payload:
-        google_id = user_info_payload.get("id")
-        email = user_info_payload.get("email")
-        name = user_info_payload.get("name", "")
-        avatar_url = user_info_payload.get("picture", "")
+    # Verify the ID token with Google
+    try:
+        resp = http_requests.get(
+            f"https://oauth2.googleapis.com/tokeninfo?id_token={id_token_str}",
+            timeout=10
+        )
+        if resp.status_code != 200:
+            return jsonify({"error": "Invalid Google token"}), 401
+        info = resp.json()
+        google_id = info.get("sub")
+        email = info.get("email")
+        name = info.get("name", "")
+        avatar_url = info.get("picture", "")
+    except Exception as e:
+        return jsonify({"error": f"Token verification failed: {str(e)}"}), 401
 
     if not email:
-        return jsonify({"error": "Could not retrieve Google account info"}), 401
+        return jsonify({"error": "Could not retrieve email from Google"}), 401
 
     user = User.query.filter_by(google_id=google_id).first() if google_id else None
     if not user:

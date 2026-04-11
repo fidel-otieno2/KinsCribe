@@ -15,11 +15,24 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.kinscribe.app"
+      "bundleIdentifier": "com.kinscribe.app",
+      "scheme": "com.googleusercontent.apps.474767363654-6knta78fh5ibd8q0a6894o8euqrs90js"
     },
     "android": {
       "package": "com.kinscribe.app",
       "versionCode": 1,
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "com.googleusercontent.apps.474767363654-6knta78fh5ibd8q0a6894o8euqrs90js"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0f172a"
@@ -45,7 +58,8 @@
     },
     "plugins": [
       "expo-image-picker",
-      "expo-media-library"
+      "expo-media-library",
+      "@react-native-google-signin/google-signin"
     ],
     "extra": {
       "apiUrl": "https://kinscribe-1.onrender.com/api",
