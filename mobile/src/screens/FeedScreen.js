@@ -111,7 +111,6 @@ export default function FeedScreen({ navigation }) {
     if (!silent) setLoading(true);
     try {
       const { data } = await api.get("/stories/feed");
-      console.log("Feed:", data);
       setStories(data?.stories || []);
     } catch (err) {
       console.log("Feed error:", err.response?.data || err.message);

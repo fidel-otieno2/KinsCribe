@@ -29,10 +29,13 @@ def _tokens(user):
 def register():
     data = request.json
 
-    if User.query.filter_by(email=data["email"]).first():
+    existing = User.query.filter_by(email=data["email"]).first()
+    if existing:
+        if existing.google_id and not existing.password:
+            return jsonify({"error": "This email is linked to a Google account. Please sign in with Google."}), 409
         return jsonify({"error": "Email already registered"}), 409
 
-    if User.query.filter_by(username=data.get("username")).first():
+    if data.get("username") and User.query.filter_by(username=data.get("username")).first():
         return jsonify({"error": "Username already taken"}), 409
 
     token = secrets.token_urlsafe(32)
@@ -92,11 +95,13 @@ def google_auth():
     if not user:
         user = User.query.filter_by(email=email).first()
         if user:
-            if google_id:
+            # Merge: link Google ID to existing manual account
+            if google_id and not user.google_id:
                 user.google_id = google_id
             if not user.avatar_url and avatar_url:
                 user.avatar_url = avatar_url
         else:
+            # Brand new user via Google
             user = User(
                 name=name,
                 email=email,
@@ -107,7 +112,7 @@ def google_auth():
             db.session.add(user)
     db.session.commit()
 
-    return jsonify(_tokens(user))
+    return jsonify({**_tokens(user), "is_new_user": user.username is None})
 
 
 @auth_bp.route("/forgot-password", methods=["POST"])
@@ -165,12 +170,12 @@ def login():
     data = request.json
     user = User.query.filter_by(email=data["email"]).first()
 
-    if not user or not user.password:
-        return jsonify({"error": "Invalid credentials"}), 401
+    if not user:
+        return jsonify({"error": "No account found with this email"}), 401
+    if user.google_id and not user.password:
+        return jsonify({"error": "This account uses Google Sign-In. Please tap \"Continue with Google\"."}), 401
     if not bcrypt.check_password_hash(user.password, data["password"]):
-        return jsonify({"error": "Invalid credentials"}), 401
-    # if not user.is_verified:
-    #     return jsonify({"error": "Please verify your email first"}), 403
+        return jsonify({"error": "Incorrect password"}), 401
 
     return jsonify(_tokens(user))
 

@@ -1,28 +1,65 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, KeyboardAvoidingView, Platform,
-  ScrollView, Image, Dimensions, StatusBar,
+  ScrollView, Image, Dimensions, StatusBar, ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
+import Svg, { Path } from 'react-native-svg';
+import * as WebBrowser from 'expo-web-browser';
+import * as Google from 'expo-auth-session/providers/google';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
 import { colors, radius, shadows } from '../theme';
 import GradientButton from '../components/GradientButton';
 
+WebBrowser.maybeCompleteAuthSession();
+
 const { width, height } = Dimensions.get('window');
 const HERO_HEIGHT = height * 0.28;
 
 export default function RegisterScreen({ navigation }) {
-  const { login } = useAuth();
+  const { login, loginWithGoogle } = useAuth();
   const [form, setForm] = useState({ name: '', username: '', email: '', password: '' });
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPass, setShowPass] = useState(false);
 
   const set = key => val => setForm(f => ({ ...f, [key]: val }));
+
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    androidClientId: '474767363654-6knta78fh5ibd8q0a6894o8euqrs90js.apps.googleusercontent.com',
+    webClientId: '474767363654-i0sdd1v140399n0mfhf0qreqn9lj30u5.apps.googleusercontent.com',
+  });
+
+  useEffect(() => {
+    if (response?.type === 'success') {
+      const token = response.authentication?.accessToken || response.params?.access_token;
+      if (token) handleGoogleToken(token);
+    }
+  }, [response]);
+
+  const handleGoogleToken = async (accessToken) => {
+    setGoogleLoading(true);
+    setError('');
+    try {
+      const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const userInfo = await userInfoRes.json();
+      const { data } = await api.post('/auth/google', { id_token: accessToken, user_info: userInfo });
+      await AsyncStorage.setItem('access_token', data.access_token);
+      await AsyncStorage.setItem('refresh_token', data.refresh_token);
+      loginWithGoogle(data);
+      if (data.is_new_user) navigation.navigate('SetupProfile');
+    } catch {
+      setError('Google sign-in failed. Try again.');
+    } finally { setGoogleLoading(false); }
+  };
 
   const handleRegister = async () => {
     setError('');
@@ -191,10 +228,22 @@ export default function RegisterScreen({ navigation }) {
             <TouchableOpacity
               style={s.googleBtn}
               activeOpacity={0.8}
-              onPress={() => alert('Google Sign-In coming soon')}
+              onPress={() => promptAsync()}
+              disabled={!request || googleLoading}
             >
-              <Text style={s.googleG}>G</Text>
-              <Text style={s.googleText}>Continue with Google</Text>
+              {googleLoading ? (
+                <ActivityIndicator size="small" color="#1f1f1f" />
+              ) : (
+                <>
+                  <Svg width={20} height={20} viewBox="0 0 48 48">
+                    <Path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                    <Path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                    <Path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                    <Path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+                  </Svg>
+                  <Text style={s.googleText}>Continue with Google</Text>
+                </>
+              )}
             </TouchableOpacity>
 
             <Text style={s.terms}>
@@ -276,13 +325,11 @@ const s = StyleSheet.create({
   dividerLine: { flex: 1, height: 1, backgroundColor: colors.border },
   dividerText: { color: colors.dim, fontSize: 11, fontWeight: '700', letterSpacing: 1 },
   googleBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
-    backgroundColor: 'rgba(30,41,59,0.8)',
-    borderWidth: 1, borderColor: colors.border2,
-    borderRadius: radius.md, padding: 14,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12,
+    backgroundColor: '#fff',
+    borderRadius: radius.md, padding: 13, minHeight: 48,
   },
-  googleG: { fontSize: 18, fontWeight: '800', color: '#4285F4' },
-  googleText: { color: colors.text, fontSize: 15, fontWeight: '600' },
+  googleText: { color: '#1f1f1f', fontSize: 15, fontWeight: '600' },
   terms: { fontSize: 11, color: colors.dim, textAlign: 'center', marginTop: 16, lineHeight: 16 },
   termsLink: { color: '#7c3aed', fontWeight: '600' },
   footer: { flexDirection: 'row', justifyContent: 'center', marginTop: 24 },

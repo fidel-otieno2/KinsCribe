@@ -238,19 +238,16 @@ export default function LoginScreen({ navigation }) {
     setGoogleLoading(true);
     setError('');
     try {
-      console.log('Google access token:', accessToken);
       const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       const userInfo = await userInfoRes.json();
-      console.log('Google user info:', userInfo);
       const { data } = await api.post('/auth/google', { id_token: accessToken, user_info: userInfo });
-      console.log('Backend response:', data);
       await AsyncStorage.setItem('access_token', data.access_token);
       await AsyncStorage.setItem('refresh_token', data.refresh_token);
       loginWithGoogle(data);
+      if (data.is_new_user) navigation.navigate('SetupProfile');
     } catch (err) {
-      console.log('Google error:', err.response?.data || err.message);
       setError('Google sign-in failed. Try again.');
     } finally { setGoogleLoading(false); }
   };
