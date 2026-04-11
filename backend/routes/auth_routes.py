@@ -60,19 +60,19 @@ def register():
 
 @auth_bp.route("/google", methods=["POST"])
 def google_auth():
-    """Accept Google ID token from native SDK, verify and sign in/up."""
+    """Accept Google access token from expo-auth-session, fetch user info and sign in/up."""
     import requests as http_requests
 
     data = request.json or {}
-    id_token_str = data.get("id_token")
+    access_token = data.get("id_token")
 
-    if not id_token_str:
+    if not access_token:
         return jsonify({"error": "No token provided"}), 400
 
-    # Verify the ID token with Google
     try:
         resp = http_requests.get(
-            f"https://oauth2.googleapis.com/tokeninfo?id_token={id_token_str}",
+            "https://www.googleapis.com/oauth2/v3/userinfo",
+            headers={"Authorization": f"Bearer {access_token}"},
             timeout=10
         )
         if resp.status_code != 200:
@@ -149,6 +149,7 @@ def reset_password():
 
 
 
+@auth_bp.route("/verify/<token>", methods=["GET"])
 def verify_email(token):
     user = User.query.filter_by(verification_token=token).first()
     if not user:
