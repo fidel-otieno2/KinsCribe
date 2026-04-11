@@ -66,13 +66,16 @@ def _run_migrations():
         "ALTER TABLE stories ADD COLUMN IF NOT EXISTS repost_count INTEGER DEFAULT 0",
     ]
 
-    with db.engine.connect() as conn:
-        for sql in migrations:
-            try:
-                conn.execute(text(sql))
-            except Exception as e:
-                print(f"Migration skipped ({sql[:50]}...): {e}")
-        conn.commit()
+    try:
+        with db.engine.connect() as conn:
+            for sql in migrations:
+                try:
+                    conn.execute(text(sql))
+                except Exception as e:
+                    print(f"Migration skipped ({sql[:50]}...): {e}")
+            conn.commit()
+    except Exception as e:
+        print(f"Migration failed, skipping: {e}")
 
 
 app = create_app()
