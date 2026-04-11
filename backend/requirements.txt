@@ -14,6 +14,7 @@ redis==7.4.0
 openai==2.30.0
 gunicorn==21.2.0
 groq==1.1.2
+requests==2.32.3
 psycopg2-binary==2.9.10
 itsdangerous==2.2.0
 click==8.3.2
