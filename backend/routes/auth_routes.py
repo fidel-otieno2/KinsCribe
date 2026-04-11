@@ -155,7 +155,7 @@ def forgot_password():
         return jsonify({"message": "A 6-digit reset code was sent to your email."}), 200
     except Exception as e:
         print(f"Mail error: {e}")
-        return jsonify({"error": "Failed to send email. Please try again later."}), 500
+        return jsonify({"error": f"Failed to send email: {str(e)}"}), 500
 
 
 @auth_bp.route("/reset-password", methods=["POST"])
