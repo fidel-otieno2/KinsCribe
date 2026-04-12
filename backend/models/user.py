@@ -22,8 +22,13 @@ class User(db.Model):
     stories = db.relationship("Story", backref="author", lazy=True)
     comments = db.relationship("Comment", backref="commenter", lazy=True)
     likes = db.relationship("Like", backref="liker", lazy=True)
+    posts = db.relationship("Post", backref="author", lazy=True)
+    post_comments = db.relationship("PostComment", backref="commenter", lazy=True)
 
     def to_dict(self):
+        from models.social import Connection
+        connection_count = Connection.query.filter_by(following_id=self.id).count()
+        interest_count = Connection.query.filter_by(follower_id=self.id).count()
         return {
             "id": self.id,
             "name": self.name,
@@ -34,5 +39,7 @@ class User(db.Model):
             "avatar_url": self.avatar_url,
             "bio": self.bio,
             "family_id": self.family_id,
+            "connection_count": connection_count,
+            "interest_count": interest_count,
             "created_at": self.created_at.isoformat()
         }

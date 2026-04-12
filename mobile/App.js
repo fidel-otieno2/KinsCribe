@@ -16,24 +16,26 @@ import SetupProfileScreen from "./src/screens/SetupProfileScreen";
 import JoinFamilyScreen from "./src/screens/JoinFamilyScreen";
 import FamilyGateScreen from "./src/screens/FamilyGateScreen";
 
-// Main screens
+// Main tabs
 import FeedScreen from "./src/screens/FeedScreen";
-import TimelineScreen from "./src/screens/TimelineScreen";
-import FamilyScreen from "./src/screens/FamilyScreen";
-import ProfileScreen from "./src/screens/ProfileScreen";
 import SearchScreen from "./src/screens/SearchScreen";
+import CreateScreen from "./src/screens/CreateScreen";
+import MessagesScreen from "./src/screens/MessagesScreen";
+import ProfileScreen from "./src/screens/ProfileScreen";
 
-// Stack screens (pushed on top)
+// Stack screens
 import AIProcessingScreen from "./src/screens/AIProcessingScreen";
 import NotificationsScreen from "./src/screens/NotificationsScreen";
 import SettingsScreen from "./src/screens/SettingsScreen";
 import StorybooksScreen from "./src/screens/StorybooksScreen";
-import CreateScreen from "./src/screens/CreateScreen";
 import StorybookGeneratorScreen from "./src/screens/StorybookGeneratorScreen";
 import FeedAI from "./src/screens/FeedAI";
 import MediaEditorScreen from "./src/screens/MediaEditorScreen";
 import VoiceRecorderScreen from "./src/screens/VoiceRecorderScreen";
 import UserProfileScreen from "./src/screens/UserProfileScreen";
+import ChatScreen from "./src/screens/ChatScreen";
+import FamilyScreen from "./src/screens/FamilyScreen";
+import TimelineScreen from "./src/screens/TimelineScreen";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -74,7 +76,7 @@ function MainTabs() {
         name="Search"
         component={SearchScreen}
         options={{
-          tabBarLabel: "Explore",
+          tabBarLabel: "Discover",
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? "compass" : "compass-outline"} size={24} color={color} />
           ),
@@ -91,22 +93,12 @@ function MainTabs() {
         }}
       />
       <Tab.Screen
-        name="Timeline"
-        component={TimelineScreen}
+        name="Messages"
+        component={MessagesScreen}
         options={{
-          tabBarLabel: "Timeline",
+          tabBarLabel: "Messages",
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "git-branch" : "git-branch-outline"} size={24} color={color} />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Family"
-        component={FamilyScreen}
-        options={{
-          tabBarLabel: "Family",
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "people-circle" : "people-circle-outline"} size={24} color={color} />
+            <Ionicons name={focused ? "chatbubbles" : "chatbubbles-outline"} size={24} color={color} />
           ),
         }}
       />
@@ -129,23 +121,14 @@ function RootNavigator() {
 
   if (loading) {
     return (
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: colors.bg,
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
+      <View style={{ flex: 1, backgroundColor: colors.bg, alignItems: "center", justifyContent: "center" }}>
         <ActivityIndicator color="#7c3aed" size="large" />
       </View>
     );
   }
 
   return (
-    <Stack.Navigator
-      screenOptions={{ headerShown: false, animation: "fade_from_bottom" }}
-    >
+    <Stack.Navigator screenOptions={{ headerShown: false, animation: "fade_from_bottom" }}>
       {!user ? (
         <>
           <Stack.Screen name="Welcome" component={WelcomeScreen} />
@@ -162,51 +145,18 @@ function RootNavigator() {
       ) : (
         <>
           <Stack.Screen name="Main" component={MainTabs} />
-          <Stack.Screen
-            name="AIProcessing"
-            component={AIProcessingScreen}
-            options={{ animation: "slide_from_bottom" }}
-          />
-          <Stack.Screen
-            name="Notifications"
-            component={NotificationsScreen}
-            options={{ animation: "slide_from_right" }}
-          />
-          <Stack.Screen
-            name="FeedAI"
-            component={FeedAI}
-            options={{ animation: "slide_from_right" }}
-          />
-          <Stack.Screen
-            name="Settings"
-            component={SettingsScreen}
-            options={{ animation: "slide_from_right" }}
-          />
-          <Stack.Screen
-            name="Storybooks"
-            component={StorybooksScreen}
-            options={{ animation: "slide_from_right" }}
-          />
-          <Stack.Screen
-            name="StorybookGenerator"
-            component={StorybookGeneratorScreen}
-            options={{ animation: "slide_from_right" }}
-          />
-          <Stack.Screen
-            name="MediaEditor"
-            component={MediaEditorScreen}
-            options={{ animation: "slide_from_bottom" }}
-          />
-          <Stack.Screen
-            name="VoiceRecorder"
-            component={VoiceRecorderScreen}
-            options={{ animation: "slide_from_bottom" }}
-          />
-          <Stack.Screen
-            name="UserProfile"
-            component={UserProfileScreen}
-            options={{ animation: "slide_from_right" }}
-          />
+          <Stack.Screen name="Chat" component={ChatScreen} options={{ animation: "slide_from_right" }} />
+          <Stack.Screen name="UserProfile" component={UserProfileScreen} options={{ animation: "slide_from_right" }} />
+          <Stack.Screen name="Family" component={FamilyScreen} options={{ animation: "slide_from_right" }} />
+          <Stack.Screen name="Timeline" component={TimelineScreen} options={{ animation: "slide_from_right" }} />
+          <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ animation: "slide_from_right" }} />
+          <Stack.Screen name="FeedAI" component={FeedAI} options={{ animation: "slide_from_right" }} />
+          <Stack.Screen name="Settings" component={SettingsScreen} options={{ animation: "slide_from_right" }} />
+          <Stack.Screen name="Storybooks" component={StorybooksScreen} options={{ animation: "slide_from_right" }} />
+          <Stack.Screen name="StorybookGenerator" component={StorybookGeneratorScreen} options={{ animation: "slide_from_right" }} />
+          <Stack.Screen name="AIProcessing" component={AIProcessingScreen} options={{ animation: "slide_from_bottom" }} />
+          <Stack.Screen name="MediaEditor" component={MediaEditorScreen} options={{ animation: "slide_from_bottom" }} />
+          <Stack.Screen name="VoiceRecorder" component={VoiceRecorderScreen} options={{ animation: "slide_from_bottom" }} />
         </>
       )}
     </Stack.Navigator>

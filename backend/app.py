@@ -8,6 +8,9 @@ from routes.family_routes import family_bp
 from routes.story_routes import story_bp
 from routes.storybook_routes import storybook_bp
 from routes.ai_routes import ai_bp
+from routes.connection_routes import connection_bp
+from routes.post_routes import post_bp
+from routes.message_routes import message_bp
 
 
 def create_app():
@@ -27,12 +30,22 @@ def create_app():
         "supports_credentials": False,
     }})
 
+    # Import models so db.create_all picks them up
+    from models.user import User
+    from models.story import Story, Comment, Like, SavedStory
+    from models.family import Family
+    from models.extras import FamilyRelationship, Storybook
+    from models.social import Connection, Post, PostLike, PostComment, Conversation, ConversationParticipant, Message, MessageReaction
+
     # Register blueprints
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
     app.register_blueprint(family_bp, url_prefix="/api/family")
     app.register_blueprint(story_bp, url_prefix="/api/stories")
     app.register_blueprint(storybook_bp, url_prefix="/api/storybooks")
     app.register_blueprint(ai_bp, url_prefix="/api/ai")
+    app.register_blueprint(connection_bp, url_prefix="/api/connections")
+    app.register_blueprint(post_bp, url_prefix="/api/posts")
+    app.register_blueprint(message_bp, url_prefix="/api/messages")
 
     with app.app_context():
         try:
