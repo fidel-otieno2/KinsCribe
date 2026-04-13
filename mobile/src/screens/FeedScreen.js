@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef, memo } from "react";
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   ActivityIndicator, StatusBar, Image, RefreshControl,
-  Modal, TextInput, Alert, Dimensions,
+  Modal, TextInput, Alert, Dimensions, ScrollView,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -346,6 +346,7 @@ const pc = StyleSheet.create({
 export default function FeedScreen({ navigation }) {
   const { user } = useAuth();
   const [posts, setPosts] = useState([]);
+  const [storyGroups, setStoryGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -354,8 +355,12 @@ export default function FeedScreen({ navigation }) {
   const fetchFeed = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const { data } = await api.get("/posts/feed");
-      setPosts(data?.posts || []);
+      const [postsRes, storiesRes] = await Promise.all([
+        api.get("/posts/feed"),
+        api.get("/pstories/feed").catch(() => ({ data: { story_groups: [] } })),
+      ]);
+      setPosts(postsRes.data?.posts || []);
+      setStoryGroups(storiesRes.data?.story_groups || []);
     } catch (err) {
       console.log("Feed error:", err.message);
     } finally {
@@ -380,10 +385,51 @@ export default function FeedScreen({ navigation }) {
 
   const ListHeader = () => (
     <View>
+      {/* Stories Row */}
+      {storyGroups.length > 0 && (
+        <View style={s.storiesWrap}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.storiesRow}>
+            {/* Add story button */}
+            <TouchableOpacity style={s.storyItem} onPress={() => navigation.navigate('Create')} activeOpacity={0.8}>
+              <View style={s.storyAddRing}>
+                <View style={s.storyAddCircle}>
+                  <Ionicons name="add" size={22} color="#fff" />
+                </View>
+              </View>
+              <Text style={s.storyLabel}>Your Story</Text>
+            </TouchableOpacity>
+            {storyGroups.map((group, idx) => (
+              <TouchableOpacity
+                key={group.user_id}
+                style={s.storyItem}
+                activeOpacity={0.8}
+                onPress={() => navigation.navigate('StoryViewer', { storyGroups, initialGroupIndex: idx })}
+              >
+                <LinearGradient
+                  colors={group.has_unseen ? ['#7c3aed', '#3b82f6', '#ec4899'] : ['#475569', '#475569']}
+                  style={s.storyRing}
+                >
+                  <View style={s.storyAvatarWrap}>
+                    {group.author_avatar
+                      ? <Image source={{ uri: group.author_avatar }} style={s.storyAvatar} />
+                      : <View style={s.storyAvatarFallback}>
+                          <Text style={s.storyAvatarLetter}>{group.author_name?.[0]?.toUpperCase()}</Text>
+                        </View>}
+                  </View>
+                </LinearGradient>
+                <Text style={s.storyLabel} numberOfLines={1}>
+                  {group.author_name?.split(' ')[0] || 'User'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
       {/* Family Banner */}
       <TouchableOpacity
         style={s.familyBanner}
-        onPress={() => user?.family_id ? navigation.navigate("Family") : setShowJoinFamily(true)}
+        onPress={() => user?.family_id ? navigation.navigate('Family') : setShowJoinFamily(true)}
         activeOpacity={0.85}
       >
         <LinearGradient colors={["#7c3aed", "#3b82f6", "#ec4899"]} style={s.familyBannerGrad}>
@@ -516,6 +562,18 @@ const s = StyleSheet.create({
   badgeText: { color: "#fff", fontSize: 9, fontWeight: "800" },
 
   loadingWrap: { flex: 1, alignItems: "center", justifyContent: "center" },
+
+  storiesWrap: { borderBottomWidth: 0.5, borderBottomColor: colors.border },
+  storiesRow: { paddingHorizontal: 12, paddingVertical: 10, gap: 14 },
+  storyItem: { alignItems: 'center', width: 64 },
+  storyAddRing: { width: 64, height: 64, borderRadius: 32, borderWidth: 1.5, borderColor: colors.border2, alignItems: 'center', justifyContent: 'center' },
+  storyAddCircle: { width: 58, height: 58, borderRadius: 29, backgroundColor: colors.bgSecondary, alignItems: 'center', justifyContent: 'center' },
+  storyRing: { width: 64, height: 64, borderRadius: 32, padding: 2.5, alignItems: 'center', justifyContent: 'center' },
+  storyAvatarWrap: { width: 57, height: 57, borderRadius: 28.5, overflow: 'hidden', borderWidth: 2, borderColor: colors.bg },
+  storyAvatar: { width: '100%', height: '100%' },
+  storyAvatarFallback: { width: '100%', height: '100%', backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+  storyAvatarLetter: { color: '#fff', fontWeight: '700', fontSize: 20 },
+  storyLabel: { fontSize: 11, color: colors.text, textAlign: 'center', maxWidth: 64, marginTop: 4 },
 
   familyBanner: { marginHorizontal: 14, marginTop: 14, marginBottom: 6, borderRadius: 16, overflow: "hidden" },
   familyBannerGrad: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 14 },

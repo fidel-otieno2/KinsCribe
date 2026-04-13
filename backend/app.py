@@ -11,6 +11,7 @@ from routes.ai_routes import ai_bp
 from routes.connection_routes import connection_bp
 from routes.post_routes import post_bp
 from routes.message_routes import message_bp
+from routes.public_story_routes import public_story_bp
 
 
 def create_app():
@@ -35,7 +36,7 @@ def create_app():
     from models.story import Story, Comment, Like, SavedStory
     from models.family import Family
     from models.extras import FamilyRelationship, Storybook
-    from models.social import Connection, Post, PostLike, PostComment, Conversation, ConversationParticipant, Message, MessageReaction
+    from models.social import Connection, Post, PostLike, PostComment, PostSave, Conversation, ConversationParticipant, Message, MessageReaction, PublicStory, PublicStoryView, StoryHighlight, StoryHighlightItem
 
     # Register blueprints
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
@@ -46,6 +47,7 @@ def create_app():
     app.register_blueprint(connection_bp, url_prefix="/api/connections")
     app.register_blueprint(post_bp, url_prefix="/api/posts")
     app.register_blueprint(message_bp, url_prefix="/api/messages")
+    app.register_blueprint(public_story_bp, url_prefix="/api/pstories")
 
     with app.app_context():
         try:
