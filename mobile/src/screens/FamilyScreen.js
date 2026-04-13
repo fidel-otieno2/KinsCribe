@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, FlatList, TextInput, TouchableOpacity,
-  StyleSheet, ActivityIndicator, Alert, ScrollView,
-  Image, Clipboard, RefreshControl,
+  View, Text, TouchableOpacity, StyleSheet, ActivityIndicator,
+  ScrollView, Image, RefreshControl, Alert, TextInput,
+  Clipboard, Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -12,15 +12,290 @@ import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import { colors, radius } from '../theme';
 
+const { width } = Dimensions.get('window');
+
+const TABS = [
+  { key: 'feed', icon: 'home-outline', iconActive: 'home', label: 'Feed' },
+  { key: 'chat', icon: 'chatbubbles-outline', iconActive: 'chatbubbles', label: 'Chat' },
+  { key: 'members', icon: 'people-outline', iconActive: 'people', label: 'Members' },
+  { key: 'timeline', icon: 'git-branch-outline', iconActive: 'git-branch', label: 'Timeline' },
+];
+
+function timeAgo(dateStr) {
+  const diff = (Date.now() - new Date(dateStr)) / 1000;
+  if (diff < 60) return 'just now';
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+}
+
+function Avatar({ uri, name, size = 44 }) {
+  return uri ? (
+    <Image source={{ uri }} style={{ width: size, height: size, borderRadius: size / 2 }} />
+  ) : (
+    <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }}>
+      <Text style={{ color: '#fff', fontWeight: '700', fontSize: size * 0.38 }}>{name?.[0]?.toUpperCase() || '?'}</Text>
+    </View>
+  );
+}
+
+// ── Family Feed Tab ───────────────────────────────────────────
+function FamilyFeedTab({ navigation }) {
+  const [stories, setStories] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.get('/stories/feed').then(({ data }) => {
+      setStories(data.stories || []);
+    }).catch(() => {}).finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />;
+
+  return (
+    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
+      {stories.length === 0 ? (
+        <View style={ft.empty}>
+          <Ionicons name="library-outline" size={48} color={colors.dim} />
+          <Text style={ft.emptyTitle}>No family stories yet</Text>
+          <Text style={ft.emptySub}>Share your first family memory</Text>
+        </View>
+      ) : stories.map(story => (
+        <TouchableOpacity
+          key={story.id}
+          style={ft.card}
+          onPress={() => navigation.navigate('UserProfile', { userId: story.user_id, userName: story.author_name })}
+          activeOpacity={0.85}
+        >
+          <View style={ft.cardHeader}>
+            <Avatar uri={story.author_avatar} name={story.author_name} size={38} />
+            <View style={{ flex: 1, marginLeft: 10 }}>
+              <Text style={ft.authorName}>{story.author_name}</Text>
+              <Text style={ft.time}>{timeAgo(story.created_at)}</Text>
+            </View>
+            {story.privacy === 'family' && (
+              <View style={ft.privacyBadge}>
+                <Ionicons name="people" size={11} color="#10b981" />
+                <Text style={ft.privacyText}>Family</Text>
+              </View>
+            )}
+          </View>
+          <Text style={ft.title}>{story.title}</Text>
+          {story.content ? <Text style={ft.content} numberOfLines={3}>{story.content}</Text> : null}
+          {story.media_url && story.media_type === 'image' && (
+            <Image source={{ uri: story.media_url }} style={ft.media} resizeMode="cover" />
+          )}
+          <View style={ft.actions}>
+            <View style={ft.actionItem}>
+              <Ionicons name="heart-outline" size={16} color={colors.muted} />
+              <Text style={ft.actionText}>{story.like_count}</Text>
+            </View>
+            <View style={ft.actionItem}>
+              <Ionicons name="chatbubble-outline" size={16} color={colors.muted} />
+              <Text style={ft.actionText}>{story.comment_count}</Text>
+            </View>
+          </View>
+        </TouchableOpacity>
+      ))}
+    </ScrollView>
+  );
+}
+
+const ft = StyleSheet.create({
+  empty: { alignItems: 'center', marginTop: 60, gap: 10 },
+  emptyTitle: { fontSize: 18, fontWeight: '700', color: colors.text },
+  emptySub: { fontSize: 14, color: colors.muted },
+  card: { backgroundColor: colors.bgSecondary, borderRadius: radius.lg, padding: 16, marginBottom: 12, borderWidth: 0.5, borderColor: colors.border },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+  authorName: { fontSize: 14, fontWeight: '700', color: colors.text },
+  time: { fontSize: 12, color: colors.muted },
+  privacyBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(16,185,129,0.1)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
+  privacyText: { fontSize: 11, color: '#10b981', fontWeight: '600' },
+  title: { fontSize: 16, fontWeight: '700', color: colors.text, marginBottom: 6 },
+  content: { fontSize: 14, color: colors.muted, lineHeight: 20, marginBottom: 10 },
+  media: { width: '100%', height: 200, borderRadius: radius.md, marginBottom: 10 },
+  actions: { flexDirection: 'row', gap: 16 },
+  actionItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  actionText: { fontSize: 13, color: colors.muted },
+});
+
+// ── Members Tab ───────────────────────────────────────────────
+function MembersTab({ members, user, family, navigation }) {
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [sending, setSending] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const copyCode = () => {
+    Clipboard.setString(family?.invite_code || '');
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const sendInvite = async () => {
+    if (!inviteEmail.trim()) return;
+    setSending(true);
+    try {
+      await api.post('/family/invite/email', { email: inviteEmail.trim() });
+      Alert.alert('✅ Invite Sent', `Invite sent to ${inviteEmail}`);
+      setInviteEmail('');
+    } catch (err) {
+      Alert.alert('Error', err.response?.data?.error || 'Failed');
+    } finally { setSending(false); }
+  };
+
+  return (
+    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
+      {/* Invite code */}
+      <BlurView intensity={20} tint="dark" style={mt.codeCard}>
+        <LinearGradient colors={['rgba(124,58,237,0.2)', 'rgba(59,130,246,0.1)']} style={StyleSheet.absoluteFill} />
+        <Text style={mt.codeLabel}>Family Invite Code</Text>
+        <Text style={mt.code}>{family?.invite_code}</Text>
+        <TouchableOpacity style={[mt.copyBtn, copied && mt.copyBtnDone]} onPress={copyCode}>
+          <Ionicons name={copied ? 'checkmark' : 'copy-outline'} size={16} color="#fff" />
+          <Text style={mt.copyBtnText}>{copied ? 'Copied!' : 'Copy Code'}</Text>
+        </TouchableOpacity>
+      </BlurView>
+
+      {/* Invite by email */}
+      {user?.role === 'admin' && (
+        <View style={mt.inviteRow}>
+          <TextInput
+            style={mt.inviteInput}
+            placeholder="Invite by email..."
+            placeholderTextColor={colors.dim}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            value={inviteEmail}
+            onChangeText={setInviteEmail}
+          />
+          <TouchableOpacity style={mt.sendBtn} onPress={sendInvite} disabled={sending}>
+            {sending ? <ActivityIndicator color="#fff" size="small" /> : <Text style={mt.sendBtnText}>Send</Text>}
+          </TouchableOpacity>
+        </View>
+      )}
+
+      <Text style={mt.sectionTitle}>Members ({members.length})</Text>
+      {members.map(m => (
+        <TouchableOpacity
+          key={m.id}
+          style={mt.memberRow}
+          onPress={() => navigation.navigate('UserProfile', { userId: m.id, userName: m.name, userAvatar: m.avatar_url })}
+          activeOpacity={0.8}
+        >
+          <Avatar uri={m.avatar_url} name={m.name} size={48} />
+          <View style={{ flex: 1, marginLeft: 12 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={mt.memberName}>{m.name}</Text>
+              {m.id === user?.id && <Text style={mt.youBadge}>You</Text>}
+            </View>
+            <Text style={mt.memberEmail}>{m.email}</Text>
+          </View>
+          <View style={[mt.roleBadge, m.role === 'admin' && mt.adminBadge]}>
+            <Text style={[mt.roleText, m.role === 'admin' && { color: '#f59e0b' }]}>
+              {m.role === 'admin' ? '👑 Admin' : m.role}
+            </Text>
+          </View>
+        </TouchableOpacity>
+      ))}
+    </ScrollView>
+  );
+}
+
+const mt = StyleSheet.create({
+  codeCard: { borderRadius: radius.xl, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(124,58,237,0.3)', padding: 20, alignItems: 'center', gap: 8, marginBottom: 16 },
+  codeLabel: { fontSize: 11, color: colors.muted, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1 },
+  code: { fontSize: 28, fontWeight: '800', color: colors.primary, letterSpacing: 8 },
+  copyBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.primary, paddingHorizontal: 20, paddingVertical: 9, borderRadius: 20 },
+  copyBtnDone: { backgroundColor: '#10b981' },
+  copyBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  inviteRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },
+  inviteInput: { flex: 1, backgroundColor: 'rgba(30,41,59,0.8)', borderWidth: 1, borderColor: colors.border2, borderRadius: radius.md, padding: 12, color: colors.text, fontSize: 14 },
+  sendBtn: { backgroundColor: colors.primary, borderRadius: radius.md, paddingHorizontal: 18, justifyContent: 'center' },
+  sendBtnText: { color: '#fff', fontWeight: '700' },
+  sectionTitle: { fontSize: 13, fontWeight: '700', color: colors.muted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 12 },
+  memberRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: colors.border },
+  memberName: { fontSize: 15, fontWeight: '700', color: colors.text },
+  youBadge: { fontSize: 10, color: colors.primary, fontWeight: '700', backgroundColor: 'rgba(124,58,237,0.15)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10 },
+  memberEmail: { fontSize: 12, color: colors.muted, marginTop: 2 },
+  roleBadge: { backgroundColor: 'rgba(30,41,59,0.8)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+  adminBadge: { backgroundColor: 'rgba(245,158,11,0.15)' },
+  roleText: { color: colors.muted, fontSize: 11, fontWeight: '600' },
+});
+
+// ── Timeline Tab ──────────────────────────────────────────────
+function TimelineTab({ navigation }) {
+  const [stories, setStories] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.get('/stories/timeline').then(({ data }) => {
+      setStories(data.stories || []);
+    }).catch(() => {}).finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />;
+
+  return (
+    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
+      {stories.map((story, idx) => (
+        <View key={story.id} style={tl.item}>
+          <View style={tl.lineWrap}>
+            <View style={tl.dot} />
+            {idx < stories.length - 1 && <View style={tl.line} />}
+          </View>
+          <View style={tl.content}>
+            <Text style={tl.date}>
+              {story.story_date
+                ? new Date(story.story_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+                : new Date(story.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}
+            </Text>
+            <TouchableOpacity style={tl.card} activeOpacity={0.85}>
+              {story.media_url && story.media_type === 'image' && (
+                <Image source={{ uri: story.media_url }} style={tl.media} resizeMode="cover" />
+              )}
+              <Text style={tl.title}>{story.title}</Text>
+              {story.content ? <Text style={tl.body} numberOfLines={2}>{story.content}</Text> : null}
+              <View style={tl.meta}>
+                <Avatar uri={story.author_avatar} name={story.author_name} size={20} />
+                <Text style={tl.author}>{story.author_name}</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ))}
+      {stories.length === 0 && (
+        <View style={{ alignItems: 'center', marginTop: 60, gap: 10 }}>
+          <Ionicons name="git-branch-outline" size={48} color={colors.dim} />
+          <Text style={{ fontSize: 16, color: colors.muted }}>No timeline entries yet</Text>
+        </View>
+      )}
+    </ScrollView>
+  );
+}
+
+const tl = StyleSheet.create({
+  item: { flexDirection: 'row', gap: 12, marginBottom: 4 },
+  lineWrap: { alignItems: 'center', width: 20 },
+  dot: { width: 12, height: 12, borderRadius: 6, backgroundColor: colors.primary, marginTop: 4 },
+  line: { width: 2, flex: 1, backgroundColor: colors.border, marginTop: 4 },
+  content: { flex: 1, paddingBottom: 20 },
+  date: { fontSize: 12, color: colors.primary, fontWeight: '700', marginBottom: 6 },
+  card: { backgroundColor: colors.bgSecondary, borderRadius: radius.md, overflow: 'hidden', borderWidth: 0.5, borderColor: colors.border },
+  media: { width: '100%', height: 140 },
+  title: { fontSize: 15, fontWeight: '700', color: colors.text, padding: 12, paddingBottom: 4 },
+  body: { fontSize: 13, color: colors.muted, paddingHorizontal: 12, paddingBottom: 8, lineHeight: 18 },
+  meta: { flexDirection: 'row', alignItems: 'center', gap: 6, padding: 12, paddingTop: 4, borderTopWidth: 0.5, borderTopColor: colors.border },
+  author: { fontSize: 12, color: colors.muted },
+});
+
+// ── Main FamilyScreen ─────────────────────────────────────────
 export default function FamilyScreen({ navigation }) {
   const { user } = useAuth();
   const [family, setFamily] = useState(null);
   const [members, setMembers] = useState([]);
-  const [inviteEmail, setInviteEmail] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [sending, setSending] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [tab, setTab] = useState('feed');
 
   const fetchFamily = useCallback(async () => {
     try {
@@ -38,26 +313,6 @@ export default function FamilyScreen({ navigation }) {
   useEffect(() => { fetchFamily(); }, [fetchFamily]);
   useFocusEffect(useCallback(() => { fetchFamily(); }, [fetchFamily]));
 
-  const copyCode = () => {
-    Clipboard.setString(family?.invite_code || '');
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const sendInvite = async () => {
-    if (!inviteEmail.trim()) return;
-    setSending(true);
-    try {
-      await api.post('/family/invite/email', { email: inviteEmail.trim() });
-      Alert.alert('✅ Invite Sent', `Invite sent to ${inviteEmail}`);
-      setInviteEmail('');
-    } catch (err) {
-      Alert.alert('Error', err.response?.data?.error || 'Failed to send invite');
-    } finally {
-      setSending(false);
-    }
-  };
-
   if (loading) return (
     <View style={[s.container, { alignItems: 'center', justifyContent: 'center' }]}>
       <ActivityIndicator color={colors.primary} size="large" />
@@ -68,121 +323,107 @@ export default function FamilyScreen({ navigation }) {
     <View style={s.container}>
       <LinearGradient colors={['#0f172a', '#1a0f2e', '#0f172a']} style={StyleSheet.absoluteFill} />
 
+      {/* Header */}
       <View style={s.header}>
-        <Text style={s.headerTitle}>{family?.name || 'My Family'}</Text>
-        <View style={s.memberCount}>
-          <Ionicons name="people-circle-outline" size={16} color={colors.primary} />
-          <Text style={s.memberCountText}>{members.length} members</Text>
+        <View style={s.headerLeft}>
+          <LinearGradient colors={['#7c3aed', '#3b82f6']} style={s.familyIcon}>
+            <Ionicons name="people" size={20} color="#fff" />
+          </LinearGradient>
+          <View>
+            <Text style={s.familyName}>{family?.name || 'My Family'}</Text>
+            <Text style={s.memberCount}>{members.length} members</Text>
+          </View>
+        </View>
+        <View style={s.headerRight}>
+          <TouchableOpacity
+            style={s.chatBtn}
+            onPress={() => navigation.navigate('Chat', {
+              conversationId: null,
+              title: `${family?.name || 'Family'} Chat`,
+              type: 'family',
+            })}
+          >
+            <Ionicons name="chatbubbles-outline" size={20} color={colors.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity style={s.chatBtn} onPress={() => navigation.navigate('Storybooks')}>
+            <Ionicons name="book-outline" size={20} color={colors.muted} />
+          </TouchableOpacity>
         </View>
       </View>
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={s.scroll}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchFamily(); }} tintColor={colors.primary} />}
-      >
-        {/* Invite Code Card */}
-        <BlurView intensity={20} tint="dark" style={s.codeCard}>
-          <LinearGradient colors={['rgba(124,58,237,0.2)', 'rgba(59,130,246,0.1)']} style={StyleSheet.absoluteFill} />
-          <Text style={s.codeLabel}>Family Invite Code</Text>
-          <Text style={s.code}>{family?.invite_code}</Text>
-          <Text style={s.codeSub}>Share this code with family members to join</Text>
-          <TouchableOpacity style={[s.copyBtn, copied && s.copyBtnDone]} onPress={copyCode}>
-            <Ionicons name={copied ? 'checkmark' : 'copy-outline'} size={16} color="#fff" />
-            <Text style={s.copyBtnText}>{copied ? 'Copied!' : 'Copy Code'}</Text>
+      {/* Quick access row */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.quickRow}>
+        {[
+          { icon: 'git-network-outline', label: 'Tree', screen: 'FamilyTree', color: '#7c3aed' },
+          { icon: 'calendar-outline', label: 'Calendar', screen: 'FamilyCalendar', color: '#3b82f6' },
+          { icon: 'restaurant-outline', label: 'Recipes', screen: 'FamilyRecipes', color: '#f59e0b' },
+          { icon: 'wallet-outline', label: 'Budget', screen: 'FamilyBudget', color: '#10b981' },
+          { icon: 'book-outline', label: 'Storybooks', screen: 'Storybooks', color: '#ec4899' },
+          { icon: 'chatbubbles-outline', label: 'Chat', screen: null, color: colors.primary },
+        ].map(item => (
+          <TouchableOpacity
+            key={item.label}
+            style={s.quickItem}
+            onPress={() => {
+              if (item.screen === null) {
+                navigation.navigate('Chat', { conversationId: null, title: `${family?.name || 'Family'} Chat`, type: 'family' });
+              } else {
+                navigation.navigate(item.screen);
+              }
+            }}
+          >
+            <View style={[s.quickIcon, { backgroundColor: `${item.color}22` }]}>
+              <Ionicons name={item.icon} size={22} color={item.color} />
+            </View>
+            <Text style={s.quickLabel}>{item.label}</Text>
           </TouchableOpacity>
-        </BlurView>
-
-        {/* Invite by email (admin only) */}
-        {user?.role === 'admin' && (
-          <View style={s.inviteSection}>
-            <View style={s.sectionTitleRow}>
-              <Ionicons name="mail-outline" size={18} color={colors.primary} />
-              <Text style={s.sectionTitle}>Invite by Email</Text>
-            </View>
-            <View style={s.inviteRow}>
-              <TextInput
-                style={s.inviteInput}
-                placeholder="Enter email address..."
-                placeholderTextColor={colors.dim}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                value={inviteEmail}
-                onChangeText={setInviteEmail}
-              />
-              <TouchableOpacity style={s.sendBtn} onPress={sendInvite} disabled={sending}>
-                {sending
-                  ? <ActivityIndicator color="#fff" size="small" />
-                  : <Text style={s.sendBtnText}>Send</Text>}
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
-
-        {/* Members */}
-        <View style={s.sectionTitleRow}>
-          <Ionicons name="people-outline" size={18} color={colors.primary} />
-          <Text style={s.sectionTitle}>Members ({members.length})</Text>
-        </View>
-        {members.map(m => (
-          <BlurView key={m.id} intensity={15} tint="dark" style={s.memberCard}>
-            <View style={s.memberCardInner}>
-              <View style={s.memberAvatar}>
-                {m.avatar_url
-                  ? <Image source={{ uri: m.avatar_url }} style={s.memberAvatarImg} />
-                  : <Text style={s.memberAvatarText}>{m.name?.[0]?.toUpperCase()}</Text>}
-              </View>
-              <View style={{ flex: 1 }}>
-                <View style={s.memberNameRow}>
-                  <Text style={s.memberName}>{m.name}</Text>
-                  {m.id === user?.id && <Text style={s.youBadge}>You</Text>}
-                </View>
-                <Text style={s.memberEmail}>{m.email}</Text>
-              </View>
-              <View style={[s.roleBadge, m.role === 'admin' && s.roleBadgeAdmin]}>
-                <Text style={[s.roleText, m.role === 'admin' && { color: '#f59e0b' }]}>
-                  {m.role === 'admin' ? '👑 Admin' : m.role}
-                </Text>
-              </View>
-            </View>
-          </BlurView>
         ))}
       </ScrollView>
+
+      {/* Tabs */}
+      <View style={s.tabRow}>
+        {TABS.map(t => (
+          <TouchableOpacity key={t.key} style={[s.tabBtn, tab === t.key && s.tabBtnActive]} onPress={() => setTab(t.key)}>
+            <Ionicons name={tab === t.key ? t.iconActive : t.icon} size={18} color={tab === t.key ? colors.primary : colors.muted} />
+            <Text style={[s.tabLabel, tab === t.key && s.tabLabelActive]}>{t.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Tab content */}
+      {tab === 'feed' && <FamilyFeedTab navigation={navigation} />}
+      {tab === 'chat' && (() => {
+        // Auto-navigate to family chat
+        navigation.navigate('Chat', {
+          conversationId: null,
+          title: `${family?.name || 'Family'} Chat`,
+          type: 'family',
+        });
+        setTab('feed');
+        return null;
+      })()}
+      {tab === 'members' && <MembersTab members={members} user={user} family={family} navigation={navigation} />}
+      {tab === 'timeline' && <TimelineTab navigation={navigation} />}
     </View>
   );
 }
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  header: { paddingTop: 52, paddingHorizontal: 16, paddingBottom: 16, borderBottomWidth: 0.5, borderBottomColor: colors.border },
-  headerTitle: { fontSize: 24, fontWeight: '800', color: colors.text },
-  memberCount: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
-  memberCountText: { fontSize: 13, color: colors.muted },
-  scroll: { padding: 16, gap: 12, paddingBottom: 100 },
-  codeCard: { borderRadius: radius.xl, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(124,58,237,0.3)', padding: 24, alignItems: 'center', gap: 8 },
-  codeLabel: { fontSize: 12, color: colors.muted, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1 },
-  code: { fontSize: 32, fontWeight: '800', color: colors.primary, letterSpacing: 8 },
-  codeSub: { fontSize: 12, color: colors.dim, textAlign: 'center' },
-  copyBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.primary, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20, marginTop: 4 },
-  copyBtnDone: { backgroundColor: '#10b981' },
-  copyBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
-  inviteSection: { gap: 10 },
-  sectionTitle: { fontSize: 15, fontWeight: '700', color: colors.text, marginTop: 4 },
-  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  inviteRow: { flexDirection: 'row', gap: 10 },
-  inviteInput: { flex: 1, backgroundColor: 'rgba(30,41,59,0.8)', borderWidth: 1, borderColor: colors.border2, borderRadius: radius.md, padding: 12, color: colors.text, fontSize: 14 },
-  sendBtn: { backgroundColor: colors.primary, borderRadius: radius.md, paddingHorizontal: 20, justifyContent: 'center' },
-  sendBtnText: { color: '#fff', fontWeight: '700' },
-  memberCard: { borderRadius: radius.lg, overflow: 'hidden', borderWidth: 1, borderColor: colors.border2 },
-  memberCardInner: { backgroundColor: 'rgba(15,23,42,0.6)', padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  memberAvatar: { width: 46, height: 46, borderRadius: 23, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
-  memberAvatarImg: { width: 46, height: 46, borderRadius: 23 },
-  memberAvatarText: { color: '#fff', fontWeight: '700', fontSize: 18 },
-  memberNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  memberName: { fontSize: 15, fontWeight: '700', color: colors.text },
-  youBadge: { fontSize: 10, color: colors.primary, fontWeight: '700', backgroundColor: 'rgba(124,58,237,0.15)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10 },
-  memberEmail: { fontSize: 12, color: colors.muted, marginTop: 2 },
-  roleBadge: { backgroundColor: 'rgba(30,41,59,0.8)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
-  roleBadgeAdmin: { backgroundColor: 'rgba(245,158,11,0.15)' },
-  roleText: { color: colors.muted, fontSize: 11, fontWeight: '600' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 52, paddingHorizontal: 16, paddingBottom: 14, borderBottomWidth: 0.5, borderBottomColor: colors.border },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  familyIcon: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  familyName: { fontSize: 18, fontWeight: '800', color: colors.text },
+  memberCount: { fontSize: 12, color: colors.muted, marginTop: 1 },
+  headerRight: { flexDirection: 'row', gap: 8 },
+  chatBtn: { width: 38, height: 38, borderRadius: 12, backgroundColor: 'rgba(30,41,59,0.8)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border2 },
+  tabRow: { flexDirection: 'row', borderBottomWidth: 0.5, borderBottomColor: colors.border },
+  tabBtn: { flex: 1, alignItems: 'center', paddingVertical: 12, gap: 3 },
+  tabBtnActive: { borderBottomWidth: 2, borderBottomColor: colors.primary },
+  tabLabel: { fontSize: 10, color: colors.muted, fontWeight: '600' },
+  tabLabelActive: { color: colors.primary },
+  quickRow: { paddingHorizontal: 16, paddingVertical: 12, gap: 16 },
+  quickItem: { alignItems: 'center', gap: 6, width: 60 },
+  quickIcon: { width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  quickLabel: { fontSize: 11, color: colors.muted, fontWeight: '600', textAlign: 'center' },
 });

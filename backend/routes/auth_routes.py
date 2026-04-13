@@ -248,6 +248,33 @@ def upload_avatar():
     return jsonify({"avatar_url": user.avatar_url, "user": user.to_dict()})
 
 
+@auth_bp.route("/profile", methods=["PUT"])
+@jwt_required()
+def update_profile():
+    user = User.query.get(int(get_jwt_identity()))
+    data = request.get_json() or {}
+    if "name" in data and data["name"].strip():
+        user.name = data["name"].strip()
+    if "bio" in data:
+        user.bio = data["bio"]
+    if "username" in data and data["username"].strip():
+        existing = User.query.filter_by(username=data["username"]).first()
+        if existing and existing.id != user.id:
+            return jsonify({"error": "Username already taken"}), 409
+        user.username = data["username"].strip().lower()
+    db.session.commit()
+    return jsonify({"user": user.to_dict()})
+
+
+@auth_bp.route("/account", methods=["DELETE"])
+@jwt_required()
+def delete_account():
+    user = User.query.get(int(get_jwt_identity()))
+    db.session.delete(user)
+    db.session.commit()
+    return jsonify({"message": "Account deleted"})
+
+
 @auth_bp.route("/refresh", methods=["POST"])
 @jwt_required(refresh=True)
 def refresh():

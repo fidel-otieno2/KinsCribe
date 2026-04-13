@@ -12,6 +12,7 @@ import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
 import { colors, radius } from "../theme";
 import { uploadMedia } from "../api/upload";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 function timeStr(dateStr) {
   const d = new Date(dateStr);
@@ -31,24 +32,32 @@ function Avatar({ uri, name, size = 32 }) {
 const REACTIONS = ["❤️", "😂", "😮", "😢", "👏", "🔥"];
 
 export default function ChatScreen({ route, navigation }) {
-  const { conversationId, title, avatar, type, otherUserId } = route.params;
+  const { conversationId: initialConvId, title, avatar, type, otherUserId } = route.params;
   const { user } = useAuth();
+  const [convId, setConvId] = useState(initialConvId);
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [replyTo, setReplyTo] = useState(null);
-  const [showReactions, setShowReactions] = useState(null); // message id
+  const [showReactions, setShowReactions] = useState(null);
   const flatRef = useRef(null);
   const pollRef = useRef(null);
 
   const fetchMessages = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const { data } = await api.get(`/messages/conversations/${conversationId}/messages`);
+      let cid = convId;
+      if (!cid && type === "family") {
+        const { data } = await api.get("/messages/family");
+        cid = data.conversation.id;
+        setConvId(cid);
+      }
+      if (!cid) { setLoading(false); return; }
+      const { data } = await api.get(`/messages/conversations/${cid}/messages`);
       setMessages(data.messages || []);
     } catch {} finally { setLoading(false); }
-  }, [conversationId]);
+  }, [convId, type]);
 
   useEffect(() => {
     fetchMessages();
@@ -71,7 +80,7 @@ export default function ChatScreen({ route, navigation }) {
     try {
       const payload = { text: msgText };
       if (replyTo) payload.reply_to_id = replyTo.id;
-      const { data } = await api.post(`/messages/conversations/${conversationId}/messages`, payload);
+      const { data } = await api.post(`/messages/conversations/${convId}/messages`, payload);
       setMessages(prev => [...prev, data.message]);
       setReplyTo(null);
       setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 100);
@@ -90,7 +99,7 @@ export default function ChatScreen({ route, navigation }) {
       const formData = new FormData();
       formData.append("file", { uri: asset.uri, type: "image/jpeg", name: "photo.jpg" });
       if (replyTo) formData.append("reply_to_id", replyTo.id);
-      const { data } = await api.post(`/messages/conversations/${conversationId}/messages`, formData, {
+      const { data } = await api.post(`/messages/conversations/${convId}/messages`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
       setMessages(prev => [...prev, data.message]);

@@ -35,7 +35,22 @@ export function multipartPost(path, formData) {
   });
 }
 
-// Convert a URI to a File/Blob for web, or return native object for mobile
+export async function uploadMedia(uri, type = 'image') {
+  const token = await AsyncStorage.getItem('access_token');
+  const formData = new FormData();
+  const ext = type === 'video' ? 'mp4' : 'jpg';
+  const mime = type === 'video' ? 'video/mp4' : 'image/jpeg';
+  formData.append('file', { uri, name: `media.${ext}`, type: mime });
+  const res = await fetch(`${BASE_URL}/messages/upload`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || 'Upload failed');
+  return json.url;
+}
+
 export async function buildFileEntry(uri, filename, mimeType) {
   if (Platform.OS === 'web') {
     const res = await fetch(uri);

@@ -37,6 +37,11 @@ import ChatScreen from "./src/screens/ChatScreen";
 import FamilyScreen from "./src/screens/FamilyScreen";
 import TimelineScreen from "./src/screens/TimelineScreen";
 import StoryViewerScreen from "./src/screens/StoryViewerScreen";
+import FamilyTreeScreen from "./src/screens/FamilyTreeScreen";
+import FamilyCalendarScreen from "./src/screens/FamilyCalendarScreen";
+import FamilyRecipesScreen from "./src/screens/FamilyRecipesScreen";
+import FamilyBudgetScreen from "./src/screens/FamilyBudgetScreen";
+import PostInsightsScreen from "./src/screens/PostInsightsScreen";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -159,6 +164,11 @@ function RootNavigator() {
           <Stack.Screen name="AIProcessing" component={AIProcessingScreen} options={{ animation: "slide_from_bottom" }} />
           <Stack.Screen name="MediaEditor" component={MediaEditorScreen} options={{ animation: "slide_from_bottom" }} />
           <Stack.Screen name="VoiceRecorder" component={VoiceRecorderScreen} options={{ animation: "slide_from_bottom" }} />
+          <Stack.Screen name="FamilyTree" component={FamilyTreeScreen} options={{ animation: "slide_from_right" }} />
+          <Stack.Screen name="FamilyCalendar" component={FamilyCalendarScreen} options={{ animation: "slide_from_right" }} />
+          <Stack.Screen name="FamilyRecipes" component={FamilyRecipesScreen} options={{ animation: "slide_from_right" }} />
+          <Stack.Screen name="FamilyBudget" component={FamilyBudgetScreen} options={{ animation: "slide_from_right" }} />
+          <Stack.Screen name="PostInsights" component={PostInsightsScreen} options={{ animation: "slide_from_right" }} />
         </>
       )}
     </Stack.Navigator>

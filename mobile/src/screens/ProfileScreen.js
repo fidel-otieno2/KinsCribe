@@ -194,6 +194,9 @@ export default function ProfileScreen({ navigation }) {
         <TouchableOpacity style={s.shareBtn} onPress={() => navigation.navigate('Family')}>
           <Ionicons name="people-outline" size={18} color={colors.text} />
         </TouchableOpacity>
+        <TouchableOpacity style={s.shareBtn} onPress={() => navigation.navigate('PostInsights')}>
+          <Ionicons name="bar-chart-outline" size={18} color={colors.text} />
+        </TouchableOpacity>
       </View>
 
       {/* Story Highlights */}
