@@ -43,19 +43,6 @@ def create_app():
     app.register_blueprint(extras_bp, url_prefix="/api/extras")
 
     with app.app_context():
-        # Import models so SQLAlchemy metadata is populated
-        from models.user import User
-        from models.story import Story, Comment, Like, SavedStory
-        from models.family import Family
-        from models.extras import (FamilyRelationship, FamilyTreeNode, FamilyEvent,
-                                    FamilyRecipe, FamilyTask, FamilyBudget, PostInsight,
-                                    CloseFriend, ScheduledPost, VerifiedBadge,
-                                    MessageRequest, Storybook)
-        from models.social import (Connection, Post, PostLike, PostComment, PostSave,
-                                    Conversation, ConversationParticipant, Message,
-                                    MessageReaction, PublicStory, PublicStoryView,
-                                    StoryHighlight, StoryHighlightItem)
-        # Run migrations in background thread so startup is instant
         import threading
         threading.Thread(target=_safe_migrate, daemon=True).start()
 
