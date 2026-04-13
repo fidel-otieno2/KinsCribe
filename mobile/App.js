@@ -6,6 +6,7 @@ import { ActivityIndicator, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 import { AuthProvider, useAuth } from "./src/context/AuthContext";
+import { ThemeProvider, useTheme } from "./src/context/ThemeContext";
 import { colors } from "./src/theme";
 
 // Auth screens
@@ -47,24 +48,25 @@ const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
 function MainTabs() {
+  const { theme } = useTheme();
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: "rgba(15,23,42,0.97)",
-          borderTopColor: "rgba(148,163,184,0.08)",
+          backgroundColor: theme.tabBar,
+          borderTopColor: theme.tabBarBorder,
           borderTopWidth: 1,
           height: 64,
           paddingBottom: 10,
-          shadowColor: "#7c3aed",
+          shadowColor: theme.primary,
           shadowOffset: { width: 0, height: -4 },
-          shadowOpacity: 0.2,
+          shadowOpacity: 0.15,
           shadowRadius: 16,
           elevation: 20,
         },
-        tabBarActiveTintColor: "#7c3aed",
-        tabBarInactiveTintColor: "#475569",
+        tabBarActiveTintColor: theme.primary,
+        tabBarInactiveTintColor: theme.dim,
         tabBarLabelStyle: { fontSize: 11, fontWeight: "600" },
       }}
     >
@@ -124,10 +126,11 @@ function MainTabs() {
 
 function RootNavigator() {
   const { user, loading } = useAuth();
+  const { theme, isDark } = useTheme();
 
   if (loading) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.bg, alignItems: "center", justifyContent: "center" }}>
+      <View style={{ flex: 1, backgroundColor: theme.bg, alignItems: "center", justifyContent: "center" }}>
         <ActivityIndicator color="#7c3aed" size="large" />
       </View>
     );
@@ -177,11 +180,13 @@ function RootNavigator() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <NavigationContainer>
-        <StatusBar style="light" />
-        <RootNavigator />
-      </NavigationContainer>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <NavigationContainer>
+          <StatusBar style="auto" />
+          <RootNavigator />
+        </NavigationContainer>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }

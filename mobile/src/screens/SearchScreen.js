@@ -8,6 +8,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 import { colors, radius } from "../theme";
 
 function Avatar({ uri, name, size = 52 }) {
@@ -55,6 +56,7 @@ function ConnectButton({ userId, initialConnected, onToggle }) {
 
 export default function SearchScreen({ navigation }) {
   const { user } = useAuth();
+  const { theme } = useTheme();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [suggestions, setSuggestions] = useState([]);
@@ -95,15 +97,15 @@ export default function SearchScreen({ navigation }) {
   const renderUser = (item, showConnect = true) => (
     <TouchableOpacity
       key={item.id}
-      style={s.userRow}
+      style={[s.userRow, { borderBottomColor: theme.border }]}
       onPress={() => navigation.navigate("UserProfile", { userId: item.id, userName: item.name, userAvatar: item.avatar_url })}
       activeOpacity={0.8}
     >
       <Avatar uri={item.avatar_url} name={item.name} size={48} />
       <View style={s.userInfo}>
-        <Text style={s.userName}>{item.name}</Text>
-        <Text style={s.userHandle}>@{item.username || "user"}</Text>
-        {item.follows_you && <Text style={s.followsYou}>Connects with you</Text>}
+        <Text style={[s.userName, { color: theme.text }]}>{item.name}</Text>
+        <Text style={[s.userHandle, { color: theme.muted }]}>@{item.username || "user"}</Text>
+        {item.follows_you && <Text style={[s.followsYou, { color: theme.primary }]}>Connects with you</Text>}
       </View>
       {showConnect && (
         <ConnectButton userId={item.id} initialConnected={item.is_connected} />
@@ -112,28 +114,28 @@ export default function SearchScreen({ navigation }) {
   );
 
   return (
-    <View style={s.container}>
+    <View style={[s.container, { backgroundColor: theme.bg }]}>
       <StatusBar barStyle="light-content" />
 
       {/* Header */}
       <View style={s.header}>
-        <Text style={s.title}>Discover</Text>
+        <Text style={[s.title, { color: theme.text }]}>Discover</Text>
       </View>
 
       {/* Search bar */}
-      <View style={s.searchWrap}>
-        <Ionicons name="search" size={16} color={colors.dim} />
+      <View style={[s.searchWrap, { backgroundColor: theme.bgSecondary }]}>
+        <Ionicons name="search" size={16} color={theme.dim} />
         <TextInput
-          style={s.searchInput}
+          style={[s.searchInput, { color: theme.text }]}
           placeholder="Search people by name or @username"
-          placeholderTextColor={colors.dim}
+          placeholderTextColor={theme.dim}
           value={query}
           onChangeText={handleSearch}
           autoCapitalize="none"
         />
         {query ? (
           <TouchableOpacity onPress={() => { setQuery(""); setResults([]); }}>
-            <Ionicons name="close-circle" size={16} color={colors.dim} />
+            <Ionicons name="close-circle" size={16} color={theme.dim} />
           </TouchableOpacity>
         ) : null}
       </View>
@@ -143,11 +145,11 @@ export default function SearchScreen({ navigation }) {
           // Search results
           <View style={s.section}>
             {searching ? (
-              <ActivityIndicator color={colors.primary} style={{ marginTop: 30 }} />
+              <ActivityIndicator color={theme.primary} style={{ marginTop: 30 }} />
             ) : results.length === 0 ? (
               <View style={s.emptyWrap}>
-                <Ionicons name="search-outline" size={40} color={colors.dim} />
-                <Text style={s.emptyText}>No users found for "{query}"</Text>
+                <Ionicons name="search-outline" size={40} color={theme.dim} />
+                <Text style={[s.emptyText, { color: theme.muted }]}>No users found for "{query}"</Text>
               </View>
             ) : (
               results.map(u => renderUser(u))
@@ -157,11 +159,11 @@ export default function SearchScreen({ navigation }) {
           <>
             {/* People you may know */}
             <View style={s.section}>
-              <Text style={s.sectionTitle}>People You May Know</Text>
+              <Text style={[s.sectionTitle, { color: theme.text }]}>People You May Know</Text>
               {loadingSuggestions ? (
-                <ActivityIndicator color={colors.primary} style={{ marginTop: 20 }} />
+                <ActivityIndicator color={theme.primary} style={{ marginTop: 20 }} />
               ) : suggestions.length === 0 ? (
-                <Text style={s.emptyText}>No suggestions right now</Text>
+                <Text style={[s.emptyText, { color: theme.muted }]}>No suggestions right now</Text>
               ) : (
                 suggestions.map(u => renderUser(u))
               )}
@@ -170,15 +172,15 @@ export default function SearchScreen({ navigation }) {
             {/* Explore posts */}
             {posts.length > 0 && (
               <View style={s.section}>
-                <Text style={s.sectionTitle}>Explore Posts</Text>
+                <Text style={[s.sectionTitle, { color: theme.text }]}>Explore Posts</Text>
                 <View style={s.postsGrid}>
                   {posts.map(p => (
                     <TouchableOpacity key={p.id} style={s.postThumb} activeOpacity={0.85}>
                       {p.media_url ? (
                         <Image source={{ uri: p.media_url }} style={s.postThumbImg} resizeMode="cover" />
                       ) : (
-                        <View style={[s.postThumbImg, s.postThumbText]}>
-                          <Text style={s.postThumbCaption} numberOfLines={4}>{p.caption}</Text>
+                        <View style={[s.postThumbImg, { backgroundColor: theme.bgSecondary, padding: 8, justifyContent: 'center' }]}>
+                          <Text style={[s.postThumbCaption, { color: theme.muted }]} numberOfLines={4}>{p.caption}</Text>
                         </View>
                       )}
                     </TouchableOpacity>

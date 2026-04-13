@@ -9,12 +9,14 @@ class Config:
     _db_url = os.getenv("DATABASE_URL", "sqlite:///kinscribe.db")
     SQLALCHEMY_DATABASE_URI = _db_url.replace("postgres://", "postgresql://", 1) if _db_url else _db_url
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+
+    _is_postgres = bool(os.getenv("DATABASE_URL"))
     SQLALCHEMY_ENGINE_OPTIONS = {
         "pool_pre_ping": True,
         "pool_recycle": 300,
         "pool_size": 5,
         "max_overflow": 2,
-        "connect_args": {"connect_timeout": 10},
+        **({"connect_args": {"connect_timeout": 10}} if _is_postgres else {}),
     }
     JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "jwt-dev-secret")
     JWT_ACCESS_TOKEN_EXPIRES = 3600

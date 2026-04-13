@@ -13,6 +13,7 @@ import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { colors, radius, shadows } from '../theme';
 import GradientButton from '../components/GradientButton';
 import api from '../api/axios';
@@ -24,6 +25,7 @@ const HERO_HEIGHT = height * 0.32;
 
 // ── Forgot Password Modal ─────────────────────────────────────
 function ForgotPasswordModal({ visible, onClose }) {
+  const { theme } = useTheme();
   const [step, setStep] = useState('email');
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
@@ -89,7 +91,7 @@ function ForgotPasswordModal({ visible, onClose }) {
           <View style={fp.handle} />
           <View style={fp.inner}>
             <TouchableOpacity style={fp.closeBtn} onPress={handleClose}>
-              <Ionicons name="close" size={22} color={colors.muted} />
+              <Ionicons name="close" size={22} color={theme.muted} />
             </TouchableOpacity>
 
             {step === 'done' ? (
@@ -133,11 +135,11 @@ function ForgotPasswordModal({ visible, onClose }) {
                   <>
                     <Text style={fp.label}>Email Address</Text>
                     <View style={fp.inputWrap}>
-                      <Ionicons name="mail-outline" size={17} color={colors.muted} />
+                      <Ionicons name="mail-outline" size={17} color={theme.muted} />
                       <TextInput
-                        style={fp.input}
+                        style={[fp.input, { color: theme.text }]}
                         placeholder="you@example.com"
-                        placeholderTextColor={colors.dim}
+                        placeholderTextColor={theme.dim}
                         keyboardType="email-address"
                         autoCapitalize="none"
                         value={email}
@@ -173,17 +175,17 @@ function ForgotPasswordModal({ visible, onClose }) {
 
                     <Text style={fp.label}>New Password</Text>
                     <View style={fp.inputWrap}>
-                      <Ionicons name="lock-closed-outline" size={17} color={colors.muted} />
+                      <Ionicons name="lock-closed-outline" size={17} color={theme.muted} />
                       <TextInput
-                        style={[fp.input, { flex: 1 }]}
+                        style={[fp.input, { flex: 1, color: theme.text }]}
                         placeholder="Min. 6 characters"
-                        placeholderTextColor={colors.dim}
+                        placeholderTextColor={theme.dim}
                         secureTextEntry={!showPass}
                         value={newPass}
                         onChangeText={setNewPass}
                       />
                       <TouchableOpacity onPress={() => setShowPass(p => !p)} style={{ padding: 4 }}>
-                        <Ionicons name={showPass ? 'eye-off-outline' : 'eye-outline'} size={17} color={colors.muted} />
+                        <Ionicons name={showPass ? 'eye-off-outline' : 'eye-outline'} size={17} color={theme.muted} />
                       </TouchableOpacity>
                     </View>
 
@@ -242,6 +244,7 @@ const fp = StyleSheet.create({
 // ── Login Screen ──────────────────────────────────────────────
 export default function LoginScreen({ navigation }) {
   const { login, loginWithGoogle } = useAuth();
+  const { theme, isDark } = useTheme();
   const [form, setForm] = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -292,9 +295,9 @@ export default function LoginScreen({ navigation }) {
   };
 
   return (
-    <KeyboardAvoidingView style={s.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-      <LinearGradient colors={['#0f172a', '#1a0a2e', '#0f172a']} style={StyleSheet.absoluteFill} />
+    <KeyboardAvoidingView style={[s.container, { backgroundColor: theme.bg }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} translucent backgroundColor="transparent" />
+      <LinearGradient colors={isDark ? ['#0f172a', '#1a0a2e', '#0f172a'] : [theme.bg, theme.bgSecondary, theme.bg]} style={StyleSheet.absoluteFill} />
 
       {/* ── HERO BANNER ── */}
       <View style={s.hero}>
@@ -317,8 +320,8 @@ export default function LoginScreen({ navigation }) {
         <BlurView intensity={20} tint="dark" style={s.card}>
           <LinearGradient colors={['rgba(124,58,237,0.08)', 'rgba(15,23,42,0.7)']} style={StyleSheet.absoluteFill} />
           <View style={s.cardInner}>
-            <Text style={s.cardTitle}>Sign In</Text>
-            <Text style={s.cardSub}>Enter your details to continue</Text>
+            <Text style={[s.cardTitle, { color: theme.text }]}>Sign In</Text>
+            <Text style={[s.cardSub, { color: theme.muted }]}>Enter your details to continue</Text>
 
             {error ? (
               <View style={s.errorBox}>
@@ -327,13 +330,13 @@ export default function LoginScreen({ navigation }) {
               </View>
             ) : null}
 
-            <Text style={s.label}>Email</Text>
-            <View style={s.inputWrap}>
-              <Ionicons name="mail-outline" size={18} color={colors.muted} />
+            <Text style={[s.label, { color: theme.muted }]}>Email</Text>
+            <View style={[s.inputWrap, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]}>
+              <Ionicons name="mail-outline" size={18} color={theme.muted} />
               <TextInput
-                style={s.input}
+                style={[s.input, { color: theme.text }]}
                 placeholder="you@example.com"
-                placeholderTextColor={colors.dim}
+                placeholderTextColor={theme.dim}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 value={form.email}
@@ -341,19 +344,19 @@ export default function LoginScreen({ navigation }) {
               />
             </View>
 
-            <Text style={s.label}>Password</Text>
-            <View style={s.inputWrap}>
-              <Ionicons name="lock-closed-outline" size={18} color={colors.muted} />
+            <Text style={[s.label, { color: theme.muted }]}>Password</Text>
+            <View style={[s.inputWrap, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]}>
+              <Ionicons name="lock-closed-outline" size={18} color={theme.muted} />
               <TextInput
-                style={[s.input, { flex: 1 }]}
+                style={[s.input, { flex: 1, color: theme.text }]}
                 placeholder="••••••••"
-                placeholderTextColor={colors.dim}
+                placeholderTextColor={theme.dim}
                 secureTextEntry={!showPass}
                 value={form.password}
                 onChangeText={v => setForm({ ...form, password: v })}
               />
               <TouchableOpacity onPress={() => setShowPass(p => !p)} style={{ padding: 4 }}>
-                <Ionicons name={showPass ? 'eye-off-outline' : 'eye-outline'} size={18} color={colors.muted} />
+                <Ionicons name={showPass ? 'eye-off-outline' : 'eye-outline'} size={18} color={theme.muted} />
               </TouchableOpacity>
             </View>
 
@@ -364,9 +367,9 @@ export default function LoginScreen({ navigation }) {
             <GradientButton label="Sign In" onPress={handleLogin} loading={loading} style={{ marginTop: 4 }} />
 
             <View style={s.dividerRow}>
-              <View style={s.dividerLine} />
-              <Text style={s.dividerText}>OR</Text>
-              <View style={s.dividerLine} />
+              <View style={[s.dividerLine, { backgroundColor: theme.border }]} />
+              <Text style={[s.dividerText, { color: theme.dim }]}>OR</Text>
+              <View style={[s.dividerLine, { backgroundColor: theme.border }]} />
             </View>
 
             <TouchableOpacity
@@ -393,15 +396,15 @@ export default function LoginScreen({ navigation }) {
         </BlurView>
 
         <View style={s.footer}>
-          <Text style={s.footerText}>Don't have an account? </Text>
+          <Text style={[s.footerText, { color: theme.muted }]}>Don't have an account? </Text>
           <TouchableOpacity onPress={() => navigation.navigate('Register')}>
             <Text style={s.footerLink}>Sign up free</Text>
           </TouchableOpacity>
         </View>
 
         <TouchableOpacity style={s.inviteRow} onPress={() => navigation.navigate('JoinFamily')}>
-          <Ionicons name="key-outline" size={14} color={colors.dim} />
-          <Text style={s.inviteText}>Have an invite code? Join family</Text>
+          <Ionicons name="key-outline" size={14} color={theme.dim} />
+          <Text style={[s.inviteText, { color: theme.dim }]}>Have an invite code? Join family</Text>
         </TouchableOpacity>
       </ScrollView>
 

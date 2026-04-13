@@ -8,6 +8,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 import { colors, radius } from "../theme";
 
 function timeAgo(dateStr) {
@@ -31,6 +32,7 @@ function Avatar({ uri, name, size = 48 }) {
 
 export default function MessagesScreen({ navigation }) {
   const { user } = useAuth();
+  const { theme } = useTheme();
   const [conversations, setConversations] = useState([]);
   const [familyConv, setFamilyConv] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -104,18 +106,18 @@ export default function MessagesScreen({ navigation }) {
     const lastMsg = item.last_message;
     const unread = item.unread_count > 0;
     return (
-      <TouchableOpacity style={s.row} onPress={() => openConv(item)} activeOpacity={0.7}>
+      <TouchableOpacity style={[s.row, { borderBottomColor: theme.border }]} onPress={() => openConv(item)} activeOpacity={0.7}>
         <Avatar uri={other?.avatar} name={other?.name} size={52} />
         <View style={s.rowInfo}>
           <View style={s.rowTop}>
-            <Text style={[s.rowName, unread && s.rowNameUnread]}>{other?.name || "User"}</Text>
-            <Text style={s.rowTime}>{timeAgo(lastMsg?.created_at)}</Text>
+            <Text style={[s.rowName, { color: theme.text }, unread && s.rowNameUnread]}>{other?.name || "User"}</Text>
+            <Text style={[s.rowTime, { color: theme.dim }]}>{timeAgo(lastMsg?.created_at)}</Text>
           </View>
           <View style={s.rowBottom}>
-            <Text style={[s.rowLast, unread && s.rowLastUnread]} numberOfLines={1}>
+            <Text style={[s.rowLast, { color: theme.muted }, unread && { color: theme.text, fontWeight: '600' }]} numberOfLines={1}>
               {lastMsg ? (lastMsg.media_url ? "📎 Media" : lastMsg.text) : "Start a conversation"}
             </Text>
-            {unread && <View style={s.unreadDot}><Text style={s.unreadCount}>{item.unread_count}</Text></View>}
+            {unread && <View style={[s.unreadDot, { backgroundColor: theme.primary }]}><Text style={s.unreadCount}>{item.unread_count}</Text></View>}
           </View>
         </View>
       </TouchableOpacity>
@@ -123,30 +125,30 @@ export default function MessagesScreen({ navigation }) {
   };
 
   return (
-    <View style={s.container}>
+    <View style={[s.container, { backgroundColor: theme.bg }]}>
       <StatusBar barStyle="light-content" />
 
       {/* Header */}
       <View style={s.header}>
-        <Text style={s.title}>Messages</Text>
+        <Text style={[s.title, { color: theme.text }]}>Messages</Text>
         <TouchableOpacity onPress={() => navigation.navigate("Search")}>
-          <Ionicons name="person-add-outline" size={24} color={colors.text} />
+          <Ionicons name="person-add-outline" size={24} color={theme.text} />
         </TouchableOpacity>
       </View>
 
       {/* Search */}
-      <View style={s.searchWrap}>
-        <Ionicons name="search" size={16} color={colors.dim} />
+      <View style={[s.searchWrap, { backgroundColor: theme.bgSecondary }]}>
+        <Ionicons name="search" size={16} color={theme.dim} />
         <TextInput
-          style={s.searchInput}
+          style={[s.searchInput, { color: theme.text }]}
           placeholder="Search people..."
-          placeholderTextColor={colors.dim}
+          placeholderTextColor={theme.dim}
           value={search}
           onChangeText={handleSearch}
         />
         {search ? (
           <TouchableOpacity onPress={() => { setSearch(""); setSearchResults([]); }}>
-            <Ionicons name="close-circle" size={16} color={colors.dim} />
+            <Ionicons name="close-circle" size={16} color={theme.dim} />
           </TouchableOpacity>
         ) : null}
       </View>
@@ -155,21 +157,21 @@ export default function MessagesScreen({ navigation }) {
       {search ? (
         <View style={s.searchResults}>
           {searching ? (
-            <ActivityIndicator color={colors.primary} style={{ marginTop: 20 }} />
+            <ActivityIndicator color={theme.primary} style={{ marginTop: 20 }} />
           ) : searchResults.length === 0 ? (
-            <Text style={s.emptyText}>No users found</Text>
+            <Text style={[s.emptyText, { color: theme.muted }]}>No users found</Text>
           ) : (
             searchResults.map(u => (
               <TouchableOpacity
                 key={u.id}
-                style={s.searchRow}
+                style={[s.searchRow, { borderBottomColor: theme.border }]}
                 onPress={() => openDM(u.id, u.name, u.avatar_url)}
                 activeOpacity={0.7}
               >
                 <Avatar uri={u.avatar_url} name={u.name} size={40} />
                 <View style={{ marginLeft: 12 }}>
-                  <Text style={s.rowName}>{u.name}</Text>
-                  <Text style={s.rowLast}>@{u.username}</Text>
+                  <Text style={[s.rowName, { color: theme.text }]}>{u.name}</Text>
+                  <Text style={[s.rowLast, { color: theme.muted }]}>@{u.username}</Text>
                 </View>
               </TouchableOpacity>
             ))
@@ -180,24 +182,24 @@ export default function MessagesScreen({ navigation }) {
           {/* Family Chat */}
           {familyConv && (
             <View style={s.section}>
-              <Text style={s.sectionLabel}>Family</Text>
+              <Text style={[s.sectionLabel, { color: theme.dim }]}>Family</Text>
               <TouchableOpacity style={s.familyRow} onPress={() => openConv(familyConv)} activeOpacity={0.8}>
-                <LinearGradient colors={["#7c3aed", "#3b82f6", "#ec4899"]} style={s.familyIcon}>
+                <LinearGradient colors={["#2D5A27", "#4A7C3F", "#C4A35A"]} style={s.familyIcon}>
                   <Ionicons name="people" size={22} color="#fff" />
                 </LinearGradient>
                 <View style={s.rowInfo}>
                   <View style={s.rowTop}>
-                    <Text style={s.rowName}>Family Chat</Text>
-                    <Text style={s.rowTime}>{timeAgo(familyConv.last_message?.created_at)}</Text>
+                    <Text style={[s.rowName, { color: theme.text }]}>Family Chat</Text>
+                    <Text style={[s.rowTime, { color: theme.dim }]}>{timeAgo(familyConv.last_message?.created_at)}</Text>
                   </View>
                   <View style={s.rowBottom}>
-                    <Text style={s.rowLast} numberOfLines={1}>
+                    <Text style={[s.rowLast, { color: theme.muted }]} numberOfLines={1}>
                       {familyConv.last_message
                         ? `${familyConv.last_message.sender_name}: ${familyConv.last_message.media_url ? "📎 Media" : familyConv.last_message.text}`
                         : "Family group chat"}
                     </Text>
                     {familyConv.unread_count > 0 && (
-                      <View style={s.unreadDot}>
+                      <View style={[s.unreadDot, { backgroundColor: theme.primary }]}>
                         <Text style={s.unreadCount}>{familyConv.unread_count}</Text>
                       </View>
                     )}
@@ -209,16 +211,16 @@ export default function MessagesScreen({ navigation }) {
 
           {/* DMs */}
           <View style={s.section}>
-            <Text style={s.sectionLabel}>Direct Messages</Text>
+            <Text style={[s.sectionLabel, { color: theme.dim }]}>Direct Messages</Text>
           </View>
 
           {loading ? (
-            <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />
+            <ActivityIndicator color={theme.primary} style={{ marginTop: 40 }} />
           ) : conversations.length === 0 ? (
             <View style={s.emptyWrap}>
-              <Ionicons name="chatbubbles-outline" size={48} color={colors.dim} />
-              <Text style={s.emptyTitle}>No messages yet</Text>
-              <Text style={s.emptyText}>Search for people above to start a conversation</Text>
+              <Ionicons name="chatbubbles-outline" size={48} color={theme.dim} />
+              <Text style={[s.emptyTitle, { color: theme.text }]}>No messages yet</Text>
+              <Text style={[s.emptyText, { color: theme.muted }]}>Search for people above to start a conversation</Text>
             </View>
           ) : (
             <FlatList

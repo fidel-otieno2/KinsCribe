@@ -12,6 +12,7 @@ import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import api from '../api/axios';
 import { colors, radius, shadows } from '../theme';
 import GradientButton from '../components/GradientButton';
@@ -23,6 +24,7 @@ const HERO_HEIGHT = height * 0.28;
 
 export default function RegisterScreen({ navigation }) {
   const { login, loginWithGoogle } = useAuth();
+  const { theme, isDark } = useTheme();
   const [form, setForm] = useState({ name: '', username: '', email: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -78,9 +80,9 @@ export default function RegisterScreen({ navigation }) {
   };
 
   return (
-    <KeyboardAvoidingView style={s.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-      <LinearGradient colors={['#0f172a', '#1a0a2e', '#0f172a']} style={StyleSheet.absoluteFill} />
+    <KeyboardAvoidingView style={[s.container, { backgroundColor: theme.bg }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} translucent backgroundColor="transparent" />
+      <LinearGradient colors={isDark ? ['#0f172a', '#1a0a2e', '#0f172a'] : [theme.bg, theme.bgSecondary, theme.bg]} style={StyleSheet.absoluteFill} />
 
       {/* ── HERO BANNER ── */}
       <View style={s.hero}>
@@ -121,8 +123,8 @@ export default function RegisterScreen({ navigation }) {
             style={StyleSheet.absoluteFill}
           />
           <View style={s.cardInner}>
-            <Text style={s.cardTitle}>Create Account</Text>
-            <Text style={s.cardSub}>Start preserving your family memories</Text>
+            <Text style={[s.cardTitle, { color: theme.text }]}>Create Account</Text>
+            <Text style={[s.cardSub, { color: theme.muted }]}>Start preserving your family memories</Text>
 
             {error ? (
               <View style={s.errorBox}>
@@ -132,13 +134,13 @@ export default function RegisterScreen({ navigation }) {
             ) : null}
 
             {/* Full Name */}
-            <Text style={s.label}>Full Name</Text>
-            <View style={s.inputWrap}>
-              <Ionicons name="person-outline" size={18} color={colors.muted} />
+            <Text style={[s.label, { color: theme.muted }]}>Full Name</Text>
+            <View style={[s.inputWrap, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]}>
+              <Ionicons name="person-outline" size={18} color={theme.muted} />
               <TextInput
-                style={s.input}
+                style={[s.input, { color: theme.text }]}
                 placeholder="e.g. Fidel Otieno"
-                placeholderTextColor={colors.dim}
+                placeholderTextColor={theme.dim}
                 autoCapitalize="words"
                 value={form.name}
                 onChangeText={set('name')}
@@ -146,13 +148,13 @@ export default function RegisterScreen({ navigation }) {
             </View>
 
             {/* Username */}
-            <Text style={s.label}>Username</Text>
-            <View style={s.inputWrap}>
-              <Text style={s.atSign}>@</Text>
+            <Text style={[s.label, { color: theme.muted }]}>Username</Text>
+            <View style={[s.inputWrap, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]}>
+              <Text style={[s.atSign, { color: theme.muted }]}>@</Text>
               <TextInput
-                style={[s.input, { flex: 1 }]}
+                style={[s.input, { flex: 1, color: theme.text }]}
                 placeholder="yourname"
-                placeholderTextColor={colors.dim}
+                placeholderTextColor={theme.dim}
                 autoCapitalize="none"
                 value={form.username}
                 onChangeText={v => set('username')(v.toLowerCase().replace(/\s/g, ''))}
@@ -160,13 +162,13 @@ export default function RegisterScreen({ navigation }) {
             </View>
 
             {/* Email */}
-            <Text style={s.label}>Email</Text>
-            <View style={s.inputWrap}>
-              <Ionicons name="mail-outline" size={18} color={colors.muted} />
+            <Text style={[s.label, { color: theme.muted }]}>Email</Text>
+            <View style={[s.inputWrap, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]}>
+              <Ionicons name="mail-outline" size={18} color={theme.muted} />
               <TextInput
-                style={s.input}
+                style={[s.input, { color: theme.text }]}
                 placeholder="you@example.com"
-                placeholderTextColor={colors.dim}
+                placeholderTextColor={theme.dim}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 value={form.email}
@@ -175,19 +177,19 @@ export default function RegisterScreen({ navigation }) {
             </View>
 
             {/* Password */}
-            <Text style={s.label}>Password</Text>
-            <View style={s.inputWrap}>
-              <Ionicons name="lock-closed-outline" size={18} color={colors.muted} />
+            <Text style={[s.label, { color: theme.muted }]}>Password</Text>
+            <View style={[s.inputWrap, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]}>
+              <Ionicons name="lock-closed-outline" size={18} color={theme.muted} />
               <TextInput
-                style={[s.input, { flex: 1 }]}
+                style={[s.input, { flex: 1, color: theme.text }]}
                 placeholder="Min. 6 characters"
-                placeholderTextColor={colors.dim}
+                placeholderTextColor={theme.dim}
                 secureTextEntry={!showPass}
                 value={form.password}
                 onChangeText={set('password')}
               />
               <TouchableOpacity onPress={() => setShowPass(!showPass)} style={{ padding: 4 }}>
-                <Ionicons name={showPass ? 'eye-off-outline' : 'eye-outline'} size={18} color={colors.muted} />
+                <Ionicons name={showPass ? 'eye-off-outline' : 'eye-outline'} size={18} color={theme.muted} />
               </TouchableOpacity>
             </View>
 
@@ -202,11 +204,11 @@ export default function RegisterScreen({ navigation }) {
                         form.password.length >= i * 3
                           ? form.password.length >= 10 ? '#10b981'
                           : form.password.length >= 6 ? '#f59e0b' : '#e11d48'
-                          : colors.border,
+                          : theme.border,
                     }]}
                   />
                 ))}
-                <Text style={s.strengthText}>
+                <Text style={[s.strengthText, { color: theme.muted }]}>
                   {form.password.length < 6 ? 'Too short' : form.password.length < 10 ? 'Good' : 'Strong'}
                 </Text>
               </View>
@@ -220,9 +222,9 @@ export default function RegisterScreen({ navigation }) {
             />
 
             <View style={s.dividerRow}>
-              <View style={s.dividerLine} />
-              <Text style={s.dividerText}>OR</Text>
-              <View style={s.dividerLine} />
+              <View style={[s.dividerLine, { backgroundColor: theme.border }]} />
+              <Text style={[s.dividerText, { color: theme.dim }]}>OR</Text>
+              <View style={[s.dividerLine, { backgroundColor: theme.border }]} />
             </View>
 
             <TouchableOpacity
@@ -256,7 +258,7 @@ export default function RegisterScreen({ navigation }) {
         </BlurView>
 
         <View style={s.footer}>
-          <Text style={s.footerText}>Already have an account? </Text>
+          <Text style={[s.footerText, { color: theme.muted }]}>Already have an account? </Text>
           <TouchableOpacity onPress={() => navigation.navigate('Login')}>
             <Text style={s.footerLink}>Sign in</Text>
           </TouchableOpacity>

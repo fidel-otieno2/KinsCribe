@@ -7,6 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../api/axios';
+import { useTheme } from '../context/ThemeContext';
 import { colors, radius } from '../theme';
 
 const CATEGORIES = [
@@ -22,6 +23,7 @@ const CATEGORIES = [
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 export default function FamilyBudgetScreen({ navigation }) {
+  const { theme, isDark } = useTheme();
   const today = new Date();
   const [month, setMonth] = useState(today.getMonth() + 1);
   const [year, setYear] = useState(today.getFullYear());
@@ -82,30 +84,30 @@ export default function FamilyBudgetScreen({ navigation }) {
   const getCatInfo = (key) => CATEGORIES.find(c => c.key === key) || CATEGORIES[CATEGORIES.length - 1];
 
   return (
-    <View style={s.container}>
-      <LinearGradient colors={['#0f172a', '#1a0f2e', '#0f172a']} style={StyleSheet.absoluteFill} />
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}><Ionicons name="arrow-back" size={24} color={colors.text} /></TouchableOpacity>
-        <Text style={s.headerTitle}>Family Budget</Text>
+    <View style={[s.container, { backgroundColor: theme.bg }]}>
+      <LinearGradient colors={isDark ? ['#0f172a', '#1a0f2e', '#0f172a'] : [theme.bg, theme.bgSecondary, theme.bg]} style={StyleSheet.absoluteFill} />
+      <View style={[s.header, { borderBottomColor: theme.border }]}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}><Ionicons name="arrow-back" size={24} color={theme.text} /></TouchableOpacity>
+        <Text style={[s.headerTitle, { color: theme.text }]}>Family Budget</Text>
         <TouchableOpacity style={s.addBtn} onPress={() => setShowAdd(true)}><Ionicons name="add" size={22} color="#fff" /></TouchableOpacity>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
         {/* Month nav */}
         <View style={s.monthNav}>
-          <TouchableOpacity onPress={prevMonth} style={s.navBtn}><Ionicons name="chevron-back" size={22} color={colors.text} /></TouchableOpacity>
-          <Text style={s.monthTitle}>{MONTHS[month - 1]} {year}</Text>
-          <TouchableOpacity onPress={nextMonth} style={s.navBtn}><Ionicons name="chevron-forward" size={22} color={colors.text} /></TouchableOpacity>
+          <TouchableOpacity onPress={prevMonth} style={s.navBtn}><Ionicons name="chevron-back" size={22} color={theme.text} /></TouchableOpacity>
+          <Text style={[s.monthTitle, { color: theme.text }]}>{MONTHS[month - 1]} {year}</Text>
+          <TouchableOpacity onPress={nextMonth} style={s.navBtn}><Ionicons name="chevron-forward" size={22} color={theme.text} /></TouchableOpacity>
         </View>
 
         {/* Summary cards */}
         <View style={s.summaryRow}>
           <LinearGradient colors={['rgba(16,185,129,0.3)', 'rgba(16,185,129,0.1)']} style={s.summaryCard}>
-            <Text style={s.summaryLabel}>Income</Text>
+            <Text style={[s.summaryLabel, { color: theme.muted }]}>Income</Text>
             <Text style={[s.summaryAmount, { color: '#10b981' }]}>+${data.total_income.toFixed(2)}</Text>
           </LinearGradient>
           <LinearGradient colors={['rgba(225,29,72,0.3)', 'rgba(225,29,72,0.1)']} style={s.summaryCard}>
-            <Text style={s.summaryLabel}>Expenses</Text>
+            <Text style={[s.summaryLabel, { color: theme.muted }]}>Expenses</Text>
             <Text style={[s.summaryAmount, { color: '#e11d48' }]}>-${data.total_expense.toFixed(2)}</Text>
           </LinearGradient>
         </View>
@@ -114,7 +116,7 @@ export default function FamilyBudgetScreen({ navigation }) {
           colors={data.balance >= 0 ? ['rgba(16,185,129,0.2)', 'rgba(59,130,246,0.1)'] : ['rgba(225,29,72,0.2)', 'rgba(239,68,68,0.1)']}
           style={s.balanceCard}
         >
-          <Text style={s.balanceLabel}>Balance</Text>
+          <Text style={[s.balanceLabel, { color: theme.text }]}>Balance</Text>
           <Text style={[s.balanceAmount, { color: data.balance >= 0 ? '#10b981' : '#e11d48' }]}>
             {data.balance >= 0 ? '+' : ''}{data.balance.toFixed(2)}
           </Text>
@@ -122,24 +124,24 @@ export default function FamilyBudgetScreen({ navigation }) {
 
         {/* Entries */}
         <View style={s.section}>
-          <Text style={s.sectionTitle}>Transactions</Text>
-          {loading ? <ActivityIndicator color={colors.primary} style={{ marginTop: 20 }} /> :
+          <Text style={[s.sectionTitle, { color: theme.muted }]}>Transactions</Text>
+          {loading ? <ActivityIndicator color={theme.primary} style={{ marginTop: 20 }} /> :
             data.entries.length === 0 ? (
               <View style={s.empty}>
                 <Text style={{ fontSize: 40 }}>💰</Text>
-                <Text style={s.emptyTitle}>No entries yet</Text>
-                <Text style={s.emptySub}>Track your family expenses and income</Text>
+                <Text style={[s.emptyTitle, { color: theme.text }]}>No entries yet</Text>
+                <Text style={[s.emptySub, { color: theme.muted }]}>Track your family expenses and income</Text>
               </View>
             ) : data.entries.map(entry => {
               const cat = getCatInfo(entry.category);
               return (
-                <TouchableOpacity key={entry.id} style={s.entryRow} onLongPress={() => deleteEntry(entry)} activeOpacity={0.8}>
+                <TouchableOpacity key={entry.id} style={[s.entryRow, { borderBottomColor: theme.border }]} onLongPress={() => deleteEntry(entry)} activeOpacity={0.8}>
                   <View style={[s.entryIcon, { backgroundColor: `${cat.color}22` }]}>
                     <Text style={{ fontSize: 18 }}>{cat.icon}</Text>
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={s.entryTitle}>{entry.title}</Text>
-                    <Text style={s.entryMeta}>{entry.author_name} · {cat.label}</Text>
+                    <Text style={[s.entryTitle, { color: theme.text }]}>{entry.title}</Text>
+                    <Text style={[s.entryMeta, { color: theme.muted }]}>{entry.author_name} · {cat.label}</Text>
                   </View>
                   <Text style={[s.entryAmount, { color: entry.entry_type === 'income' ? '#10b981' : '#e11d48' }]}>
                     {entry.entry_type === 'income' ? '+' : '-'}${entry.amount.toFixed(2)}
@@ -155,27 +157,27 @@ export default function FamilyBudgetScreen({ navigation }) {
           <View style={s.addSheet}>
             <LinearGradient colors={['rgba(124,58,237,0.1)', '#0f172a']} style={StyleSheet.absoluteFill} />
             <View style={s.modalHandle} />
-            <Text style={s.modalTitle}>Add Entry</Text>
+            <Text style={[s.modalTitle, { color: theme.text }]}>Add Entry</Text>
 
             <View style={s.typeToggle}>
-              <TouchableOpacity style={[s.typeBtn, form.entry_type === 'expense' && s.typeBtnExpense]} onPress={() => set('entry_type', 'expense')}>
-                <Text style={[s.typeBtnText, form.entry_type === 'expense' && { color: '#fff' }]}>Expense</Text>
+              <TouchableOpacity style={[s.typeBtn, { borderColor: theme.border2 }, form.entry_type === 'expense' && s.typeBtnExpense]} onPress={() => set('entry_type', 'expense')}>
+                <Text style={[s.typeBtnText, { color: theme.muted }, form.entry_type === 'expense' && { color: '#fff' }]}>Expense</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[s.typeBtn, form.entry_type === 'income' && s.typeBtnIncome]} onPress={() => set('entry_type', 'income')}>
-                <Text style={[s.typeBtnText, form.entry_type === 'income' && { color: '#fff' }]}>Income</Text>
+              <TouchableOpacity style={[s.typeBtn, { borderColor: theme.border2 }, form.entry_type === 'income' && s.typeBtnIncome]} onPress={() => set('entry_type', 'income')}>
+                <Text style={[s.typeBtnText, { color: theme.muted }, form.entry_type === 'income' && { color: '#fff' }]}>Income</Text>
               </TouchableOpacity>
             </View>
 
-            <TextInput style={s.input} placeholder="Title *" placeholderTextColor={colors.dim} value={form.title} onChangeText={v => set('title', v)} />
-            <TextInput style={s.input} placeholder="Amount *" placeholderTextColor={colors.dim} keyboardType="decimal-pad" value={form.amount} onChangeText={v => set('amount', v)} />
+            <TextInput style={[s.input, { backgroundColor: theme.bgCard, color: theme.text, borderColor: theme.border2 }]} placeholder="Title *" placeholderTextColor={theme.dim} value={form.title} onChangeText={v => set('title', v)} />
+            <TextInput style={[s.input, { backgroundColor: theme.bgCard, color: theme.text, borderColor: theme.border2 }]} placeholder="Amount *" placeholderTextColor={theme.dim} keyboardType="decimal-pad" value={form.amount} onChangeText={v => set('amount', v)} />
 
-            <Text style={s.fieldLabel}>Category</Text>
+            <Text style={[s.fieldLabel, { color: theme.muted }]}>Category</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 {CATEGORIES.map(c => (
-                  <TouchableOpacity key={c.key} style={[s.catChip, form.category === c.key && { borderColor: c.color, backgroundColor: `${c.color}22` }]} onPress={() => set('category', c.key)}>
+                  <TouchableOpacity key={c.key} style={[s.catChip, { backgroundColor: theme.bgCard, borderColor: theme.border2 }, form.category === c.key && { borderColor: c.color, backgroundColor: `${c.color}22` }]} onPress={() => set('category', c.key)}>
                     <Text>{c.icon}</Text>
-                    <Text style={[s.catChipText, form.category === c.key && { color: c.color }]}>{c.label}</Text>
+                    <Text style={[s.catChipText, { color: theme.muted }, form.category === c.key && { color: c.color }]}>{c.label}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -187,7 +189,7 @@ export default function FamilyBudgetScreen({ navigation }) {
               </LinearGradient>
             </TouchableOpacity>
             <TouchableOpacity style={{ alignItems: 'center', paddingVertical: 12 }} onPress={() => setShowAdd(false)}>
-              <Text style={{ color: colors.muted }}>Cancel</Text>
+              <Text style={{ color: theme.muted }}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </BlurView>

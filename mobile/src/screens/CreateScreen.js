@@ -8,6 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import api from '../api/axios';
 import { colors, radius } from '../theme';
 
@@ -27,6 +28,7 @@ const PRIVACY_OPTS = [
 
 export default function CreateScreen({ navigation }) {
   const { user } = useAuth();
+  const { theme, isDark } = useTheme();
   const [mode, setMode] = useState('post');
   const [mediaFiles, setMediaFiles] = useState([]); // [{uri, type}]
   const [caption, setCaption] = useState('');
@@ -143,11 +145,11 @@ export default function CreateScreen({ navigation }) {
   };
 
   return (
-    <KeyboardAvoidingView style={s.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <LinearGradient colors={['#0f172a', '#1e1040', '#0f172a']} style={StyleSheet.absoluteFill} />
+    <KeyboardAvoidingView style={[s.container, { backgroundColor: theme.bg }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <LinearGradient colors={isDark ? ['#0f172a', '#1e1040', '#0f172a'] : [theme.bg, theme.bgSecondary, theme.bg]} style={StyleSheet.absoluteFill} />
 
-      <View style={s.header}>
-        <Text style={s.headerTitle}>Create</Text>
+      <View style={[s.header, { borderBottomColor: theme.border }]}>
+        <Text style={[s.headerTitle, { color: theme.text }]}>Create</Text>
         <TouchableOpacity
           style={[s.postBtn, loading && { opacity: 0.5 }]}
           onPress={handlePost}
@@ -167,7 +169,7 @@ export default function CreateScreen({ navigation }) {
             style={[s.modeBtn, mode === m.key && s.modeBtnActive]}
             onPress={() => setMode(m.key)}
           >
-            <Ionicons name={m.icon} size={18} color={mode === m.key ? '#fff' : colors.muted} />
+            <Ionicons name={m.icon} size={18} color={mode === m.key ? '#fff' : theme.muted} />
             <Text style={[s.modeBtnText, mode === m.key && { color: '#fff' }]}>{m.label}</Text>
           </TouchableOpacity>
         ))}
@@ -193,8 +195,8 @@ export default function CreateScreen({ navigation }) {
                   </View>
                 ))}
                 {mediaFiles.length < 10 && (
-                  <TouchableOpacity style={s.addMoreBtn} onPress={() => pickMedia(true)}>
-                    <Ionicons name="add" size={28} color={colors.muted} />
+                  <TouchableOpacity style={[s.addMoreBtn, { backgroundColor: theme.bgSecondary, borderColor: theme.border2 }]} onPress={() => pickMedia(true)}>
+                    <Ionicons name="add" size={28} color={theme.muted} />
                   </TouchableOpacity>
                 )}
               </ScrollView>
@@ -219,35 +221,35 @@ export default function CreateScreen({ navigation }) {
             )}
 
             <TextInput
-              style={s.captionInput}
+              style={[s.captionInput, { backgroundColor: theme.bgCard, color: theme.text, borderColor: theme.border2 }]}
               placeholder="Write a caption..."
-              placeholderTextColor={colors.dim}
+              placeholderTextColor={theme.dim}
               multiline
               value={caption}
               onChangeText={setCaption}
               maxLength={2200}
             />
 
-            <View style={s.fieldRow}>
-              <Ionicons name="location-outline" size={18} color={colors.muted} />
-              <TextInput style={s.fieldInput} placeholder="Add location" placeholderTextColor={colors.dim} value={location} onChangeText={setLocation} />
+            <View style={[s.fieldRow, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]}>
+              <Ionicons name="location-outline" size={18} color={theme.muted} />
+              <TextInput style={[s.fieldInput, { color: theme.text }]} placeholder="Add location" placeholderTextColor={theme.dim} value={location} onChangeText={setLocation} />
             </View>
 
-            <View style={s.fieldRow}>
-              <Ionicons name="pricetag-outline" size={18} color={colors.muted} />
-              <TextInput style={s.fieldInput} placeholder="#hashtags" placeholderTextColor={colors.dim} value={hashtags} onChangeText={setHashtags} autoCapitalize="none" />
+            <View style={[s.fieldRow, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]}>
+              <Ionicons name="pricetag-outline" size={18} color={theme.muted} />
+              <TextInput style={[s.fieldInput, { color: theme.text }]} placeholder="#hashtags" placeholderTextColor={theme.dim} value={hashtags} onChangeText={setHashtags} autoCapitalize="none" />
             </View>
 
-            <Text style={s.label}>Audience</Text>
+            <Text style={[s.label, { color: theme.muted }]}>Audience</Text>
             <View style={s.privacyRow}>
               {PRIVACY_OPTS.map(opt => (
                 <TouchableOpacity
                   key={opt.key}
-                  style={[s.privacyBtn, privacy === opt.key && { borderColor: opt.color, backgroundColor: `${opt.color}22` }]}
+                  style={[s.privacyBtn, { backgroundColor: theme.bgCard, borderColor: theme.border2 }, privacy === opt.key && { borderColor: opt.color, backgroundColor: `${opt.color}22` }]}
                   onPress={() => setPrivacy(opt.key)}
                 >
-                  <Ionicons name={opt.icon} size={14} color={privacy === opt.key ? opt.color : colors.muted} />
-                  <Text style={[s.privacyText, privacy === opt.key && { color: opt.color }]}>{opt.label}</Text>
+                  <Ionicons name={opt.icon} size={14} color={privacy === opt.key ? opt.color : theme.muted} />
+                  <Text style={[s.privacyText, { color: theme.muted }, privacy === opt.key && { color: opt.color }]}>{opt.label}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -279,19 +281,19 @@ export default function CreateScreen({ navigation }) {
             )}
 
             <View style={s.storyActions}>
-              <TouchableOpacity style={s.storyActionBtn} onPress={takePhoto}>
-                <Ionicons name="camera-outline" size={22} color={colors.text} />
-                <Text style={s.storyActionText}>Camera</Text>
+              <TouchableOpacity style={[s.storyActionBtn, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]} onPress={takePhoto}>
+                <Ionicons name="camera-outline" size={22} color={theme.text} />
+                <Text style={[s.storyActionText, { color: theme.text }]}>Camera</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={s.storyActionBtn} onPress={() => pickMedia(false)}>
-                <Ionicons name="images-outline" size={22} color={colors.text} />
-                <Text style={s.storyActionText}>Gallery</Text>
+              <TouchableOpacity style={[s.storyActionBtn, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]} onPress={() => pickMedia(false)}>
+                <Ionicons name="images-outline" size={22} color={theme.text} />
+                <Text style={[s.storyActionText, { color: theme.text }]}>Gallery</Text>
               </TouchableOpacity>
             </View>
 
             {!mediaFiles[0] && (
               <>
-                <Text style={s.label}>Background Color</Text>
+                <Text style={[s.label, { color: theme.muted }]}>Background Color</Text>
                 <View style={s.bgColorRow}>
                   {BG_COLORS.map(c => (
                     <TouchableOpacity
@@ -304,16 +306,16 @@ export default function CreateScreen({ navigation }) {
               </>
             )}
 
-            <Text style={s.label}>Audience</Text>
+            <Text style={[s.label, { color: theme.muted }]}>Audience</Text>
             <View style={s.privacyRow}>
               {PRIVACY_OPTS.slice(0, 2).map(opt => (
                 <TouchableOpacity
                   key={opt.key}
-                  style={[s.privacyBtn, privacy === opt.key && { borderColor: opt.color, backgroundColor: `${opt.color}22` }]}
+                  style={[s.privacyBtn, { backgroundColor: theme.bgCard, borderColor: theme.border2 }, privacy === opt.key && { borderColor: opt.color, backgroundColor: `${opt.color}22` }]}
                   onPress={() => setPrivacy(opt.key)}
                 >
-                  <Ionicons name={opt.icon} size={14} color={privacy === opt.key ? opt.color : colors.muted} />
-                  <Text style={[s.privacyText, privacy === opt.key && { color: opt.color }]}>{opt.label}</Text>
+                  <Ionicons name={opt.icon} size={14} color={privacy === opt.key ? opt.color : theme.muted} />
+                  <Text style={[s.privacyText, { color: theme.muted }, privacy === opt.key && { color: opt.color }]}>{opt.label}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -348,16 +350,16 @@ export default function CreateScreen({ navigation }) {
               </View>
             )}
 
-            <Text style={s.label}>Title *</Text>
-            <TextInput style={s.input} placeholder="Give your story a title..." placeholderTextColor={colors.dim} value={familyTitle} onChangeText={setFamilyTitle} />
+            <Text style={[s.label, { color: theme.muted }]}>Title *</Text>
+            <TextInput style={[s.input, { backgroundColor: theme.bgCard, color: theme.text, borderColor: theme.border2 }]} placeholder="Give your story a title..." placeholderTextColor={theme.dim} value={familyTitle} onChangeText={setFamilyTitle} />
 
-            <Text style={s.label}>Story</Text>
-            <TextInput style={[s.input, s.textarea]} multiline placeholder="Tell your family story..." placeholderTextColor={colors.dim} value={familyContent} onChangeText={setFamilyContent} />
+            <Text style={[s.label, { color: theme.muted }]}>Story</Text>
+            <TextInput style={[s.input, s.textarea, { backgroundColor: theme.bgCard, color: theme.text, borderColor: theme.border2 }]} multiline placeholder="Tell your family story..." placeholderTextColor={theme.dim} value={familyContent} onChangeText={setFamilyContent} />
 
-            <Text style={s.label}>When did this happen?</Text>
-            <TextInput style={s.input} placeholder="YYYY-MM-DD" placeholderTextColor={colors.dim} value={storyDate} onChangeText={setStoryDate} keyboardType="numeric" />
+            <Text style={[s.label, { color: theme.muted }]}>When did this happen?</Text>
+            <TextInput style={[s.input, { backgroundColor: theme.bgCard, color: theme.text, borderColor: theme.border2 }]} placeholder="YYYY-MM-DD" placeholderTextColor={theme.dim} value={storyDate} onChangeText={setStoryDate} keyboardType="numeric" />
 
-            <Text style={s.label}>Privacy</Text>
+            <Text style={[s.label, { color: theme.muted }]}>Privacy</Text>
             <View style={s.privacyRow}>
               {[
                 { key: 'family', label: '👨‍👩‍👧 Family', color: '#10b981' },

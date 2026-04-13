@@ -8,6 +8,7 @@ import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import api from '../api/axios';
+import { useTheme } from '../context/ThemeContext';
 import { colors, radius } from '../theme';
 
 const CATEGORIES = [
@@ -20,20 +21,21 @@ const CATEGORIES = [
 ];
 
 function RecipeCard({ recipe, onPress, onDelete }) {
+  const { theme } = useTheme();
   return (
-    <TouchableOpacity style={rc.card} onPress={onPress} onLongPress={onDelete} activeOpacity={0.85}>
+    <TouchableOpacity style={[rc.card, { backgroundColor: theme.bgSecondary, borderColor: theme.border }]} onPress={onPress} onLongPress={onDelete} activeOpacity={0.85}>
       {recipe.image_url
         ? <Image source={{ uri: recipe.image_url }} style={rc.img} resizeMode="cover" />
         : <View style={[rc.img, rc.imgPlaceholder]}>
             <Text style={{ fontSize: 40 }}>🍽️</Text>
           </View>}
       <View style={rc.info}>
-        <Text style={rc.title} numberOfLines={1}>{recipe.title}</Text>
-        <Text style={rc.author}>by {recipe.author_name}</Text>
+        <Text style={[rc.title, { color: theme.text }]} numberOfLines={1}>{recipe.title}</Text>
+        <Text style={[rc.author, { color: theme.muted }]}>by {recipe.author_name}</Text>
         <View style={rc.meta}>
-          {recipe.prep_time && <View style={rc.metaItem}><Ionicons name="time-outline" size={12} color={colors.muted} /><Text style={rc.metaText}>{recipe.prep_time}m</Text></View>}
-          {recipe.servings && <View style={rc.metaItem}><Ionicons name="people-outline" size={12} color={colors.muted} /><Text style={rc.metaText}>{recipe.servings}</Text></View>}
-          {recipe.category && <View style={[rc.catBadge]}><Text style={rc.catText}>{recipe.category}</Text></View>}
+          {recipe.prep_time && <View style={rc.metaItem}><Ionicons name="time-outline" size={12} color={theme.muted} /><Text style={[rc.metaText, { color: theme.muted }]}>{recipe.prep_time}m</Text></View>}
+          {recipe.servings && <View style={rc.metaItem}><Ionicons name="people-outline" size={12} color={theme.muted} /><Text style={[rc.metaText, { color: theme.muted }]}>{recipe.servings}</Text></View>}
+          {recipe.category && <View style={rc.catBadge}><Text style={[rc.catText, { color: theme.primary }]}>{recipe.category}</Text></View>}
         </View>
       </View>
     </TouchableOpacity>
@@ -55,6 +57,7 @@ const rc = StyleSheet.create({
 });
 
 export default function FamilyRecipesScreen({ navigation }) {
+  const { theme, isDark } = useTheme();
   const [recipes, setRecipes] = useState([]);
   const [category, setCategory] = useState('all');
   const [loading, setLoading] = useState(true);
@@ -128,32 +131,32 @@ export default function FamilyRecipesScreen({ navigation }) {
 
   if (selected) {
     return (
-      <View style={s.container}>
-        <LinearGradient colors={['#0f172a', '#1a0f2e', '#0f172a']} style={StyleSheet.absoluteFill} />
-        <View style={s.header}>
-          <TouchableOpacity onPress={() => setSelected(null)} style={s.backBtn}><Ionicons name="arrow-back" size={24} color={colors.text} /></TouchableOpacity>
-          <Text style={s.headerTitle} numberOfLines={1}>{selected.title}</Text>
+      <View style={[s.container, { backgroundColor: theme.bg }]}>
+        <LinearGradient colors={isDark ? ['#0f172a', '#1a0f2e', '#0f172a'] : [theme.bg, theme.bgSecondary, theme.bg]} style={StyleSheet.absoluteFill} />
+        <View style={[s.header, { borderBottomColor: theme.border }]}>
+          <TouchableOpacity onPress={() => setSelected(null)} style={s.backBtn}><Ionicons name="arrow-back" size={24} color={theme.text} /></TouchableOpacity>
+          <Text style={[s.headerTitle, { color: theme.text }]} numberOfLines={1}>{selected.title}</Text>
         </View>
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
           {selected.image_url && <Image source={{ uri: selected.image_url }} style={{ width: '100%', height: 220, borderRadius: radius.lg, marginBottom: 16 }} resizeMode="cover" />}
-          <Text style={s.recipeTitle}>{selected.title}</Text>
-          <Text style={s.recipeAuthor}>by {selected.author_name}</Text>
-          {selected.description && <Text style={s.recipeDesc}>{selected.description}</Text>}
+          <Text style={[s.recipeTitle, { color: theme.text }]}>{selected.title}</Text>
+          <Text style={[s.recipeAuthor, { color: theme.muted }]}>by {selected.author_name}</Text>
+          {selected.description && <Text style={[s.recipeDesc, { color: theme.muted }]}>{selected.description}</Text>}
           {selected.ingredients?.length > 0 && (
             <>
-              <Text style={s.sectionTitle}>Ingredients</Text>
+              <Text style={[s.sectionTitle, { color: theme.text }]}>Ingredients</Text>
               {selected.ingredients.map((ing, i) => (
                 <View key={i} style={s.ingredientRow}>
-                  <View style={s.ingredientDot} />
-                  <Text style={s.ingredientText}>{ing}</Text>
+                  <View style={[s.ingredientDot, { backgroundColor: theme.primary }]} />
+                  <Text style={[s.ingredientText, { color: theme.text }]}>{ing}</Text>
                 </View>
               ))}
             </>
           )}
           {selected.instructions && (
             <>
-              <Text style={s.sectionTitle}>Instructions</Text>
-              <Text style={s.instructions}>{selected.instructions}</Text>
+              <Text style={[s.sectionTitle, { color: theme.text }]}>Instructions</Text>
+              <Text style={[s.instructions, { color: theme.muted }]}>{selected.instructions}</Text>
             </>
           )}
         </ScrollView>
@@ -162,24 +165,24 @@ export default function FamilyRecipesScreen({ navigation }) {
   }
 
   return (
-    <View style={s.container}>
-      <LinearGradient colors={['#0f172a', '#1a0f2e', '#0f172a']} style={StyleSheet.absoluteFill} />
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}><Ionicons name="arrow-back" size={24} color={colors.text} /></TouchableOpacity>
-        <Text style={s.headerTitle}>Family Recipes</Text>
+    <View style={[s.container, { backgroundColor: theme.bg }]}>
+      <LinearGradient colors={isDark ? ['#0f172a', '#1a0f2e', '#0f172a'] : [theme.bg, theme.bgSecondary, theme.bg]} style={StyleSheet.absoluteFill} />
+      <View style={[s.header, { borderBottomColor: theme.border }]}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}><Ionicons name="arrow-back" size={24} color={theme.text} /></TouchableOpacity>
+        <Text style={[s.headerTitle, { color: theme.text }]}>Family Recipes</Text>
         <TouchableOpacity style={s.addBtn} onPress={() => setShowAdd(true)}><Ionicons name="add" size={22} color="#fff" /></TouchableOpacity>
       </View>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.catRow}>
         {CATEGORIES.map(c => (
-          <TouchableOpacity key={c.key} style={[s.catBtn, category === c.key && s.catBtnActive]} onPress={() => setCategory(c.key)}>
+          <TouchableOpacity key={c.key} style={[s.catBtn, { backgroundColor: theme.bgCard, borderColor: theme.border2 }, category === c.key && s.catBtnActive]} onPress={() => setCategory(c.key)}>
             <Text style={s.catIcon}>{c.icon}</Text>
-            <Text style={[s.catLabel, category === c.key && { color: '#fff' }]}>{c.label}</Text>
+            <Text style={[s.catLabel, { color: theme.muted }, category === c.key && { color: '#fff' }]}>{c.label}</Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
 
-      {loading ? <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} /> : (
+      {loading ? <ActivityIndicator color={theme.primary} style={{ marginTop: 40 }} /> : (
         <FlatList
           data={recipes}
           keyExtractor={i => String(i.id)}
@@ -188,8 +191,8 @@ export default function FamilyRecipesScreen({ navigation }) {
           ListEmptyComponent={
             <View style={s.empty}>
               <Text style={{ fontSize: 48 }}>🍽️</Text>
-              <Text style={s.emptyTitle}>No recipes yet</Text>
-              <Text style={s.emptySub}>Add your family's favourite recipes</Text>
+              <Text style={[s.emptyTitle, { color: theme.text }]}>No recipes yet</Text>
+              <Text style={[s.emptySub, { color: theme.muted }]}>Add your family's favourite recipes</Text>
             </View>
           }
         />
@@ -201,23 +204,23 @@ export default function FamilyRecipesScreen({ navigation }) {
             <LinearGradient colors={['rgba(124,58,237,0.1)', '#0f172a']} style={StyleSheet.absoluteFill} />
             <View style={s.modalHandle} />
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-              <Text style={s.modalTitle}>Add Recipe</Text>
-              <TouchableOpacity style={s.imgPicker} onPress={pickImage}>
-                {imageUri ? <Image source={{ uri: imageUri }} style={s.imgPickerImg} resizeMode="cover" /> : <><Ionicons name="camera-outline" size={28} color={colors.muted} /><Text style={s.imgPickerText}>Add Photo</Text></>}
+              <Text style={[s.modalTitle, { color: theme.text }]}>Add Recipe</Text>
+              <TouchableOpacity style={[s.imgPicker, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]} onPress={pickImage}>
+                {imageUri ? <Image source={{ uri: imageUri }} style={s.imgPickerImg} resizeMode="cover" /> : <><Ionicons name="camera-outline" size={28} color={theme.muted} /><Text style={[s.imgPickerText, { color: theme.muted }]}>Add Photo</Text></>}
               </TouchableOpacity>
-              <TextInput style={s.input} placeholder="Recipe title *" placeholderTextColor={colors.dim} value={form.title} onChangeText={v => set('title', v)} />
-              <TextInput style={[s.input, { height: 70 }]} placeholder="Description" placeholderTextColor={colors.dim} multiline value={form.description} onChangeText={v => set('description', v)} />
-              <Text style={s.fieldLabel}>Ingredients</Text>
+              <TextInput style={[s.input, { backgroundColor: theme.bgCard, color: theme.text, borderColor: theme.border2 }]} placeholder="Recipe title *" placeholderTextColor={theme.dim} value={form.title} onChangeText={v => set('title', v)} />
+              <TextInput style={[s.input, { height: 70, backgroundColor: theme.bgCard, color: theme.text, borderColor: theme.border2 }]} placeholder="Description" placeholderTextColor={theme.dim} multiline value={form.description} onChangeText={v => set('description', v)} />
+              <Text style={[s.fieldLabel, { color: theme.muted }]}>Ingredients</Text>
               {ingredients.map((ing, i) => (
                 <View key={i} style={s.ingRow}>
-                  <TextInput style={[s.input, { flex: 1, marginBottom: 0 }]} placeholder={`Ingredient ${i + 1}`} placeholderTextColor={colors.dim} value={ing} onChangeText={v => { const arr = [...ingredients]; arr[i] = v; setIngredients(arr); }} />
-                  {i === ingredients.length - 1 && <TouchableOpacity onPress={() => setIngredients([...ingredients, ''])} style={{ padding: 10 }}><Ionicons name="add-circle" size={22} color={colors.primary} /></TouchableOpacity>}
+                  <TextInput style={[s.input, { flex: 1, marginBottom: 0, backgroundColor: theme.bgCard, color: theme.text, borderColor: theme.border2 }]} placeholder={`Ingredient ${i + 1}`} placeholderTextColor={theme.dim} value={ing} onChangeText={v => { const arr = [...ingredients]; arr[i] = v; setIngredients(arr); }} />
+                  {i === ingredients.length - 1 && <TouchableOpacity onPress={() => setIngredients([...ingredients, ''])} style={{ padding: 10 }}><Ionicons name="add-circle" size={22} color={theme.primary} /></TouchableOpacity>}
                 </View>
               ))}
-              <TextInput style={[s.input, { height: 100, marginTop: 12 }]} placeholder="Instructions (step by step)" placeholderTextColor={colors.dim} multiline value={form.instructions} onChangeText={v => set('instructions', v)} />
+              <TextInput style={[s.input, { height: 100, marginTop: 12, backgroundColor: theme.bgCard, color: theme.text, borderColor: theme.border2 }]} placeholder="Instructions (step by step)" placeholderTextColor={theme.dim} multiline value={form.instructions} onChangeText={v => set('instructions', v)} />
               <View style={{ flexDirection: 'row', gap: 10 }}>
-                <TextInput style={[s.input, { flex: 1 }]} placeholder="Prep time (min)" placeholderTextColor={colors.dim} keyboardType="numeric" value={form.prep_time} onChangeText={v => set('prep_time', v)} />
-                <TextInput style={[s.input, { flex: 1 }]} placeholder="Servings" placeholderTextColor={colors.dim} keyboardType="numeric" value={form.servings} onChangeText={v => set('servings', v)} />
+                <TextInput style={[s.input, { flex: 1, backgroundColor: theme.bgCard, color: theme.text, borderColor: theme.border2 }]} placeholder="Prep time (min)" placeholderTextColor={theme.dim} keyboardType="numeric" value={form.prep_time} onChangeText={v => set('prep_time', v)} />
+                <TextInput style={[s.input, { flex: 1, backgroundColor: theme.bgCard, color: theme.text, borderColor: theme.border2 }]} placeholder="Servings" placeholderTextColor={theme.dim} keyboardType="numeric" value={form.servings} onChangeText={v => set('servings', v)} />
               </View>
               <TouchableOpacity style={s.saveBtn} onPress={saveRecipe} disabled={saving}>
                 <LinearGradient colors={['#7c3aed', '#3b82f6']} style={s.saveBtnGrad}>
@@ -225,7 +228,7 @@ export default function FamilyRecipesScreen({ navigation }) {
                 </LinearGradient>
               </TouchableOpacity>
               <TouchableOpacity style={{ alignItems: 'center', paddingVertical: 12 }} onPress={() => setShowAdd(false)}>
-                <Text style={{ color: colors.muted }}>Cancel</Text>
+                <Text style={{ color: theme.muted }}>Cancel</Text>
               </TouchableOpacity>
             </ScrollView>
           </View>

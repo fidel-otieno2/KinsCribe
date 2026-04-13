@@ -5,63 +5,56 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, radius } from '../theme';
+import { colors, gradients, radius, shadows } from '../theme';
 import GradientButton from '../components/GradientButton';
 
 const { width, height } = Dimensions.get('window');
-const HERO_HEIGHT = height * 0.52;
+const HERO_HEIGHT = height * 0.55;
 
 export default function WelcomeScreen({ navigation }) {
   return (
     <View style={s.container}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-      {/* ── HERO SECTION ── */}
+      {/* Hero image */}
       <View style={s.hero}>
-        {/* Full-bleed logo image */}
         <Image
           source={require('../../assets/kinscribe-logo.png')}
           style={s.heroImg}
           resizeMode="cover"
         />
-
-        {/* Dark overlay so text is readable */}
         <LinearGradient
-          colors={['rgba(15,23,42,0.15)', 'rgba(15,23,42,0.5)', '#0f172a']}
+          colors={['rgba(28,26,20,0.05)', 'rgba(28,26,20,0.4)', '#1C1A14']}
           style={StyleSheet.absoluteFill}
         />
+        {/* Green glow */}
+        <View style={s.glowGreen} />
+        <View style={s.glowGold} />
 
-        {/* Subtle purple glow top-left */}
-        <View style={s.glowPurple} />
-        <View style={s.glowBlue} />
-
-        {/* App name overlaid on hero */}
+        {/* Badge */}
         <View style={s.heroTextWrap}>
-          <View style={s.badgeRow}>
-            <BlurView intensity={30} tint="dark" style={s.badge}>
-              <Ionicons name="sparkles" size={12} color="#a78bfa" />
-              <Text style={s.badgeText}>AI-Powered Family Stories</Text>
-            </BlurView>
-          </View>
+          <BlurView intensity={30} tint="dark" style={s.badge}>
+            <Ionicons name="leaf" size={12} color={colors.primaryLight} />
+            <Text style={s.badgeText}>AI-Powered Family Stories</Text>
+          </BlurView>
 
           <Text style={s.appName}>KinsCribe</Text>
-
           <Text style={s.tagline}>
-            Preserve your family's voice{'\n'}across generations
+            Preserve your family's roots{'\\n'}across generations
           </Text>
         </View>
       </View>
 
-      {/* ── BOTTOM SECTION ── */}
+      {/* Bottom section */}
       <View style={s.bottom}>
         {/* Feature row */}
         <View style={s.featureRow}>
           {[
-            { icon: 'mic', label: 'Voice', color: '#10b981' },
-            { icon: 'sparkles', label: 'AI', color: '#7c3aed' },
-            { icon: 'lock-closed', label: 'Private', color: '#3b82f6' },
-            { icon: 'book', label: 'Stories', color: '#f59e0b' },
-            { icon: 'people', label: 'Family', color: '#ec4899' },
+            { icon: 'mic', label: 'Voice', color: colors.primaryLight },
+            { icon: 'sparkles', label: 'AI', color: colors.gold },
+            { icon: 'lock-closed', label: 'Private', color: colors.primaryMid },
+            { icon: 'book', label: 'Stories', color: colors.gold },
+            { icon: 'people', label: 'Family', color: colors.brown },
           ].map(({ icon, label, color }) => (
             <View key={label} style={s.featureItem}>
               <View style={[s.featureIcon, { backgroundColor: `${color}22` }]}>
@@ -72,7 +65,6 @@ export default function WelcomeScreen({ navigation }) {
           ))}
         </View>
 
-        {/* Divider */}
         <View style={s.divider} />
 
         {/* Buttons */}
@@ -98,7 +90,7 @@ export default function WelcomeScreen({ navigation }) {
             activeOpacity={0.8}
           >
             <View style={s.inviteBtnInner}>
-              <Ionicons name="key-outline" size={16} color="#7c3aed" />
+              <Ionicons name="key-outline" size={16} color={colors.gold} />
               <Text style={s.inviteBtnText}>Join with Invite Code</Text>
             </View>
           </TouchableOpacity>
@@ -111,81 +103,65 @@ export default function WelcomeScreen({ navigation }) {
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0f172a' },
+  container: { flex: 1, backgroundColor: colors.bg },
 
-  // hero
   hero: { width, height: HERO_HEIGHT, position: 'relative', overflow: 'hidden' },
   heroImg: { width: '100%', height: '100%' },
-  glowPurple: {
+  glowGreen: {
     position: 'absolute', width: 300, height: 300, borderRadius: 150,
-    backgroundColor: 'rgba(124,58,237,0.25)', top: -80, left: -60,
+    backgroundColor: 'rgba(45,90,39,0.3)', top: -80, left: -60,
   },
-  glowBlue: {
-    position: 'absolute', width: 220, height: 220, borderRadius: 110,
-    backgroundColor: 'rgba(59,130,246,0.18)', top: 40, right: -40,
+  glowGold: {
+    position: 'absolute', width: 200, height: 200, borderRadius: 100,
+    backgroundColor: 'rgba(196,163,90,0.15)', top: 40, right: -40,
   },
   heroTextWrap: {
-    position: 'absolute', bottom: 28, left: 0, right: 0,
-    paddingHorizontal: 28,
+    position: 'absolute', bottom: 28, left: 0, right: 0, paddingHorizontal: 28,
   },
-  badgeRow: { marginBottom: 12 },
   badge: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     alignSelf: 'flex-start', borderRadius: radius.full,
     overflow: 'hidden', borderWidth: 1,
-    borderColor: 'rgba(124,58,237,0.4)',
-    paddingHorizontal: 12, paddingVertical: 5,
+    borderColor: 'rgba(196,163,90,0.4)',
+    paddingHorizontal: 12, paddingVertical: 5, marginBottom: 12,
   },
-  badgeText: { color: '#a78bfa', fontSize: 11, fontWeight: '600' },
+  badgeText: { color: colors.gold, fontSize: 11, fontWeight: '600' },
   appName: {
-    fontSize: 52, fontWeight: '900', color: '#fff',
+    fontSize: 52, fontWeight: '700', color: colors.text,
     letterSpacing: -2, lineHeight: 54,
-    textShadowColor: 'rgba(124,58,237,0.8)',
+    textShadowColor: 'rgba(45,90,39,0.8)',
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 20,
   },
   tagline: {
-    fontSize: 15, color: 'rgba(255,255,255,0.7)',
+    fontSize: 15, color: 'rgba(245,240,232,0.7)',
     marginTop: 8, lineHeight: 22, fontWeight: '400',
   },
 
-  // bottom
   bottom: {
     flex: 1, paddingHorizontal: 24, paddingTop: 20,
     paddingBottom: 24, justifyContent: 'space-between',
   },
-  featureRow: {
-    flexDirection: 'row', justifyContent: 'space-between',
-    paddingHorizontal: 4,
-  },
+  featureRow: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 4 },
   featureItem: { alignItems: 'center', gap: 6 },
-  featureIcon: {
-    width: 44, height: 44, borderRadius: 14,
-    alignItems: 'center', justifyContent: 'center',
-  },
+  featureIcon: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   featureLabel: { fontSize: 11, color: colors.muted, fontWeight: '600' },
   divider: { height: 0.5, backgroundColor: colors.border, marginVertical: 4 },
 
-  // buttons
   buttons: { gap: 0 },
   signInBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     paddingVertical: 14, marginBottom: 4,
   },
   signInBtnText: { color: colors.muted, fontSize: 14 },
-  signInBtnHighlight: { color: '#7c3aed', fontWeight: '700', fontSize: 14 },
-  inviteBtn: {
-    alignItems: 'center', paddingVertical: 10,
-  },
+  signInBtnHighlight: { color: colors.primaryLight, fontWeight: '700', fontSize: 14 },
+  inviteBtn: { alignItems: 'center', paddingVertical: 10 },
   inviteBtnInner: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    borderWidth: 1, borderColor: 'rgba(124,58,237,0.35)',
+    borderWidth: 1, borderColor: 'rgba(196,163,90,0.35)',
     borderRadius: radius.full, paddingHorizontal: 20, paddingVertical: 10,
-    backgroundColor: 'rgba(124,58,237,0.08)',
+    backgroundColor: 'rgba(196,163,90,0.08)',
   },
-  inviteBtnText: { color: '#7c3aed', fontWeight: '600', fontSize: 13 },
-  footer: {
-    textAlign: 'center', color: colors.dim,
-    fontSize: 12, marginTop: 8,
-  },
+  inviteBtnText: { color: colors.gold, fontWeight: '600', fontSize: 13 },
+  footer: { textAlign: 'center', color: colors.dim, fontSize: 12, marginTop: 8 },
 });

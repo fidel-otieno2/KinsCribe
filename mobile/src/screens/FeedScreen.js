@@ -1,15 +1,17 @@
 import { useEffect, useState, useCallback, useRef, memo } from "react";
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
-  ActivityIndicator, StatusBar, Image, RefreshControl,
+  ActivityIndicator, Image, RefreshControl,
   Modal, TextInput, Alert, Dimensions, ScrollView,
 } from "react-native";
+import { StatusBar } from "expo-status-bar";
 import { useFocusEffect } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
 import { Ionicons } from "@expo/vector-icons";
 import api from "../api/axios";
 import { colors, radius } from "../theme";
+import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
 
 const { width } = Dimensions.get("window");
@@ -26,6 +28,7 @@ function timeAgo(dateStr) {
 // ── Join Family Modal ──────────────────────────────────────────
 function JoinFamilyModal({ visible, onClose, onJoined }) {
   const { refreshUser } = useAuth();
+  const { theme } = useTheme();
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -50,7 +53,7 @@ function JoinFamilyModal({ visible, onClose, onJoined }) {
           <LinearGradient colors={["rgba(124,58,237,0.15)", "#0f172a"]} style={StyleSheet.absoluteFill} />
           <View style={jf.handle} />
           <TouchableOpacity style={jf.closeBtn} onPress={onClose}>
-            <Ionicons name="close" size={22} color={colors.muted} />
+            <Ionicons name="close" size={22} color={theme.muted} />
           </TouchableOpacity>
 
           <LinearGradient colors={["#7c3aed", "#3b82f6"]} style={jf.iconWrap}>
@@ -108,6 +111,7 @@ const jf = StyleSheet.create({
 // ── Post Card ──────────────────────────────────────────────────
 const PostCard = memo(function PostCard({ post, onUpdate, navigation }) {
   const { user } = useAuth();
+  const { theme } = useTheme();
   const [liked, setLiked] = useState(post.liked_by_me || false);
   const [likeCount, setLikeCount] = useState(post.like_count || 0);
   const [showComments, setShowComments] = useState(false);
@@ -167,25 +171,25 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation }) {
         activeOpacity={0.8}
       >
         <LinearGradient colors={["#7c3aed", "#3b82f6", "#ec4899"]} style={pc.avatarRing}>
-          <View style={pc.avatarInner}>
+          <View style={[pc.avatarInner, { backgroundColor: theme.primary, borderColor: theme.bg }]}>
             {post.author_avatar
               ? <Image source={{ uri: post.author_avatar }} style={pc.avatarImg} />
               : <Text style={pc.avatarLetter}>{post.author_name?.[0]?.toUpperCase() || "?"}</Text>}
           </View>
         </LinearGradient>
         <View style={{ flex: 1 }}>
-          <Text style={pc.authorName}>{post.author_name}</Text>
+          <Text style={[pc.authorName, { color: theme.text }]}>{post.author_name}</Text>
           <View style={pc.metaRow}>
             {post.location ? (
               <>
-                <Ionicons name="location-outline" size={11} color={colors.muted} />
-                <Text style={pc.metaText}>{post.location}</Text>
-                <Text style={pc.dot}>·</Text>
+                <Ionicons name="location-outline" size={11} color={theme.muted} />
+                <Text style={[pc.metaText, { color: theme.muted }]}>{post.location}</Text>
+                <Text style={[pc.dot, { color: theme.dim }]}>·</Text>
               </>
             ) : null}
-            <Text style={pc.metaText}>{timeAgo(post.created_at)}</Text>
+            <Text style={[pc.metaText, { color: theme.muted }]}>{timeAgo(post.created_at)}</Text>
             {post.privacy === "connections" && (
-              <><Text style={pc.dot}>·</Text><Ionicons name="people-outline" size={11} color={colors.muted} /></>
+              <><Text style={[pc.dot, { color: theme.dim }]}>·</Text><Ionicons name="people-outline" size={11} color={theme.muted} /></>
             )}
           </View>
         </View>
@@ -196,7 +200,7 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation }) {
               try { await api.delete(`/posts/${post.id}`); onUpdate?.(); } catch {}
             }},
           ])}>
-            <Ionicons name="ellipsis-horizontal" size={20} color={colors.muted} />
+            <Ionicons name="ellipsis-horizontal" size={20} color={theme.muted} />
           </TouchableOpacity>
         )}
       </TouchableOpacity>
@@ -212,13 +216,13 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation }) {
       <View style={pc.actions}>
         <View style={pc.actionsLeft}>
           <TouchableOpacity onPress={toggleLike} style={pc.actionBtn}>
-            <Ionicons name={liked ? "heart" : "heart-outline"} size={26} color={liked ? "#e11d48" : colors.text} />
+            <Ionicons name={liked ? "heart" : "heart-outline"} size={26} color={liked ? "#e11d48" : theme.text} />
           </TouchableOpacity>
           <TouchableOpacity onPress={openComments} style={pc.actionBtn}>
-            <Ionicons name="chatbubble-outline" size={24} color={colors.text} />
+            <Ionicons name="chatbubble-outline" size={24} color={theme.text} />
           </TouchableOpacity>
           <TouchableOpacity style={pc.actionBtn}>
-            <Ionicons name="paper-plane-outline" size={24} color={colors.text} />
+            <Ionicons name="paper-plane-outline" size={24} color={theme.text} />
           </TouchableOpacity>
         </View>
       </View>
@@ -250,31 +254,31 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation }) {
       {/* Comments Modal */}
       <Modal visible={showComments} animationType="slide" transparent>
         <View style={pc.commentsOverlay}>
-          <View style={pc.commentsSheet}>
-            <View style={pc.sheetHandle} />
-            <View style={pc.commentsHeader}>
-              <Text style={pc.commentsTitle}>Comments</Text>
+          <View style={[pc.commentsSheet, { backgroundColor: theme.surface }]}>
+            <View style={[pc.sheetHandle, { backgroundColor: theme.border }]} />
+            <View style={[pc.commentsHeader, { borderBottomColor: theme.border }]}>
+              <Text style={[pc.commentsTitle, { color: theme.text }]}>Comments</Text>
               <TouchableOpacity onPress={() => setShowComments(false)}>
-                <Ionicons name="close" size={24} color={colors.text} />
+                <Ionicons name="close" size={24} color={theme.text} />
               </TouchableOpacity>
             </View>
             {loadingComments ? (
-              <ActivityIndicator color={colors.primary} style={{ marginTop: 30 }} />
+              <ActivityIndicator color={theme.primary} style={{ marginTop: 30 }} />
             ) : (
               <FlatList
                 data={comments}
                 keyExtractor={(_, i) => String(i)}
                 style={{ flex: 1 }}
                 contentContainerStyle={{ padding: 16 }}
-                ListEmptyComponent={<Text style={{ color: colors.dim, textAlign: "center", marginTop: 20 }}>No comments yet</Text>}
+                ListEmptyComponent={<Text style={{ color: theme.dim, textAlign: "center", marginTop: 20 }}>No comments yet</Text>}
                 renderItem={({ item }) => (
                   <View style={pc.commentRow}>
-                    <View style={pc.commentAvatar}>
+                    <View style={[pc.commentAvatar, { backgroundColor: theme.primary }]}>
                       <Text style={pc.commentAvatarText}>{item.author_name?.[0] || "U"}</Text>
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={pc.commentText}>
-                        <Text style={pc.commentName}>{item.author_name} </Text>
+                      <Text style={[pc.commentText, { color: theme.text }]}>
+                        <Text style={[pc.commentName, { color: theme.text }]}>{item.author_name} </Text>
                         {item.text}
                       </Text>
                     </View>
@@ -282,20 +286,20 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation }) {
                 )}
               />
             )}
-            <View style={pc.commentInputRow}>
-              <View style={pc.commentAvatar}>
+            <View style={[pc.commentInputRow, { borderTopColor: theme.border }]}>
+              <View style={[pc.commentAvatar, { backgroundColor: theme.primary }]}>
                 <Text style={pc.commentAvatarText}>{user?.name?.[0] || "U"}</Text>
               </View>
               <TextInput
-                style={pc.commentInput}
+                style={[pc.commentInput, { color: theme.text }]}
                 placeholder="Add a comment..."
-                placeholderTextColor={colors.dim}
+                placeholderTextColor={theme.dim}
                 value={commentText}
                 onChangeText={setCommentText}
               />
               <TouchableOpacity onPress={postComment} disabled={posting || !commentText.trim()}>
                 {posting
-                  ? <ActivityIndicator size="small" color={colors.primary} />
+                  ? <ActivityIndicator size="small" color={theme.primary} />
                   : <Text style={[pc.postBtn, !commentText.trim() && { opacity: 0.4 }]}>Post</Text>}
               </TouchableOpacity>
             </View>
@@ -345,6 +349,7 @@ const pc = StyleSheet.create({
 // ── Feed Screen ────────────────────────────────────────────────
 export default function FeedScreen({ navigation }) {
   const { user } = useAuth();
+  const { theme, isDark } = useTheme();
   const [posts, setPosts] = useState([]);
   const [storyGroups, setStoryGroups] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -391,12 +396,12 @@ export default function FeedScreen({ navigation }) {
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.storiesRow}>
             {/* Add story button */}
             <TouchableOpacity style={s.storyItem} onPress={() => navigation.navigate('Create')} activeOpacity={0.8}>
-              <View style={s.storyAddRing}>
-                <View style={s.storyAddCircle}>
-                  <Ionicons name="add" size={22} color="#fff" />
+              <View style={[s.storyAddRing, { borderColor: theme.border2 }]}>
+                <View style={[s.storyAddCircle, { backgroundColor: theme.bgSecondary }]}>
+                  <Ionicons name="add" size={22} color={theme.text} />
                 </View>
               </View>
-              <Text style={s.storyLabel}>Your Story</Text>
+              <Text style={[s.storyLabel, { color: theme.text }]}>Your Story</Text>
             </TouchableOpacity>
             {storyGroups.map((group, idx) => (
               <TouchableOpacity
@@ -406,18 +411,18 @@ export default function FeedScreen({ navigation }) {
                 onPress={() => navigation.navigate('StoryViewer', { storyGroups, initialGroupIndex: idx })}
               >
                 <LinearGradient
-                  colors={group.has_unseen ? ['#7c3aed', '#3b82f6', '#ec4899'] : ['#475569', '#475569']}
+                  colors={group.has_unseen ? ['#2D5A27', '#7FB069', '#C4A35A'] : ['#4A4035', '#4A4035']}
                   style={s.storyRing}
                 >
-                  <View style={s.storyAvatarWrap}>
+                  <View style={[s.storyAvatarWrap, { borderColor: theme.bg }]}>
                     {group.author_avatar
                       ? <Image source={{ uri: group.author_avatar }} style={s.storyAvatar} />
-                      : <View style={s.storyAvatarFallback}>
+                      : <View style={[s.storyAvatarFallback, { backgroundColor: theme.primary }]}>
                           <Text style={s.storyAvatarLetter}>{group.author_name?.[0]?.toUpperCase()}</Text>
                         </View>}
                   </View>
                 </LinearGradient>
-                <Text style={s.storyLabel} numberOfLines={1}>
+                <Text style={[s.storyLabel, { color: theme.text }]} numberOfLines={1}>
                   {group.author_name?.split(' ')[0] || 'User'}
                 </Text>
               </TouchableOpacity>
@@ -432,7 +437,7 @@ export default function FeedScreen({ navigation }) {
         onPress={() => user?.family_id ? navigation.navigate('Family') : setShowJoinFamily(true)}
         activeOpacity={0.85}
       >
-        <LinearGradient colors={["#7c3aed", "#3b82f6", "#ec4899"]} style={s.familyBannerGrad}>
+        <LinearGradient colors={["#2D5A27", "#4A7C3F", "#C4A35A"]} style={s.familyBannerGrad}>
           <View style={s.familyBannerLeft}>
             <View style={s.familyIconWrap}>
               <Ionicons name="people" size={22} color="#fff" />
@@ -459,22 +464,22 @@ export default function FeedScreen({ navigation }) {
   );
 
   return (
-    <View style={s.container}>
-      <StatusBar barStyle="light-content" />
+    <View style={[s.container, { backgroundColor: theme.bg }]}>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
 
       {/* Header */}
-      <View style={s.header}>
+      <View style={[s.header, { borderBottomColor: theme.border }]}>
         <View style={s.logoWrap}>
           <Image
             source={require("../../assets/kinscribe-logo.png")}
             style={s.logoIcon}
             resizeMode="cover"
           />
-          <Text style={s.logo}>KinsCribe</Text>
+          <Text style={[s.logo, { color: theme.text }]}>KinsCribe</Text>
         </View>
         <View style={s.headerRight}>
           <TouchableOpacity onPress={() => navigation.navigate("Notifications")} style={s.headerBtn}>
-            <Ionicons name="notifications-outline" size={25} color={colors.text} />
+            <Ionicons name="notifications-outline" size={25} color={theme.text} />
             {unreadCount > 0 && (
               <View style={s.badge}>
                 <Text style={s.badgeText}>{unreadCount > 9 ? "9+" : unreadCount}</Text>
@@ -482,14 +487,14 @@ export default function FeedScreen({ navigation }) {
             )}
           </TouchableOpacity>
           <TouchableOpacity onPress={() => navigation.navigate("FeedAI")} style={s.headerBtn}>
-            <Ionicons name="sparkles" size={23} color={colors.primary} />
+            <Ionicons name="sparkles" size={23} color={theme.primary} />
           </TouchableOpacity>
         </View>
       </View>
 
       {loading ? (
         <View style={s.loadingWrap}>
-          <ActivityIndicator color={colors.primary} size="large" />
+          <ActivityIndicator color={theme.primary} size="large" />
         </View>
       ) : (
         <FlatList
@@ -508,16 +513,16 @@ export default function FeedScreen({ navigation }) {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={() => { setRefreshing(true); fetchFeed(true); }}
-              tintColor={colors.primary}
+              tintColor={theme.primary}
             />
           }
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
             <View style={s.emptyWrap}>
               <LinearGradient colors={["rgba(124,58,237,0.15)", "rgba(59,130,246,0.1)"]} style={s.emptyCard}>
-                <Ionicons name="people-outline" size={52} color={colors.primary} />
-                <Text style={s.emptyTitle}>Your feed is empty</Text>
-                <Text style={s.emptySub}>
+                <Ionicons name="people-outline" size={52} color={theme.primary} />
+                <Text style={[s.emptyTitle, { color: theme.text }]}>Your feed is empty</Text>
+                <Text style={[s.emptySub, { color: theme.muted }]}>
                   Connect with people on the Discover tab to see their posts here
                 </Text>
                 <TouchableOpacity

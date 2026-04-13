@@ -9,6 +9,7 @@ import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { colors, radius } from '../theme';
 
 const { width } = Dimensions.get('window');
@@ -58,6 +59,7 @@ function TreeNode({ node, onPress, onLongPress }) {
 }
 
 function AddNodeModal({ visible, onClose, onSave, parentNode }) {
+  const { theme } = useTheme();
   const [form, setForm] = useState({
     display_name: '', relationship_label: '', birth_date: '',
     death_date: '', is_deceased: false, generation: parentNode ? parentNode.generation + 1 : 0
@@ -85,7 +87,7 @@ function AddNodeModal({ visible, onClose, onSave, parentNode }) {
           <Text style={s.modalTitle}>{parentNode ? `Add child of ${parentNode.display_name}` : 'Add Family Member'}</Text>
 
           <Text style={s.fieldLabel}>Full Name *</Text>
-          <TextInput style={s.fieldInput} placeholder="e.g. John Smith" placeholderTextColor={colors.dim} value={form.display_name} onChangeText={v => set('display_name', v)} />
+          <TextInput style={[s.fieldInput, { backgroundColor: theme.bgCard, color: theme.text, borderColor: theme.border2 }]} placeholder="e.g. John Smith" placeholderTextColor={theme.dim} value={form.display_name} onChangeText={v => set('display_name', v)} />
 
           <Text style={s.fieldLabel}>Relationship</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
@@ -103,7 +105,7 @@ function AddNodeModal({ visible, onClose, onSave, parentNode }) {
           </ScrollView>
 
           <Text style={s.fieldLabel}>Birth Year (optional)</Text>
-          <TextInput style={s.fieldInput} placeholder="e.g. 1965" placeholderTextColor={colors.dim} keyboardType="numeric" value={form.birth_date} onChangeText={v => set('birth_date', v.length === 4 ? `${v}-01-01` : v)} />
+          <TextInput style={[s.fieldInput, { backgroundColor: theme.bgCard, color: theme.text, borderColor: theme.border2 }]} placeholder="e.g. 1965" placeholderTextColor={theme.dim} keyboardType="numeric" value={form.birth_date} onChangeText={v => set('birth_date', v.length === 4 ? `${v}-01-01` : v)} />
 
           <TouchableOpacity style={s.deceasedToggle} onPress={() => set('is_deceased', !form.is_deceased)}>
             <View style={[s.checkbox, form.is_deceased && s.checkboxActive]}>
@@ -115,7 +117,7 @@ function AddNodeModal({ visible, onClose, onSave, parentNode }) {
           {form.is_deceased && (
             <>
               <Text style={s.fieldLabel}>Death Year (optional)</Text>
-              <TextInput style={s.fieldInput} placeholder="e.g. 2010" placeholderTextColor={colors.dim} keyboardType="numeric" value={form.death_date} onChangeText={v => set('death_date', v.length === 4 ? `${v}-12-31` : v)} />
+              <TextInput style={[s.fieldInput, { backgroundColor: theme.bgCard, color: theme.text, borderColor: theme.border2 }]} placeholder="e.g. 2010" placeholderTextColor={theme.dim} keyboardType="numeric" value={form.death_date} onChangeText={v => set('death_date', v.length === 4 ? `${v}-12-31` : v)} />
             </>
           )}
 
@@ -136,6 +138,7 @@ function AddNodeModal({ visible, onClose, onSave, parentNode }) {
 
 export default function FamilyTreeScreen({ navigation }) {
   const { user } = useAuth();
+  const { theme, isDark } = useTheme();
   const [nodes, setNodes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
@@ -180,20 +183,20 @@ export default function FamilyTreeScreen({ navigation }) {
   const genLabels = { '-2': 'Great Grandparents', '-1': 'Grandparents', '0': 'Parents / You', '1': 'Children', '2': 'Grandchildren' };
 
   if (loading) return (
-    <View style={[s.container, { alignItems: 'center', justifyContent: 'center' }]}>
-      <ActivityIndicator color={colors.primary} size="large" />
+    <View style={[s.container, { backgroundColor: theme.bg, alignItems: 'center', justifyContent: 'center' }]}>
+      <ActivityIndicator color={theme.primary} size="large" />
     </View>
   );
 
   return (
-    <View style={s.container}>
-      <LinearGradient colors={['#0f172a', '#1a0f2e', '#0f172a']} style={StyleSheet.absoluteFill} />
+    <View style={[s.container, { backgroundColor: theme.bg }]}>
+      <LinearGradient colors={isDark ? ['#0f172a', '#1a0f2e', '#0f172a'] : [theme.bg, theme.bgSecondary, theme.bg]} style={StyleSheet.absoluteFill} />
 
-      <View style={s.header}>
+      <View style={[s.header, { borderBottomColor: theme.border }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
+          <Ionicons name="arrow-back" size={24} color={theme.text} />
         </TouchableOpacity>
-        <Text style={s.headerTitle}>Family Tree</Text>
+        <Text style={[s.headerTitle, { color: theme.text }]}>Family Tree</Text>
         <TouchableOpacity style={s.addBtn} onPress={() => { setSelectedParent(null); setShowAdd(true); }}>
           <Ionicons name="add" size={22} color="#fff" />
         </TouchableOpacity>
@@ -202,10 +205,10 @@ export default function FamilyTreeScreen({ navigation }) {
       {nodes.length === 0 ? (
         <View style={s.empty}>
           <LinearGradient colors={['rgba(124,58,237,0.2)', 'rgba(59,130,246,0.1)']} style={s.emptyIcon}>
-            <Ionicons name="git-network-outline" size={48} color={colors.primary} />
+            <Ionicons name="git-network-outline" size={48} color={theme.primary} />
           </LinearGradient>
-          <Text style={s.emptyTitle}>Build Your Family Tree</Text>
-          <Text style={s.emptySub}>Add family members to create your interactive family tree</Text>
+          <Text style={[s.emptyTitle, { color: theme.text }]}>Build Your Family Tree</Text>
+          <Text style={[s.emptySub, { color: theme.muted }]}>Add family members to create your interactive family tree</Text>
           <TouchableOpacity style={s.startBtn} onPress={() => setShowAdd(true)}>
             <LinearGradient colors={['#7c3aed', '#3b82f6']} style={s.startBtnGrad}>
               <Ionicons name="add" size={18} color="#fff" />
@@ -219,7 +222,7 @@ export default function FamilyTreeScreen({ navigation }) {
             <View key={gen} style={s.generation}>
               <View style={s.genLabelRow}>
                 <View style={[s.genDot, { backgroundColor: GENERATION_COLORS[gen] || colors.primary }]} />
-                <Text style={s.genLabel}>{genLabels[gen] || `Generation ${gen}`}</Text>
+                <Text style={[s.genLabel, { color: theme.muted }]}>{genLabels[gen] || `Generation ${gen}`}</Text>
                 <TouchableOpacity
                   style={s.addChildBtn}
                   onPress={() => {
@@ -227,7 +230,7 @@ export default function FamilyTreeScreen({ navigation }) {
                     setShowAdd(true);
                   }}
                 >
-                  <Ionicons name="add-circle-outline" size={18} color={colors.muted} />
+                  <Ionicons name="add-circle-outline" size={18} color={theme.muted} />
                 </TouchableOpacity>
               </View>
 
@@ -248,10 +251,10 @@ export default function FamilyTreeScreen({ navigation }) {
                   />
                 ))}
                 <TouchableOpacity
-                  style={s.addNodeBtn}
+                  style={[s.addNodeBtn, { borderColor: theme.border2 }]}
                   onPress={() => { setSelectedParent(byGeneration[gen][0]); setShowAdd(true); }}
                 >
-                  <Ionicons name="add" size={24} color={colors.dim} />
+                  <Ionicons name="add" size={24} color={theme.dim} />
                 </TouchableOpacity>
               </ScrollView>
 
@@ -263,8 +266,8 @@ export default function FamilyTreeScreen({ navigation }) {
           ))}
 
           <TouchableOpacity style={s.addGenerationBtn} onPress={() => { setSelectedParent(null); setShowAdd(true); }}>
-            <Ionicons name="add-circle-outline" size={20} color={colors.primary} />
-            <Text style={s.addGenerationText}>Add Another Generation</Text>
+            <Ionicons name="add-circle-outline" size={20} color={theme.primary} />
+            <Text style={[s.addGenerationText, { color: theme.primary }]}>Add Another Generation</Text>
           </TouchableOpacity>
         </ScrollView>
       )}

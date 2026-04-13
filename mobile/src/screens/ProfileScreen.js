@@ -8,6 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import api from '../api/axios';
 import { colors, radius } from '../theme';
 import * as ImagePicker from 'expo-image-picker';
@@ -24,6 +25,7 @@ const TABS = [
 
 export default function ProfileScreen({ navigation }) {
   const { user, refreshUser, logout } = useAuth();
+  const { theme } = useTheme();
   const [posts, setPosts] = useState([]);
   const [savedPosts, setSavedPosts] = useState([]);
   const [highlights, setHighlights] = useState([]);
@@ -129,13 +131,13 @@ export default function ProfileScreen({ navigation }) {
     <View>
       {/* Top bar */}
       <View style={s.topBar}>
-        <Text style={s.username}>@{user?.username || user?.name}</Text>
+        <Text style={[s.username, { color: theme.text }]}>@{user?.username || user?.name}</Text>
         <View style={s.topBarRight}>
           <TouchableOpacity onPress={() => navigation.navigate('Settings')} style={s.iconBtn}>
-            <Ionicons name="settings-outline" size={22} color={colors.text} />
+            <Ionicons name="settings-outline" size={22} color={theme.text} />
           </TouchableOpacity>
           <TouchableOpacity onPress={handleLogout} style={s.iconBtn}>
-            <Ionicons name="log-out-outline" size={22} color={colors.muted} />
+            <Ionicons name="log-out-outline" size={22} color={theme.muted} />
           </TouchableOpacity>
         </View>
       </View>
@@ -144,7 +146,7 @@ export default function ProfileScreen({ navigation }) {
       <View style={s.profileRow}>
         <TouchableOpacity onPress={handleAvatarUpload} style={s.avatarWrap} disabled={uploading}>
           <LinearGradient colors={['#7c3aed', '#3b82f6', '#ec4899']} style={s.avatarRing}>
-            <View style={s.avatarInner}>
+            <View style={[s.avatarInner, { backgroundColor: theme.primary, borderColor: theme.bg }]}>
               {uploading ? <ActivityIndicator color="#fff" /> :
                 user?.avatar_url ? <Image source={{ uri: user.avatar_url }} style={s.avatarImg} /> :
                 <Text style={s.avatarLetter}>{user?.name?.[0]?.toUpperCase()}</Text>}
@@ -157,16 +159,16 @@ export default function ProfileScreen({ navigation }) {
 
         <View style={s.statsRow}>
           <View style={s.stat}>
-            <Text style={s.statNum}>{stats.posts}</Text>
-            <Text style={s.statLabel}>Posts</Text>
+            <Text style={[s.statNum, { color: theme.text }]}>{stats.posts}</Text>
+            <Text style={[s.statLabel, { color: theme.muted }]}>Posts</Text>
           </View>
           <TouchableOpacity style={s.stat} onPress={() => {}}>
-            <Text style={s.statNum}>{stats.connections}</Text>
-            <Text style={s.statLabel}>Connections</Text>
+            <Text style={[s.statNum, { color: theme.text }]}>{stats.connections}</Text>
+            <Text style={[s.statLabel, { color: theme.muted }]}>Connections</Text>
           </TouchableOpacity>
           <TouchableOpacity style={s.stat} onPress={() => {}}>
-            <Text style={s.statNum}>{stats.interests}</Text>
-            <Text style={s.statLabel}>Interests</Text>
+            <Text style={[s.statNum, { color: theme.text }]}>{stats.interests}</Text>
+            <Text style={[s.statLabel, { color: theme.muted }]}>Interests</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -174,28 +176,28 @@ export default function ProfileScreen({ navigation }) {
       {/* Bio */}
       <View style={s.bioWrap}>
         <View style={s.nameRow}>
-          <Text style={s.name}>{user?.name}</Text>
+          <Text style={[s.name, { color: theme.text }]}>{user?.name}</Text>
           <View style={s.roleBadge}>
             <Ionicons name="shield-checkmark" size={11} color="#7c3aed" />
             <Text style={s.roleText}>{user?.role}</Text>
           </View>
         </View>
-        {user?.bio ? <Text style={s.bio}>{user.bio}</Text> : null}
+        {user?.bio ? <Text style={[s.bio, { color: theme.muted }]}>{user.bio}</Text> : null}
       </View>
 
       {/* Action buttons */}
       <View style={s.actionRow}>
-        <TouchableOpacity style={s.editBtn} onPress={() => navigation.navigate('Settings')}>
-          <Text style={s.editBtnText}>Edit Profile</Text>
+        <TouchableOpacity style={[s.editBtn, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]} onPress={() => navigation.navigate('Settings')}>
+          <Text style={[s.editBtnText, { color: theme.text }]}>Edit Profile</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={s.shareBtn} onPress={handleShare}>
-          <Ionicons name="share-outline" size={18} color={colors.text} />
+        <TouchableOpacity style={[s.shareBtn, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]} onPress={handleShare}>
+          <Ionicons name="share-outline" size={18} color={theme.text} />
         </TouchableOpacity>
-        <TouchableOpacity style={s.shareBtn} onPress={() => navigation.navigate('Family')}>
-          <Ionicons name="people-outline" size={18} color={colors.text} />
+        <TouchableOpacity style={[s.shareBtn, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]} onPress={() => navigation.navigate('Family')}>
+          <Ionicons name="people-outline" size={18} color={theme.text} />
         </TouchableOpacity>
-        <TouchableOpacity style={s.shareBtn} onPress={() => navigation.navigate('PostInsights')}>
-          <Ionicons name="bar-chart-outline" size={18} color={colors.text} />
+        <TouchableOpacity style={[s.shareBtn, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]} onPress={() => navigation.navigate('PostInsights')}>
+          <Ionicons name="bar-chart-outline" size={18} color={theme.text} />
         </TouchableOpacity>
       </View>
 
@@ -203,31 +205,31 @@ export default function ProfileScreen({ navigation }) {
       {highlights.length > 0 && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.highlightsRow}>
           <TouchableOpacity style={s.highlightItem} onPress={() => {}}>
-            <View style={[s.highlightCircle, s.highlightAdd]}>
-              <Ionicons name="add" size={22} color={colors.primary} />
+            <View style={[s.highlightCircle, s.highlightAdd, { backgroundColor: theme.bgSecondary, borderColor: theme.border2 }]}>
+              <Ionicons name="add" size={22} color={theme.primary} />
             </View>
-            <Text style={s.highlightLabel}>New</Text>
+            <Text style={[s.highlightLabel, { color: theme.text }]}>New</Text>
           </TouchableOpacity>
           {highlights.map(h => (
             <TouchableOpacity key={h.id} style={s.highlightItem}>
               <LinearGradient colors={['#7c3aed', '#3b82f6']} style={s.highlightRing}>
-                <View style={s.highlightCircle}>
+                <View style={[s.highlightCircle, { backgroundColor: theme.bgSecondary, borderColor: theme.bg }]}>
                   {h.cover_url
                     ? <Image source={{ uri: h.cover_url }} style={s.highlightImg} />
                     : <Ionicons name="star" size={20} color="#fff" />}
                 </View>
               </LinearGradient>
-              <Text style={s.highlightLabel} numberOfLines={1}>{h.title}</Text>
+              <Text style={[s.highlightLabel, { color: theme.text }]} numberOfLines={1}>{h.title}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
       )}
 
       {/* Tabs */}
-      <View style={s.tabRow}>
+      <View style={[s.tabRow, { borderTopColor: theme.border }]}>
         {TABS.map(t => (
           <TouchableOpacity key={t.key} style={[s.tabBtn, tab === t.key && s.tabBtnActive]} onPress={() => setTab(t.key)}>
-            <Ionicons name={tab === t.key ? t.iconActive : t.icon} size={22} color={tab === t.key ? colors.primary : colors.muted} />
+            <Ionicons name={tab === t.key ? t.iconActive : t.icon} size={22} color={tab === t.key ? theme.primary : theme.muted} />
           </TouchableOpacity>
         ))}
       </View>
@@ -235,22 +237,22 @@ export default function ProfileScreen({ navigation }) {
   );
 
   if (loading) return (
-    <View style={[s.container, { alignItems: 'center', justifyContent: 'center' }]}>
-      <ActivityIndicator color={colors.primary} size="large" />
+    <View style={[s.container, { backgroundColor: theme.bg, alignItems: 'center', justifyContent: 'center' }]}>
+      <ActivityIndicator color={theme.primary} size="large" />
     </View>
   );
 
   return (
-    <View style={s.container}>
+    <View style={[s.container, { backgroundColor: theme.bg }]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchAll(); }} tintColor={colors.primary} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchAll(); }} tintColor={theme.primary} />}
       >
         <Header />
         {currentData.length === 0 ? (
           <View style={s.empty}>
-            <Ionicons name={tab === 'saved' ? 'bookmark-outline' : tab === 'reels' ? 'film-outline' : 'camera-outline'} size={48} color={colors.dim} />
-            <Text style={s.emptyTitle}>
+            <Ionicons name={tab === 'saved' ? 'bookmark-outline' : tab === 'reels' ? 'film-outline' : 'camera-outline'} size={48} color={theme.dim} />
+            <Text style={[s.emptyTitle, { color: theme.muted }]}>
               {tab === 'saved' ? 'No saved posts' : tab === 'reels' ? 'No reels yet' : 'No posts yet'}
             </Text>
             {tab === 'posts' && (

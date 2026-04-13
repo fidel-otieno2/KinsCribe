@@ -53,7 +53,7 @@ export default function StorybooksScreen() {
         keyExtractor={(item) => String(item.id)}
         ListEmptyComponent={
           <View style={s.empty}>
-            <Ionicons name="book-open" size={64} color={colors.muted} />
+            <Ionicons name="book-outline" size={64} color={colors.muted} />
             <Text style={s.emptyTitle}>No storybooks yet</Text>
             <Text style={s.emptySub}>Create your first family memory book</Text>
             <TouchableOpacity

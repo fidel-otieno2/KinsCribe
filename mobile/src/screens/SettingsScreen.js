@@ -9,8 +9,26 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import api from '../api/axios';
 import { colors, radius } from '../theme';
+
+const th = StyleSheet.create({
+  themeRow: { flexDirection: 'row', gap: 6 },
+  themeBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 10, paddingVertical: 6,
+    borderRadius: radius.full, borderWidth: 1,
+    borderColor: 'rgba(196,163,90,0.2)',
+    backgroundColor: 'rgba(42,39,32,0.6)',
+  },
+  themeBtnActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  themeBtnText: { fontSize: 11, color: colors.muted, fontWeight: '600' },
+  themeBtnTextActive: { color: '#F5F0E8' },
+});
 
 function Row({ icon, iconColor = '#7c3aed', label, value, onPress, toggle, toggled, danger, chevron = true }) {
   return (
@@ -47,6 +65,7 @@ function Divider() {
 
 export default function SettingsScreen({ navigation }) {
   const { user, refreshUser, logout } = useAuth();
+  const { theme, mode, setThemeMode, isDark } = useTheme();
   const [name, setName] = useState(user?.name || '');
   const [bio, setBio] = useState(user?.bio || '');
   const [username, setUsername] = useState(user?.username || '');
@@ -124,8 +143,8 @@ export default function SettingsScreen({ navigation }) {
   );
 
   return (
-    <View style={s.container}>
-      <LinearGradient colors={['#0f172a', '#1a0f2e', '#0f172a']} style={StyleSheet.absoluteFill} />
+    <View style={[s.container, { backgroundColor: theme.bg }]}>
+      <LinearGradient colors={isDark ? ['#1C1A14', '#2A2720', '#1C1A14'] : ['#F5F0E8', '#EDE6D6', '#F5F0E8']} style={StyleSheet.absoluteFill} />
 
       <View style={s.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
@@ -222,9 +241,36 @@ export default function SettingsScreen({ navigation }) {
 
         {/* Appearance */}
         <Section title="Appearance">
-          <Row icon="moon-outline" iconColor="#6366f1" label="Dark Mode" value="On" chevron={false} />
+          <View style={s.row}>
+            <View style={[s.rowIcon, { backgroundColor: 'rgba(196,163,90,0.15)' }]}>
+              <Ionicons name="color-palette-outline" size={18} color={colors.gold} />
+            </View>
+            <Text style={s.rowLabel}>Theme</Text>
+            <View style={th.themeRow}>
+              {[
+                { key: 'dark', icon: 'moon', label: 'Dark' },
+                { key: 'light', icon: 'sunny', label: 'Light' },
+                { key: 'system', icon: 'phone-portrait', label: 'Auto' },
+              ].map(opt => (
+                <TouchableOpacity
+                  key={opt.key}
+                  style={[th.themeBtn, mode === opt.key && th.themeBtnActive]}
+                  onPress={() => setThemeMode(opt.key)}
+                >
+                  <Ionicons
+                    name={opt.icon}
+                    size={16}
+                    color={mode === opt.key ? '#F5F0E8' : colors.muted}
+                  />
+                  <Text style={[th.themeBtnText, mode === opt.key && th.themeBtnTextActive]}>
+                    {opt.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
           <Divider />
-          <Row icon="text-outline" iconColor="#94a3b8" label="Font Size" value="Default" onPress={() => Alert.alert('Font Size', 'Coming soon')} />
+          <Row icon="text-outline" iconColor={colors.muted} label="Font Size" value="Default" onPress={() => Alert.alert('Font Size', 'Coming soon')} />
           <Divider />
           <Row icon="language-outline" iconColor="#06b6d4" label="Language" value="English" onPress={() => Alert.alert('Language', 'Coming soon')} />
         </Section>
