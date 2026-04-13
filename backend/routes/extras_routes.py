@@ -192,17 +192,29 @@ def create_recipe():
         result = cloudinary.uploader.upload(request.files["image"], folder="kinscribe/recipes")
         image_url = result["secure_url"]
 
-    data = request.form if request.files else request.get_json(force=True, silent=True) or {}
+    # Accept both JSON and form data
+    if request.is_json:
+        data = request.get_json() or {}
+    else:
+        data = request.form.to_dict()
+
     ingredients = data.get("ingredients", "[]")
     if isinstance(ingredients, list):
         ingredients = json.dumps(ingredients)
+    elif isinstance(ingredients, str):
+        # already a JSON string or plain string
+        try:
+            json.loads(ingredients)  # validate it's valid JSON
+        except:
+            ingredients = json.dumps([ingredients]) if ingredients else "[]"
 
     recipe = FamilyRecipe(
         family_id=user.family_id, user_id=user.id,
         title=data.get("title", ""), description=data.get("description"),
         ingredients=ingredients, instructions=data.get("instructions"),
         image_url=image_url or data.get("image_url"),
-        prep_time=data.get("prep_time"), servings=data.get("servings"),
+        prep_time=int(data["prep_time"]) if data.get("prep_time") else None,
+        servings=int(data["servings"]) if data.get("servings") else None,
         category=data.get("category"), tags=data.get("tags")
     )
     db.session.add(recipe)

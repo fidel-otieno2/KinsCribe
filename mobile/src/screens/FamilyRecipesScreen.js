@@ -86,19 +86,34 @@ export default function FamilyRecipesScreen({ navigation }) {
     if (!form.title.trim()) return Alert.alert('Title required');
     setSaving(true);
     try {
-      const formData = new FormData();
-      Object.entries(form).forEach(([k, v]) => { if (v) formData.append(k, v); });
       const filteredIngredients = ingredients.filter(i => i.trim());
-      formData.append('ingredients', JSON.stringify(filteredIngredients));
-      if (imageUri) formData.append('image', { uri: imageUri, type: 'image/jpeg', name: 'recipe.jpg' });
-      const { data } = await api.post('/extras/recipes', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-      setRecipes(prev => [data.recipe, ...prev]);
+
+      if (imageUri) {
+        // Use FormData for image upload
+        const formData = new FormData();
+        Object.entries(form).forEach(([k, v]) => { if (v) formData.append(k, String(v)); });
+        formData.append('ingredients', JSON.stringify(filteredIngredients));
+        formData.append('image', { uri: imageUri, type: 'image/jpeg', name: 'recipe.jpg' });
+        const { data } = await api.post('/extras/recipes', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          transformRequest: (d) => d,
+        });
+        setRecipes(prev => [data.recipe, ...prev]);
+      } else {
+        // JSON post — simpler and more reliable without image
+        const { data } = await api.post('/extras/recipes', {
+          ...form,
+          ingredients: filteredIngredients,
+        });
+        setRecipes(prev => [data.recipe, ...prev]);
+      }
+
       setShowAdd(false);
       setForm({ title: '', description: '', instructions: '', prep_time: '', servings: '', category: 'dinner', tags: '' });
       setIngredients(['']);
       setImageUri(null);
     } catch (err) {
-      Alert.alert('Error', err.response?.data?.error || 'Failed to save');
+      Alert.alert('Error', err.response?.data?.error || err.message || 'Failed to save');
     } finally { setSaving(false); }
   };
 
