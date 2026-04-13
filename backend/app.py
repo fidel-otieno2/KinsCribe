@@ -14,6 +14,18 @@ from routes.message_routes import message_bp
 from routes.public_story_routes import public_story_bp
 from routes.extras_routes import extras_bp
 
+# Import all models at module level so db.create_all sees them
+from models.user import User
+from models.story import Story, Comment, Like, SavedStory
+from models.family import Family
+from models.extras import (FamilyRelationship, FamilyTreeNode, FamilyEvent, FamilyRecipe,
+                            FamilyTask, FamilyBudget, PostInsight, CloseFriend,
+                            ScheduledPost, VerifiedBadge, MessageRequest, Storybook)
+from models.social import (Connection, Post, PostLike, PostComment, PostSave,
+                            Conversation, ConversationParticipant, Message,
+                            MessageReaction, PublicStory, PublicStoryView,
+                            StoryHighlight, StoryHighlightItem)
+
 
 def create_app():
     app = Flask(__name__)
@@ -32,13 +44,6 @@ def create_app():
         "supports_credentials": False,
     }})
 
-    # Import models so db.create_all picks them up
-    from models.user import User
-    from models.story import Story, Comment, Like, SavedStory
-    from models.family import Family
-    from models.extras import FamilyRelationship, FamilyTreeNode, FamilyEvent, FamilyRecipe, FamilyTask, FamilyBudget, PostInsight, CloseFriend, ScheduledPost, VerifiedBadge, MessageRequest, Storybook
-    from models.social import Connection, Post, PostLike, PostComment, PostSave, Conversation, ConversationParticipant, Message, MessageReaction, PublicStory, PublicStoryView, StoryHighlight, StoryHighlightItem
-
     # Register blueprints
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
     app.register_blueprint(family_bp, url_prefix="/api/family")
@@ -54,9 +59,12 @@ def create_app():
     with app.app_context():
         try:
             db.create_all()
-            _run_migrations()
         except Exception as e:
             print(f"Startup DB error (non-fatal): {e}")
+        try:
+            _run_migrations()
+        except Exception as e:
+            print(f"Migration error (non-fatal): {e}")
 
     @app.errorhandler(Exception)
     def handle_exception(e):
