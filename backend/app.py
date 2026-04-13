@@ -43,7 +43,7 @@ def create_app():
     app.register_blueprint(extras_bp, url_prefix="/api/extras")
 
     with app.app_context():
-        # Import models here so db is already bound
+        # Import models so SQLAlchemy metadata is populated
         from models.user import User
         from models.story import Story, Comment, Like, SavedStory
         from models.family import Family
@@ -55,14 +55,9 @@ def create_app():
                                     Conversation, ConversationParticipant, Message,
                                     MessageReaction, PublicStory, PublicStoryView,
                                     StoryHighlight, StoryHighlightItem)
-        try:
-            db.create_all()
-        except Exception as e:
-            print(f"db.create_all error (non-fatal): {e}")
-        try:
-            _run_migrations()
-        except Exception as e:
-            print(f"Migration error (non-fatal): {e}")
+        # Run migrations in background thread so startup is instant
+        import threading
+        threading.Thread(target=_safe_migrate, daemon=True).start()
 
     @app.errorhandler(Exception)
     def handle_exception(e):
@@ -71,6 +66,24 @@ def create_app():
         return {"error": str(e)}, 500
 
     return app
+
+
+def _safe_migrate():
+    """Run db.create_all + migrations in background so startup is instant."""
+    import time
+    time.sleep(2)  # Let the app fully start first
+    try:
+        with app.app_context():
+            db.create_all()
+            print("db.create_all completed")
+    except Exception as e:
+        print(f"db.create_all error: {e}")
+    try:
+        with app.app_context():
+            _run_migrations()
+            print("Migrations completed")
+    except Exception as e:
+        print(f"Migration error: {e}")
 
 
 def _run_migrations():
