@@ -300,8 +300,9 @@ def delete_account():
 @auth_bp.route("/deactivate", methods=["POST"])
 @jwt_required()
 def deactivate_account():
+    # Soft deactivate: store flag in verification_token field temporarily
     user = User.query.get(int(get_jwt_identity()))
-    user.is_active = False
+    user.verification_token = "deactivated"
     db.session.commit()
     return jsonify({"message": "Account deactivated"})
 
