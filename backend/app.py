@@ -85,29 +85,29 @@ def _run_migrations():
     # PostgreSQL migrations - check if column exists before adding
     migrations = [
         # Stories table
-        "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='stories' AND column_name='music_url') THEN ALTER TABLE stories ADD COLUMN music_url VARCHAR(300); END IF; END $$",
-        "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='stories' AND column_name='music_name') THEN ALTER TABLE stories ADD COLUMN music_name VARCHAR(200); END IF; END $$",
-        "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='stories' AND column_name='location') THEN ALTER TABLE stories ADD COLUMN location VARCHAR(200); END IF; END $$",
-        "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='stories' AND column_name='transcript') THEN ALTER TABLE stories ADD COLUMN transcript TEXT; END IF; END $$",
-        "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='stories' AND column_name='enhanced_text') THEN ALTER TABLE stories ADD COLUMN enhanced_text TEXT; END IF; END $$",
-        "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='stories' AND column_name='summary') THEN ALTER TABLE stories ADD COLUMN summary TEXT; END IF; END $$",
-        "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='stories' AND column_name='tags') THEN ALTER TABLE stories ADD COLUMN tags VARCHAR(300); END IF; END $$",
-        "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='stories' AND column_name='ai_processed') THEN ALTER TABLE stories ADD COLUMN ai_processed BOOLEAN DEFAULT FALSE; END IF; END $$",
-        "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='stories' AND column_name='story_date') THEN ALTER TABLE stories ADD COLUMN story_date DATE; END IF; END $$",
-        "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='stories' AND column_name='updated_at') THEN ALTER TABLE stories ADD COLUMN updated_at TIMESTAMP DEFAULT NOW(); END IF; END $$",
-        "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='stories' AND column_name='repost_count') THEN ALTER TABLE stories ADD COLUMN repost_count INTEGER DEFAULT 0; END IF; END $$",
+        "ALTER TABLE stories ADD COLUMN IF NOT EXISTS music_url VARCHAR(300)",
+        "ALTER TABLE stories ADD COLUMN IF NOT EXISTS music_name VARCHAR(200)",
+        "ALTER TABLE stories ADD COLUMN IF NOT EXISTS location VARCHAR(200)",
+        "ALTER TABLE stories ADD COLUMN IF NOT EXISTS transcript TEXT",
+        "ALTER TABLE stories ADD COLUMN IF NOT EXISTS enhanced_text TEXT",
+        "ALTER TABLE stories ADD COLUMN IF NOT EXISTS summary TEXT",
+        "ALTER TABLE stories ADD COLUMN IF NOT EXISTS tags VARCHAR(300)",
+        "ALTER TABLE stories ADD COLUMN IF NOT EXISTS ai_processed BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE stories ADD COLUMN IF NOT EXISTS story_date DATE",
+        "ALTER TABLE stories ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW()",
+        "ALTER TABLE stories ADD COLUMN IF NOT EXISTS repost_count INTEGER DEFAULT 0",
         # Users table
-        "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='website') THEN ALTER TABLE users ADD COLUMN website VARCHAR(200); END IF; END $$",
-        "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='interests') THEN ALTER TABLE users ADD COLUMN interests VARCHAR(500); END IF; END $$",
-        "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='is_private') THEN ALTER TABLE users ADD COLUMN is_private BOOLEAN DEFAULT FALSE; END IF; END $$",
-        "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='phone') THEN ALTER TABLE users ADD COLUMN phone VARCHAR(20); END IF; END $$",
-        "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='apple_id') THEN ALTER TABLE users ADD COLUMN apple_id VARCHAR(200); END IF; END $$",
-        "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='two_factor_enabled') THEN ALTER TABLE users ADD COLUMN two_factor_enabled BOOLEAN DEFAULT FALSE; END IF; END $$",
-        "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='two_factor_secret') THEN ALTER TABLE users ADD COLUMN two_factor_secret VARCHAR(32); END IF; END $$",
-        "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='backup_codes') THEN ALTER TABLE users ADD COLUMN backup_codes TEXT; END IF; END $$",
-        "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='account_type') THEN ALTER TABLE users ADD COLUMN account_type VARCHAR(20) DEFAULT 'personal'; END IF; END $$",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS website VARCHAR(200)",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS interests VARCHAR(500)",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_private BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(20)",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS apple_id VARCHAR(200)",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS two_factor_enabled BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS two_factor_secret VARCHAR(32)",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS backup_codes TEXT",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS account_type VARCHAR(20) DEFAULT 'personal'",
         # Conversations table
-        "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='conversations' AND column_name='name') THEN ALTER TABLE conversations ADD COLUMN name VARCHAR(100); END IF; END $$",
+        "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS name VARCHAR(100)",
         # Indexes
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone ON users(phone)",
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_apple_id ON users(apple_id)",
@@ -118,9 +118,10 @@ def _run_migrations():
             for sql in migrations:
                 try:
                     conn.execute(text(sql))
+                    conn.commit()
+                    print(f"Migration executed: {sql[:50]}...")
                 except Exception as e:
                     print(f"Migration skipped ({sql[:50]}...): {e}")
-            conn.commit()
     except Exception as e:
         print(f"Migration failed, skipping: {e}")
 
