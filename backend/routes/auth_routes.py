@@ -775,30 +775,6 @@ def send_add_phone_otp():
     })
 
 
-@auth_bp.route("/2fa/disable", methods=["POST"])
-@jwt_required()
-def disable_2fa():
-    """Disable 2FA for user account"""
-    user = User.query.get(int(get_jwt_identity()))
-    data = request.json or {}
-    password = data.get("password", "")
-    
-    if not user.two_factor_enabled:
-        return jsonify({"error": "2FA is not enabled"}), 400
-    
-    # Verify password
-    if user.password and not bcrypt.check_password_hash(user.password, password):
-        return jsonify({"error": "Incorrect password"}), 401
-    
-    # Disable 2FA
-    user.two_factor_enabled = False
-    user.two_factor_secret = None
-    user.backup_codes = None
-    db.session.commit()
-    
-    return jsonify({"message": "2FA disabled successfully"})
-
-
 @auth_bp.route("/refresh", methods=["POST"])
 @jwt_required(refresh=True)
 def refresh():
