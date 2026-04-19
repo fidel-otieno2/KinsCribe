@@ -100,14 +100,20 @@ function PhoneLoginModal({ visible, onClose }) {
       setStep('otp');
       startCooldown();
       
-      // Show OTP in development
-      if (data.otp) {
-        console.log('📱 Development OTP:', data.otp);
-        Alert.alert(
-          'Development Mode', 
-          `Your OTP code is: ${data.otp}\n\n(This will be sent via SMS in production)`, 
-          [{ text: 'OK' }]
-        );
+      // Handle SMS response
+      if (data.sms_sent) {
+        console.log('✅ SMS sent successfully to', phone);
+        // SMS was sent successfully - no need to show OTP
+      } else {
+        // SMS failed, show OTP as fallback
+        console.log('⚠️ SMS failed, showing OTP:', data.otp);
+        if (data.otp) {
+          Alert.alert(
+            'SMS Service Unavailable', 
+            `SMS couldn't be sent. Your verification code is: ${data.otp}\n\nPlease enter this code to continue.`, 
+            [{ text: 'OK' }]
+          );
+        }
       }
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to send OTP. Please try again.');

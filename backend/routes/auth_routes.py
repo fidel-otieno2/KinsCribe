@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from extensions import db, bcrypt, mail
 from models.user import User
+from services.sms_service import sms_service
 from flask_jwt_extended import create_access_token, create_refresh_token, jwt_required, get_jwt_identity
 from flask_mail import Message
 import secrets
@@ -475,20 +476,28 @@ def send_phone_otp():
     
     db.session.commit()
     
+    # Send SMS with OTP
+    sms_result = sms_service.send_otp(phone, otp)
+    
     # Format phone for display (mask middle digits)
     display_phone = phone[:4] + '*' * (len(phone) - 8) + phone[-4:] if len(phone) > 8 else phone
     
-    # Log OTP for development (always show in development)
-    print(f"📱 SMS OTP for {phone}: {otp}")
-    
-    # TODO: Integrate with SMS service (Twilio, AWS SNS, etc.)
-    # For development, always return OTP in response
-    return jsonify({
-        "message": f"OTP sent to {display_phone}",
-        "phone": phone,
-        "otp": otp,  # Always show in development
-        "dev_note": "OTP shown for development - will be hidden in production"
-    })
+    if sms_result['success']:
+        return jsonify({
+            "message": f"OTP sent to {display_phone}",
+            "phone": phone,
+            "sms_sent": True
+        })
+    else:
+        # SMS failed, return OTP for development/fallback
+        print(f"📱 SMS failed, showing OTP for development: {otp}")
+        return jsonify({
+            "message": f"SMS service unavailable. OTP: {otp}",
+            "phone": phone,
+            "otp": sms_result.get('dev_otp', otp),
+            "sms_sent": False,
+            "error": sms_result.get('error', 'SMS service unavailable')
+        })
 
 
 @auth_bp.route("/phone/verify-otp", methods=["POST"])
@@ -533,6 +542,10 @@ def verify_phone_otp():
     user.is_verified = True
     user.verification_token = None
     db.session.commit()
+    
+    # Send welcome SMS for new users
+    if is_new_user:
+        sms_service.send_welcome_sms(phone, user.name)
     
     return jsonify({
         **_tokens(user),
@@ -775,18 +788,28 @@ def send_add_phone_otp():
     user.verification_token = f"phone_otp:{otp}:{expiry}"
     db.session.commit()
     
+    # Send SMS with OTP
+    sms_result = sms_service.send_otp(phone, otp)
+    
     # Format phone for display
     display_phone = phone[:4] + '*' * (len(phone) - 8) + phone[-4:] if len(phone) > 8 else phone
     
-    # Log OTP for development
-    print(f"📱 Add Phone OTP for {phone}: {otp}")
-    
-    return jsonify({
-        "message": f"OTP sent to {display_phone}",
-        "phone": phone,
-        "otp": otp,  # Always show in development
-        "dev_note": "OTP shown for development - will be hidden in production"
-    })
+    if sms_result['success']:
+        return jsonify({
+            "message": f"OTP sent to {display_phone}",
+            "phone": phone,
+            "sms_sent": True
+        })
+    else:
+        # SMS failed, return OTP for development/fallback
+        print(f"📱 Add Phone SMS failed, showing OTP for development: {otp}")
+        return jsonify({
+            "message": f"SMS service unavailable. OTP: {otp}",
+            "phone": phone,
+            "otp": sms_result.get('dev_otp', otp),
+            "sms_sent": False,
+            "error": sms_result.get('error', 'SMS service unavailable')
+        })
 
 
 @auth_bp.route("/refresh", methods=["POST"])
