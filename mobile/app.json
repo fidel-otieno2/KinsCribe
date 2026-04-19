@@ -45,7 +45,8 @@
     },
     "plugins": [
       "expo-image-picker",
-      "expo-media-library"
+      "expo-media-library",
+      "expo-local-authentication"
     ],
     "extra": {
       "apiUrl": "https://kinscribe-1.onrender.com/api",

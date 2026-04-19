@@ -19,6 +19,24 @@ import GradientButton from '../components/GradientButton';
 import api from '../api/axios';
 import * as LocalAuthentication from 'expo-local-authentication';
 
+const isBiometricAvailable = async () => {
+  try {
+    const compatible = await LocalAuthentication.hasHardwareAsync();
+    const enrolled = await LocalAuthentication.isEnrolledAsync();
+    return compatible && enrolled;
+  } catch {
+    return false;
+  }
+};
+
+const authenticateAsync = async (options) => {
+  try {
+    return await LocalAuthentication.authenticateAsync(options);
+  } catch {
+    return { success: false };
+  }
+};
+
 WebBrowser.maybeCompleteAuthSession();
 
 const { width, height } = Dimensions.get('window');
@@ -258,13 +276,26 @@ export default function LoginScreen({ navigation }) {
   const [request, response, promptAsync] = Google.useAuthRequest({
     androidClientId: '474767363654-6knta78fh5ibd8q0a6894o8euqrs90js.apps.googleusercontent.com',
     webClientId: '474767363654-i0sdd1v140399n0mfhf0qreqn9lj30u5.apps.googleusercontent.com',
+    scopes: ['profile', 'email'],
+    redirectUri: 'https://auth.expo.io/@martinsfidel/kinscribe',
   });
 
   useEffect(() => {
     checkBiometric();
     if (response?.type === 'success') {
-      const token = response.authentication?.accessToken || response.params?.access_token;
-      if (token) handleGoogleToken(token);
+      // Try all possible token locations
+      const accessToken =
+        response.authentication?.accessToken ||
+        response.params?.access_token ||
+        response.authentication?.idToken ||
+        response.params?.id_token;
+      if (accessToken) {
+        handleGoogleToken(accessToken);
+      } else {
+        setError('Google sign-in failed: no token received.');
+      }
+    } else if (response?.type === 'error') {
+      setError('Google sign-in was cancelled or failed.');
     }
   }, [response]);
 
@@ -272,32 +303,39 @@ export default function LoginScreen({ navigation }) {
     setGoogleLoading(true);
     setError('');
     try {
+      // Fetch user info directly on the client — more reliable than backend fetch
       const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
+      if (!userInfoRes.ok) throw new Error('Failed to fetch Google user info');
       const userInfo = await userInfoRes.json();
-      const { data } = await api.post('/auth/google', { id_token: accessToken, user_info: userInfo });
+      if (!userInfo.email) throw new Error('No email from Google');
+      // Send both token and pre-fetched user info to backend
+      const { data } = await api.post('/auth/google', {
+        id_token: accessToken,
+        user_info: userInfo,
+      });
       await AsyncStorage.setItem('access_token', data.access_token);
       await AsyncStorage.setItem('refresh_token', data.refresh_token);
       loginWithGoogle(data);
       if (data.is_new_user) navigation.navigate('SetupProfile');
     } catch (err) {
-      setError('Google sign-in failed. Try again.');
+      console.log('Google auth error:', err.message, err.response?.data);
+      setError(err.response?.data?.error || err.message || 'Google sign-in failed. Try again.');
     } finally { setGoogleLoading(false); }
   };
 
   const checkBiometric = async () => {
-    const compatible = await LocalAuthentication.hasHardwareAsync();
-    const enrolled = await LocalAuthentication.isEnrolledAsync();
+    const available = await isBiometricAvailable();
     const savedEmail = await AsyncStorage.getItem('biometric_email');
-    setBiometricAvailable(compatible && enrolled && !!savedEmail);
+    setBiometricAvailable(available && !!savedEmail);
   };
 
   const handleBiometricLogin = async () => {
     setBiometricLoading(true);
     setError('');
     try {
-      const result = await LocalAuthentication.authenticateAsync({
+      const result = await authenticateAsync({
         promptMessage: 'Sign in to KinsCribe',
         fallbackLabel: 'Use password',
         cancelLabel: 'Cancel',

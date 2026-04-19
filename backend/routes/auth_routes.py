@@ -63,30 +63,37 @@ def register():
 
 @auth_bp.route("/google", methods=["POST"])
 def google_auth():
-    """Accept Google access token from expo-auth-session, fetch user info and sign in/up."""
+    """Accept Google access token + pre-fetched user_info from client."""
     import requests as http_requests
 
     data = request.json or {}
     access_token = data.get("id_token")
+    client_user_info = data.get("user_info", {})
 
     if not access_token:
         return jsonify({"error": "No token provided"}), 400
 
-    try:
-        resp = http_requests.get(
-            "https://www.googleapis.com/oauth2/v3/userinfo",
-            headers={"Authorization": f"Bearer {access_token}"},
-            timeout=10
-        )
-        if resp.status_code != 200:
-            return jsonify({"error": "Invalid Google token"}), 401
-        info = resp.json()
-        google_id = info.get("sub")
-        email = info.get("email")
-        name = info.get("name", "")
-        avatar_url = info.get("picture", "")
-    except Exception as e:
-        return jsonify({"error": f"Token verification failed: {str(e)}"}), 401
+    # Use pre-fetched user_info from client if available (avoids double-fetch timeout)
+    # Fall back to fetching from Google if not provided
+    if client_user_info and client_user_info.get("email"):
+        info = client_user_info
+    else:
+        try:
+            resp = http_requests.get(
+                "https://www.googleapis.com/oauth2/v3/userinfo",
+                headers={"Authorization": f"Bearer {access_token}"},
+                timeout=10
+            )
+            if resp.status_code != 200:
+                return jsonify({"error": "Invalid Google token"}), 401
+            info = resp.json()
+        except Exception as e:
+            return jsonify({"error": f"Token verification failed: {str(e)}"}), 401
+
+    google_id = info.get("sub")
+    email = info.get("email")
+    name = info.get("name") or info.get("given_name", "User")
+    avatar_url = info.get("picture", "")
 
     if not email:
         return jsonify({"error": "Could not retrieve email from Google"}), 401
@@ -95,13 +102,11 @@ def google_auth():
     if not user:
         user = User.query.filter_by(email=email).first()
         if user:
-            # Merge: link Google ID to existing manual account
             if google_id and not user.google_id:
                 user.google_id = google_id
             if not user.avatar_url and avatar_url:
                 user.avatar_url = avatar_url
         else:
-            # Brand new user via Google
             user = User(
                 name=name,
                 email=email,

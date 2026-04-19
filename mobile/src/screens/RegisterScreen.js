@@ -58,12 +58,21 @@ export default function RegisterScreen({ navigation }) {
   const [request, response, promptAsync] = Google.useAuthRequest({
     androidClientId: '474767363654-6knta78fh5ibd8q0a6894o8euqrs90js.apps.googleusercontent.com',
     webClientId: '474767363654-i0sdd1v140399n0mfhf0qreqn9lj30u5.apps.googleusercontent.com',
+    scopes: ['profile', 'email'],
+    redirectUri: 'https://auth.expo.io/@martinsfidel/kinscribe',
   });
 
   useEffect(() => {
     if (response?.type === 'success') {
-      const token = response.authentication?.accessToken || response.params?.access_token;
+      const token =
+        response.authentication?.accessToken ||
+        response.params?.access_token ||
+        response.authentication?.idToken ||
+        response.params?.id_token;
       if (token) handleGoogleToken(token);
+      else setError('Google sign-in failed: no token received.');
+    } else if (response?.type === 'error') {
+      setError('Google sign-in was cancelled or failed.');
     }
   }, [response]);
 
@@ -74,14 +83,17 @@ export default function RegisterScreen({ navigation }) {
       const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
+      if (!userInfoRes.ok) throw new Error('Failed to fetch Google user info');
       const userInfo = await userInfoRes.json();
+      if (!userInfo.email) throw new Error('No email from Google');
       const { data } = await api.post('/auth/google', { id_token: accessToken, user_info: userInfo });
       await AsyncStorage.setItem('access_token', data.access_token);
       await AsyncStorage.setItem('refresh_token', data.refresh_token);
       loginWithGoogle(data);
       if (data.is_new_user) navigation.navigate('SetupProfile');
-    } catch {
-      setError('Google sign-in failed. Try again.');
+    } catch (err) {
+      console.log('Google register error:', err.message, err.response?.data);
+      setError(err.response?.data?.error || err.message || 'Google sign-in failed. Try again.');
     } finally { setGoogleLoading(false); }
   };
 
