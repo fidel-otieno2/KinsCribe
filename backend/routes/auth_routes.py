@@ -90,11 +90,24 @@ def register():
     db.session.commit()
 
     try:
+        # Debug email configuration
+        print(f"📧 Registration email config check:")
+        print(f"  MAIL_SERVER: {os.getenv('MAIL_SERVER')}")
+        print(f"  MAIL_USERNAME: {os.getenv('MAIL_USERNAME')}")
+        print(f"  MAIL_DEFAULT_SENDER: {os.getenv('MAIL_DEFAULT_SENDER')}")
+        print(f"  MAIL_PASSWORD configured: {'Yes' if os.getenv('MAIL_PASSWORD') else 'No'}")
+        
         msg = Message("Verify your KinsCribe account", recipients=[email])
         msg.html = _otp_email_html(name, otp)
+        print(f"📧 Attempting to send registration email to: {email}")
         mail.send(msg)
+        print(f"📧 Registration email sent successfully!")
         return jsonify({"message": "OTP sent to your email.", "requires_otp": True, "email": email}), 201
-    except Exception:
+    except Exception as e:
+        print(f"📧 Registration email failed with error: {str(e)}")
+        print(f"📧 Registration email error type: {type(e).__name__}")
+        import traceback
+        print(f"📧 Registration email full traceback: {traceback.format_exc()}")
         # Email not configured — auto-verify so user isn't stuck
         user.is_verified = True
         user.verification_token = None
@@ -488,6 +501,13 @@ def send_phone_otp():
     
     # Send OTP via email
     try:
+        # Debug email configuration
+        print(f"📧 Email config check:")
+        print(f"  MAIL_SERVER: {os.getenv('MAIL_SERVER')}")
+        print(f"  MAIL_USERNAME: {os.getenv('MAIL_USERNAME')}")
+        print(f"  MAIL_DEFAULT_SENDER: {os.getenv('MAIL_DEFAULT_SENDER')}")
+        print(f"  MAIL_PASSWORD configured: {'Yes' if os.getenv('MAIL_PASSWORD') else 'No'}")
+        
         msg = Message("Your KinsCribe Phone Verification Code", recipients=[email])
         msg.html = f"""
         <div style="font-family:sans-serif;max-width:480px;margin:auto;background:#0f172a;color:#f1f5f9;padding:32px;border-radius:16px">
@@ -502,7 +522,10 @@ def send_phone_otp():
           <p style="color:#94a3b8;font-size:13px">If you didn't request this verification, please ignore this email.</p>
         </div>
         """
+        
+        print(f"📧 Attempting to send email to: {email}")
         mail.send(msg)
+        print(f"📧 Email sent successfully!")
         
         return jsonify({
             "message": f"Verification code sent to {email}",
@@ -512,7 +535,11 @@ def send_phone_otp():
         })
         
     except Exception as e:
-        print(f"📧 Email failed, showing OTP for development: {otp}")
+        print(f"📧 Email failed with error: {str(e)}")
+        print(f"📧 Email error type: {type(e).__name__}")
+        import traceback
+        print(f"📧 Full traceback: {traceback.format_exc()}")
+        
         return jsonify({
             "message": f"Email service unavailable. OTP: {otp}",
             "phone": phone,
@@ -842,6 +869,13 @@ def send_add_phone_otp():
     
     # Send OTP via email
     try:
+        # Debug email configuration
+        print(f"📧 Add Phone Email config check:")
+        print(f"  MAIL_SERVER: {os.getenv('MAIL_SERVER')}")
+        print(f"  MAIL_USERNAME: {os.getenv('MAIL_USERNAME')}")
+        print(f"  MAIL_DEFAULT_SENDER: {os.getenv('MAIL_DEFAULT_SENDER')}")
+        print(f"  MAIL_PASSWORD configured: {'Yes' if os.getenv('MAIL_PASSWORD') else 'No'}")
+        
         msg = Message("Add Phone Number to KinsCribe", recipients=[user.email])
         msg.html = f"""
         <div style="font-family:sans-serif;max-width:480px;margin:auto;background:#0f172a;color:#f1f5f9;padding:32px;border-radius:16px">
@@ -856,7 +890,10 @@ def send_add_phone_otp():
           <p style="color:#94a3b8;font-size:13px">If you didn't request this, please ignore this email.</p>
         </div>
         """
+        
+        print(f"📧 Attempting to send add phone email to: {user.email}")
         mail.send(msg)
+        print(f"📧 Add phone email sent successfully!")
         
         return jsonify({
             "message": f"Verification code sent to {user.email}",
@@ -865,7 +902,11 @@ def send_add_phone_otp():
         })
         
     except Exception as e:
-        print(f"📧 Add Phone Email failed, showing OTP for development: {otp}")
+        print(f"📧 Add Phone Email failed with error: {str(e)}")
+        print(f"📧 Add Phone Email error type: {type(e).__name__}")
+        import traceback
+        print(f"📧 Add Phone Full traceback: {traceback.format_exc()}")
+        
         return jsonify({
             "message": f"Email service unavailable. OTP: {otp}",
             "phone": phone,
