@@ -184,3 +184,30 @@ def get_post(post_id):
     current_id = int(get_jwt_identity())
     post = Post.query.get_or_404(post_id)
     return jsonify({"post": post.to_dict(current_id)})
+
+
+@post_bp.route("/tagged/<int:user_id>", methods=["GET"])
+@jwt_required()
+def tagged_posts(user_id):
+    """Posts where the user is tagged (caption mentions @username)."""
+    current_id = int(get_jwt_identity())
+    target = User.query.get_or_404(user_id)
+    username = target.username or target.name
+    posts = Post.query.filter(
+        Post.caption.ilike(f"%@{username}%"),
+        Post.privacy == "public"
+    ).order_by(Post.created_at.desc()).limit(50).all()
+    return jsonify({"posts": [p.to_dict(current_id) for p in posts]})
+
+
+@post_bp.route("/liked/<int:user_id>", methods=["GET"])
+@jwt_required()
+def liked_posts(user_id):
+    """Posts liked by the given user."""
+    current_id = int(get_jwt_identity())
+    likes = PostLike.query.filter_by(user_id=user_id).order_by(PostLike.id.desc()).limit(50).all()
+    post_ids = [l.post_id for l in likes]
+    posts = Post.query.filter(Post.id.in_(post_ids), Post.privacy == "public").all()
+    posts_map = {p.id: p for p in posts}
+    result = [posts_map[pid].to_dict(current_id) for pid in post_ids if pid in posts_map]
+    return jsonify({"posts": result})

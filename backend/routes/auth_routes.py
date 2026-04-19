@@ -292,6 +292,15 @@ def delete_account():
     return jsonify({"message": "Account deleted"})
 
 
+@auth_bp.route("/deactivate", methods=["POST"])
+@jwt_required()
+def deactivate_account():
+    user = User.query.get(int(get_jwt_identity()))
+    user.is_active = False
+    db.session.commit()
+    return jsonify({"message": "Account deactivated"})
+
+
 @auth_bp.route("/refresh", methods=["POST"])
 @jwt_required(refresh=True)
 def refresh():

@@ -179,3 +179,36 @@ def saved_posts():
             d["collection"] = s.collection
             posts.append(d)
     return jsonify({"posts": posts})
+
+
+@public_story_bp.route("/<int:story_id>/views", methods=["GET"])
+@jwt_required()
+def story_views(story_id):
+    story = PublicStory.query.get_or_404(story_id)
+    if story.user_id != int(get_jwt_identity()):
+        return jsonify({"error": "Not authorized"}), 403
+    views = PublicStoryView.query.filter_by(story_id=story_id).order_by(PublicStoryView.created_at.desc()).all()
+    result = []
+    for v in views:
+        u = User.query.get(v.user_id)
+        if u:
+            result.append({
+                "user_id": u.id, "name": u.name, "username": u.username,
+                "avatar_url": u.avatar_url, "viewed_at": v.created_at.isoformat()
+            })
+    return jsonify({"views": result})
+
+
+@public_story_bp.route("/collections", methods=["GET"])
+@jwt_required()
+def get_collections():
+    from models.social import Post
+    current_id = int(get_jwt_identity())
+    saves = PostSave.query.filter_by(user_id=current_id).all()
+    collections = {}
+    for s in saves:
+        col = s.collection or "Saved"
+        if col not in collections:
+            collections[col] = 0
+        collections[col] += 1
+    return jsonify({"collections": [{ "name": k, "count": v } for k, v in collections.items()]})

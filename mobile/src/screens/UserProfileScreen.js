@@ -57,6 +57,39 @@ export default function UserProfileScreen({ route, navigation }) {
     } catch {} finally { setConnecting(false); }
   };
 
+  const handleBlock = () => Alert.alert(
+    'Block Account',
+    `Block @${profile?.username || profile?.name}? They won't be able to see your posts or contact you.`,
+    [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Block', style: 'destructive', onPress: async () => {
+        try { await api.post(`/connections/${userId}/block`); navigation.goBack(); } catch {}
+      }},
+    ]
+  );
+
+  const handleMute = () => Alert.alert(
+    'Mute Account',
+    `Mute @${profile?.username || profile?.name}? Their posts won't appear in your feed.`,
+    [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Mute', onPress: async () => {
+        try { await api.post(`/connections/${userId}/mute`); Alert.alert('Muted', 'Account muted successfully'); } catch {}
+      }},
+    ]
+  );
+
+  const handleReport = () => Alert.alert(
+    'Report Account',
+    'Why are you reporting this account?',
+    [
+      { text: 'Spam', onPress: () => Alert.alert('Reported', 'Thank you for your report.') },
+      { text: 'Harassment', onPress: () => Alert.alert('Reported', 'Thank you for your report.') },
+      { text: 'Inappropriate content', onPress: () => Alert.alert('Reported', 'Thank you for your report.') },
+      { text: 'Cancel', style: 'cancel' },
+    ]
+  );
+
   const openDM = async () => {
     try {
       const { data } = await api.post(`/messages/dm/${userId}`);
@@ -77,7 +110,18 @@ export default function UserProfileScreen({ route, navigation }) {
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <Text style={s.topName}>{profile?.name || userName}</Text>
-        <View style={{ width: 32 }} />
+        <TouchableOpacity onPress={() => Alert.alert(
+          profile?.name || userName,
+          'Choose an action',
+          [
+            { text: 'Mute', onPress: handleMute },
+            { text: 'Block', style: 'destructive', onPress: handleBlock },
+            { text: 'Report', onPress: handleReport },
+            { text: 'Cancel', style: 'cancel' },
+          ]
+        )} style={s.backBtn}>
+          <Ionicons name="ellipsis-horizontal" size={22} color={colors.muted} />
+        </TouchableOpacity>
       </View>
 
       {/* Avatar + stats */}

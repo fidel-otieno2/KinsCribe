@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   Image, ActivityIndicator, Alert, RefreshControl,
-  ScrollView, Dimensions, Share,
+  ScrollView, Dimensions, Share, Modal,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,6 +15,7 @@ import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Toast from '../components/Toast';
 import useToast from '../hooks/useToast';
+import QRCode from 'react-native-qrcode-svg';
 
 const { width } = Dimensions.get('window');
 const GRID = (width - 3) / 3;
@@ -23,6 +24,8 @@ const TABS = [
   { key: 'posts', icon: 'grid-outline', iconActive: 'grid' },
   { key: 'reels', icon: 'film-outline', iconActive: 'film' },
   { key: 'saved', icon: 'bookmark-outline', iconActive: 'bookmark' },
+  { key: 'tagged', icon: 'at-outline', iconActive: 'at' },
+  { key: 'liked', icon: 'heart-outline', iconActive: 'heart' },
 ];
 
 export default function ProfileScreen({ navigation }) {
@@ -31,24 +34,32 @@ export default function ProfileScreen({ navigation }) {
   const { toast, hide, success, error, info } = useToast();
   const [posts, setPosts] = useState([]);
   const [savedPosts, setSavedPosts] = useState([]);
+  const [taggedPosts, setTaggedPosts] = useState([]);
+  const [likedPosts, setLikedPosts] = useState([]);
   const [highlights, setHighlights] = useState([]);
   const [tab, setTab] = useState('posts');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [showQR, setShowQR] = useState(false);
+  const [feedLayout, setFeedLayout] = useState('grid'); // 'grid' | 'list'
   const [stats, setStats] = useState({ posts: 0, connections: 0, interests: 0 });
 
   const fetchAll = useCallback(async () => {
     if (!user) return;
     try {
-      const [postsRes, savedRes, highlightsRes] = await Promise.all([
+      const [postsRes, savedRes, highlightsRes, taggedRes, likedRes] = await Promise.all([
         api.get(`/posts/user/${user.id}`).catch(() => ({ data: { posts: [] } })),
         api.get('/pstories/saved').catch(() => ({ data: { posts: [] } })),
         api.get(`/pstories/highlights?user_id=${user.id}`).catch(() => ({ data: { highlights: [] } })),
+        api.get(`/posts/tagged/${user.id}`).catch(() => ({ data: { posts: [] } })),
+        api.get(`/posts/liked/${user.id}`).catch(() => ({ data: { posts: [] } })),
       ]);
       const allPosts = postsRes.data.posts || [];
       setPosts(allPosts);
       setSavedPosts(savedRes.data.posts || []);
+      setTaggedPosts(taggedRes.data.posts || []);
+      setLikedPosts(likedRes.data.posts || []);
       setHighlights(highlightsRes.data.highlights || []);
       setStats({
         posts: allPosts.length,
@@ -128,7 +139,11 @@ export default function ProfileScreen({ navigation }) {
     </TouchableOpacity>
   );
 
-  const currentData = tab === 'saved' ? savedPosts : posts.filter(p => tab === 'reels' ? p.media_type === 'video' : true);
+  const currentData =
+    tab === 'saved' ? savedPosts :
+    tab === 'tagged' ? taggedPosts :
+    tab === 'liked' ? likedPosts :
+    posts.filter(p => tab === 'reels' ? p.media_type === 'video' : true);
 
   const Header = () => (
     <View>
@@ -196,6 +211,9 @@ export default function ProfileScreen({ navigation }) {
         <TouchableOpacity style={[s.shareBtn, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]} onPress={handleShare}>
           <Ionicons name="share-outline" size={18} color={theme.text} />
         </TouchableOpacity>
+        <TouchableOpacity style={[s.shareBtn, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]} onPress={() => setShowQR(true)}>
+          <Ionicons name="qr-code-outline" size={18} color={theme.text} />
+        </TouchableOpacity>
         <TouchableOpacity style={[s.shareBtn, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]} onPress={() => navigation.navigate('Family')}>
           <Ionicons name="people-outline" size={18} color={theme.text} />
         </TouchableOpacity>
@@ -235,6 +253,9 @@ export default function ProfileScreen({ navigation }) {
             <Ionicons name={tab === t.key ? t.iconActive : t.icon} size={22} color={tab === t.key ? theme.primary : theme.muted} />
           </TouchableOpacity>
         ))}
+        <TouchableOpacity style={s.tabBtn} onPress={() => setFeedLayout(l => l === 'grid' ? 'list' : 'grid')}>
+          <Ionicons name={feedLayout === 'grid' ? 'list-outline' : 'grid-outline'} size={22} color={theme.muted} />
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -245,9 +266,28 @@ export default function ProfileScreen({ navigation }) {
     </View>
   );
 
+  const qrValue = `kinscribe://profile/${user?.id}`;
+
   return (
     <View style={[s.container, { backgroundColor: theme.bg }]}>
       <Toast visible={toast.visible} type={toast.type} message={toast.message} onHide={hide} />
+
+      {/* QR Modal */}
+      <Modal visible={showQR} transparent animationType="fade" onRequestClose={() => setShowQR(false)}>
+        <TouchableOpacity style={s.qrOverlay} activeOpacity={1} onPress={() => setShowQR(false)}>
+          <View style={[s.qrCard, { backgroundColor: theme.bgCard }]}>
+            <Text style={[s.qrTitle, { color: theme.text }]}>Scan to visit profile</Text>
+            <Text style={[s.qrSub, { color: theme.muted }]}>@{user?.username || user?.name}</Text>
+            <View style={s.qrBox}>
+              <QRCode value={qrValue} size={200} color="#7c3aed" backgroundColor="#fff" />
+            </View>
+            <TouchableOpacity style={s.qrClose} onPress={() => setShowQR(false)}>
+              <Ionicons name="close-circle" size={32} color={theme.muted} />
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchAll(); }} tintColor={theme.primary} />}
@@ -255,15 +295,35 @@ export default function ProfileScreen({ navigation }) {
         <Header />
         {currentData.length === 0 ? (
           <View style={s.empty}>
-            <Ionicons name={tab === 'saved' ? 'bookmark-outline' : tab === 'reels' ? 'film-outline' : 'camera-outline'} size={48} color={theme.dim} />
+            <Ionicons
+              name={tab === 'saved' ? 'bookmark-outline' : tab === 'reels' ? 'film-outline' : tab === 'tagged' ? 'at-outline' : tab === 'liked' ? 'heart-outline' : 'camera-outline'}
+              size={48} color={theme.dim}
+            />
             <Text style={[s.emptyTitle, { color: theme.muted }]}>
-              {tab === 'saved' ? 'No saved posts' : tab === 'reels' ? 'No reels yet' : 'No posts yet'}
+              {tab === 'saved' ? 'No saved posts' : tab === 'reels' ? 'No reels yet' : tab === 'tagged' ? 'No tagged posts yet' : tab === 'liked' ? 'No liked posts yet' : 'No posts yet'}
             </Text>
             {tab === 'posts' && (
               <TouchableOpacity style={s.createBtn} onPress={() => navigation.navigate('Create')}>
                 <Text style={s.createBtnText}>Create your first post</Text>
               </TouchableOpacity>
             )}
+          </View>
+        ) : feedLayout === 'list' ? (
+          <View style={{ paddingHorizontal: 1 }}>
+            {currentData.map(item => (
+              <TouchableOpacity key={item.id} style={[s.listItem, { borderBottomColor: theme.border }]} activeOpacity={0.85}>
+                {item.media_url && <Image source={{ uri: item.media_url }} style={s.listImg} resizeMode="cover" />}
+                <View style={s.listInfo}>
+                  <Text style={[s.listCaption, { color: theme.text }]} numberOfLines={2}>{item.caption}</Text>
+                  <View style={s.listMeta}>
+                    <Ionicons name="heart" size={13} color={colors.muted} />
+                    <Text style={[s.listMetaText, { color: theme.muted }]}>{item.like_count}</Text>
+                    <Ionicons name="chatbubble-outline" size={13} color={colors.muted} />
+                    <Text style={[s.listMetaText, { color: theme.muted }]}>{item.comment_count}</Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            ))}
           </View>
         ) : (
           <View style={s.grid}>
@@ -322,8 +382,20 @@ const s = StyleSheet.create({
   videoBadge: { position: 'absolute', top: 6, right: 6, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 4, padding: 3 },
   gridLikes: { position: 'absolute', bottom: 4, left: 4, flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 10 },
   gridLikesText: { color: '#fff', fontSize: 10, fontWeight: '600' },
+  qrOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', alignItems: 'center', justifyContent: 'center' },
+  qrCard: { borderRadius: 24, padding: 28, alignItems: 'center', gap: 8, width: 280 },
+  qrTitle: { fontSize: 18, fontWeight: '800' },
+  qrSub: { fontSize: 13, marginBottom: 8 },
+  qrBox: { backgroundColor: '#fff', padding: 16, borderRadius: 16 },
+  qrClose: { marginTop: 12 },
   empty: { alignItems: 'center', marginTop: 60, gap: 12, paddingHorizontal: 40 },
   emptyTitle: { fontSize: 16, color: colors.muted },
   createBtn: { backgroundColor: colors.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: radius.md },
   createBtnText: { color: '#fff', fontWeight: '700' },
+  listItem: { flexDirection: 'row', gap: 12, padding: 12, borderBottomWidth: 0.5, borderBottomColor: colors.border },
+  listImg: { width: 72, height: 72, borderRadius: 8 },
+  listInfo: { flex: 1, justifyContent: 'center' },
+  listCaption: { fontSize: 14, color: colors.text, lineHeight: 19 },
+  listMeta: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
+  listMetaText: { fontSize: 12, color: colors.muted },
 });

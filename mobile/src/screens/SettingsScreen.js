@@ -83,6 +83,18 @@ export default function SettingsScreen({ navigation }) {
   const [notifStories, setNotifStories] = useState(true);
   const [notifFollows, setNotifFollows] = useState(true);
 
+  // Quiet hours / DND
+  const [quietHours, setQuietHours] = useState(false);
+  const [quietFrom] = useState('22:00');
+  const [quietTo] = useState('08:00');
+
+  // Active sessions (mock — real impl needs backend)
+  const [sessions] = useState([
+    { id: 1, device: 'This device', location: 'Current session', current: true, last: 'Now' },
+    { id: 2, device: 'Chrome on Windows', location: 'Other session', current: false, last: '2 days ago' },
+  ]);
+  const [showSessions, setShowSessions] = useState(false);
+
   // Privacy toggles
   const [privateAccount, setPrivateAccount] = useState(false);
   const [showActivity, setShowActivity] = useState(true);
@@ -130,6 +142,29 @@ export default function SettingsScreen({ navigation }) {
     { text: 'Cancel', style: 'cancel' },
     { text: 'Log Out', style: 'destructive', onPress: logout },
   ]);
+
+  const handleDeactivate = () => Alert.alert(
+    'Deactivate Account',
+    'Your account will be hidden temporarily. You can reactivate anytime by logging back in.',
+    [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Deactivate', style: 'destructive', onPress: async () => {
+        try {
+          await api.post('/auth/deactivate');
+          logout();
+        } catch { error('Could not deactivate. Try again.'); }
+      }},
+    ]
+  );
+
+  const handleRevokeSession = (sessionId) => Alert.alert(
+    'Revoke Session',
+    'This will sign out that device.',
+    [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Revoke', style: 'destructive', onPress: () => success('Session revoked') },
+    ]
+  );
 
   const handleDeleteAccount = () => Alert.alert(
     'Delete Account',
@@ -217,6 +252,8 @@ export default function SettingsScreen({ navigation }) {
           <Row icon="shield-checkmark-outline" iconColor="#10b981" label="Two-Factor Authentication" onPress={() => Alert.alert('2FA', 'Coming soon')} />
           <Divider />
           <Row icon="people-outline" iconColor="#3b82f6" label="My Family" onPress={() => { navigation.goBack(); navigation.navigate('Family'); }} />
+          <Divider />
+          <Row icon="swap-horizontal-outline" iconColor="#7c3aed" label="Switch Account" onPress={() => navigation.navigate('AccountSwitcher')} />
         </Section>
 
         {/* Privacy */}
@@ -241,6 +278,41 @@ export default function SettingsScreen({ navigation }) {
           <Row icon="time-outline" iconColor="#f59e0b" label="Stories" toggle toggled={notifStories} onPress={() => setNotifStories(v => !v)} />
           <Divider />
           <Row icon="person-add-outline" iconColor="#10b981" label="New Connections" toggle toggled={notifFollows} onPress={() => setNotifFollows(v => !v)} />
+          <Divider />
+          <Row icon="moon-outline" iconColor="#6366f1" label="Quiet Hours (DND)" toggle toggled={quietHours} onPress={() => setQuietHours(v => !v)} />
+          {quietHours && (
+            <View style={s.quietRow}>
+              <Ionicons name="time-outline" size={15} color={colors.muted} />
+              <Text style={s.quietText}>Silent from <Text style={s.quietTime}>{quietFrom}</Text> to <Text style={s.quietTime}>{quietTo}</Text></Text>
+              <TouchableOpacity onPress={() => Alert.alert('Quiet Hours', 'Custom time picker coming soon')}>
+                <Text style={s.quietEdit}>Edit</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </Section>
+
+        {/* Active Sessions */}
+        <Section title="Active Sessions">
+          <Row icon="phone-portrait-outline" iconColor="#06b6d4" label="Manage Sessions" onPress={() => setShowSessions(v => !v)} />
+          {showSessions && sessions.map((sess, i) => (
+            <View key={sess.id}>
+              <Divider />
+              <View style={s.sessionRow}>
+                <View style={[s.rowIcon, { backgroundColor: sess.current ? 'rgba(16,185,129,0.15)' : 'rgba(100,116,139,0.15)' }]}>
+                  <Ionicons name={sess.current ? 'checkmark-circle' : 'phone-portrait-outline'} size={18} color={sess.current ? '#10b981' : colors.muted} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[s.rowLabel, { fontSize: 13 }]}>{sess.device}</Text>
+                  <Text style={[s.rowValue, { fontSize: 11 }]}>{sess.location} · {sess.last}</Text>
+                </View>
+                {!sess.current && (
+                  <TouchableOpacity onPress={() => handleRevokeSession(sess.id)}>
+                    <Text style={s.revokeBtn}>Revoke</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          ))}
         </Section>
 
         {/* Appearance */}
@@ -289,6 +361,27 @@ export default function SettingsScreen({ navigation }) {
         </Section>
 
         {/* About */}
+        <Section title="Subscription">
+          <View style={s.row}>
+            <View style={[s.rowIcon, { backgroundColor: 'rgba(245,158,11,0.15)' }]}>
+              <Ionicons name="star" size={18} color="#f59e0b" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.rowLabel}>Current Plan</Text>
+              <Text style={[s.rowValue, { fontSize: 12, marginTop: 2 }]}>Free</Text>
+            </View>
+          </View>
+          <Divider />
+          <TouchableOpacity style={s.row} onPress={() => Alert.alert('KinsCribe Premium', 'Premium plan coming soon!\n\n✅ Unlimited storage\n✅ AI story generation\n✅ Priority support\n✅ Advanced analytics\n\nStay tuned!')} activeOpacity={0.7}>
+            <View style={[s.rowIcon, { backgroundColor: 'rgba(124,58,237,0.15)' }]}>
+              <Ionicons name="diamond-outline" size={18} color="#7c3aed" />
+            </View>
+            <Text style={[s.rowLabel, { color: '#7c3aed' }]}>Upgrade to Premium</Text>
+            <Ionicons name="chevron-forward" size={16} color="#7c3aed" />
+          </TouchableOpacity>
+        </Section>
+
+        {/* About */}
         <Section title="About">
           <Row icon="phone-portrait-outline" iconColor="#94a3b8" label="App Version" value="1.0.0" chevron={false} />
           <Divider />
@@ -301,6 +394,8 @@ export default function SettingsScreen({ navigation }) {
 
         {/* Danger zone */}
         <Section title="Account Actions">
+          <Row icon="pause-circle-outline" iconColor="#f59e0b" label="Deactivate Account" onPress={handleDeactivate} />
+          <Divider />
           <Row icon="log-out-outline" iconColor="#f87171" label="Log Out" onPress={handleLogout} danger />
           <Divider />
           <Row icon="trash-outline" iconColor="#f87171" label="Delete Account" onPress={handleDeleteAccount} danger />
@@ -339,4 +434,10 @@ const s = StyleSheet.create({
   editField: { padding: 14 },
   editLabel: { fontSize: 11, color: colors.muted, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
   editInput: { color: colors.text, fontSize: 15, borderBottomWidth: 1, borderBottomColor: colors.border2, paddingBottom: 6 },
+  quietRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 15, paddingBottom: 12, paddingTop: 4 },
+  quietText: { flex: 1, fontSize: 12, color: colors.muted },
+  quietTime: { color: colors.primary, fontWeight: '700' },
+  quietEdit: { color: colors.primary, fontSize: 12, fontWeight: '700' },
+  sessionRow: { flexDirection: 'row', alignItems: 'center', padding: 15, gap: 12 },
+  revokeBtn: { color: '#f87171', fontSize: 12, fontWeight: '700' },
 });

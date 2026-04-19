@@ -39,6 +39,9 @@ export default function MessagesScreen({ navigation }) {
   const [search, setSearch] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
+  const [pinnedIds, setPinnedIds] = useState(new Set());
+  const [mutedIds, setMutedIds] = useState(new Set());
+  const [archivedIds, setArchivedIds] = useState(new Set());
 
   const fetchConversations = async () => {
     try {
@@ -105,19 +108,41 @@ export default function MessagesScreen({ navigation }) {
     const other = item.other_user;
     const lastMsg = item.last_message;
     const unread = item.unread_count > 0;
+    const isPinned = pinnedIds.has(item.id);
+    const isMuted = mutedIds.has(item.id);
     return (
-      <TouchableOpacity style={[s.row, { borderBottomColor: theme.border }]} onPress={() => openConv(item)} activeOpacity={0.7}>
+      <TouchableOpacity
+        style={[s.row, { borderBottomColor: theme.border }, isPinned && { backgroundColor: 'rgba(124,58,237,0.06)' }]}
+        onPress={() => openConv(item)}
+        onLongPress={() => Alert.alert(
+          other?.name || 'Chat',
+          '',
+          [
+            { text: isPinned ? 'Unpin' : 'Pin to top', onPress: () => setPinnedIds(prev => { const n = new Set(prev); isPinned ? n.delete(item.id) : n.add(item.id); return n; }) },
+            { text: isMuted ? 'Unmute' : 'Mute notifications', onPress: () => setMutedIds(prev => { const n = new Set(prev); isMuted ? n.delete(item.id) : n.add(item.id); return n; }) },
+            { text: 'Archive', onPress: () => setArchivedIds(prev => new Set([...prev, item.id])) },
+            { text: 'Cancel', style: 'cancel' },
+          ]
+        )}
+        activeOpacity={0.7}
+      >
         <Avatar uri={other?.avatar} name={other?.name} size={52} />
         <View style={s.rowInfo}>
           <View style={s.rowTop}>
-            <Text style={[s.rowName, { color: theme.text }, unread && s.rowNameUnread]}>{other?.name || "User"}</Text>
-            <Text style={[s.rowTime, { color: theme.dim }]}>{timeAgo(lastMsg?.created_at)}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              {isPinned && <Ionicons name="pin" size={12} color={theme.primary} />}
+              <Text style={[s.rowName, { color: theme.text }, unread && s.rowNameUnread]}>{other?.name || "User"}</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              {isMuted && <Ionicons name="notifications-off-outline" size={12} color={theme.dim} />}
+              <Text style={[s.rowTime, { color: theme.dim }]}>{timeAgo(lastMsg?.created_at)}</Text>
+            </View>
           </View>
           <View style={s.rowBottom}>
             <Text style={[s.rowLast, { color: theme.muted }, unread && { color: theme.text, fontWeight: '600' }]} numberOfLines={1}>
               {lastMsg ? (lastMsg.media_url ? "📎 Media" : lastMsg.text) : "Start a conversation"}
             </Text>
-            {unread && <View style={[s.unreadDot, { backgroundColor: theme.primary }]}><Text style={s.unreadCount}>{item.unread_count}</Text></View>}
+            {unread && !isMuted && <View style={[s.unreadDot, { backgroundColor: theme.primary }]}><Text style={s.unreadCount}>{item.unread_count}</Text></View>}
           </View>
         </View>
       </TouchableOpacity>
@@ -224,7 +249,7 @@ export default function MessagesScreen({ navigation }) {
             </View>
           ) : (
             <FlatList
-              data={conversations}
+              data={[...conversations.filter(c => !archivedIds.has(c.id))].sort((a, b) => (pinnedIds.has(b.id) ? 1 : 0) - (pinnedIds.has(a.id) ? 1 : 0))}
               keyExtractor={i => String(i.id)}
               renderItem={renderDM}
               showsVerticalScrollIndicator={false}

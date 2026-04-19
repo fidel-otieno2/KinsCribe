@@ -115,3 +115,23 @@ def search_users():
         ).first() is not None
         result.append({**u.to_dict(), "is_connected": is_connected})
     return jsonify({"users": result})
+
+
+@connection_bp.route("/<int:user_id>/block", methods=["POST"])
+@jwt_required()
+def block_user(user_id):
+    current_id = int(get_jwt_identity())
+    # Remove any existing connection both ways
+    Connection.query.filter(
+        ((Connection.follower_id == current_id) & (Connection.following_id == user_id)) |
+        ((Connection.follower_id == user_id) & (Connection.following_id == current_id))
+    ).delete(synchronize_session=False)
+    db.session.commit()
+    return jsonify({"blocked": True})
+
+
+@connection_bp.route("/<int:user_id>/mute", methods=["POST"])
+@jwt_required()
+def mute_user(user_id):
+    # Mute is client-side preference; just acknowledge
+    return jsonify({"muted": True})

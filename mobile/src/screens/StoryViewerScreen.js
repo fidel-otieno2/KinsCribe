@@ -23,6 +23,8 @@ export default function StoryViewerScreen({ route, navigation }) {
   const [paused, setPaused] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [showReply, setShowReply] = useState(false);
+  const [showViews, setShowViews] = useState(false);
+  const [views, setViews] = useState([]);
   const progress = useRef(new Animated.Value(0)).current;
   const animRef = useRef(null);
 
@@ -76,6 +78,14 @@ export default function StoryViewerScreen({ route, navigation }) {
       await api.delete(`/pstories/${story.id}`);
       goNext();
     } catch {}
+  };
+
+  const loadViews = async () => {
+    try {
+      const { data } = await api.get(`/pstories/${story.id}/views`);
+      setViews(data.views || []);
+      setShowViews(true);
+    } catch { setShowViews(true); }
   };
 
   if (!story) return null;
@@ -164,10 +174,10 @@ export default function StoryViewerScreen({ route, navigation }) {
 
       {/* View count (own stories) */}
       {isOwn && (
-        <View style={s.viewCount}>
+        <TouchableOpacity style={s.viewCount} onPress={loadViews}>
           <Ionicons name="eye-outline" size={14} color="rgba(255,255,255,0.8)" />
-          <Text style={s.viewCountText}>{story.view_count || 0}</Text>
-        </View>
+          <Text style={s.viewCountText}>{story.view_count || 0} views</Text>
+        </TouchableOpacity>
       )}
 
       {/* Reply bar */}
@@ -199,6 +209,41 @@ export default function StoryViewerScreen({ route, navigation }) {
           </BlurView>
         </KeyboardAvoidingView>
       )}
+
+      {/* Views Modal */}
+      <Modal visible={showViews} transparent animationType="slide" onRequestClose={() => setShowViews(false)}>
+        <View style={s.viewsOverlay}>
+          <View style={s.viewsSheet}>
+            <View style={s.viewsHandle} />
+            <View style={s.viewsHeader}>
+              <Text style={s.viewsTitle}>Viewed by {views.length}</Text>
+              <TouchableOpacity onPress={() => setShowViews(false)}>
+                <Ionicons name="close" size={22} color={colors.muted} />
+              </TouchableOpacity>
+            </View>
+            {views.length === 0 ? (
+              <View style={{ alignItems: 'center', padding: 40 }}>
+                <Ionicons name="eye-off-outline" size={40} color={colors.dim} />
+                <Text style={{ color: colors.muted, marginTop: 10 }}>No views yet</Text>
+              </View>
+            ) : (
+              views.map((v, i) => (
+                <View key={i} style={s.viewRow}>
+                  <View style={s.viewAvatar}>
+                    {v.avatar_url
+                      ? <Image source={{ uri: v.avatar_url }} style={{ width: 40, height: 40, borderRadius: 20 }} />
+                      : <Text style={s.viewAvatarLetter}>{v.name?.[0]?.toUpperCase()}</Text>}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.viewName}>{v.name}</Text>
+                    <Text style={s.viewTime}>{v.viewed_at ? new Date(v.viewed_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : ''}</Text>
+                  </View>
+                </View>
+              ))
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -233,4 +278,14 @@ const s = StyleSheet.create({
   replyBar: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 12, paddingBottom: 28 },
   replyInput: { flex: 1, color: '#fff', fontSize: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)', borderRadius: 24, paddingHorizontal: 16, paddingVertical: 10 },
   replyEmojis: { flexDirection: 'row', gap: 6 },
+  viewsOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.6)' },
+  viewsSheet: { backgroundColor: colors.bgSecondary, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 40, maxHeight: '60%' },
+  viewsHandle: { width: 40, height: 4, backgroundColor: colors.border, borderRadius: 2, alignSelf: 'center', marginTop: 12, marginBottom: 4 },
+  viewsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 0.5, borderBottomColor: colors.border },
+  viewsTitle: { fontSize: 16, fontWeight: '700', color: colors.text },
+  viewRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: colors.border },
+  viewAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  viewAvatarLetter: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  viewName: { fontSize: 14, fontWeight: '600', color: colors.text },
+  viewTime: { fontSize: 11, color: colors.muted, marginTop: 2 },
 });

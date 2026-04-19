@@ -41,6 +41,9 @@ export default function CreateScreen({ navigation }) {
   const [textContent, setTextContent] = useState('');
   const [bgColor, setBgColor] = useState('#7c3aed');
   const [loading, setLoading] = useState(false);
+  const [altText, setAltText] = useState('');
+  const [collabUser, setCollabUser] = useState('');
+  const [scheduledFor, setScheduledFor] = useState('');
 
   // Family story fields
   const [familyTitle, setFamilyTitle] = useState('');
@@ -242,6 +245,21 @@ export default function CreateScreen({ navigation }) {
             <View style={[s.fieldRow, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]}>
               <Ionicons name="pricetag-outline" size={18} color={theme.muted} />
               <TextInput style={[s.fieldInput, { color: theme.text }]} placeholder="#hashtags" placeholderTextColor={theme.dim} value={hashtags} onChangeText={setHashtags} autoCapitalize="none" />
+            </View>
+
+            <View style={[s.fieldRow, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]}>
+              <Ionicons name="person-add-outline" size={18} color={theme.muted} />
+              <TextInput style={[s.fieldInput, { color: theme.text }]} placeholder="Tag a co-creator @username (Collab)" placeholderTextColor={theme.dim} value={collabUser} onChangeText={setCollabUser} autoCapitalize="none" />
+            </View>
+
+            <View style={[s.fieldRow, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]}>
+              <Ionicons name="text-outline" size={18} color={theme.muted} />
+              <TextInput style={[s.fieldInput, { color: theme.text }]} placeholder="Alt text for accessibility" placeholderTextColor={theme.dim} value={altText} onChangeText={setAltText} />
+            </View>
+
+            <View style={[s.fieldRow, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]}>
+              <Ionicons name="calendar-outline" size={18} color={theme.muted} />
+              <TextInput style={[s.fieldInput, { color: theme.text }]} placeholder="Schedule: YYYY-MM-DD HH:MM (optional)" placeholderTextColor={theme.dim} value={scheduledFor} onChangeText={setScheduledFor} />
             </View>
 
             <Text style={[s.label, { color: theme.muted }]}>Audience</Text>

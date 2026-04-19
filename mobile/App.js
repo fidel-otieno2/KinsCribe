@@ -43,6 +43,7 @@ import FamilyCalendarScreen from "./src/screens/FamilyCalendarScreen";
 import FamilyRecipesScreen from "./src/screens/FamilyRecipesScreen";
 import FamilyBudgetScreen from "./src/screens/FamilyBudgetScreen";
 import PostInsightsScreen from "./src/screens/PostInsightsScreen";
+import AccountSwitcherScreen from "./src/screens/AccountSwitcherScreen";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -172,6 +173,7 @@ function RootNavigator() {
           <Stack.Screen name="FamilyRecipes" component={FamilyRecipesScreen} options={{ animation: "slide_from_right" }} />
           <Stack.Screen name="FamilyBudget" component={FamilyBudgetScreen} options={{ animation: "slide_from_right" }} />
           <Stack.Screen name="PostInsights" component={PostInsightsScreen} options={{ animation: "slide_from_right" }} />
+          <Stack.Screen name="AccountSwitcher" component={AccountSwitcherScreen} options={{ animation: "slide_from_right" }} />
         </>
       )}
     </Stack.Navigator>

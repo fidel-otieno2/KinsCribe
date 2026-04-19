@@ -102,6 +102,7 @@ export default function TimelineScreen() {
   const [grouped, setGrouped] = useState([]);
   const [stats, setStats] = useState({ total: 0, earliest: null, latest: null });
   const [loading, setLoading] = useState(true);
+  const [onThisDay, setOnThisDay] = useState([]);
 
   useEffect(() => {
     api.get('/stories/feed').then(({ data }) => {
@@ -130,6 +131,17 @@ export default function TimelineScreen() {
         latest: years.length ? Math.max(...years) : null,
       });
       setGrouped(sorted);
+
+      // On This Day — stories with story_date matching today's month/day in past years
+      const today = new Date();
+      const todayMD = `${String(today.getMonth() + 1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+      const memories = all.filter(s => {
+        if (!s.story_date) return false;
+        const d = new Date(s.story_date);
+        const md = `${String(d.getMonth() + 1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        return md === todayMD && d.getFullYear() < today.getFullYear();
+      });
+      setOnThisDay(memories);
     }).finally(() => setLoading(false));
   }, []);
 
@@ -185,7 +197,26 @@ export default function TimelineScreen() {
 
       {loading ? (
         <ActivityIndicator color="#7c3aed" style={{ marginTop: 80 }} />
-      ) : grouped.length === 0 ? (
+      ) : (
+        <>
+          {/* On This Day banner */}
+          {onThisDay.length > 0 && (
+            <View style={s.onThisDayBanner}>
+              <LinearGradient colors={['rgba(124,58,237,0.3)', 'rgba(59,130,246,0.2)']} style={StyleSheet.absoluteFill} />
+              <View style={s.onThisDayHeader}>
+                <Ionicons name="calendar" size={18} color="#a78bfa" />
+                <Text style={s.onThisDayTitle}>On This Day</Text>
+              </View>
+              {onThisDay.map(story => (
+                <View key={story.id} style={s.onThisDayItem}>
+                  <Text style={s.onThisDayYear}>{new Date(story.story_date).getFullYear()}</Text>
+                  <Text style={s.onThisDayStory} numberOfLines={1}>{story.title}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {grouped.length === 0 ? (
         <View style={s.emptyState}>
           <LinearGradient colors={['rgba(124,58,237,0.2)', 'rgba(59,130,246,0.1)']} style={s.emptyIcon}>
             <Ionicons name="time-outline" size={40} color="#7c3aed" />
@@ -204,6 +235,8 @@ export default function TimelineScreen() {
           contentContainerStyle={s.list}
           showsVerticalScrollIndicator={false}
         />
+      )}
+        </>
       )}
     </View>
   );
@@ -274,4 +307,10 @@ const s = StyleSheet.create({
   emptyIcon: { width: 90, height: 90, borderRadius: 45, alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
   emptyTitle: { fontSize: 20, fontWeight: '800', color: colors.text, marginBottom: 10 },
   emptySub: { fontSize: 14, color: colors.muted, textAlign: 'center', lineHeight: 22 },
+  onThisDayBanner: { margin: 16, borderRadius: radius.lg, overflow: 'hidden', padding: 16, borderWidth: 1, borderColor: 'rgba(124,58,237,0.3)', gap: 8 },
+  onThisDayHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+  onThisDayTitle: { fontSize: 15, fontWeight: '800', color: '#a78bfa' },
+  onThisDayItem: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  onThisDayYear: { fontSize: 13, fontWeight: '700', color: colors.primary, width: 40 },
+  onThisDayStory: { fontSize: 13, color: colors.text, flex: 1 },
 });

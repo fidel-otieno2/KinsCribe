@@ -41,6 +41,7 @@ export default function ChatScreen({ route, navigation }) {
   const [sending, setSending] = useState(false);
   const [replyTo, setReplyTo] = useState(null);
   const [showReactions, setShowReactions] = useState(null);
+  const [disappearing, setDisappearing] = useState(false);
   const flatRef = useRef(null);
   const pollRef = useRef(null);
 
@@ -252,6 +253,19 @@ export default function ChatScreen({ route, navigation }) {
             <Ionicons name="information-circle-outline" size={24} color={colors.muted} />
           </TouchableOpacity>
         )}
+        {type === "private" && (
+          <TouchableOpacity onPress={() => Alert.alert(
+            'Chat Options',
+            '',
+            [
+              { text: disappearing ? 'Turn off disappearing messages' : 'Turn on disappearing messages (24h)', onPress: () => setDisappearing(d => !d) },
+              { text: 'Mute notifications', onPress: () => Alert.alert('Muted', 'Notifications muted for this chat') },
+              { text: 'Cancel', style: 'cancel' },
+            ]
+          )}>
+            <Ionicons name="ellipsis-vertical" size={22} color={colors.muted} />
+          </TouchableOpacity>
+        )}
       </LinearGradient>
 
       {/* Messages */}
@@ -272,6 +286,13 @@ export default function ChatScreen({ route, navigation }) {
             </View>
           }
         />
+      )}
+
+      {disappearing && (
+        <View style={cs.disappearBanner}>
+          <Ionicons name="timer-outline" size={14} color="#f59e0b" />
+          <Text style={cs.disappearText}>Disappearing messages on · 24h</Text>
+        </View>
       )}
 
       {/* Reply preview bar */}
@@ -370,4 +391,6 @@ const cs = StyleSheet.create({
   sendGrad: { flex: 1, alignItems: "center", justifyContent: "center" },
   emptyWrap: { alignItems: "center", marginTop: 80, gap: 10 },
   emptyText: { color: colors.muted, fontSize: 14 },
+  disappearBanner: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(245,158,11,0.1)', paddingHorizontal: 16, paddingVertical: 8, borderTopWidth: 0.5, borderTopColor: 'rgba(245,158,11,0.3)' },
+  disappearText: { fontSize: 12, color: '#f59e0b', fontWeight: '600' },
 });

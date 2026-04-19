@@ -17,6 +17,7 @@ class User(db.Model):
     website = db.Column(db.String(200), nullable=True)
     interests = db.Column(db.String(500), nullable=True)
     is_private = db.Column(db.Boolean, default=False)
+    is_active = db.Column(db.Boolean, default=True)
     google_id = db.Column(db.String(200), nullable=True, unique=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
