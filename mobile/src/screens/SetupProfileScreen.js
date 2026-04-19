@@ -119,13 +119,16 @@ function PhotoStep({ onNext }) {
 }
 
 // ── Step 2: Profile Info ──────────────────────────────────────
-function ProfileStep({ onNext }) {
+function ProfileStep({ onNext, required }) {
   const { user, refreshUser } = useAuth();
   const [bio, setBio] = useState(user?.bio || '');
-  const [website, setWebsite] = useState('');
+  const [website, setWebsite] = useState(user?.website || '');
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
   const handleNext = async () => {
+    if (required && !bio.trim()) { setError('Please add a bio to continue.'); return; }
+    setError('');
     setSaving(true);
     try {
       await api.put('/auth/profile', { bio, website });
@@ -139,7 +142,9 @@ function ProfileStep({ onNext }) {
       <Text style={s.stepTitle}>Tell us about yourself</Text>
       <Text style={s.stepSub}>Add a bio and website so people know who you are</Text>
 
-      <Text style={s.fieldLabel}>Bio</Text>
+      {error ? <Text style={s.stepError}>{error}</Text> : null}
+
+      <Text style={s.fieldLabel}>Bio {required && <Text style={{ color: '#e11d48' }}>*</Text>}</Text>
       <TextInput
         style={[s.input, { height: 90, textAlignVertical: 'top' }]}
         placeholder="Write a short bio..."
@@ -147,7 +152,7 @@ function ProfileStep({ onNext }) {
         multiline
         maxLength={150}
         value={bio}
-        onChangeText={setBio}
+        onChangeText={v => { setBio(v); setError(''); }}
       />
       <Text style={s.charCount}>{bio.length}/150</Text>
 
@@ -166,17 +171,20 @@ function ProfileStep({ onNext }) {
       </View>
 
       <GradientButton label="Continue" onPress={handleNext} loading={saving} style={{ width: '100%', marginTop: 20 }} />
-      <TouchableOpacity onPress={onNext} style={{ marginTop: 14 }}>
-        <Text style={s.skip}>Skip for now</Text>
-      </TouchableOpacity>
+      {!required && (
+        <TouchableOpacity onPress={onNext} style={{ marginTop: 14 }}>
+          <Text style={s.skip}>Skip for now</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
 
 // ── Step 3: Interests ─────────────────────────────────────────
-function InterestsStep({ onNext }) {
+function InterestsStep({ onNext, required }) {
   const [selected, setSelected] = useState(new Set(['family']));
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
   const toggle = (key) => {
     setSelected(prev => {
@@ -187,6 +195,8 @@ function InterestsStep({ onNext }) {
   };
 
   const handleNext = async () => {
+    if (required && selected.size < 3) { setError('Please select at least 3 interests to continue.'); return; }
+    setError('');
     setSaving(true);
     try {
       await api.put('/auth/profile', { interests: Array.from(selected).join(',') });
@@ -198,6 +208,8 @@ function InterestsStep({ onNext }) {
     <View style={s.stepContent}>
       <Text style={s.stepTitle}>What interests you?</Text>
       <Text style={s.stepSub}>Pick at least 3 topics to personalise your feed</Text>
+
+      {error ? <Text style={s.stepError}>{error}</Text> : null}
 
       <View style={s.interestsGrid}>
         {INTERESTS.map(item => (
@@ -220,13 +232,12 @@ function InterestsStep({ onNext }) {
         ))}
       </View>
 
-      <Text style={s.selectedCount}>{selected.size} selected</Text>
+      <Text style={s.selectedCount}>{selected.size} selected {required && <Text style={{ color: selected.size >= 3 ? '#10b981' : '#f59e0b' }}>({selected.size < 3 ? `${3 - selected.size} more needed` : '✓'})</Text>}</Text>
 
       <GradientButton
         label="Continue"
         onPress={handleNext}
         loading={saving}
-        disabled={selected.size < 1}
         style={{ width: '100%', marginTop: 16 }}
       />
     </View>
@@ -366,7 +377,15 @@ function DiscoverStep({ onDone }) {
 // ── Main Wizard ───────────────────────────────────────────────
 export default function SetupProfileScreen({ navigation }) {
   const [step, setStep] = useState(1);
-  const { refreshUser } = useAuth();
+  const { user, refreshUser } = useAuth();
+
+  // Determine which steps are already done so we can skip ahead
+  useEffect(() => {
+    if (user?.username && user?.bio) setStep(3); // skip to interests
+    else if (user?.avatar_url) setStep(2); // skip to profile info
+  }, []);
+
+  const isReturning = !!(user?.username || user?.bio || user?.avatar_url);
 
   const next = () => {
     if (step < STEPS.length) setStep(s => s + 1);
@@ -386,14 +405,21 @@ export default function SetupProfileScreen({ navigation }) {
 
       <StepIndicator current={step} total={STEPS.length} />
 
+      {isReturning && (
+        <View style={s.returnBanner}>
+          <Ionicons name="information-circle" size={16} color="#f59e0b" />
+          <Text style={s.returnBannerText}>Complete your profile to continue using KinsCribe</Text>
+        </View>
+      )}
+
       <ScrollView
         contentContainerStyle={s.scroll}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
         {step === 1 && <PhotoStep onNext={next} />}
-        {step === 2 && <ProfileStep onNext={next} />}
-        {step === 3 && <InterestsStep onNext={next} />}
+        {step === 2 && <ProfileStep onNext={next} required={isReturning} />}
+        {step === 3 && <InterestsStep onNext={next} required={isReturning} />}
         {step === 4 && <PrivacyStep onNext={next} />}
         {step === 5 && <DiscoverStep onDone={done} />}
       </ScrollView>
@@ -466,4 +492,7 @@ const s = StyleSheet.create({
   followBtnActive: { backgroundColor: colors.primary },
   followBtnText: { fontSize: 13, fontWeight: '700', color: colors.primary },
   followBtnTextActive: { color: '#fff' },
+  returnBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(245,158,11,0.12)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.3)', marginHorizontal: 24, marginBottom: 4, borderRadius: 10, padding: 10 },
+  returnBannerText: { flex: 1, fontSize: 12, color: '#f59e0b', fontWeight: '600', lineHeight: 17 },
+  stepError: { fontSize: 12, color: '#f87171', marginBottom: 10, textAlign: 'center', fontWeight: '600' },
 });

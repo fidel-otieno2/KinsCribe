@@ -137,6 +137,9 @@ function RootNavigator() {
     );
   }
 
+  // Profile is complete when username, bio, and at least 1 interest are set
+  const isProfileComplete = !!(user?.username && user?.bio && user?.interests?.length > 0);
+
   return (
     <Stack.Navigator screenOptions={{ headerShown: false, animation: "fade_from_bottom" }}>
       {!user ? (
@@ -146,6 +149,11 @@ function RootNavigator() {
           <Stack.Screen name="Register" component={RegisterScreen} />
           <Stack.Screen name="SetupProfile" component={SetupProfileScreen} />
           <Stack.Screen name="JoinFamily" component={JoinFamilyScreen} />
+        </>
+      ) : !isProfileComplete ? (
+        // Logged in but profile not complete — must finish setup
+        <>
+          <Stack.Screen name="SetupProfile" component={SetupProfileScreen} />
         </>
       ) : !user.family_id ? (
         <>
