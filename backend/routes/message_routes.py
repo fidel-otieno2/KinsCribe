@@ -89,9 +89,17 @@ def start_dm(user_id):
     if user.id == user_id:
         return jsonify({"error": "Cannot message yourself"}), 400
 
-    target = User.query.get_or_404(user_id)
-    conv = _get_or_create_dm(user.id, user_id)
-    return jsonify({"conversation": conv.to_dict(user.id)})
+    target = User.query.get(user_id)
+    if not target:
+        return jsonify({"error": "User not found"}), 404
+
+    try:
+        conv = _get_or_create_dm(user.id, user_id)
+        return jsonify({"conversation": conv.to_dict(user.id)})
+    except Exception as e:
+        db.session.rollback()
+        print(f"DM error: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 @message_bp.route("/family", methods=["GET"])

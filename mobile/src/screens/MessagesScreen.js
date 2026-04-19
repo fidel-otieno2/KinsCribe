@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
-  Image, ActivityIndicator, StatusBar, TextInput,
+  Image, ActivityIndicator, StatusBar, TextInput, Alert,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
@@ -42,6 +42,7 @@ export default function MessagesScreen({ navigation }) {
   const [pinnedIds, setPinnedIds] = useState(new Set());
   const [mutedIds, setMutedIds] = useState(new Set());
   const [archivedIds, setArchivedIds] = useState(new Set());
+  const [openingDM, setOpeningDM] = useState(null);
 
   const fetchConversations = async () => {
     try {
@@ -73,22 +74,45 @@ export default function MessagesScreen({ navigation }) {
     if (!q.trim()) { setSearchResults([]); return; }
     setSearching(true);
     try {
-      const { data } = await api.get(`/connections/search?q=${q}`);
+      // Search all users, not just connections
+      const { data } = await api.get(`/connections/search?q=${encodeURIComponent(q)}`);
       setSearchResults(data.users || []);
-    } catch {} finally { setSearching(false); }
+    } catch (err) {
+      console.log('search error:', err.message);
+    } finally { setSearching(false); }
   };
 
   const openDM = async (userId, userName, userAvatar) => {
-    setSearch(""); setSearchResults([]);
+    if (openingDM) return;
+    setOpeningDM(userId);
+    setSearch('');
+    setSearchResults([]);
     try {
       const { data } = await api.post(`/messages/dm/${userId}`);
-      navigation.navigate("Chat", {
+      navigation.navigate('Chat', {
         conversationId: data.conversation.id,
         title: userName,
         avatar: userAvatar,
-        type: "private",
+        type: 'private',
+        otherUserId: userId,
       });
-    } catch {}
+    } catch (err) {
+      console.log('openDM error:', err.response?.status, JSON.stringify(err.response?.data), err.message);
+      // If we got a conversation back despite the error, still navigate
+      if (err.response?.data?.conversation) {
+        navigation.navigate('Chat', {
+          conversationId: err.response.data.conversation.id,
+          title: userName,
+          avatar: userAvatar,
+          type: 'private',
+          otherUserId: userId,
+        });
+      } else {
+        Alert.alert('Error', err.response?.data?.error || err.message || 'Could not open conversation. Try again.');
+      }
+    } finally {
+      setOpeningDM(null);
+    }
   };
 
   const openConv = (conv) => {
@@ -191,13 +215,22 @@ export default function MessagesScreen({ navigation }) {
                 key={u.id}
                 style={[s.searchRow, { borderBottomColor: theme.border }]}
                 onPress={() => openDM(u.id, u.name, u.avatar_url)}
+                disabled={openingDM === u.id}
                 activeOpacity={0.7}
               >
-                <Avatar uri={u.avatar_url} name={u.name} size={40} />
-                <View style={{ marginLeft: 12 }}>
+                <Avatar uri={u.avatar_url} name={u.name} size={46} />
+                <View style={{ flex: 1, marginLeft: 12 }}>
                   <Text style={[s.rowName, { color: theme.text }]}>{u.name}</Text>
-                  <Text style={[s.rowLast, { color: theme.muted }]}>@{u.username}</Text>
+                  <Text style={[s.rowLast, { color: theme.muted }]}>@{u.username || 'user'}</Text>
                 </View>
+                {openingDM === u.id ? (
+                  <ActivityIndicator size="small" color={theme.primary} />
+                ) : (
+                  <View style={s.dmBtn}>
+                    <Ionicons name="chatbubble-outline" size={16} color={theme.primary} />
+                    <Text style={[s.dmBtnText, { color: theme.primary }]}>Message</Text>
+                  </View>
+                )}
               </TouchableOpacity>
             ))
           )}
@@ -269,7 +302,9 @@ const s = StyleSheet.create({
   searchWrap: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: colors.bgSecondary, borderRadius: radius.md, marginHorizontal: 16, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 8 },
   searchInput: { flex: 1, color: colors.text, fontSize: 14 },
   searchResults: { flex: 1, paddingHorizontal: 16 },
-  searchRow: { flexDirection: "row", alignItems: "center", paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: colors.border },
+  searchRow: { flexDirection: "row", alignItems: "center", paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: colors.border },
+  dmBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 7, borderRadius: radius.full, borderWidth: 1, borderColor: colors.primary },
+  dmBtnText: { fontSize: 12, fontWeight: '700' },
   section: { paddingHorizontal: 16, paddingVertical: 6 },
   sectionLabel: { fontSize: 12, fontWeight: "700", color: colors.dim, textTransform: "uppercase", letterSpacing: 0.8 },
   familyRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 10 },
