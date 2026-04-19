@@ -1,61 +1,75 @@
 import { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  Image, Alert, ActivityIndicator,
+  Image, Alert, ActivityIndicator, Modal, TextInput,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { colors, radius } from '../theme';
-import api from '../api/axios';
-
-const ACCOUNTS_KEY = 'saved_accounts';
+import GradientButton from '../components/GradientButton';
 
 export default function AccountSwitcherScreen({ navigation }) {
-  const { user, login, logout } = useAuth();
+  const { user, savedAccounts, switchAccount, addAccount, removeAccount } = useAuth();
   const { theme } = useTheme();
-  const [accounts, setAccounts] = useState([]);
   const [switching, setSwitching] = useState(null);
-
-  useEffect(() => {
-    loadAccounts();
-  }, []);
-
-  const loadAccounts = async () => {
-    try {
-      const raw = await AsyncStorage.getItem(ACCOUNTS_KEY);
-      const saved = raw ? JSON.parse(raw) : [];
-      // Always include current user
-      const current = { id: user?.id, name: user?.name, username: user?.username, avatar: user?.avatar_url, email: user?.email, isCurrent: true };
-      const others = saved.filter(a => a.id !== user?.id);
-      setAccounts([current, ...others]);
-    } catch {}
-  };
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [addForm, setAddForm] = useState({ email: '', password: '' });
+  const [addLoading, setAddLoading] = useState(false);
 
   const handleSwitch = async (account) => {
     if (account.isCurrent) return;
-    if (!account.email || !account.password) {
-      return Alert.alert('Cannot Switch', 'Re-login to that account first to enable quick switching.');
-    }
+    
     setSwitching(account.id);
     try {
-      await login(account.email, account.password);
+      await switchAccount(account.id);
       navigation.goBack();
-    } catch {
-      Alert.alert('Switch Failed', 'Could not switch to that account.');
-    } finally { setSwitching(null); }
+    } catch (error) {
+      Alert.alert('Switch Failed', error.message || 'Could not switch to that account.');
+    } finally {
+      setSwitching(null);
+    }
   };
 
-  const handleAddAccount = () => {
-    Alert.alert('Add Account', 'Log out and sign in with another account to add it here.');
+  const handleAddAccount = async () => {
+    if (!addForm.email.trim() || !addForm.password.trim()) {
+      Alert.alert('Error', 'Please enter both email and password.');
+      return;
+    }
+
+    setAddLoading(true);
+    try {
+      await addAccount(addForm.email.trim(), addForm.password);
+      setShowAddModal(false);
+      setAddForm({ email: '', password: '' });
+      navigation.goBack();
+    } catch (error) {
+      Alert.alert('Add Account Failed', error.response?.data?.error || 'Could not add account.');
+    } finally {
+      setAddLoading(false);
+    }
   };
 
   const handleRemove = async (accountId) => {
-    const updated = accounts.filter(a => a.id !== accountId && !a.isCurrent);
-    await AsyncStorage.setItem(ACCOUNTS_KEY, JSON.stringify(updated));
-    loadAccounts();
+    Alert.alert(
+      'Remove Account',
+      'Are you sure you want to remove this account? You\'ll need to log in again to add it back.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await removeAccount(accountId);
+            } catch (error) {
+              Alert.alert('Error', 'Could not remove account.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -70,7 +84,7 @@ export default function AccountSwitcherScreen({ navigation }) {
       </View>
 
       <ScrollView contentContainerStyle={s.scroll}>
-        {accounts.map(account => (
+        {savedAccounts.map(account => (
           <TouchableOpacity
             key={account.id}
             style={[s.accountRow, account.isCurrent && s.accountRowActive, { borderColor: theme.border2 }]}
@@ -116,26 +130,107 @@ export default function AccountSwitcherScreen({ navigation }) {
           </TouchableOpacity>
         ))}
 
-        <TouchableOpacity style={[s.addBtn, { borderColor: theme.border2 }]} onPress={handleAddAccount}>
+        <TouchableOpacity 
+          style={[s.addBtn, { borderColor: theme.border2 }]} 
+          onPress={() => setShowAddModal(true)}
+        >
           <Ionicons name="add-circle-outline" size={22} color={colors.primary} />
           <Text style={s.addBtnText}>Add Account</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      {/* Add Account Modal */}
+      <Modal
+        visible={showAddModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowAddModal(false)}
+      >
+        <View style={s.modalOverlay}>
+          <View style={[s.modalContent, { backgroundColor: theme.bg }]}>
+            <View style={s.modalHeader}>
+              <Text style={[s.modalTitle, { color: theme.text }]}>Add Account</Text>
+              <TouchableOpacity onPress={() => setShowAddModal(false)} style={s.modalClose}>
+                <Ionicons name="close" size={24} color={colors.muted} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={s.modalBody}>
+              <Text style={[s.inputLabel, { color: theme.text }]}>Email</Text>
+              <TextInput
+                style={[s.input, { backgroundColor: theme.bgSecondary, color: theme.text, borderColor: theme.border2 }]}
+                value={addForm.email}
+                onChangeText={(text) => setAddForm(prev => ({ ...prev, email: text }))}
+                placeholder="Enter email address"
+                placeholderTextColor={colors.muted}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+
+              <Text style={[s.inputLabel, { color: theme.text }]}>Password</Text>
+              <TextInput
+                style={[s.input, { backgroundColor: theme.bgSecondary, color: theme.text, borderColor: theme.border2 }]}
+                value={addForm.password}
+                onChangeText={(text) => setAddForm(prev => ({ ...prev, password: text }))}
+                placeholder="Enter password"
+                placeholderTextColor={colors.muted}
+                secureTextEntry
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+
+              <GradientButton
+                label={addLoading ? 'Adding Account...' : 'Add Account'}
+                onPress={handleAddAccount}
+                disabled={addLoading}
+                loading={addLoading}
+                style={s.addButton}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
 
 const s = StyleSheet.create({
   container: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', paddingTop: 52, paddingHorizontal: 16, paddingBottom: 14, gap: 12, borderBottomWidth: 0.5, borderBottomColor: colors.border },
+  header: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    paddingTop: 52, 
+    paddingHorizontal: 16, 
+    paddingBottom: 14, 
+    gap: 12, 
+    borderBottomWidth: 0.5, 
+    borderBottomColor: colors.border 
+  },
   backBtn: { padding: 4 },
   headerTitle: { flex: 1, fontSize: 22, fontWeight: '800', color: colors.text },
   scroll: { padding: 16, gap: 10 },
-  accountRow: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 14, borderRadius: radius.lg, borderWidth: 1, backgroundColor: 'rgba(30,41,59,0.5)' },
+  accountRow: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 14, 
+    padding: 14, 
+    borderRadius: radius.lg, 
+    borderWidth: 1, 
+    backgroundColor: 'rgba(30,41,59,0.5)' 
+  },
   accountRowActive: { borderColor: '#7c3aed', backgroundColor: 'rgba(124,58,237,0.08)' },
   avatarWrap: { width: 52, height: 52 },
   avatarRing: { width: 52, height: 52, borderRadius: 26, padding: 2.5, alignItems: 'center', justifyContent: 'center' },
-  avatarInner: { width: 46, height: 46, borderRadius: 23, overflow: 'hidden', backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+  avatarInner: { 
+    width: 46, 
+    height: 46, 
+    borderRadius: 23, 
+    overflow: 'hidden', 
+    backgroundColor: colors.primary, 
+    alignItems: 'center', 
+    justifyContent: 'center' 
+  },
   avatarImg: { width: '100%', height: '100%' },
   avatarLetter: { color: '#fff', fontWeight: '800', fontSize: 18 },
   accountName: { fontSize: 15, fontWeight: '700' },
@@ -143,6 +238,63 @@ const s = StyleSheet.create({
   activeBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   activeText: { color: '#10b981', fontSize: 12, fontWeight: '700' },
   removeBtn: { padding: 4 },
-  addBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, padding: 14, borderRadius: radius.lg, borderWidth: 1, borderStyle: 'dashed', marginTop: 6 },
+  addBtn: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    gap: 10, 
+    padding: 14, 
+    borderRadius: radius.lg, 
+    borderWidth: 1, 
+    borderStyle: 'dashed', 
+    marginTop: 6 
+  },
   addBtnText: { color: colors.primary, fontWeight: '700', fontSize: 15 },
+  
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 34,
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 20,
+    borderBottomWidth: 0.5,
+    borderBottomColor: colors.border,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+  },
+  modalClose: {
+    padding: 4,
+  },
+  modalBody: {
+    padding: 20,
+    gap: 16,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  input: {
+    borderWidth: 1,
+    borderRadius: radius.md,
+    padding: 14,
+    fontSize: 16,
+    marginBottom: 4,
+  },
+  addButton: {
+    marginTop: 10,
+  },
 });

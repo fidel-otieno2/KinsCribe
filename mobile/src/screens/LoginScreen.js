@@ -277,23 +277,16 @@ export default function LoginScreen({ navigation }) {
     androidClientId: '474767363654-6knta78fh5ibd8q0a6894o8euqrs90js.apps.googleusercontent.com',
     webClientId: '474767363654-i0sdd1v140399n0mfhf0qreqn9lj30u5.apps.googleusercontent.com',
     scopes: ['profile', 'email'],
-    redirectUri: 'https://auth.expo.io/@martinsfidel/kinscribe',
   });
 
   useEffect(() => {
     checkBiometric();
     if (response?.type === 'success') {
-      // Try all possible token locations
       const accessToken =
         response.authentication?.accessToken ||
-        response.params?.access_token ||
-        response.authentication?.idToken ||
-        response.params?.id_token;
-      if (accessToken) {
-        handleGoogleToken(accessToken);
-      } else {
-        setError('Google sign-in failed: no token received.');
-      }
+        response.params?.access_token;
+      if (accessToken) handleGoogleToken(accessToken);
+      else setError('Google sign-in failed: no token received.');
     } else if (response?.type === 'error') {
       setError('Google sign-in was cancelled or failed.');
     }
@@ -475,15 +468,7 @@ export default function LoginScreen({ navigation }) {
               )}
             </TouchableOpacity>
 
-            {/* Apple Sign In */}
-            <TouchableOpacity
-              style={[s.appleBtn, { backgroundColor: isDark ? '#fff' : '#000', marginTop: 10 }]}
-              onPress={() => setError('Apple Sign In requires an Apple Developer account — coming soon')}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="logo-apple" size={20} color={isDark ? '#000' : '#fff'} />
-              <Text style={[s.appleBtnText, { color: isDark ? '#000' : '#fff' }]}>Continue with Apple</Text>
-            </TouchableOpacity>
+
           </View>
         </BlurView>
 
