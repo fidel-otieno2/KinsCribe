@@ -79,7 +79,10 @@ def search_posts():
     if media_type:
         posts_query = posts_query.filter(Post.media_type == media_type)
     
-    posts = posts_query.order_by(desc(Post.created_at))\\\n                     .offset((page - 1) * limit)\\\n                     .limit(limit + 1)\\\n                     .all()
+    posts = posts_query.order_by(desc(Post.created_at)) \
+                     .offset((page - 1) * limit) \
+                     .limit(limit + 1) \
+                     .all()
     
     has_more = len(posts) > limit
     if has_more:
@@ -109,7 +112,8 @@ def search_hashtags():
     ).all()
     
     # Extract and count hashtags
-    hashtag_counts = {}\n    for post in recent_posts:
+    hashtag_counts = {}
+    for post in recent_posts:
         if post.hashtags:
             tags = [tag.strip() for tag in post.hashtags.split(',') if tag.strip()]
             for tag in tags:
@@ -138,7 +142,16 @@ def search_places():
         return jsonify({"places": []})
     
     # Get unique locations from posts
-    locations = db.session.query(Post.location, func.count(Post.id).label('post_count'))\\\n                        .filter(and_(\n                            Post.location.isnot(None),\n                            Post.location.ilike(f"%{query}%"),\n                            Post.privacy == "public"\n                        ))\\\n                        .group_by(Post.location)\\\n                        .order_by(desc('post_count'))\\\n                        .limit(limit)\\\n                        .all()
+    locations = db.session.query(Post.location, func.count(Post.id).label('post_count')) \
+                        .filter(and_(
+                            Post.location.isnot(None),
+                            Post.location.ilike(f"%{query}%"),
+                            Post.privacy == "public"
+                        )) \
+                        .group_by(Post.location) \
+                        .order_by(desc('post_count')) \
+                        .limit(limit) \
+                        .all()
     
     return jsonify({
         "places": [{"name": loc[0], "post_count": loc[1]} for loc in locations]
@@ -172,10 +185,21 @@ def explore_feed():
     
     if category == "trending":
         # Posts with high engagement in last 24 hours
-        posts = base_query.join(PostLike)\\\n                          .filter(PostLike.created_at >= datetime.utcnow() - timedelta(hours=24))\\\n                          .group_by(Post.id)\\\n                          .order_by(desc(func.count(PostLike.id)))\\\n                          .offset((page - 1) * limit)\\\n                          .limit(limit + 1)\\\n                          .all()
+        posts = base_query.join(PostLike) \
+                          .filter(PostLike.created_at >= datetime.utcnow() - timedelta(hours=24)) \
+                          .group_by(Post.id) \
+                          .order_by(desc(func.count(PostLike.id))) \
+                          .offset((page - 1) * limit) \
+                          .limit(limit + 1) \
+                          .all()
     elif category == "popular":
         # Posts with most likes overall
-        posts = base_query.join(PostLike)\\\n                          .group_by(Post.id)\\\n                          .order_by(desc(func.count(PostLike.id)))\\\n                          .offset((page - 1) * limit)\\\n                          .limit(limit + 1)\\\n                          .all()
+        posts = base_query.join(PostLike) \
+                          .group_by(Post.id) \
+                          .order_by(desc(func.count(PostLike.id))) \
+                          .offset((page - 1) * limit) \
+                          .limit(limit + 1) \
+                          .all()
     else:
         # Recent posts, optionally filtered by interests
         query = base_query
@@ -184,7 +208,10 @@ def explore_feed():
             interest_conditions = [Post.hashtags.ilike(f"%{interest}%") for interest in user_interests]
             query = query.filter(or_(*interest_conditions))
         
-        posts = query.order_by(desc(Post.created_at))\\\n                     .offset((page - 1) * limit)\\\n                     .limit(limit + 1)\\\n                     .all()
+        posts = query.order_by(desc(Post.created_at)) \
+                     .offset((page - 1) * limit) \
+                     .limit(limit + 1) \
+                     .all()
     
     has_more = len(posts) > limit
     if has_more:
@@ -228,7 +255,13 @@ def user_suggestions():
     
     # 2. Popular users (most followers)
     if len(suggestions) < limit:
-        popular_users = db.session.query(User, func.count(Connection.follower_id).label('follower_count'))\\\n                                  .outerjoin(Connection, Connection.following_id == User.id)\\\n                                  .filter(~User.id.in_(following_ids + [u.id for u in suggestions]))\\\n                                  .group_by(User.id)\\\n                                  .order_by(desc('follower_count'))\\\n                                  .limit(limit - len(suggestions))\\\n                                  .all()
+        popular_users = db.session.query(User, func.count(Connection.follower_id).label('follower_count')) \
+                                  .outerjoin(Connection, Connection.following_id == User.id) \
+                                  .filter(~User.id.in_(following_ids + [u.id for u in suggestions])) \
+                                  .group_by(User.id) \
+                                  .order_by(desc('follower_count')) \
+                                  .limit(limit - len(suggestions)) \
+                                  .all()
         suggestions.extend([u[0] for u in popular_users])
     
     return jsonify({
@@ -255,7 +288,10 @@ def search_audio():
             PublicStory.privacy == "public",
             PublicStory.expires_at > datetime.utcnow()
         )
-    ).order_by(desc(PublicStory.created_at))\\\n     .offset((page - 1) * limit)\\\n     .limit(limit + 1)\\\n     .all()
+    ).order_by(desc(PublicStory.created_at)) \
+     .offset((page - 1) * limit) \
+     .limit(limit + 1) \
+     .all()
     
     has_more = len(stories) > limit
     if has_more:
@@ -294,10 +330,28 @@ def trending_content():
     trending_hashtags = sorted(hashtag_counts.items(), key=lambda x: x[1], reverse=True)[:10]
     
     # Trending locations
-    trending_locations = db.session.query(Post.location, func.count(Post.id).label('count'))\\\n                                  .filter(and_(\n                                      Post.location.isnot(None),\n                                      Post.created_at >= datetime.utcnow() - timedelta(days=7),\n                                      Post.privacy == "public"\n                                  ))\\\n                                  .group_by(Post.location)\\\n                                  .order_by(desc('count'))\\\n                                  .limit(10)\\\n                                  .all()
+    trending_locations = db.session.query(Post.location, func.count(Post.id).label('count')) \
+                                  .filter(and_(
+                                      Post.location.isnot(None),
+                                      Post.created_at >= datetime.utcnow() - timedelta(days=7),
+                                      Post.privacy == "public"
+                                  )) \
+                                  .group_by(Post.location) \
+                                  .order_by(desc('count')) \
+                                  .limit(10) \
+                                  .all()
     
     # Trending sounds/music
-    trending_sounds = db.session.query(PublicStory.music_name, func.count(PublicStory.id).label('count'))\\\n                                .filter(and_(\n                                    PublicStory.music_name.isnot(None),\n                                    PublicStory.created_at >= datetime.utcnow() - timedelta(days=7),\n                                    PublicStory.privacy == "public"\n                                ))\\\n                                .group_by(PublicStory.music_name)\\\n                                .order_by(desc('count'))\\\n                                .limit(10)\\\n                                .all()
+    trending_sounds = db.session.query(PublicStory.music_name, func.count(PublicStory.id).label('count')) \
+                                .filter(and_(
+                                    PublicStory.music_name.isnot(None),
+                                    PublicStory.created_at >= datetime.utcnow() - timedelta(days=7),
+                                    PublicStory.privacy == "public"
+                                )) \
+                                .group_by(PublicStory.music_name) \
+                                .order_by(desc('count')) \
+                                .limit(10) \
+                                .all()
     
     return jsonify({
         "hashtags": [{"tag": tag, "count": count} for tag, count in trending_hashtags],
