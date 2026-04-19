@@ -7,6 +7,11 @@ import secrets
 import cloudinary
 import cloudinary.uploader
 import os
+import pyotp
+import qrcode
+import io
+import base64
+import json
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -429,17 +434,361 @@ def deactivate_account():
     return jsonify({"message": "Account deactivated"})
 
 
-@auth_bp.route("/refresh", methods=["POST"])
+@auth_bp.route("/phone/send-otp", methods=["POST"])
+def send_phone_otp():
+    """Send OTP to phone number for login/registration"""
+    import random
+    from datetime import datetime, timedelta
+    
+    data = request.json or {}
+    phone = data.get("phone", "").strip()
+    
+    if not phone:
+        return jsonify({"error": "Phone number is required"}), 400
+    
+    # Normalize phone number (remove spaces, dashes, etc.)
+    phone = ''.join(filter(str.isdigit, phone))
+    if len(phone) < 10:
+        return jsonify({"error": "Invalid phone number"}), 400
+    
+    # Add country code if not present
+    if not phone.startswith('1') and len(phone) == 10:
+        phone = '1' + phone
+    
+    # Generate 6-digit OTP
+    otp = str(random.randint(100000, 999999))
+    expiry = (datetime.utcnow() + timedelta(minutes=10)).isoformat()
+    
+    # Check if user exists
+    user = User.query.filter_by(phone=phone).first()
+    if not user:
+        # Create new user for phone registration
+        user = User(
+            name="Phone User",  # Will be updated during profile setup
+            phone=phone,
+            verification_token=f"phone_otp:{otp}:{expiry}",
+            is_verified=False
+        )
+        db.session.add(user)
+    else:
+        user.verification_token = f"phone_otp:{otp}:{expiry}"
+    
+    db.session.commit()
+    
+    # TODO: Integrate with SMS service (Twilio, AWS SNS, etc.)
+    # For now, return OTP in response (development only)
+    return jsonify({
+        "message": f"OTP sent to {phone[-4:].rjust(len(phone), '*')}",
+        "phone": phone,
+        "otp": otp if os.getenv("FLASK_ENV") == "development" else None
+    })
+
+
+@auth_bp.route("/phone/verify-otp", methods=["POST"])
+def verify_phone_otp():
+    """Verify phone OTP and login/register user"""
+    from datetime import datetime
+    
+    data = request.json or {}
+    phone = data.get("phone", "").strip()
+    otp = data.get("otp", "").strip()
+    name = data.get("name", "").strip()  # For new registrations
+    
+    if not phone or not otp:
+        return jsonify({"error": "Phone and OTP are required"}), 400
+    
+    # Normalize phone
+    phone = ''.join(filter(str.isdigit, phone))
+    if not phone.startswith('1') and len(phone) == 10:
+        phone = '1' + phone
+    
+    user = User.query.filter_by(phone=phone).first()
+    if not user:
+        return jsonify({"error": "Phone number not found"}), 404
+    
+    token = user.verification_token or ""
+    if not token.startswith("phone_otp:"):
+        return jsonify({"error": "No OTP pending for this phone"}), 400
+    
+    try:
+        _, stored_otp, expiry_str = token.split(":", 2)
+        if stored_otp != otp:
+            return jsonify({"error": "Incorrect OTP"}), 400
+        if datetime.utcnow() > datetime.fromisoformat(expiry_str):
+            return jsonify({"error": "OTP has expired"}), 400
+    except Exception:
+        return jsonify({"error": "Invalid OTP"}), 400
+    
+    # Update user info for new registrations
+    is_new_user = user.name == "Phone User"
+    if is_new_user and name:
+        user.name = name
+    
+    user.is_verified = True
+    user.verification_token = None
+    db.session.commit()
+    
+    return jsonify({
+        **_tokens(user),
+        "is_new_user": is_new_user,
+        "message": "Phone verified successfully!"
+    })
+
+
+@auth_bp.route("/apple", methods=["POST"])
+def apple_auth():
+    """Apple Sign-In authentication"""
+    data = request.json or {}
+    identity_token = data.get("identity_token")
+    user_info = data.get("user_info", {})
+    
+    if not identity_token:
+        return jsonify({"error": "Identity token required"}), 400
+    
+    try:
+        # TODO: Verify Apple identity token
+        # For now, extract user info from the provided data
+        apple_id = user_info.get("sub") or user_info.get("id")
+        email = user_info.get("email")
+        name = user_info.get("name", {}).get("firstName", "Apple User")
+        
+        if not apple_id:
+            return jsonify({"error": "Invalid Apple token"}), 401
+        
+        # Find existing user
+        user = User.query.filter_by(apple_id=apple_id).first()
+        if not user and email:
+            user = User.query.filter_by(email=email).first()
+            if user:
+                user.apple_id = apple_id
+        
+        if not user:
+            user = User(
+                name=name,
+                email=email,
+                apple_id=apple_id,
+                is_verified=True
+            )
+            db.session.add(user)
+        
+        db.session.commit()
+        
+        return jsonify({
+            **_tokens(user),
+            "is_new_user": user.username is None
+        })
+        
+    except Exception as e:
+        return jsonify({"error": f"Apple authentication failed: {str(e)}"}), 401
+
+
+@auth_bp.route("/2fa/setup", methods=["POST"])
+@jwt_required()
+def setup_2fa():
+    """Setup 2FA for user account"""
+    import pyotp
+    import qrcode
+    import io
+    import base64
+    
+    user = User.query.get(int(get_jwt_identity()))
+    
+    if user.two_factor_enabled:
+        return jsonify({"error": "2FA is already enabled"}), 400
+    
+    # Generate secret
+    secret = pyotp.random_base32()
+    
+    # Generate QR code
+    totp_uri = pyotp.totp.TOTP(secret).provisioning_uri(
+        name=user.email or user.phone,
+        issuer_name="KinsCribe"
+    )
+    
+    qr = qrcode.QRCode(version=1, box_size=10, border=5)
+    qr.add_data(totp_uri)
+    qr.make(fit=True)
+    
+    img = qr.make_image(fill_color="black", back_color="white")
+    buffer = io.BytesIO()
+    img.save(buffer, format='PNG')
+    qr_code = base64.b64encode(buffer.getvalue()).decode()
+    
+    # Store secret temporarily (not enabled until verified)
+    user.two_factor_secret = secret
+    db.session.commit()
+    
+    return jsonify({
+        "secret": secret,
+        "qr_code": f"data:image/png;base64,{qr_code}",
+        "manual_entry_key": secret
+    })
+
+
+@auth_bp.route("/2fa/verify", methods=["POST"])
+@jwt_required()
+def verify_2fa_setup():
+    """Verify 2FA setup with TOTP code"""
+    import pyotp
+    import secrets
+    import json
+    
+    user = User.query.get(int(get_jwt_identity()))
+    data = request.json or {}
+    code = data.get("code", "").strip()
+    
+    if not user.two_factor_secret:
+        return jsonify({"error": "2FA setup not initiated"}), 400
+    
+    if not code:
+        return jsonify({"error": "Verification code required"}), 400
+    
+    # Verify TOTP code
+    totp = pyotp.TOTP(user.two_factor_secret)
+    if not totp.verify(code, valid_window=1):
+        return jsonify({"error": "Invalid verification code"}), 400
+    
+    # Generate backup codes
+    backup_codes = [secrets.token_hex(4).upper() for _ in range(8)]
+    
+    # Enable 2FA
+    user.two_factor_enabled = True
+    user.backup_codes = json.dumps(backup_codes)
+    db.session.commit()
+    
+    return jsonify({
+        "message": "2FA enabled successfully",
+        "backup_codes": backup_codes
+    })
+
+
+@auth_bp.route("/2fa/disable", methods=["POST"])
+@jwt_required()
+def disable_2fa():
+    """Disable 2FA for user account"""
+    user = User.query.get(int(get_jwt_identity()))
+    data = request.json or {}
+    password = data.get("password", "")
+    
+    if not user.two_factor_enabled:
+        return jsonify({"error": "2FA is not enabled"}), 400
+    
+    # Verify password
+    if user.password and not bcrypt.check_password_hash(user.password, password):
+        return jsonify({"error": "Incorrect password"}), 401
+    
+    # Disable 2FA
+    user.two_factor_enabled = False
+    user.two_factor_secret = None
+    user.backup_codes = None
+    db.session.commit()
+    
+@auth_bp.route("/phone/add", methods=["POST"])
+@jwt_required()
+def add_phone_number():
+    """Add phone number to existing account"""
+    import random
+    from datetime import datetime, timedelta
+    
+    user = User.query.get(int(get_jwt_identity()))
+    data = request.json or {}
+    phone = data.get("phone", "").strip()
+    otp = data.get("otp", "").strip()
+    
+    if not phone or not otp:
+        return jsonify({"error": "Phone and OTP are required"}), 400
+    
+    # Normalize phone
+    phone = ''.join(filter(str.isdigit, phone))
+    if not phone.startswith('1') and len(phone) == 10:
+        phone = '1' + phone
+    
+    # Check if phone is already used
+    existing = User.query.filter(User.phone == phone, User.id != user.id).first()
+    if existing:
+        return jsonify({"error": "This phone number is already registered"}), 409
+    
+    # Verify OTP (stored in verification_token temporarily)
+    token = user.verification_token or ""
+    if not token.startswith("phone_otp:"):
+        return jsonify({"error": "No OTP pending for phone verification"}), 400
+    
+    try:
+        _, stored_otp, expiry_str = token.split(":", 2)
+        if stored_otp != otp:
+            return jsonify({"error": "Incorrect OTP"}), 400
+        if datetime.utcnow() > datetime.fromisoformat(expiry_str):
+            return jsonify({"error": "OTP has expired"}), 400
+    except Exception:
+        return jsonify({"error": "Invalid OTP"}), 400
+    
+    # Add phone to user account
+    user.phone = phone
+    user.verification_token = None
+    db.session.commit()
+    
+    return jsonify({
+        "message": "Phone number added successfully",
+        "user": user.to_dict()
+    })
+
+
+@auth_bp.route("/phone/send-add-otp", methods=["POST"])
+@jwt_required()
+def send_add_phone_otp():
+    """Send OTP to add phone number to existing account"""
+    import random
+    from datetime import datetime, timedelta
+    
+    user = User.query.get(int(get_jwt_identity()))
+    data = request.json or {}
+    phone = data.get("phone", "").strip()
+    
+    if not phone:
+        return jsonify({"error": "Phone number is required"}), 400
+    
+    # Normalize phone number
+    phone = ''.join(filter(str.isdigit, phone))
+    if len(phone) < 10:
+        return jsonify({"error": "Invalid phone number"}), 400
+    
+    if not phone.startswith('1') and len(phone) == 10:
+        phone = '1' + phone
+    
+    # Check if phone is already used
+    existing = User.query.filter(User.phone == phone, User.id != user.id).first()
+    if existing:
+        return jsonify({"error": "This phone number is already registered"}), 409
+    
+    # Generate OTP
+    otp = str(random.randint(100000, 999999))
+    expiry = (datetime.utcnow() + timedelta(minutes=10)).isoformat()
+    
+    # Store OTP temporarily
+    user.verification_token = f"phone_otp:{otp}:{expiry}"
+    db.session.commit()
+    
+    # TODO: Send SMS with OTP
+    return jsonify({
+        "message": f"OTP sent to {phone[-4:].rjust(len(phone), '*')}",
+        "phone": phone,
+        "otp": otp if os.getenv("FLASK_ENV") == "development" else None
+    })
+
+    return jsonify({\"message\": \"2FA disabled successfully\"})
+
+
+@auth_bp.route(\"/refresh\", methods=[\"POST\"])
 @jwt_required(refresh=True)
 def refresh():
     user_id = get_jwt_identity()
-    return jsonify({"access_token": create_access_token(identity=user_id)})
+    return jsonify({\"access_token\": create_access_token(identity=user_id)})
 
 
-@auth_bp.route("/me", methods=["GET"])
+@auth_bp.route(\"/me\", methods=[\"GET\"])
 @jwt_required()
 def me():
     user = User.query.get(int(get_jwt_identity()))
     if not user:
-        return jsonify({"error": "User not found"}), 404
+        return jsonify({\"error\": \"User not found\"}), 404
     return jsonify(user.to_dict())

@@ -2,16 +2,16 @@
 User Journey
 • Splash / welcome screen
 # • Login or Sign up
-• Phone or email verification (OTP)
-• Profile setup wizard
-• Interest and topic picker
-• Follow suggestions (people you may know)
-• Land on home feed
+# • Phone or email verification (OTP)
+# • Profile setup wizard
+# • Interest and topic picker
+# • Follow suggestions (people you may know)
+# • Land on home feed
 Login Options
-• Email and password login
+# • Email and password login
 • Phone number login
-• Google SSO (Sign in with Google)
-• Apple SSO (Sign in with Apple)
+# • Google SSO (Sign in with Google)
+# • Apple SSO (Sign in with Apple)
 • Biometric login — Face ID / fingerprint
 • Forgot password / reset via email or phone
 • Two-factor authentication (2FA)

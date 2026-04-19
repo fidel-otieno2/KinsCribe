@@ -3,7 +3,7 @@ import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, KeyboardAvoidingView, Platform,
   ScrollView, Image, Dimensions, StatusBar, Modal,
-  ActivityIndicator,
+  ActivityIndicator, Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -41,6 +41,272 @@ WebBrowser.maybeCompleteAuthSession();
 
 const { width, height } = Dimensions.get('window');
 const HERO_HEIGHT = height * 0.32;
+
+// ── Phone Login Modal ─────────────────────────────────────────
+function PhoneLoginModal({ visible, onClose }) {
+  const { theme } = useTheme();
+  const { login } = useAuth();
+  const [step, setStep] = useState('phone'); // phone | otp
+  const [phone, setPhone] = useState('');
+  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const inputRefs = useRef([]);
+  const cooldownRef = useRef(null);
+
+  const reset = () => {
+    setStep('phone');
+    setPhone('');
+    setOtp(['', '', '', '', '', '']);
+    setError('');
+    setResendCooldown(0);
+    if (cooldownRef.current) {
+      clearInterval(cooldownRef.current);
+    }
+  };
+
+  const handleClose = () => {
+    reset();
+    onClose();
+  };
+
+  const formatPhoneNumber = (value) => {
+    const cleaned = value.replace(/\D/g, '');
+    const match = cleaned.match(/^(\d{0,3})(\d{0,3})(\d{0,4})$/);
+    if (match) {
+      return !match[2] ? match[1] : `(${match[1]}) ${match[2]}${match[3] ? `-${match[3]}` : ''}`;
+    }
+    return value;
+  };
+
+  const sendOTP = async () => {
+    if (!phone.trim()) {
+      setError('Please enter your phone number');
+      return;
+    }
+
+    const cleanPhone = phone.replace(/\D/g, '');
+    if (cleanPhone.length < 10) {
+      setError('Please enter a valid phone number');
+      return;
+    }
+
+    setError('');
+    setLoading(true);
+
+    try {
+      const { data } = await api.post('/auth/phone/send-otp', { phone: cleanPhone });
+      setStep('otp');
+      startCooldown();
+      
+      // Show OTP in development
+      if (data.otp) {
+        Alert.alert('Development Mode', `OTP: ${data.otp}`, [{ text: 'OK' }]);
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to send OTP. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const startCooldown = () => {
+    setResendCooldown(60);
+    cooldownRef.current = setInterval(() => {
+      setResendCooldown(prev => {
+        if (prev <= 1) {
+          clearInterval(cooldownRef.current);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const handleOtpChange = (val, idx) => {
+    if (!/^[0-9]?$/.test(val)) return;
+    const next = [...otp];
+    next[idx] = val;
+    setOtp(next);
+    setError('');
+    if (val && idx < 5) inputRefs.current[idx + 1]?.focus();
+  };
+
+  const handleOtpKeyPress = (e, idx) => {
+    if (e.nativeEvent.key === 'Backspace' && !otp[idx] && idx > 0) {
+      inputRefs.current[idx - 1]?.focus();
+    }
+  };
+
+  const verifyOTP = async () => {
+    const code = otp.join('');
+    if (code.length < 6) {
+      setError('Please enter the complete 6-digit code');
+      return;
+    }
+
+    setError('');
+    setLoading(true);
+
+    try {
+      const cleanPhone = phone.replace(/\D/g, '');
+      const { data } = await api.post('/auth/phone/verify-otp', {
+        phone: cleanPhone,
+        otp: code
+      });
+
+      await AsyncStorage.setItem('access_token', data.access_token);
+      await AsyncStorage.setItem('refresh_token', data.refresh_token);
+      
+      login(data.user);
+      handleClose();
+      
+      if (data.is_new_user) {
+        // Navigate to profile setup
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || 'Invalid code. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resendOTP = async () => {
+    if (resendCooldown > 0) return;
+    await sendOTP();
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose}>
+      <KeyboardAvoidingView style={pl.overlay} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <BlurView intensity={20} tint="dark" style={pl.sheet}>
+          <LinearGradient colors={['rgba(124,58,237,0.1)', 'rgba(15,23,42,0.98)']} style={StyleSheet.absoluteFill} />
+          <View style={pl.handle} />
+          <View style={pl.inner}>
+            <TouchableOpacity style={pl.closeBtn} onPress={handleClose}>
+              <Ionicons name="close" size={22} color={theme.muted} />
+            </TouchableOpacity>
+
+            <View style={pl.iconWrap}>
+              <LinearGradient colors={['#7c3aed', '#3b82f6']} style={pl.iconGrad}>
+                <Ionicons name={step === 'phone' ? 'phone-portrait-outline' : 'keypad-outline'} size={26} color="#fff" />
+              </LinearGradient>
+            </View>
+
+            <Text style={pl.title}>
+              {step === 'phone' ? 'Sign in with Phone' : 'Enter Verification Code'}
+            </Text>
+            <Text style={pl.sub}>
+              {step === 'phone'
+                ? "Enter your phone number and we'll send you a verification code."
+                : `We sent a 6-digit code to ${phone}`}
+            </Text>
+
+            {error ? (
+              <View style={pl.errorBox}>
+                <Ionicons name="alert-circle" size={14} color="#f87171" />
+                <Text style={pl.errorText}>{error}</Text>
+              </View>
+            ) : null}
+
+            {step === 'phone' ? (
+              <>
+                <Text style={pl.label}>Phone Number</Text>
+                <View style={pl.inputWrap}>
+                  <Ionicons name="phone-portrait-outline" size={17} color={theme.muted} />
+                  <TextInput
+                    style={[pl.input, { color: theme.text }]}
+                    placeholder="(555) 123-4567"
+                    placeholderTextColor={theme.dim}
+                    keyboardType="phone-pad"
+                    value={phone}
+                    onChangeText={v => { setPhone(formatPhoneNumber(v)); setError(''); }}
+                    maxLength={14}
+                  />
+                </View>
+                <TouchableOpacity style={pl.btn} onPress={sendOTP} disabled={loading} activeOpacity={0.85}>
+                  <LinearGradient colors={['#7c3aed', '#3b82f6']} style={pl.btnGrad}>
+                    {loading
+                      ? <ActivityIndicator color="#fff" size="small" />
+                      : <Text style={pl.btnText}>Send Code</Text>}
+                  </LinearGradient>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <View style={pl.otpRow}>
+                  {otp.map((digit, idx) => (
+                    <TextInput
+                      key={idx}
+                      ref={r => inputRefs.current[idx] = r}
+                      style={[pl.otpBox, digit ? pl.otpBoxFilled : null]}
+                      value={digit}
+                      onChangeText={v => handleOtpChange(v, idx)}
+                      onKeyPress={e => handleOtpKeyPress(e, idx)}
+                      keyboardType="number-pad"
+                      maxLength={1}
+                      selectTextOnFocus
+                    />
+                  ))}
+                </View>
+
+                <TouchableOpacity style={pl.btn} onPress={verifyOTP} disabled={loading} activeOpacity={0.85}>
+                  <LinearGradient colors={['#7c3aed', '#3b82f6']} style={pl.btnGrad}>
+                    {loading
+                      ? <ActivityIndicator color="#fff" size="small" />
+                      : <Text style={pl.btnText}>Verify Code</Text>}
+                  </LinearGradient>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={pl.resendBtn} 
+                  onPress={resendOTP} 
+                  disabled={resendCooldown > 0}
+                >
+                  <Text style={[pl.resendText, { color: resendCooldown > 0 ? theme.dim : '#7c3aed' }]}>
+                    {resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : "Didn't get it? Resend code"}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={pl.backLink} onPress={() => { setStep('phone'); setError(''); setOtp(['','','','','','']); }}>
+                  <Text style={pl.backLinkText}>← Use a different number</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </BlurView>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
+const pl = StyleSheet.create({
+  overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.7)' },
+  sheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, overflow: 'hidden', paddingBottom: 40 },
+  handle: { width: 40, height: 4, backgroundColor: colors.border, borderRadius: 2, alignSelf: 'center', marginTop: 12, marginBottom: 4 },
+  inner: { padding: 24, paddingTop: 12 },
+  closeBtn: { alignSelf: 'flex-end', padding: 4, marginBottom: 8 },
+  iconWrap: { alignSelf: 'center', marginBottom: 16 },
+  iconGrad: { width: 60, height: 60, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  title: { fontSize: 22, fontWeight: '800', color: colors.text, textAlign: 'center', marginBottom: 6, marginTop: 12 },
+  sub: { fontSize: 13, color: colors.muted, textAlign: 'center', marginBottom: 20, lineHeight: 19 },
+  errorBox: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(248,113,113,0.1)', borderWidth: 1, borderColor: 'rgba(248,113,113,0.3)', borderRadius: radius.sm, padding: 10, marginBottom: 14 },
+  errorText: { color: '#f87171', fontSize: 12, flex: 1 },
+  label: { fontSize: 11, color: colors.muted, fontWeight: '600', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
+  inputWrap: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(30,41,59,0.9)', borderWidth: 1, borderColor: colors.border2, borderRadius: radius.md, paddingHorizontal: 14, marginBottom: 16 },
+  input: { flex: 1, paddingVertical: 13, color: colors.text, fontSize: 14 },
+  otpRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24 },
+  otpBox: { width: 46, height: 56, borderRadius: 12, borderWidth: 1.5, borderColor: colors.border2, backgroundColor: 'rgba(30,41,59,0.9)', textAlign: 'center', fontSize: 22, fontWeight: '800', color: colors.text },
+  otpBoxFilled: { borderColor: '#7c3aed', backgroundColor: 'rgba(124,58,237,0.1)' },
+  btn: { borderRadius: radius.md, overflow: 'hidden', marginTop: 4 },
+  btnGrad: { paddingVertical: 14, alignItems: 'center', justifyContent: 'center' },
+  btnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  resendBtn: { alignSelf: 'center', marginTop: 16, padding: 8 },
+  resendText: { fontSize: 13, fontWeight: '600' },
+  backLink: { alignSelf: 'center', marginTop: 16 },
+  backLinkText: { color: colors.muted, fontSize: 13 },
+});
 
 // ── Forgot Password Modal ─────────────────────────────────────
 function ForgotPasswordModal({ visible, onClose }) {
@@ -260,7 +526,6 @@ const fp = StyleSheet.create({
   doneBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
 });
 
-// ── Login Screen ──────────────────────────────────────────────
 export default function LoginScreen({ navigation }) {
   const { login, loginWithGoogle } = useAuth();
   const { theme, isDark } = useTheme();
@@ -269,9 +534,11 @@ export default function LoginScreen({ navigation }) {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [biometricLoading, setBiometricLoading] = useState(false);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
   const [error, setError] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [showForgot, setShowForgot] = useState(false);
+  const [showPhoneLogin, setShowPhoneLogin] = useState(false);
 
   const [request, response, promptAsync] = Google.useAuthRequest({
     androidClientId: '474767363654-6knta78fh5ibd8q0a6894o8euqrs90js.apps.googleusercontent.com',
@@ -320,8 +587,11 @@ export default function LoginScreen({ navigation }) {
 
   const checkBiometric = async () => {
     const available = await isBiometricAvailable();
-    const savedEmail = await AsyncStorage.getItem('biometric_email');
-    setBiometricAvailable(available && !!savedEmail);
+    const enabled = await AsyncStorage.getItem('biometric_enabled');
+    const savedCredentials = await AsyncStorage.getItem('biometric_credentials');
+    
+    setBiometricAvailable(available);
+    setBiometricEnabled(available && enabled === 'true' && !!savedCredentials);
   };
 
   const handleBiometricLogin = async () => {
@@ -334,16 +604,19 @@ export default function LoginScreen({ navigation }) {
         cancelLabel: 'Cancel',
       });
       if (result.success) {
-        const savedEmail = await AsyncStorage.getItem('biometric_email');
-        const savedPassword = await AsyncStorage.getItem('biometric_password');
-        if (savedEmail && savedPassword) {
-          await login(savedEmail, savedPassword);
+        const savedCredentials = await AsyncStorage.getItem('biometric_credentials');
+        if (savedCredentials) {
+          const { email, password } = JSON.parse(savedCredentials);
+          await login(email, password);
         } else {
-          setError('Sign in with password first to enable biometric login.');
+          setError('Biometric credentials not found. Please sign in with password first.');
         }
       }
-    } catch { setError('Biometric authentication failed.'); }
-    finally { setBiometricLoading(false); }
+    } catch { 
+      setError('Biometric authentication failed.'); 
+    } finally { 
+      setBiometricLoading(false); 
+    }
   };
 
   const handleLogin = async () => {
@@ -351,8 +624,38 @@ export default function LoginScreen({ navigation }) {
     setLoading(true);
     try {
       await login(form.email, form.password);
-      await AsyncStorage.setItem('biometric_email', form.email);
-      await AsyncStorage.setItem('biometric_password', form.password);
+      
+      // Ask user if they want to enable biometric login
+      if (await isBiometricAvailable()) {
+        const biometricEnabled = await AsyncStorage.getItem('biometric_enabled');
+        if (biometricEnabled !== 'true') {
+          setTimeout(() => {
+            Alert.alert(
+              'Enable Biometric Login?',
+              'Would you like to use Face ID/Fingerprint for faster login next time?',
+              [
+                { text: 'Not Now', style: 'cancel' },
+                {
+                  text: 'Enable',
+                  onPress: async () => {
+                    await AsyncStorage.setItem('biometric_enabled', 'true');
+                    await AsyncStorage.setItem('biometric_credentials', JSON.stringify({
+                      email: form.email,
+                      password: form.password
+                    }));
+                  }
+                }
+              ]
+            );
+          }, 1000);
+        } else {
+          // Update saved credentials
+          await AsyncStorage.setItem('biometric_credentials', JSON.stringify({
+            email: form.email,
+            password: form.password
+          }));
+        }
+      }
     } catch (err) {
       setError(err.response?.data?.error || 'Login failed. Check your credentials.');
     } finally {
@@ -433,11 +736,20 @@ export default function LoginScreen({ navigation }) {
             <GradientButton label="Sign In" onPress={handleLogin} loading={loading} style={{ marginTop: 4 }} />
 
             {/* Biometric */}
-            {biometricAvailable && (
-              <TouchableOpacity style={[s.biometricBtn, { borderColor: theme.border2, backgroundColor: theme.bgCard }]} onPress={handleBiometricLogin} disabled={biometricLoading} activeOpacity={0.8}>
+            {biometricEnabled && (
+              <TouchableOpacity 
+                style={[s.biometricBtn, { borderColor: theme.border2, backgroundColor: theme.bgCard }]} 
+                onPress={handleBiometricLogin} 
+                disabled={biometricLoading} 
+                activeOpacity={0.8}
+              >
                 {biometricLoading
                   ? <ActivityIndicator size="small" color={theme.primary} />
-                  : <><Ionicons name="finger-print" size={22} color={theme.primary} /><Text style={[s.biometricText, { color: theme.text }]}>Sign in with Face ID / Fingerprint</Text></>}
+                  : <>
+                      <Ionicons name="finger-print" size={22} color={theme.primary} />
+                      <Text style={[s.biometricText, { color: theme.text }]}>Sign in with Face ID / Fingerprint</Text>
+                    </>
+                }
               </TouchableOpacity>
             )}
 
@@ -468,6 +780,16 @@ export default function LoginScreen({ navigation }) {
               )}
             </TouchableOpacity>
 
+            {/* Phone Login Button */}
+            <TouchableOpacity
+              style={[s.phoneBtn, { borderColor: theme.border2, backgroundColor: theme.bgCard }]}
+              onPress={() => setShowPhoneLogin(true)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="phone-portrait-outline" size={20} color={theme.primary} />
+              <Text style={[s.phoneBtnText, { color: theme.text }]}>Continue with Phone</Text>
+            </TouchableOpacity>
+
 
           </View>
         </BlurView>
@@ -486,6 +808,7 @@ export default function LoginScreen({ navigation }) {
       </ScrollView>
 
       <ForgotPasswordModal visible={showForgot} onClose={() => setShowForgot(false)} />
+      <PhoneLoginModal visible={showPhoneLogin} onClose={() => setShowPhoneLogin(false)} />
     </KeyboardAvoidingView>
   );
 }
@@ -515,10 +838,10 @@ const s = StyleSheet.create({
   dividerRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 18, gap: 12 },
   dividerLine: { flex: 1, height: 1, backgroundColor: colors.border },
   dividerText: { color: colors.dim, fontSize: 11, fontWeight: '700', letterSpacing: 1 },
-  googleBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: '#fff', borderRadius: radius.md, padding: 13, minHeight: 48 },
+  googleBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: '#fff', borderRadius: radius.md, padding: 13, minHeight: 48, marginBottom: 10 },
   googleText: { color: '#1f1f1f', fontSize: 15, fontWeight: '600' },
-  appleBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, borderRadius: radius.md, padding: 13, minHeight: 48 },
-  appleBtnText: { fontSize: 15, fontWeight: '600' },
+  phoneBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, borderRadius: radius.md, padding: 13, minHeight: 48, borderWidth: 1, marginBottom: 10 },
+  phoneBtnText: { fontSize: 15, fontWeight: '600' },
   biometricBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: radius.md, padding: 13, minHeight: 48, borderWidth: 1, marginTop: 10 },
   biometricText: { fontSize: 14, fontWeight: '600' },
   footer: { flexDirection: 'row', justifyContent: 'center', marginTop: 24, marginBottom: 8 },

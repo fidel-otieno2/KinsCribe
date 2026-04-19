@@ -13,6 +13,8 @@ from routes.post_routes import post_bp
 from routes.message_routes import message_bp
 from routes.public_story_routes import public_story_bp
 from routes.extras_routes import extras_bp
+from routes.notification_routes import notification_bp
+from routes.search_routes import search_bp
 
 
 def create_app():
@@ -41,6 +43,8 @@ def create_app():
     app.register_blueprint(message_bp, url_prefix="/api/messages")
     app.register_blueprint(public_story_bp, url_prefix="/api/pstories")
     app.register_blueprint(extras_bp, url_prefix="/api/extras")
+    app.register_blueprint(notification_bp, url_prefix="/api/notifications")
+    app.register_blueprint(search_bp, url_prefix="/api/search")
 
     with app.app_context():
         import threading
@@ -93,6 +97,15 @@ def _run_migrations():
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS website VARCHAR(200)",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS interests VARCHAR(500)",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_private BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(20)",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS apple_id VARCHAR(200)",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS two_factor_enabled BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS two_factor_secret VARCHAR(32)",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS backup_codes TEXT",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS account_type VARCHAR(20) DEFAULT 'personal'",
+        "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS name VARCHAR(100)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone ON users(phone)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_apple_id ON users(apple_id)",
     ]
 
     try:

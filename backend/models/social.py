@@ -20,11 +20,25 @@ class Post(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     caption = db.Column(db.Text, nullable=True)
     media_url = db.Column(db.String(300), nullable=True)
-    media_urls = db.Column(db.Text, nullable=True)
-    media_type = db.Column(db.String(20), nullable=True)
+    media_urls = db.Column(db.Text, nullable=True)  # JSON array for carousel
+    media_type = db.Column(db.String(20), nullable=True)  # photo|video|carousel|text
     location = db.Column(db.String(200), nullable=True)
     hashtags = db.Column(db.String(500), nullable=True)
-    privacy = db.Column(db.String(20), default="public")
+    privacy = db.Column(db.String(20), default="public")  # public|followers|family|close_friends
+    alt_text = db.Column(db.Text, nullable=True)  # Accessibility alt text
+    
+    # Collaboration
+    is_collab = db.Column(db.Boolean, default=False)
+    collab_users = db.Column(db.Text, nullable=True)  # JSON array of user IDs
+    
+    # Scheduling
+    is_scheduled = db.Column(db.Boolean, default=False)
+    scheduled_at = db.Column(db.DateTime, nullable=True)
+    
+    # Analytics
+    view_count = db.Column(db.Integer, default=0)
+    share_count = db.Column(db.Integer, default=0)
+    
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     likes = db.relationship("PostLike", backref="post", lazy=True, cascade="all, delete")
@@ -37,15 +51,31 @@ class Post(db.Model):
         if current_user_id:
             liked = any(l.user_id == current_user_id for l in self.likes)
             saved = any(s.user_id == current_user_id for s in self.saves)
+        
         media_list = []
         if self.media_urls:
-            try: media_list = json.loads(self.media_urls)
-            except: pass
+            try: 
+                media_list = json.loads(self.media_urls)
+            except: 
+                pass
+        
+        collab_users_list = []
+        if self.collab_users:
+            try:
+                collab_users_list = json.loads(self.collab_users)
+            except:
+                pass
+        
         return {
             "id": self.id, "caption": self.caption,
             "media_url": self.media_url, "media_urls": media_list,
             "media_type": self.media_type, "location": self.location,
             "hashtags": self.hashtags, "privacy": self.privacy,
+            "alt_text": self.alt_text,
+            "is_collab": self.is_collab, "collab_users": collab_users_list,
+            "is_scheduled": self.is_scheduled,
+            "scheduled_at": self.scheduled_at.isoformat() if self.scheduled_at else None,
+            "view_count": self.view_count, "share_count": self.share_count,
             "like_count": len(self.likes), "comment_count": len(self.comments),
             "liked_by_me": liked, "saved_by_me": saved,
             "user_id": self.user_id,

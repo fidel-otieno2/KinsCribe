@@ -7,7 +7,8 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     username = db.Column(db.String(50), unique=True, nullable=True)
-    email = db.Column(db.String(120), unique=True, nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=True)  # Made nullable for phone-only users
+    phone = db.Column(db.String(20), unique=True, nullable=True)  # Added phone number
     password = db.Column(db.String(200), nullable=True)  # nullable for Google OAuth users
     role = db.Column(db.String(20), default="member")  # admin | member | historian
     is_verified = db.Column(db.Boolean, default=False)
@@ -18,6 +19,16 @@ class User(db.Model):
     interests = db.Column(db.String(500), nullable=True)
     is_private = db.Column(db.Boolean, default=False)
     google_id = db.Column(db.String(200), nullable=True, unique=True)
+    apple_id = db.Column(db.String(200), nullable=True, unique=True)  # Added Apple ID
+    
+    # 2FA settings
+    two_factor_enabled = db.Column(db.Boolean, default=False)
+    two_factor_secret = db.Column(db.String(32), nullable=True)
+    backup_codes = db.Column(db.Text, nullable=True)  # JSON array of backup codes
+    
+    # Account type
+    account_type = db.Column(db.String(20), default="personal")  # personal|professional|creator
+    
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     family_id = db.Column(db.Integer, db.ForeignKey("families.id"), nullable=True)
@@ -37,6 +48,7 @@ class User(db.Model):
             "name": self.name,
             "username": self.username,
             "email": self.email,
+            "phone": self.phone,
             "role": self.role,
             "is_verified": self.is_verified,
             "avatar_url": self.avatar_url,
@@ -44,6 +56,8 @@ class User(db.Model):
             "website": self.website,
             "interests": self.interests.split(',') if self.interests else [],
             "is_private": self.is_private,
+            "account_type": self.account_type,
+            "two_factor_enabled": self.two_factor_enabled,
             "family_id": self.family_id,
             "connection_count": connection_count,
             "interest_count": interest_count,

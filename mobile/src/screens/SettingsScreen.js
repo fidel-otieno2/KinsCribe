@@ -1,12 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Switch, Alert, TextInput, Image, ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import * as LocalAuthentication from 'expo-local-authentication';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -14,6 +16,7 @@ import api from '../api/axios';
 import { colors, radius } from '../theme';
 import Toast from '../components/Toast';
 import useToast from '../hooks/useToast';
+import { PhoneModal, TwoFactorModal } from '../components/SecurityModals';
 
 const th = StyleSheet.create({
   themeRow: { flexDirection: 'row', gap: 6 },
@@ -75,6 +78,9 @@ export default function SettingsScreen({ navigation }) {
   const [editMode, setEditMode] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
+  const [showPhoneModal, setShowPhoneModal] = useState(false);
+  const [show2FAModal, setShow2FAModal] = useState(false);
 
   // Notification toggles
   const [notifLikes, setNotifLikes] = useState(true);
@@ -99,6 +105,68 @@ export default function SettingsScreen({ navigation }) {
   const [privateAccount, setPrivateAccount] = useState(false);
   const [showActivity, setShowActivity] = useState(true);
   const [allowDMs, setAllowDMs] = useState(true);
+
+  useEffect(() => {
+    checkBiometricStatus();
+  }, []);
+
+  const checkBiometricStatus = async () => {
+    try {
+      const enabled = await AsyncStorage.getItem('biometric_enabled');
+      setBiometricEnabled(enabled === 'true');
+    } catch {}
+  };
+
+  const toggleBiometric = async () => {
+    try {
+      const available = await LocalAuthentication.hasHardwareAsync();
+      const enrolled = await LocalAuthentication.isEnrolledAsync();
+      
+      if (!available || !enrolled) {
+        Alert.alert(
+          'Biometric Not Available',
+          'Please set up Face ID or Fingerprint in your device settings first.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
+      if (biometricEnabled) {
+        // Disable biometric
+        Alert.alert(
+          'Disable Biometric Login?',
+          'You will need to enter your password to sign in.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Disable',
+              style: 'destructive',
+              onPress: async () => {
+                await AsyncStorage.removeItem('biometric_enabled');
+                await AsyncStorage.removeItem('biometric_credentials');
+                setBiometricEnabled(false);
+                success('Biometric login disabled');
+              }
+            }
+          ]
+        );
+      } else {
+        // Enable biometric
+        const result = await LocalAuthentication.authenticateAsync({
+          promptMessage: 'Authenticate to enable biometric login',
+          fallbackLabel: 'Use password',
+        });
+        
+        if (result.success) {
+          await AsyncStorage.setItem('biometric_enabled', 'true');
+          setBiometricEnabled(true);
+          success('Biometric login enabled');
+        }
+      }
+    } catch (err) {
+      error('Failed to toggle biometric login');
+    }
+  };
 
   const saveProfile = async () => {
     setSaving(true);
@@ -242,6 +310,14 @@ export default function SettingsScreen({ navigation }) {
         <Section title="Account">
           <Row icon="mail-outline" label="Email" value={user?.email} chevron={false} />
           <Divider />
+          <Row 
+            icon="phone-portrait-outline" 
+            iconColor="#10b981"
+            label="Phone Number" 
+            value={user?.phone ? `${user.phone.slice(-4).padStart(user.phone.length, '*')}` : 'Not added'}
+            onPress={() => setShowPhoneModal(true)} 
+          />
+          <Divider />
           <Row icon="key-outline" label="Change Password" onPress={() => Alert.alert('Reset Password', 'A reset link will be sent to your email', [
             { text: 'Cancel', style: 'cancel' },
             { text: 'Send', onPress: async () => {
@@ -249,7 +325,16 @@ export default function SettingsScreen({ navigation }) {
             }},
           ])} />
           <Divider />
-          <Row icon="shield-checkmark-outline" iconColor="#10b981" label="Two-Factor Authentication" onPress={() => Alert.alert('2FA', 'Coming soon')} />
+          <Row icon="shield-checkmark-outline" iconColor="#10b981" label="Two-Factor Authentication" onPress={() => setShow2FAModal(true)} />
+          <Divider />
+          <Row 
+            icon="finger-print" 
+            iconColor="#7c3aed" 
+            label="Biometric Login" 
+            toggle 
+            toggled={biometricEnabled} 
+            onPress={toggleBiometric} 
+          />
           <Divider />
           <Row icon="people-outline" iconColor="#3b82f6" label="My Family" onPress={() => { navigation.goBack(); navigation.navigate('Family'); }} />
           <Divider />
@@ -403,6 +488,18 @@ export default function SettingsScreen({ navigation }) {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      <PhoneModal 
+        visible={showPhoneModal} 
+        onClose={() => setShowPhoneModal(false)}
+        onSuccess={refreshUser}
+      />
+      
+      <TwoFactorModal 
+        visible={show2FAModal} 
+        onClose={() => setShow2FAModal(false)}
+        onSuccess={refreshUser}
+      />
     </View>
   );
 }
