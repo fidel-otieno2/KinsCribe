@@ -768,27 +768,48 @@ def send_add_phone_otp():
     user.verification_token = f"phone_otp:{otp}:{expiry}"
     db.session.commit()
     
-    # TODO: Send SMS with OTP
     return jsonify({
-        "message": f"OTP sent to {phone[-4:].rjust(len(phone), '*')}",
+        "message": "OTP sent to {}".format(phone[-4:].rjust(len(phone), '*')),
         "phone": phone,
         "otp": otp if os.getenv("FLASK_ENV") == "development" else None
     })
 
-    return jsonify({\"message\": \"2FA disabled successfully\"})
+
+@auth_bp.route("/2fa/disable", methods=["POST"])
+@jwt_required()
+def disable_2fa():
+    """Disable 2FA for user account"""
+    user = User.query.get(int(get_jwt_identity()))
+    data = request.json or {}
+    password = data.get("password", "")
+    
+    if not user.two_factor_enabled:
+        return jsonify({"error": "2FA is not enabled"}), 400
+    
+    # Verify password
+    if user.password and not bcrypt.check_password_hash(user.password, password):
+        return jsonify({"error": "Incorrect password"}), 401
+    
+    # Disable 2FA
+    user.two_factor_enabled = False
+    user.two_factor_secret = None
+    user.backup_codes = None
+    db.session.commit()
+    
+    return jsonify({"message": "2FA disabled successfully"})
 
 
-@auth_bp.route(\"/refresh\", methods=[\"POST\"])
+@auth_bp.route("/refresh", methods=["POST"])
 @jwt_required(refresh=True)
 def refresh():
     user_id = get_jwt_identity()
-    return jsonify({\"access_token\": create_access_token(identity=user_id)})
+    return jsonify({"access_token": create_access_token(identity=user_id)})
 
 
-@auth_bp.route(\"/me\", methods=[\"GET\"])
+@auth_bp.route("/me", methods=["GET"])
 @jwt_required()
 def me():
     user = User.query.get(int(get_jwt_identity()))
     if not user:
-        return jsonify({\"error\": \"User not found\"}), 404
+        return jsonify({"error": "User not found"}), 404
     return jsonify(user.to_dict())
