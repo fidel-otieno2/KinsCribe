@@ -446,14 +446,14 @@ def send_phone_otp():
     if not phone:
         return jsonify({"error": "Phone number is required"}), 400
     
-    # Normalize phone number (remove spaces, dashes, etc.)
-    phone = ''.join(filter(str.isdigit, phone))
-    if len(phone) < 10:
-        return jsonify({"error": "Invalid phone number"}), 400
+    # Validate international phone format
+    if not phone.startswith('+'):
+        return jsonify({"error": "Phone number must include country code (e.g., +254729569010)"}), 400
     
-    # Add country code if not present
-    if not phone.startswith('1') and len(phone) == 10:
-        phone = '1' + phone
+    # Remove + and validate digits
+    phone_digits = phone[1:]
+    if not phone_digits.isdigit() or len(phone_digits) < 7 or len(phone_digits) > 15:
+        return jsonify({"error": "Invalid phone number format"}), 400
     
     # Generate 6-digit OTP
     otp = str(random.randint(100000, 999999))
@@ -475,10 +475,13 @@ def send_phone_otp():
     
     db.session.commit()
     
+    # Format phone for display (mask middle digits)
+    display_phone = phone[:4] + '*' * (len(phone) - 8) + phone[-4:] if len(phone) > 8 else phone
+    
     # TODO: Integrate with SMS service (Twilio, AWS SNS, etc.)
     # For now, return OTP in response (development only)
     return jsonify({
-        "message": f"OTP sent to {phone[-4:].rjust(len(phone), '*')}",
+        "message": f"OTP sent to {display_phone}",
         "phone": phone,
         "otp": otp if os.getenv("FLASK_ENV") == "development" else None
     })
@@ -497,10 +500,9 @@ def verify_phone_otp():
     if not phone or not otp:
         return jsonify({"error": "Phone and OTP are required"}), 400
     
-    # Normalize phone
-    phone = ''.join(filter(str.isdigit, phone))
-    if not phone.startswith('1') and len(phone) == 10:
-        phone = '1' + phone
+    # Validate international phone format
+    if not phone.startswith('+'):
+        return jsonify({"error": "Invalid phone format"}), 400
     
     user = User.query.filter_by(phone=phone).first()
     if not user:
@@ -747,13 +749,14 @@ def send_add_phone_otp():
     if not phone:
         return jsonify({"error": "Phone number is required"}), 400
     
-    # Normalize phone number
-    phone = ''.join(filter(str.isdigit, phone))
-    if len(phone) < 10:
-        return jsonify({"error": "Invalid phone number"}), 400
+    # Validate international phone format
+    if not phone.startswith('+'):
+        return jsonify({"error": "Phone number must include country code (e.g., +254729569010)"}), 400
     
-    if not phone.startswith('1') and len(phone) == 10:
-        phone = '1' + phone
+    # Remove + and validate digits
+    phone_digits = phone[1:]
+    if not phone_digits.isdigit() or len(phone_digits) < 7 or len(phone_digits) > 15:
+        return jsonify({"error": "Invalid phone number format"}), 400
     
     # Check if phone is already used
     existing = User.query.filter(User.phone == phone, User.id != user.id).first()
@@ -768,8 +771,11 @@ def send_add_phone_otp():
     user.verification_token = f"phone_otp:{otp}:{expiry}"
     db.session.commit()
     
+    # Format phone for display
+    display_phone = phone[:4] + '*' * (len(phone) - 8) + phone[-4:] if len(phone) > 8 else phone
+    
     return jsonify({
-        "message": "OTP sent to {}".format(phone[-4:].rjust(len(phone), '*')),
+        "message": f"OTP sent to {display_phone}",
         "phone": phone,
         "otp": otp if os.getenv("FLASK_ENV") == "development" else None
     })

@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, radius } from '../theme';
 import api from '../api/axios';
 import GradientButton from './GradientButton';
+import PhoneInput from './PhoneInput';
 
 // Phone Number Modal
 export function PhoneModal({ visible, onClose, onSuccess }) {
@@ -52,9 +53,8 @@ export function PhoneModal({ visible, onClose, onSuccess }) {
       return;
     }
 
-    const cleanPhone = phone.replace(/\D/g, '');
-    if (cleanPhone.length < 10) {
-      setError('Please enter a valid phone number');
+    if (!phone.startsWith('+')) {
+      setError('Please select a country and enter a valid phone number');
       return;
     }
 
@@ -62,7 +62,7 @@ export function PhoneModal({ visible, onClose, onSuccess }) {
     setLoading(true);
 
     try {
-      const { data } = await api.post('/auth/phone/send-add-otp', { phone: cleanPhone });
+      const { data } = await api.post('/auth/phone/send-add-otp', { phone });
       setStep('otp');
       startCooldown();
       
@@ -115,9 +115,8 @@ export function PhoneModal({ visible, onClose, onSuccess }) {
     setLoading(true);
 
     try {
-      const cleanPhone = phone.replace(/\D/g, '');
       await api.post('/auth/phone/add', {
-        phone: cleanPhone,
+        phone,
         otp: code
       });
 
@@ -167,18 +166,13 @@ export function PhoneModal({ visible, onClose, onSuccess }) {
             {step === 'phone' ? (
               <>
                 <Text style={s.label}>Phone Number</Text>
-                <View style={s.inputWrap}>
-                  <Ionicons name="phone-portrait-outline" size={17} color={colors.muted} />
-                  <TextInput
-                    style={s.input}
-                    placeholder="(555) 123-4567"
-                    placeholderTextColor={colors.dim}
-                    keyboardType="phone-pad"
-                    value={phone}
-                    onChangeText={v => { setPhone(formatPhoneNumber(v)); setError(''); }}
-                    maxLength={14}
-                  />
-                </View>
+                <PhoneInput
+                  value={phone}
+                  onChangeText={setPhone}
+                  placeholder="Enter phone number"
+                  error={error}
+                  style={{ marginBottom: 16 }}
+                />
                 <GradientButton
                   label={loading ? 'Sending...' : 'Send Code'}
                   onPress={sendOTP}

@@ -16,6 +16,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { colors, radius, shadows } from '../theme';
 import GradientButton from '../components/GradientButton';
+import PhoneInput from '../components/PhoneInput';
 import api from '../api/axios';
 import * as LocalAuthentication from 'expo-local-authentication';
 
@@ -86,9 +87,8 @@ function PhoneLoginModal({ visible, onClose }) {
       return;
     }
 
-    const cleanPhone = phone.replace(/\D/g, '');
-    if (cleanPhone.length < 10) {
-      setError('Please enter a valid phone number');
+    if (!phone.startsWith('+')) {
+      setError('Please select a country and enter a valid phone number');
       return;
     }
 
@@ -96,7 +96,7 @@ function PhoneLoginModal({ visible, onClose }) {
     setLoading(true);
 
     try {
-      const { data } = await api.post('/auth/phone/send-otp', { phone: cleanPhone });
+      const { data } = await api.post('/auth/phone/send-otp', { phone });
       setStep('otp');
       startCooldown();
       
@@ -150,9 +150,8 @@ function PhoneLoginModal({ visible, onClose }) {
     setLoading(true);
 
     try {
-      const cleanPhone = phone.replace(/\D/g, '');
       const { data } = await api.post('/auth/phone/verify-otp', {
-        phone: cleanPhone,
+        phone,
         otp: code
       });
 
@@ -213,18 +212,12 @@ function PhoneLoginModal({ visible, onClose }) {
             {step === 'phone' ? (
               <>
                 <Text style={pl.label}>Phone Number</Text>
-                <View style={pl.inputWrap}>
-                  <Ionicons name="phone-portrait-outline" size={17} color={theme.muted} />
-                  <TextInput
-                    style={[pl.input, { color: theme.text }]}
-                    placeholder="(555) 123-4567"
-                    placeholderTextColor={theme.dim}
-                    keyboardType="phone-pad"
-                    value={phone}
-                    onChangeText={v => { setPhone(formatPhoneNumber(v)); setError(''); }}
-                    maxLength={14}
-                  />
-                </View>
+                <PhoneInput
+                  value={phone}
+                  onChangeText={setPhone}
+                  placeholder="Enter phone number"
+                  style={{ marginBottom: 16 }}
+                />
                 <TouchableOpacity style={pl.btn} onPress={sendOTP} disabled={loading} activeOpacity={0.85}>
                   <LinearGradient colors={['#7c3aed', '#3b82f6']} style={pl.btnGrad}>
                     {loading
