@@ -9,6 +9,8 @@ import { Ionicons } from '@expo/vector-icons';
 import api from '../api/axios';
 import { useTheme } from '../context/ThemeContext';
 import { colors, radius } from '../theme';
+import Toast from '../components/Toast';
+import useToast from '../hooks/useToast';
 
 const { width } = Dimensions.get('window');
 const DAY_SIZE = (width - 32 - 24) / 7;
@@ -25,12 +27,13 @@ const EVENT_TYPES = [
 
 function AddEventModal({ visible, onClose, onSave, selectedDate }) {
   const { theme } = useTheme();
+  const { toast, hide, info } = useToast();
   const [form, setForm] = useState({ title: '', description: '', event_type: 'event', color: '#7c3aed', is_recurring: false, recurrence: 'yearly' });
   const [loading, setLoading] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const handleSave = async () => {
-    if (!form.title.trim()) return Alert.alert('Title required');
+    if (!form.title.trim()) return info('Please enter an event title');
     setLoading(true);
     try {
       await onSave({ ...form, event_date: selectedDate?.toISOString() });
@@ -108,6 +111,7 @@ const m = StyleSheet.create({
 
 export default function FamilyCalendarScreen({ navigation }) {
   const { theme, isDark } = useTheme();
+  const { toast, hide, success, error } = useToast();
   const today = new Date();
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
@@ -179,6 +183,7 @@ export default function FamilyCalendarScreen({ navigation }) {
 
   return (
     <View style={[s.container, { backgroundColor: theme.bg }]}>
+      <Toast visible={toast.visible} type={toast.type} message={toast.message} onHide={hide} />
       <LinearGradient colors={isDark ? ['#0f172a', '#1a0f2e', '#0f172a'] : [theme.bg, theme.bgSecondary, theme.bg]} style={StyleSheet.absoluteFill} />
 
       <View style={[s.header, { borderBottomColor: theme.border }]}>

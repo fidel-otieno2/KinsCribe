@@ -13,6 +13,8 @@ import api from '../api/axios';
 import { colors, radius } from '../theme';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Toast from '../components/Toast';
+import useToast from '../hooks/useToast';
 
 const { width } = Dimensions.get('window');
 const GRID = (width - 3) / 3;
@@ -26,6 +28,7 @@ const TABS = [
 export default function ProfileScreen({ navigation }) {
   const { user, refreshUser, logout } = useAuth();
   const { theme } = useTheme();
+  const { toast, hide, success, error, info } = useToast();
   const [posts, setPosts] = useState([]);
   const [savedPosts, setSavedPosts] = useState([]);
   const [highlights, setHighlights] = useState([]);
@@ -63,7 +66,7 @@ export default function ProfileScreen({ navigation }) {
 
   const handleAvatarUpload = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) return Alert.alert('Permission needed');
+    if (!perm.granted) return info('Allow photo access in your device settings');
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true, aspect: [1, 1], quality: 0.7, base64: true,
@@ -81,7 +84,7 @@ export default function ProfileScreen({ navigation }) {
         if (!res.ok) throw new Error(json.error || 'Upload failed');
         await refreshUser();
       } catch (err) {
-        Alert.alert('Error', err.message);
+        error(err.message);
       } finally { setUploading(false); }
     }
   };
@@ -244,6 +247,7 @@ export default function ProfileScreen({ navigation }) {
 
   return (
     <View style={[s.container, { backgroundColor: theme.bg }]}>
+      <Toast visible={toast.visible} type={toast.type} message={toast.message} onHide={hide} />
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchAll(); }} tintColor={theme.primary} />}

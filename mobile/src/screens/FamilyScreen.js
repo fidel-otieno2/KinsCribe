@@ -11,6 +11,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import { colors, radius } from '../theme';
+import Toast from '../components/Toast';
+import useToast from '../hooks/useToast';
 
 const { width } = Dimensions.get('window');
 
@@ -120,7 +122,7 @@ const ft = StyleSheet.create({
 });
 
 // ── Members Tab ───────────────────────────────────────────────
-function MembersTab({ members, user, family, navigation }) {
+function MembersTab({ members, user, family, navigation, success, error }) {
   const [inviteEmail, setInviteEmail] = useState('');
   const [sending, setSending] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -136,10 +138,10 @@ function MembersTab({ members, user, family, navigation }) {
     setSending(true);
     try {
       await api.post('/family/invite/email', { email: inviteEmail.trim() });
-      Alert.alert('✅ Invite Sent', `Invite sent to ${inviteEmail}`);
+      success(`Invite sent to ${inviteEmail.trim()}`);
       setInviteEmail('');
     } catch (err) {
-      Alert.alert('Error', err.response?.data?.error || 'Failed');
+      error(err.response?.data?.error || 'Failed to send invite');
     } finally { setSending(false); }
   };
 
@@ -291,6 +293,7 @@ const tl = StyleSheet.create({
 // ── Main FamilyScreen ─────────────────────────────────────────
 export default function FamilyScreen({ navigation }) {
   const { user } = useAuth();
+  const { toast, hide, success, error } = useToast();
   const [family, setFamily] = useState(null);
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -321,6 +324,7 @@ export default function FamilyScreen({ navigation }) {
 
   return (
     <View style={s.container}>
+      <Toast visible={toast.visible} type={toast.type} message={toast.message} onHide={hide} />
       <LinearGradient colors={['#0f172a', '#1a0f2e', '#0f172a']} style={StyleSheet.absoluteFill} />
 
       {/* Header */}
@@ -402,7 +406,7 @@ export default function FamilyScreen({ navigation }) {
         setTab('feed');
         return null;
       })()}
-      {tab === 'members' && <MembersTab members={members} user={user} family={family} navigation={navigation} />}
+      {tab === 'members' && <MembersTab members={members} user={user} family={family} navigation={navigation} success={success} error={error} />}
       {tab === 'timeline' && <TimelineTab navigation={navigation} />}
     </View>
   );

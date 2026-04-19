@@ -17,6 +17,7 @@ import { useTheme } from '../context/ThemeContext';
 import { colors, radius, shadows } from '../theme';
 import GradientButton from '../components/GradientButton';
 import api from '../api/axios';
+import * as LocalAuthentication from 'expo-local-authentication';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -248,6 +249,8 @@ export default function LoginScreen({ navigation }) {
   const [form, setForm] = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [biometricLoading, setBiometricLoading] = useState(false);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [error, setError] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [showForgot, setShowForgot] = useState(false);
@@ -258,6 +261,7 @@ export default function LoginScreen({ navigation }) {
   });
 
   useEffect(() => {
+    checkBiometric();
     if (response?.type === 'success') {
       const token = response.authentication?.accessToken || response.params?.access_token;
       if (token) handleGoogleToken(token);
@@ -282,11 +286,42 @@ export default function LoginScreen({ navigation }) {
     } finally { setGoogleLoading(false); }
   };
 
+  const checkBiometric = async () => {
+    const compatible = await LocalAuthentication.hasHardwareAsync();
+    const enrolled = await LocalAuthentication.isEnrolledAsync();
+    const savedEmail = await AsyncStorage.getItem('biometric_email');
+    setBiometricAvailable(compatible && enrolled && !!savedEmail);
+  };
+
+  const handleBiometricLogin = async () => {
+    setBiometricLoading(true);
+    setError('');
+    try {
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: 'Sign in to KinsCribe',
+        fallbackLabel: 'Use password',
+        cancelLabel: 'Cancel',
+      });
+      if (result.success) {
+        const savedEmail = await AsyncStorage.getItem('biometric_email');
+        const savedPassword = await AsyncStorage.getItem('biometric_password');
+        if (savedEmail && savedPassword) {
+          await login(savedEmail, savedPassword);
+        } else {
+          setError('Sign in with password first to enable biometric login.');
+        }
+      }
+    } catch { setError('Biometric authentication failed.'); }
+    finally { setBiometricLoading(false); }
+  };
+
   const handleLogin = async () => {
     setError('');
     setLoading(true);
     try {
       await login(form.email, form.password);
+      await AsyncStorage.setItem('biometric_email', form.email);
+      await AsyncStorage.setItem('biometric_password', form.password);
     } catch (err) {
       setError(err.response?.data?.error || 'Login failed. Check your credentials.');
     } finally {
@@ -366,6 +401,15 @@ export default function LoginScreen({ navigation }) {
 
             <GradientButton label="Sign In" onPress={handleLogin} loading={loading} style={{ marginTop: 4 }} />
 
+            {/* Biometric */}
+            {biometricAvailable && (
+              <TouchableOpacity style={[s.biometricBtn, { borderColor: theme.border2, backgroundColor: theme.bgCard }]} onPress={handleBiometricLogin} disabled={biometricLoading} activeOpacity={0.8}>
+                {biometricLoading
+                  ? <ActivityIndicator size="small" color={theme.primary} />
+                  : <><Ionicons name="finger-print" size={22} color={theme.primary} /><Text style={[s.biometricText, { color: theme.text }]}>Sign in with Face ID / Fingerprint</Text></>}
+              </TouchableOpacity>
+            )}
+
             <View style={s.dividerRow}>
               <View style={[s.dividerLine, { backgroundColor: theme.border }]} />
               <Text style={[s.dividerText, { color: theme.dim }]}>OR</Text>
@@ -391,6 +435,16 @@ export default function LoginScreen({ navigation }) {
                   <Text style={s.googleText}>Continue with Google</Text>
                 </>
               )}
+            </TouchableOpacity>
+
+            {/* Apple Sign In */}
+            <TouchableOpacity
+              style={[s.appleBtn, { backgroundColor: isDark ? '#fff' : '#000', marginTop: 10 }]}
+              onPress={() => setError('Apple Sign In requires an Apple Developer account — coming soon')}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="logo-apple" size={20} color={isDark ? '#000' : '#fff'} />
+              <Text style={[s.appleBtnText, { color: isDark ? '#000' : '#fff' }]}>Continue with Apple</Text>
             </TouchableOpacity>
           </View>
         </BlurView>
@@ -440,6 +494,10 @@ const s = StyleSheet.create({
   dividerText: { color: colors.dim, fontSize: 11, fontWeight: '700', letterSpacing: 1 },
   googleBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: '#fff', borderRadius: radius.md, padding: 13, minHeight: 48 },
   googleText: { color: '#1f1f1f', fontSize: 15, fontWeight: '600' },
+  appleBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, borderRadius: radius.md, padding: 13, minHeight: 48 },
+  appleBtnText: { fontSize: 15, fontWeight: '600' },
+  biometricBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: radius.md, padding: 13, minHeight: 48, borderWidth: 1, marginTop: 10 },
+  biometricText: { fontSize: 14, fontWeight: '600' },
   footer: { flexDirection: 'row', justifyContent: 'center', marginTop: 24, marginBottom: 8 },
   footerText: { color: colors.muted, fontSize: 14 },
   footerLink: { color: '#7c3aed', fontSize: 14, fontWeight: '700' },

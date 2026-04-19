@@ -9,6 +9,8 @@ import { Ionicons } from '@expo/vector-icons';
 import api from '../api/axios';
 import { useTheme } from '../context/ThemeContext';
 import { colors, radius } from '../theme';
+import Toast from '../components/Toast';
+import useToast from '../hooks/useToast';
 
 const CATEGORIES = [
   { key: 'food', label: 'Food', icon: '🍔', color: '#f59e0b' },
@@ -24,6 +26,7 @@ const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
 
 export default function FamilyBudgetScreen({ navigation }) {
   const { theme, isDark } = useTheme();
+  const { toast, hide, success, error, info } = useToast();
   const today = new Date();
   const [month, setMonth] = useState(today.getMonth() + 1);
   const [year, setYear] = useState(today.getFullYear());
@@ -44,7 +47,7 @@ export default function FamilyBudgetScreen({ navigation }) {
   useEffect(() => { fetchBudget(); }, [fetchBudget]);
 
   const saveEntry = async () => {
-    if (!form.title.trim() || !form.amount) return Alert.alert('Title and amount required');
+    if (!form.title.trim() || !form.amount) return info('Please enter a title and amount');
     setSaving(true);
     try {
       const res = await api.post('/extras/budget', { ...form, amount: parseFloat(form.amount) });
@@ -57,7 +60,7 @@ export default function FamilyBudgetScreen({ navigation }) {
       }));
       setShowAdd(false);
       setForm({ title: '', amount: '', category: 'other', entry_type: 'expense', notes: '' });
-    } catch {} finally { setSaving(false); }
+    } catch { error('Failed to save entry. Try again.'); }finally { setSaving(false); }
   };
 
   const deleteEntry = (entry) => {
@@ -85,6 +88,7 @@ export default function FamilyBudgetScreen({ navigation }) {
 
   return (
     <View style={[s.container, { backgroundColor: theme.bg }]}>
+      <Toast visible={toast.visible} type={toast.type} message={toast.message} onHide={hide} />
       <LinearGradient colors={isDark ? ['#0f172a', '#1a0f2e', '#0f172a'] : [theme.bg, theme.bgSecondary, theme.bg]} style={StyleSheet.absoluteFill} />
       <View style={[s.header, { borderBottomColor: theme.border }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}><Ionicons name="arrow-back" size={24} color={theme.text} /></TouchableOpacity>

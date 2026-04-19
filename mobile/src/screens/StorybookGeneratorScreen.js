@@ -15,9 +15,12 @@ import { useAuth } from "../context/AuthContext";
 import api from "../api/axios";
 import StoryCard from "../components/StoryCard";
 import { colors } from "../theme";
+import Toast from '../components/Toast';
+import useToast from '../hooks/useToast';
 
 export default function StorybookGeneratorScreen({ navigation }) {
   const { user } = useAuth();
+  const { toast, hide, success, error, info } = useToast();
   const [stories, setStories] = useState([]);
   const [selected, setSelected] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -40,17 +43,17 @@ export default function StorybookGeneratorScreen({ navigation }) {
   };
 
   const generateStorybook = async () => {
-    if (selected.length < 3) return Alert.alert("Select at least 3 stories");
+    if (selected.length < 3) return info('Select at least 3 stories to generate a storybook');
     setGenerating(true);
     try {
       const res = await api.post("/storybooks", {
         story_ids: selected,
         title: `Family Memories ${new Date().getFullYear()}`,
       });
-      Alert.alert("Success", "Storybook generated! View in Storybooks.");
+      success('Storybook generated! View it in Storybooks.');
       navigation.goBack();
     } catch (err) {
-      Alert.alert("Error", err.response?.data?.error || "Failed to generate.");
+      error(err.response?.data?.error || 'Failed to generate storybook.');
     } finally {
       setGenerating(false);
     }
@@ -66,6 +69,7 @@ export default function StorybookGeneratorScreen({ navigation }) {
 
   return (
     <View style={s.container}>
+      <Toast visible={toast.visible} type={toast.type} message={toast.message} onHide={hide} />
       <View style={s.header}>
         <Text style={s.title}>Create Storybook</Text>
         <Text style={s.subtitle}>Select stories for your family book</Text>

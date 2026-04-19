@@ -8,10 +8,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radius } from '../theme';
 import { multipartPost, buildFileEntry } from '../api/upload';
+import Toast from '../components/Toast';
+import useToast from '../hooks/useToast';
 
 const BAR_COUNT = 32;
 
 export default function VoiceRecorderScreen({ navigation }) {
+  const { toast, hide, success, error, info } = useToast();
   const [recording, setRecording] = useState(null);
   const [recordedUri, setRecordedUri] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
@@ -77,7 +80,7 @@ export default function VoiceRecorderScreen({ navigation }) {
       animateBars();
       startPulse();
     } catch (e) {
-      Alert.alert('Error', 'Could not start recording. Check microphone permissions.');
+      error('Could not start recording. Check microphone permissions.');
     }
   };
 
@@ -121,8 +124,8 @@ export default function VoiceRecorderScreen({ navigation }) {
   };
 
   const handlePost = async () => {
-    if (!form.title.trim()) return Alert.alert('Title Required', 'Give your voice story a title');
-    if (!recordedUri) return Alert.alert('No Recording', 'Record your voice first');
+    if (!form.title.trim()) return info('Give your voice story a title');
+    if (!recordedUri) return info('Record your voice first');
     setPosting(true);
     setStep('posting');
     try {
@@ -135,7 +138,7 @@ export default function VoiceRecorderScreen({ navigation }) {
       const data = await multipartPost('/stories/', fd);
       navigation.replace('AIProcessing', { storyId: data.story?.id });
     } catch (err) {
-      Alert.alert('Post Failed', err.message || 'Network error');
+      error(err.message || 'Network error. Try again.');
       setStep('details');
     } finally {
       setPosting(false);
@@ -146,6 +149,7 @@ export default function VoiceRecorderScreen({ navigation }) {
 
   return (
     <KeyboardAvoidingView style={s.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <Toast visible={toast.visible} type={toast.type} message={toast.message} onHide={hide} />
       <LinearGradient colors={['#0f172a', '#1a0a2e', '#0f172a']} style={StyleSheet.absoluteFill} />
 
       {/* Header */}

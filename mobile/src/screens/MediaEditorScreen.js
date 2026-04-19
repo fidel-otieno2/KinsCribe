@@ -10,6 +10,8 @@ import { Audio } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, radius } from '../theme';
+import Toast from '../components/Toast';
+import useToast from '../hooks/useToast';
 import { multipartPost, buildFileEntry } from '../api/upload';
 
 // ── Curated music library ─────────────────────────────────────────────────────
@@ -260,6 +262,7 @@ const lp = StyleSheet.create({
 // ── Main MediaEditorScreen ────────────────────────────────────────────────────
 export default function MediaEditorScreen({ route, navigation }) {
   const { mediaFile, mediaType } = route.params;
+  const { toast, hide, success, error, info } = useToast();
 
   const videoRef = useRef(null);
   const [title, setTitle] = useState('');
@@ -284,7 +287,7 @@ export default function MediaEditorScreen({ route, navigation }) {
   }, [uploadProgress]);
 
   const handlePost = async () => {
-    if (!title.trim()) return Alert.alert('Title Required', 'Give your story a title');
+    if (!title.trim()) return info('Give your story a title');
 
     setLoading(true);
     setUploadProgress(10);
@@ -314,7 +317,7 @@ export default function MediaEditorScreen({ route, navigation }) {
         navigation.navigate('AIProcessing', { storyId: data.story?.id });
       }, 400);
     } catch (err) {
-      Alert.alert('Upload Failed', err.message || 'Something went wrong. Try again.');
+      error(err.message || 'Something went wrong. Try again.');
       setUploadProgress(0);
     } finally {
       setLoading(false);
@@ -329,6 +332,7 @@ export default function MediaEditorScreen({ route, navigation }) {
 
   return (
     <View style={s.container}>
+      <Toast visible={toast.visible} type={toast.type} message={toast.message} onHide={hide} />
       <LinearGradient colors={['#0f172a', '#1e1040', '#0f172a']} style={StyleSheet.absoluteFill} />
 
       {/* Header */}
@@ -403,7 +407,7 @@ export default function MediaEditorScreen({ route, navigation }) {
               <Text style={[s.pillText, location && { color: '#fff' }]}>{location || 'Add Location'}</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={s.pill} onPress={() => Alert.alert('AI Caption', 'AI will auto-generate a caption after posting!')}>
+            <TouchableOpacity style={s.pill} onPress={() => info('AI will auto-generate a caption after posting!')}>
               <Ionicons name="sparkles" size={16} color={colors.muted} />
               <Text style={s.pillText}>AI Enhance</Text>
             </TouchableOpacity>

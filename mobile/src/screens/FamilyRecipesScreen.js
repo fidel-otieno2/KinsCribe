@@ -10,6 +10,8 @@ import * as ImagePicker from 'expo-image-picker';
 import api from '../api/axios';
 import { useTheme } from '../context/ThemeContext';
 import { colors, radius } from '../theme';
+import Toast from '../components/Toast';
+import useToast from '../hooks/useToast';
 
 const CATEGORIES = [
   { key: 'all', label: 'All', icon: '🍽️' },
@@ -58,6 +60,7 @@ const rc = StyleSheet.create({
 
 export default function FamilyRecipesScreen({ navigation }) {
   const { theme, isDark } = useTheme();
+  const { toast, hide, success, error, info } = useToast();
   const [recipes, setRecipes] = useState([]);
   const [category, setCategory] = useState('all');
   const [loading, setLoading] = useState(true);
@@ -86,7 +89,7 @@ export default function FamilyRecipesScreen({ navigation }) {
   };
 
   const saveRecipe = async () => {
-    if (!form.title.trim()) return Alert.alert('Title required');
+    if (!form.title.trim()) return info('Please add a recipe title');
     setSaving(true);
     try {
       const filteredIngredients = ingredients.filter(i => i.trim());
@@ -116,7 +119,7 @@ export default function FamilyRecipesScreen({ navigation }) {
       setIngredients(['']);
       setImageUri(null);
     } catch (err) {
-      Alert.alert('Error', err.response?.data?.error || err.message || 'Failed to save');
+      error(err.response?.data?.error || err.message || 'Failed to save recipe');
     } finally { setSaving(false); }
   };
 
@@ -166,6 +169,7 @@ export default function FamilyRecipesScreen({ navigation }) {
 
   return (
     <View style={[s.container, { backgroundColor: theme.bg }]}>
+      <Toast visible={toast.visible} type={toast.type} message={toast.message} onHide={hide} />
       <LinearGradient colors={isDark ? ['#0f172a', '#1a0f2e', '#0f172a'] : [theme.bg, theme.bgSecondary, theme.bg]} style={StyleSheet.absoluteFill} />
       <View style={[s.header, { borderBottomColor: theme.border }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}><Ionicons name="arrow-back" size={24} color={theme.text} /></TouchableOpacity>

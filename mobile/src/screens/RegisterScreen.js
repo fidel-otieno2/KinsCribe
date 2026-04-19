@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, KeyboardAvoidingView, Platform,
@@ -30,8 +30,30 @@ export default function RegisterScreen({ navigation }) {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPass, setShowPass] = useState(false);
+  const [usernameStatus, setUsernameStatus] = useState(null); // null | 'checking' | 'available' | 'taken' | 'invalid'
 
-  const set = key => val => setForm(f => ({ ...f, [key]: val }));
+  const set = key => val => {
+    setForm(f => ({ ...f, [key]: val }));
+    if (key === 'username') checkUsername(val);
+  };
+
+  const checkUsername = useCallback(
+    debounce(async (val) => {
+      const clean = val.toLowerCase().replace(/\s/g, '');
+      if (clean.length < 3) { setUsernameStatus(null); return; }
+      setUsernameStatus('checking');
+      try {
+        const { data } = await api.get(`/auth/username/check?username=${clean}`);
+        setUsernameStatus(data.available ? 'available' : 'taken');
+      } catch { setUsernameStatus(null); }
+    }, 600),
+    []
+  );
+
+  function debounce(fn, delay) {
+    let timer;
+    return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), delay); };
+  }
 
   const [request, response, promptAsync] = Google.useAuthRequest({
     androidClientId: '474767363654-6knta78fh5ibd8q0a6894o8euqrs90js.apps.googleusercontent.com',

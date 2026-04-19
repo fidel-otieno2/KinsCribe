@@ -12,6 +12,8 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import api from '../api/axios';
 import { colors, radius } from '../theme';
+import Toast from '../components/Toast';
+import useToast from '../hooks/useToast';
 
 const th = StyleSheet.create({
   themeRow: { flexDirection: 'row', gap: 6 },
@@ -66,6 +68,7 @@ function Divider() {
 export default function SettingsScreen({ navigation }) {
   const { user, refreshUser, logout } = useAuth();
   const { theme, mode, setThemeMode, isDark } = useTheme();
+  const { toast, hide, success, error } = useToast();
   const [name, setName] = useState(user?.name || '');
   const [bio, setBio] = useState(user?.bio || '');
   const [username, setUsername] = useState(user?.username || '');
@@ -91,9 +94,9 @@ export default function SettingsScreen({ navigation }) {
       await api.put('/auth/profile', { name, bio, username });
       await refreshUser();
       setEditMode(false);
-      Alert.alert('✅ Saved', 'Profile updated successfully');
+      success('Profile updated successfully');
     } catch (err) {
-      Alert.alert('Error', err.response?.data?.error || 'Failed to save');
+      error(err.response?.data?.error || 'Failed to save');
     } finally { setSaving(false); }
   };
 
@@ -116,9 +119,9 @@ export default function SettingsScreen({ navigation }) {
         const json = await res.json();
         if (!res.ok) throw new Error(json.error);
         await refreshUser();
-        Alert.alert('✅ Updated', 'Profile photo updated');
+        success('Profile photo updated');
       } catch (err) {
-        Alert.alert('Error', err.message);
+        error(err.message);
       } finally { setUploading(false); }
     }
   };
@@ -137,13 +140,14 @@ export default function SettingsScreen({ navigation }) {
         try {
           await api.delete('/auth/account');
           logout();
-        } catch { Alert.alert('Error', 'Could not delete account. Contact support.'); }
+        } catch { error('Could not delete account. Contact support.'); }
       }},
     ]
   );
 
   return (
     <View style={[s.container, { backgroundColor: theme.bg }]}>
+      <Toast visible={toast.visible} type={toast.type} message={toast.message} onHide={hide} />
       <LinearGradient colors={isDark ? ['#1C1A14', '#2A2720', '#1C1A14'] : ['#F5F0E8', '#EDE6D6', '#F5F0E8']} style={StyleSheet.absoluteFill} />
 
       <View style={s.header}>
@@ -206,7 +210,7 @@ export default function SettingsScreen({ navigation }) {
           <Row icon="key-outline" label="Change Password" onPress={() => Alert.alert('Reset Password', 'A reset link will be sent to your email', [
             { text: 'Cancel', style: 'cancel' },
             { text: 'Send', onPress: async () => {
-              try { await api.post('/auth/forgot-password', { email: user?.email }); Alert.alert('✅ Sent', 'Check your email'); } catch {}
+              try { await api.post('/auth/forgot-password', { email: user?.email }); success('Reset link sent — check your email'); } catch { error('Failed to send reset link'); }
             }},
           ])} />
           <Divider />

@@ -90,6 +90,9 @@ def _run_migrations():
         "ALTER TABLE stories ADD COLUMN IF NOT EXISTS story_date DATE",
         "ALTER TABLE stories ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW()",
         "ALTER TABLE stories ADD COLUMN IF NOT EXISTS repost_count INTEGER DEFAULT 0",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS website VARCHAR(200)",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS interests VARCHAR(500)",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_private BOOLEAN DEFAULT FALSE",
     ]
 
     try:

@@ -14,6 +14,9 @@ class User(db.Model):
     verification_token = db.Column(db.String(200), nullable=True)
     avatar_url = db.Column(db.String(300), nullable=True)
     bio = db.Column(db.String(300), nullable=True)
+    website = db.Column(db.String(200), nullable=True)
+    interests = db.Column(db.String(500), nullable=True)
+    is_private = db.Column(db.Boolean, default=False)
     google_id = db.Column(db.String(200), nullable=True, unique=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -38,6 +41,9 @@ class User(db.Model):
             "is_verified": self.is_verified,
             "avatar_url": self.avatar_url,
             "bio": self.bio,
+            "website": self.website,
+            "interests": self.interests.split(',') if self.interests else [],
+            "is_private": self.is_private,
             "family_id": self.family_id,
             "connection_count": connection_count,
             "interest_count": interest_count,

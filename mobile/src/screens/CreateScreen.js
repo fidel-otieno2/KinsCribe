@@ -11,6 +11,8 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import api from '../api/axios';
 import { colors, radius } from '../theme';
+import Toast from '../components/Toast';
+import useToast from '../hooks/useToast';
 
 const { width } = Dimensions.get('window');
 
@@ -29,6 +31,7 @@ const PRIVACY_OPTS = [
 export default function CreateScreen({ navigation }) {
   const { user } = useAuth();
   const { theme, isDark } = useTheme();
+  const { toast, hide, success, error, info } = useToast();
   const [mode, setMode] = useState('post');
   const [mediaFiles, setMediaFiles] = useState([]); // [{uri, type}]
   const [caption, setCaption] = useState('');
@@ -49,7 +52,7 @@ export default function CreateScreen({ navigation }) {
 
   const pickMedia = useCallback(async (allowMultiple = false) => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) return Alert.alert('Permission Required');
+    if (!perm.granted) return info('Allow photo access in your device settings');
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.All,
       allowsMultipleSelection: allowMultiple,
@@ -68,7 +71,7 @@ export default function CreateScreen({ navigation }) {
 
   const takePhoto = useCallback(async () => {
     const perm = await ImagePicker.requestCameraPermissionsAsync();
-    if (!perm.granted) return Alert.alert('Permission Required');
+    if (!perm.granted) return info('Allow camera access in your device settings');
     const result = await ImagePicker.launchCameraAsync({ quality: 0.9 });
     if (!result.canceled) {
       const a = result.assets?.[0] || result;
@@ -80,7 +83,7 @@ export default function CreateScreen({ navigation }) {
 
   const handlePost = async () => {
     if (mode === 'family') {
-      if (!familyTitle.trim()) return Alert.alert('Title required');
+      if (!familyTitle.trim()) return info('Please add a title for your story');
       setLoading(true);
       try {
         const formData = new FormData();
@@ -95,7 +98,7 @@ export default function CreateScreen({ navigation }) {
         setFamilyTitle(''); setFamilyContent(''); setMediaFiles([]);
         navigation.navigate('AIProcessing', { storyId: data.story?.id });
       } catch (err) {
-        Alert.alert('Failed', err.response?.data?.error || 'Try again');
+        error(err.response?.data?.error || 'Failed to post story. Try again.');
       } finally { setLoading(false); }
       return;
     }
@@ -112,16 +115,16 @@ export default function CreateScreen({ navigation }) {
         }
         await api.post('/pstories/', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
         setMediaFiles([]); setTextContent('');
-        Alert.alert('✅ Story posted!', 'Your story will disappear in 24 hours');
+        success('Story posted! It will disappear in 24 hours');
         navigation.navigate('Feed');
       } catch (err) {
-        Alert.alert('Failed', err.response?.data?.error || 'Try again');
+        error(err.response?.data?.error || 'Failed to post story. Try again.');
       } finally { setLoading(false); }
       return;
     }
 
     // Post mode
-    if (!caption.trim() && mediaFiles.length === 0) return Alert.alert('Add a caption or media');
+    if (!caption.trim() && mediaFiles.length === 0) return info('Add a caption or pick some media');
     setLoading(true);
     try {
       const formData = new FormData();
@@ -140,12 +143,13 @@ export default function CreateScreen({ navigation }) {
       setCaption(''); setMediaFiles([]); setLocation(''); setHashtags('');
       navigation.navigate('Feed');
     } catch (err) {
-      Alert.alert('Failed', err.response?.data?.error || 'Try again');
+      error(err.response?.data?.error || 'Failed to post. Try again.');
     } finally { setLoading(false); }
   };
 
   return (
     <KeyboardAvoidingView style={[s.container, { backgroundColor: theme.bg }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <Toast visible={toast.visible} type={toast.type} message={toast.message} onHide={hide} />
       <LinearGradient colors={isDark ? ['#0f172a', '#1e1040', '#0f172a'] : [theme.bg, theme.bgSecondary, theme.bg]} style={StyleSheet.absoluteFill} />
 
       <View style={[s.header, { borderBottomColor: theme.border }]}>

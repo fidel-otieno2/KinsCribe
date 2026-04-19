@@ -248,6 +248,17 @@ def upload_avatar():
     return jsonify({"avatar_url": user.avatar_url, "user": user.to_dict()})
 
 
+@auth_bp.route("/username/check", methods=["GET"])
+def check_username():
+    username = request.args.get("username", "").strip().lower()
+    if not username or len(username) < 3:
+        return jsonify({"available": False, "error": "Too short"})
+    if not username.replace('_', '').replace('.', '').isalnum():
+        return jsonify({"available": False, "error": "Only letters, numbers, _ and . allowed"})
+    exists = User.query.filter_by(username=username).first()
+    return jsonify({"available": not exists})
+
+
 @auth_bp.route("/profile", methods=["PUT"])
 @jwt_required()
 def update_profile():
@@ -262,6 +273,12 @@ def update_profile():
         if existing and existing.id != user.id:
             return jsonify({"error": "Username already taken"}), 409
         user.username = data["username"].strip().lower()
+    if "website" in data:
+        user.website = data.get("website", "")
+    if "interests" in data:
+        user.interests = data.get("interests", "")
+    if "is_private" in data:
+        user.is_private = bool(data["is_private"])
     db.session.commit()
     return jsonify({"user": user.to_dict()})
 
