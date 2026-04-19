@@ -66,23 +66,23 @@ export function PhoneModal({ visible, onClose, onSuccess }) {
       setStep('otp');
       startCooldown();
       
-      // Handle SMS response
-      if (data.sms_sent) {
-        console.log('✅ SMS sent successfully to', phone);
-        // SMS was sent successfully - no need to show OTP
+      // Handle email response
+      if (data.email_sent) {
+        console.log('✅ Email sent successfully');
+        // Email was sent successfully
       } else {
-        // SMS failed, show OTP as fallback
-        console.log('⚠️ SMS failed, showing OTP:', data.otp);
+        // Email failed, show OTP as fallback
+        console.log('⚠️ Email failed, showing OTP:', data.otp);
         if (data.otp) {
           Alert.alert(
-            'SMS Service Unavailable', 
-            `SMS couldn't be sent. Your verification code is: ${data.otp}\n\nPlease enter this code to continue.`, 
+            'Email Service Unavailable', 
+            `Email couldn't be sent. Your verification code is: ${data.otp}\n\nPlease enter this code to continue.`, 
             [{ text: 'OK' }]
           );
         }
       }
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to send OTP. Please try again.');
+      setError(err.response?.data?.error || 'Failed to send verification code. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -164,8 +164,8 @@ export function PhoneModal({ visible, onClose, onSuccess }) {
             </Text>
             <Text style={s.sub}>
               {step === 'phone'
-                ? "Add your phone number for enhanced security and login options."
-                : `We sent a 6-digit code to ${phone}`}
+                ? "Add your phone number for enhanced security. We'll send a verification code to your email."
+                : `We sent a 6-digit code to your email`}
             </Text>
 
             {error ? (

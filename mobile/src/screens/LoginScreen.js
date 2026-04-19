@@ -49,6 +49,8 @@ function PhoneLoginModal({ visible, onClose }) {
   const { login } = useAuth();
   const [step, setStep] = useState('phone'); // phone | otp
   const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
+  const [name, setName] = useState('');
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -59,6 +61,8 @@ function PhoneLoginModal({ visible, onClose }) {
   const reset = () => {
     setStep('phone');
     setPhone('');
+    setEmail('');
+    setName('');
     setOtp(['', '', '', '', '', '']);
     setError('');
     setResendCooldown(0);
@@ -72,15 +76,6 @@ function PhoneLoginModal({ visible, onClose }) {
     onClose();
   };
 
-  const formatPhoneNumber = (value) => {
-    const cleaned = value.replace(/\D/g, '');
-    const match = cleaned.match(/^(\d{0,3})(\d{0,3})(\d{0,4})$/);
-    if (match) {
-      return !match[2] ? match[1] : `(${match[1]}) ${match[2]}${match[3] ? `-${match[3]}` : ''}`;
-    }
-    return value;
-  };
-
   const sendOTP = async () => {
     if (!phone.trim()) {
       setError('Please enter your phone number');
@@ -92,31 +87,45 @@ function PhoneLoginModal({ visible, onClose }) {
       return;
     }
 
+    if (!email.trim()) {
+      setError('Please enter your email address');
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
     setError('');
     setLoading(true);
 
     try {
-      const { data } = await api.post('/auth/phone/send-otp', { phone });
+      const { data } = await api.post('/auth/phone/send-otp', { 
+        phone, 
+        email: email.trim().toLowerCase() 
+      });
       setStep('otp');
       startCooldown();
       
-      // Handle SMS response
-      if (data.sms_sent) {
-        console.log('✅ SMS sent successfully to', phone);
-        // SMS was sent successfully - no need to show OTP
+      // Handle email response
+      if (data.email_sent) {
+        console.log('✅ Email sent successfully to', email);
+        // Email was sent successfully
       } else {
-        // SMS failed, show OTP as fallback
-        console.log('⚠️ SMS failed, showing OTP:', data.otp);
+        // Email failed, show OTP as fallback
+        console.log('⚠️ Email failed, showing OTP:', data.otp);
         if (data.otp) {
           Alert.alert(
-            'SMS Service Unavailable', 
-            `SMS couldn't be sent. Your verification code is: ${data.otp}\n\nPlease enter this code to continue.`, 
+            'Email Service Unavailable', 
+            `Email couldn't be sent. Your verification code is: ${data.otp}\n\nPlease enter this code to continue.`, 
             [{ text: 'OK' }]
           );
         }
       }
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to send OTP. Please try again.');
+      setError(err.response?.data?.error || 'Failed to send verification code. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -163,7 +172,9 @@ function PhoneLoginModal({ visible, onClose }) {
     try {
       const { data } = await api.post('/auth/phone/verify-otp', {
         phone,
-        otp: code
+        email: email.trim().toLowerCase(),
+        otp: code,
+        name: name.trim() || 'Phone User'
       });
 
       await AsyncStorage.setItem('access_token', data.access_token);
@@ -209,8 +220,8 @@ function PhoneLoginModal({ visible, onClose }) {
             </Text>
             <Text style={pl.sub}>
               {step === 'phone'
-                ? "Enter your phone number and we'll send you a verification code."
-                : `We sent a 6-digit code to ${phone}`}
+                ? "Enter your phone number and email. We'll send you a verification code via email."
+                : `We sent a 6-digit code to ${email}`}
             </Text>
 
             {error ? (
@@ -229,6 +240,33 @@ function PhoneLoginModal({ visible, onClose }) {
                   placeholder="Enter phone number"
                   style={{ marginBottom: 16 }}
                 />
+                
+                <Text style={pl.label}>Email Address</Text>
+                <View style={pl.inputWrap}>
+                  <Ionicons name="mail-outline" size={17} color={theme.muted} />
+                  <TextInput
+                    style={[pl.input, { color: theme.text }]}
+                    placeholder="you@example.com"
+                    placeholderTextColor={theme.dim}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    value={email}
+                    onChangeText={v => { setEmail(v); setError(''); }}
+                  />
+                </View>
+                
+                <Text style={pl.label}>Name (Optional)</Text>
+                <View style={pl.inputWrap}>
+                  <Ionicons name="person-outline" size={17} color={theme.muted} />
+                  <TextInput
+                    style={[pl.input, { color: theme.text }]}
+                    placeholder="Your name"
+                    placeholderTextColor={theme.dim}
+                    value={name}
+                    onChangeText={v => { setName(v); setError(''); }}
+                  />
+                </View>
+                
                 <TouchableOpacity style={pl.btn} onPress={sendOTP} disabled={loading} activeOpacity={0.85}>
                   <LinearGradient colors={['#7c3aed', '#3b82f6']} style={pl.btnGrad}>
                     {loading
@@ -274,7 +312,7 @@ function PhoneLoginModal({ visible, onClose }) {
                 </TouchableOpacity>
 
                 <TouchableOpacity style={pl.backLink} onPress={() => { setStep('phone'); setError(''); setOtp(['','','','','','']); }}>
-                  <Text style={pl.backLinkText}>← Use a different number</Text>
+                  <Text style={pl.backLinkText}>← Use different details</Text>
                 </TouchableOpacity>
               </>
             )}
