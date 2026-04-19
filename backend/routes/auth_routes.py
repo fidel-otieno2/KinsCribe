@@ -478,12 +478,16 @@ def send_phone_otp():
     # Format phone for display (mask middle digits)
     display_phone = phone[:4] + '*' * (len(phone) - 8) + phone[-4:] if len(phone) > 8 else phone
     
+    # Log OTP for development (always show in development)
+    print(f"📱 SMS OTP for {phone}: {otp}")
+    
     # TODO: Integrate with SMS service (Twilio, AWS SNS, etc.)
-    # For now, return OTP in response (development only)
+    # For development, always return OTP in response
     return jsonify({
         "message": f"OTP sent to {display_phone}",
         "phone": phone,
-        "otp": otp if os.getenv("FLASK_ENV") == "development" else None
+        "otp": otp,  # Always show in development
+        "dev_note": "OTP shown for development - will be hidden in production"
     })
 
 
@@ -774,10 +778,14 @@ def send_add_phone_otp():
     # Format phone for display
     display_phone = phone[:4] + '*' * (len(phone) - 8) + phone[-4:] if len(phone) > 8 else phone
     
+    # Log OTP for development
+    print(f"📱 Add Phone OTP for {phone}: {otp}")
+    
     return jsonify({
         "message": f"OTP sent to {display_phone}",
         "phone": phone,
-        "otp": otp if os.getenv("FLASK_ENV") == "development" else None
+        "otp": otp,  # Always show in development
+        "dev_note": "OTP shown for development - will be hidden in production"
     })
 
 

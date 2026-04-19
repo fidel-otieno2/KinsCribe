@@ -102,7 +102,12 @@ function PhoneLoginModal({ visible, onClose }) {
       
       // Show OTP in development
       if (data.otp) {
-        Alert.alert('Development Mode', `OTP: ${data.otp}`, [{ text: 'OK' }]);
+        console.log('📱 Development OTP:', data.otp);
+        Alert.alert(
+          'Development Mode', 
+          `Your OTP code is: ${data.otp}\n\n(This will be sent via SMS in production)`, 
+          [{ text: 'OK' }]
+        );
       }
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to send OTP. Please try again.');
