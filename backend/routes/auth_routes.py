@@ -27,6 +27,8 @@ def _tokens(user):
 
 @auth_bp.route("/register", methods=["POST"])
 def register():
+    import random
+    from datetime import datetime, timedelta
     data = request.json
 
     existing = User.query.filter_by(email=data["email"]).first()
@@ -38,27 +40,110 @@ def register():
     if data.get("username") and User.query.filter_by(username=data.get("username")).first():
         return jsonify({"error": "Username already taken"}), 409
 
-    token = secrets.token_urlsafe(32)
+    otp = str(random.randint(100000, 999999))
+    expiry = (datetime.utcnow() + timedelta(minutes=15)).isoformat()
+
     user = User(
         name=data["name"],
         username=data.get("username"),
         email=data["email"],
         password=bcrypt.generate_password_hash(data["password"]).decode("utf-8"),
-        verification_token=token
+        verification_token=f"otp:{otp}:{expiry}",
+        is_verified=False
     )
     db.session.add(user)
     db.session.commit()
 
     try:
         msg = Message("Verify your KinsCribe account", recipients=[user.email])
-        msg.body = f"Click to verify: http://localhost:3000/verify/{token}"
+        msg.html = f"""
+        <div style="font-family:sans-serif;max-width:480px;margin:auto;background:#0f172a;color:#f1f5f9;padding:32px;border-radius:16px">
+          <h2 style="color:#7c3aed;margin-bottom:4px">KinsCribe</h2>
+          <p style="color:#94a3b8;margin-top:0">Email Verification</p>
+          <hr style="border-color:#1e293b;margin:20px 0">
+          <p>Hi <strong>{user.name}</strong>, welcome to KinsCribe!</p>
+          <p>Use the code below to verify your email. It expires in <strong>15 minutes</strong>.</p>
+          <div style="background:#1e293b;border-radius:12px;padding:24px;text-align:center;margin:24px 0">
+            <span style="font-size:40px;font-weight:900;letter-spacing:12px;color:#7c3aed">{otp}</span>
+          </div>
+          <p style="color:#94a3b8;font-size:13px">If you didn't create this account, ignore this email.</p>
+        </div>
+        """
         mail.send(msg)
-        return jsonify({"message": "Registered. Check your email to verify."}), 201
+        return jsonify({"message": "OTP sent to your email.", "requires_otp": True, "email": user.email}), 201
     except Exception:
-        # Email not configured — still allow registration, mark verified for dev
+        # Email not configured — auto-verify
         user.is_verified = True
+        user.verification_token = None
         db.session.commit()
-        return jsonify({"message": "Registered successfully."}), 201
+        tokens = _tokens(user)
+        return jsonify({**tokens, "message": "Registered successfully.", "requires_otp": False}), 201
+
+
+@auth_bp.route("/verify-otp", methods=["POST"])
+def verify_otp():
+    from datetime import datetime
+    data = request.json or {}
+    email = data.get("email", "").strip().lower()
+    otp = data.get("otp", "").strip()
+
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        return jsonify({"error": "Account not found"}), 404
+
+    if user.is_verified:
+        return jsonify({**_tokens(user), "already_verified": True})
+
+    token = user.verification_token or ""
+    if not token.startswith("otp:"):
+        return jsonify({"error": "No OTP pending for this account"}), 400
+
+    try:
+        _, stored_otp, expiry_str = token.split(":", 2)
+        if stored_otp != otp:
+            return jsonify({"error": "Incorrect code. Please try again."}), 400
+        if datetime.utcnow() > datetime.fromisoformat(expiry_str):
+            return jsonify({"error": "Code has expired. Please register again."}), 400
+    except Exception:
+        return jsonify({"error": "Invalid OTP"}), 400
+
+    user.is_verified = True
+    user.verification_token = None
+    db.session.commit()
+    return jsonify({**_tokens(user), "message": "Email verified successfully!"})
+
+
+@auth_bp.route("/resend-otp", methods=["POST"])
+def resend_otp():
+    import random
+    from datetime import datetime, timedelta
+    data = request.json or {}
+    email = data.get("email", "").strip().lower()
+    user = User.query.filter_by(email=email).first()
+    if not user or user.is_verified:
+        return jsonify({"error": "Account not found or already verified"}), 400
+
+    otp = str(random.randint(100000, 999999))
+    expiry = (datetime.utcnow() + timedelta(minutes=15)).isoformat()
+    user.verification_token = f"otp:{otp}:{expiry}"
+    db.session.commit()
+
+    try:
+        msg = Message("Your new KinsCribe verification code", recipients=[user.email])
+        msg.html = f"""
+        <div style="font-family:sans-serif;max-width:480px;margin:auto;background:#0f172a;color:#f1f5f9;padding:32px;border-radius:16px">
+          <h2 style="color:#7c3aed">KinsCribe</h2>
+          <p>Your new verification code:</p>
+          <div style="background:#1e293b;border-radius:12px;padding:24px;text-align:center;margin:24px 0">
+            <span style="font-size:40px;font-weight:900;letter-spacing:12px;color:#7c3aed">{otp}</span>
+          </div>
+          <p style="color:#94a3b8;font-size:13px">Expires in 15 minutes.</p>
+        </div>
+        """
+        mail.send(msg)
+        return jsonify({"message": "New OTP sent."})
+    except Exception as e:
+        return jsonify({"error": f"Failed to send email: {str(e)}"}), 500
 
 
 @auth_bp.route("/google", methods=["POST"])
