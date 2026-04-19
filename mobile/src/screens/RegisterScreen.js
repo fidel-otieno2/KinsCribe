@@ -51,11 +51,12 @@ export default function RegisterScreen({ navigation }) {
       if (clean.length < 3) { setUsernameStatus(null); return; }
       setUsernameStatus('checking');
       try {
-        const { data } = await api.get(`/auth/username/check?username=${clean}`);
+        const email = form.email.trim().toLowerCase();
+        const { data } = await api.get(`/auth/username/check?username=${clean}&email=${encodeURIComponent(email)}`);
         setUsernameStatus(data.available ? 'available' : 'taken');
       } catch { setUsernameStatus(null); }
     }, 600),
-    []
+    [form.email]
   );
 
   function debounce(fn, delay) {

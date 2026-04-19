@@ -366,13 +366,17 @@ function DiscoverStep({ onDone }) {
 // ── Main Wizard ───────────────────────────────────────────────
 export default function SetupProfileScreen({ navigation }) {
   const [step, setStep] = useState(1);
+  const { refreshUser } = useAuth();
 
   const next = () => {
     if (step < STEPS.length) setStep(s => s + 1);
-    else navigation.replace('FamilyGate');
+    else done();
   };
 
-  const done = () => navigation.replace('FamilyGate');
+  const done = async () => {
+    await refreshUser().catch(() => {});
+    navigation.replace('FamilyGate');
+  };
 
   return (
     <View style={s.container}>

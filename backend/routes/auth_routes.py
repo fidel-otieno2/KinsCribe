@@ -29,25 +29,54 @@ def _tokens(user):
 def register():
     import random
     from datetime import datetime, timedelta
-    data = request.json
+    data = request.json or {}
 
-    existing = User.query.filter_by(email=data["email"]).first()
-    if existing:
-        if existing.google_id and not existing.password:
+    email = data.get("email", "").strip().lower()
+    username = data.get("username", "").strip().lower()
+    name = data.get("name", "").strip()
+    password = data.get("password", "")
+
+    if not email or not username or not name or not password:
+        return jsonify({"error": "All fields are required"}), 400
+    if len(password) < 6:
+        return jsonify({"error": "Password must be at least 6 characters"}), 400
+
+    # Same email cannot be registered twice
+    existing_email = User.query.filter_by(email=email).first()
+    if existing_email:
+        if existing_email.google_id and not existing_email.password:
             return jsonify({"error": "This email is linked to a Google account. Please sign in with Google."}), 409
-        return jsonify({"error": "Email already registered"}), 409
+        # If unverified, resend OTP instead of blocking
+        if not existing_email.is_verified:
+            otp = str(random.randint(100000, 999999))
+            expiry = (datetime.utcnow() + timedelta(minutes=15)).isoformat()
+            existing_email.verification_token = f"otp:{otp}:{expiry}"
+            db.session.commit()
+            try:
+                msg = Message("Verify your KinsCribe account", recipients=[email])
+                msg.html = _otp_email_html(existing_email.name, otp)
+                mail.send(msg)
+                return jsonify({"message": "OTP resent to your email.", "requires_otp": True, "email": email}), 200
+            except Exception:
+                existing_email.is_verified = True
+                existing_email.verification_token = None
+                db.session.commit()
+                return jsonify({**_tokens(existing_email), "requires_otp": False}), 200
+        return jsonify({"error": "This email is already registered. Please sign in."}), 409
 
-    if data.get("username") and User.query.filter_by(username=data.get("username")).first():
-        return jsonify({"error": "Username already taken"}), 409
+    # Same username+email combo cannot exist — but same username on different email is fine
+    existing_username_email = User.query.filter_by(username=username, email=email).first()
+    if existing_username_email:
+        return jsonify({"error": "This username is already taken for this email."}), 409
 
     otp = str(random.randint(100000, 999999))
     expiry = (datetime.utcnow() + timedelta(minutes=15)).isoformat()
 
     user = User(
-        name=data["name"],
-        username=data.get("username"),
-        email=data["email"],
-        password=bcrypt.generate_password_hash(data["password"]).decode("utf-8"),
+        name=name,
+        username=username,
+        email=email,
+        password=bcrypt.generate_password_hash(password).decode("utf-8"),
         verification_token=f"otp:{otp}:{expiry}",
         is_verified=False
     )
@@ -55,29 +84,32 @@ def register():
     db.session.commit()
 
     try:
-        msg = Message("Verify your KinsCribe account", recipients=[user.email])
-        msg.html = f"""
-        <div style="font-family:sans-serif;max-width:480px;margin:auto;background:#0f172a;color:#f1f5f9;padding:32px;border-radius:16px">
-          <h2 style="color:#7c3aed;margin-bottom:4px">KinsCribe</h2>
-          <p style="color:#94a3b8;margin-top:0">Email Verification</p>
-          <hr style="border-color:#1e293b;margin:20px 0">
-          <p>Hi <strong>{user.name}</strong>, welcome to KinsCribe!</p>
-          <p>Use the code below to verify your email. It expires in <strong>15 minutes</strong>.</p>
-          <div style="background:#1e293b;border-radius:12px;padding:24px;text-align:center;margin:24px 0">
-            <span style="font-size:40px;font-weight:900;letter-spacing:12px;color:#7c3aed">{otp}</span>
-          </div>
-          <p style="color:#94a3b8;font-size:13px">If you didn't create this account, ignore this email.</p>
-        </div>
-        """
+        msg = Message("Verify your KinsCribe account", recipients=[email])
+        msg.html = _otp_email_html(name, otp)
         mail.send(msg)
-        return jsonify({"message": "OTP sent to your email.", "requires_otp": True, "email": user.email}), 201
+        return jsonify({"message": "OTP sent to your email.", "requires_otp": True, "email": email}), 201
     except Exception:
-        # Email not configured — auto-verify
+        # Email not configured — auto-verify so user isn't stuck
         user.is_verified = True
         user.verification_token = None
         db.session.commit()
-        tokens = _tokens(user)
-        return jsonify({**tokens, "message": "Registered successfully.", "requires_otp": False}), 201
+        return jsonify({**_tokens(user), "message": "Registered successfully.", "requires_otp": False}), 201
+
+
+def _otp_email_html(name, otp):
+    return f"""
+    <div style="font-family:sans-serif;max-width:480px;margin:auto;background:#0f172a;color:#f1f5f9;padding:32px;border-radius:16px">
+      <h2 style="color:#7c3aed;margin-bottom:4px">KinsCribe</h2>
+      <p style="color:#94a3b8;margin-top:0">Email Verification</p>
+      <hr style="border-color:#1e293b;margin:20px 0">
+      <p>Hi <strong>{name}</strong>, welcome to KinsCribe!</p>
+      <p>Use the code below to verify your email. It expires in <strong>15 minutes</strong>.</p>
+      <div style="background:#1e293b;border-radius:12px;padding:24px;text-align:center;margin:24px 0">
+        <span style="font-size:40px;font-weight:900;letter-spacing:12px;color:#7c3aed">{otp}</span>
+      </div>
+      <p style="color:#94a3b8;font-size:13px">If you didn't create this account, ignore this email.</p>
+    </div>
+    """
 
 
 @auth_bp.route("/verify-otp", methods=["POST"])
@@ -341,11 +373,16 @@ def upload_avatar():
 @auth_bp.route("/username/check", methods=["GET"])
 def check_username():
     username = request.args.get("username", "").strip().lower()
+    email = request.args.get("email", "").strip().lower()
     if not username or len(username) < 3:
         return jsonify({"available": False, "error": "Too short"})
     if not username.replace('_', '').replace('.', '').isalnum():
         return jsonify({"available": False, "error": "Only letters, numbers, _ and . allowed"})
-    exists = User.query.filter_by(username=username).first()
+    # Username is only taken if same username+email combo exists
+    if email:
+        exists = User.query.filter_by(username=username, email=email).first()
+    else:
+        exists = User.query.filter_by(username=username).first()
     return jsonify({"available": not exists})
 
 
