@@ -16,7 +16,7 @@ import api from '../api/axios';
 import { colors, radius } from '../theme';
 import Toast from '../components/Toast';
 import useToast from '../hooks/useToast';
-import { PhoneModal, TwoFactorModal } from '../components/SecurityModals';
+import { PhoneModal, TwoFactorModal, ChangePasswordModal } from '../components/SecurityModals';
 
 const th = StyleSheet.create({
   themeRow: { flexDirection: 'row', gap: 6 },
@@ -83,6 +83,10 @@ export default function SettingsScreen({ navigation }) {
   const [show2FAModal, setShow2FAModal] = useState(false);
   const [showRemovePhoneModal, setShowRemovePhoneModal] = useState(false);
   const [removingPhone, setRemovingPhone] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
 
   // Notification toggles
   const [notifLikes, setNotifLikes] = useState(true);
@@ -208,10 +212,7 @@ export default function SettingsScreen({ navigation }) {
     }
   };
 
-  const handleLogout = () => Alert.alert('Log Out', 'Are you sure?', [
-    { text: 'Cancel', style: 'cancel' },
-    { text: 'Log Out', style: 'destructive', onPress: logout },
-  ]);
+  const handleLogout = () => setShowLogoutModal(true);
 
   const handleDeactivate = () => Alert.alert(
     'Deactivate Account',
@@ -236,19 +237,16 @@ export default function SettingsScreen({ navigation }) {
     ]
   );
 
-  const handleDeleteAccount = () => Alert.alert(
-    'Delete Account',
-    'This will permanently delete your account and all your data. This cannot be undone.',
-    [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: async () => {
-        try {
-          await api.delete('/auth/account');
-          logout();
-        } catch { error('Could not delete account. Contact support.'); }
-      }},
-    ]
-  );
+  const handleDeleteAccount = () => setShowDeleteModal(true);
+
+  const confirmDeleteAccount = async () => {
+    setDeletingAccount(true);
+    try {
+      await api.delete('/auth/account');
+      logout();
+    } catch { error('Could not delete account. Contact support.'); }
+    finally { setDeletingAccount(false); }
+  };
 
   const handleRemovePhone = async () => {
     setRemovingPhone(true);
@@ -342,12 +340,7 @@ export default function SettingsScreen({ navigation }) {
             </>
           )}
           <Divider />
-          <Row icon="key-outline" label="Change Password" onPress={() => Alert.alert('Reset Password', 'A reset link will be sent to your email', [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Send', onPress: async () => {
-              try { await api.post('/auth/forgot-password', { email: user?.email }); success('Reset link sent — check your email'); } catch { error('Failed to send reset link'); }
-            }},
-          ])} />
+          <Row icon="key-outline" label="Change Password" onPress={() => setShowChangePasswordModal(true)} />
           <Divider />
           <Row icon="shield-checkmark-outline" iconColor="#10b981" label="Two-Factor Authentication" onPress={() => setShow2FAModal(true)} />
           <Divider />
@@ -565,6 +558,99 @@ export default function SettingsScreen({ navigation }) {
           </BlurView>
         </View>
       </Modal>
+
+      {/* Logout Confirmation Modal */}
+      <Modal visible={showLogoutModal} transparent animationType="fade" onRequestClose={() => setShowLogoutModal(false)}>
+        <View style={s.modalOverlay}>
+          <BlurView intensity={20} tint="dark" style={s.confirmModal}>
+            <LinearGradient colors={['rgba(248,113,113,0.06)', 'rgba(15,23,42,0.98)']} style={StyleSheet.absoluteFill} />
+            <View style={s.confirmIconWrap}>
+              <LinearGradient colors={['#f87171', '#ef4444']} style={s.confirmIcon}>
+                <Ionicons name="log-out-outline" size={26} color="#fff" />
+              </LinearGradient>
+            </View>
+            <Text style={s.confirmTitle}>Log Out</Text>
+            <Text style={s.confirmSub}>Are you sure you want to log out of your account?</Text>
+            <View style={s.confirmBtns}>
+              <TouchableOpacity style={s.confirmCancelBtn} onPress={() => setShowLogoutModal(false)} activeOpacity={0.8}>
+                <Text style={s.confirmCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.confirmRemoveBtn} onPress={logout} activeOpacity={0.8}>
+                <LinearGradient colors={['#f87171', '#ef4444']} style={s.confirmRemoveBtnGrad}>
+                  <Text style={s.confirmRemoveText}>Log Out</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </BlurView>
+        </View>
+      </Modal>
+
+      {/* Logout Confirmation Modal */}
+      <Modal visible={showLogoutModal} transparent animationType="fade" onRequestClose={() => setShowLogoutModal(false)}>
+        <View style={s.modalOverlay}>
+          <BlurView intensity={20} tint="dark" style={s.confirmModal}>
+            <LinearGradient colors={['rgba(248,113,113,0.06)', 'rgba(15,23,42,0.98)']} style={StyleSheet.absoluteFill} />
+            <View style={s.confirmIconWrap}>
+              <LinearGradient colors={['#f87171', '#ef4444']} style={s.confirmIcon}>
+                <Ionicons name="log-out-outline" size={26} color="#fff" />
+              </LinearGradient>
+            </View>
+            <Text style={s.confirmTitle}>Log Out</Text>
+            <Text style={s.confirmSub}>Are you sure you want to log out of your account?</Text>
+            <View style={s.confirmBtns}>
+              <TouchableOpacity style={s.confirmCancelBtn} onPress={() => setShowLogoutModal(false)} activeOpacity={0.8}>
+                <Text style={s.confirmCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.confirmRemoveBtn} onPress={logout} activeOpacity={0.8}>
+                <LinearGradient colors={['#f87171', '#ef4444']} style={s.confirmRemoveBtnGrad}>
+                  <Text style={s.confirmRemoveText}>Log Out</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </BlurView>
+        </View>
+      </Modal>
+
+      {/* Delete Account Confirmation Modal */}
+      <Modal visible={showDeleteModal} transparent animationType="fade" onRequestClose={() => setShowDeleteModal(false)}>
+        <View style={s.modalOverlay}>
+          <BlurView intensity={20} tint="dark" style={s.confirmModal}>
+            <LinearGradient colors={['rgba(248,113,113,0.08)', 'rgba(15,23,42,0.98)']} style={StyleSheet.absoluteFill} />
+            <View style={s.confirmIconWrap}>
+              <LinearGradient colors={['#f87171', '#ef4444']} style={s.confirmIcon}>
+                <Ionicons name="warning-outline" size={26} color="#fff" />
+              </LinearGradient>
+            </View>
+            <Text style={s.confirmTitle}>Delete Account</Text>
+            <Text style={s.confirmSub}>
+              This will permanently delete your account and all your data.{`\n\n`}
+              <Text style={{ color: '#f87171', fontWeight: '700' }}>This cannot be undone.</Text>
+            </Text>
+            <View style={s.confirmBtns}>
+              <TouchableOpacity style={s.confirmCancelBtn} onPress={() => setShowDeleteModal(false)} activeOpacity={0.8}>
+                <Text style={s.confirmCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.confirmRemoveBtn} onPress={confirmDeleteAccount} disabled={deletingAccount} activeOpacity={0.8}>
+                <LinearGradient colors={['#f87171', '#ef4444']} style={s.confirmRemoveBtnGrad}>
+                  {deletingAccount
+                    ? <ActivityIndicator color="#fff" size="small" />
+                    : <Text style={s.confirmRemoveText}>Delete</Text>}
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </BlurView>
+        </View>
+      </Modal>
+
+      {/* Change Password Modal */}
+      <ChangePasswordModal
+        visible={showChangePasswordModal}
+        onClose={() => setShowChangePasswordModal(false)}
+        userEmail={user?.email}
+        hasPassword={!!user?.password}
+        onSuccess={() => success('Password changed successfully!')}
+      />
+
     </View>
   );
 }

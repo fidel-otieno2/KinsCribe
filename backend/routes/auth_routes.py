@@ -811,6 +811,74 @@ def send_add_phone_otp():
         return jsonify({"message": f"Email service unavailable. OTP: {otp}", "phone": phone, "otp": otp, "email_sent": False, "error": str(e)})
 
 
+@auth_bp.route("/change-password", methods=["POST"])
+@jwt_required()
+def change_password():
+    import random
+    from datetime import datetime, timedelta
+
+    user = User.query.get(int(get_jwt_identity()))
+    data = request.json or {}
+    current_password = data.get("current_password", "")
+    new_password = data.get("new_password", "")
+    otp = data.get("otp", "").strip()
+
+    if len(new_password) < 6:
+        return jsonify({"error": "Password must be at least 6 characters"}), 400
+
+    if user.password:
+        if not current_password:
+            return jsonify({"error": "Current password is required"}), 400
+        if not bcrypt.check_password_hash(user.password, current_password):
+            return jsonify({"error": "Current password is incorrect"}), 401
+
+    # Step 1: No OTP yet — send OTP to email
+    if not otp:
+        code = str(random.randint(100000, 999999))
+        expiry = (datetime.utcnow() + timedelta(minutes=10)).isoformat()
+        user.verification_token = f"pwd_otp:{code}:{expiry}"
+        db.session.commit()
+        try:
+            _send_email(
+                "Confirm Password Change - KinsCribe",
+                [user.email],
+                f"""
+                <div style="font-family:sans-serif;max-width:480px;margin:auto;background:#0f172a;color:#f1f5f9;padding:32px;border-radius:16px">
+                  <h2 style="color:#7c3aed;margin-bottom:4px">KinsCribe</h2>
+                  <p style="color:#94a3b8;margin-top:0">Password Change Verification</p>
+                  <hr style="border-color:#1e293b;margin:20px 0">
+                  <p>Hi <strong>{user.name}</strong>,</p>
+                  <p>Use the code below to confirm your password change. It expires in <strong>10 minutes</strong>.</p>
+                  <div style="background:#1e293b;border-radius:12px;padding:24px;text-align:center;margin:24px 0">
+                    <span style="font-size:40px;font-weight:900;letter-spacing:12px;color:#7c3aed">{code}</span>
+                  </div>
+                  <p style="color:#94a3b8;font-size:13px">If you didn't request this, please ignore this email.</p>
+                </div>
+                """
+            )
+            return jsonify({"message": f"Verification code sent to {user.email}", "otp_sent": True})
+        except Exception as e:
+            return jsonify({"error": f"Failed to send verification email: {str(e)}"}), 500
+
+    # Step 2: OTP provided — verify and change password
+    token = user.verification_token or ""
+    if not token.startswith("pwd_otp:"):
+        return jsonify({"error": "No verification pending. Please request a new code."}), 400
+    try:
+        _, stored_otp, expiry_str = token.split(":", 2)
+        if stored_otp != otp:
+            return jsonify({"error": "Incorrect code. Please try again."}), 400
+        if datetime.utcnow() > datetime.fromisoformat(expiry_str):
+            return jsonify({"error": "Code has expired. Please try again."}), 400
+    except Exception:
+        return jsonify({"error": "Invalid code"}), 400
+
+    user.password = bcrypt.generate_password_hash(new_password).decode("utf-8")
+    user.verification_token = None
+    db.session.commit()
+    return jsonify({"message": "Password changed successfully"})
+
+
 @auth_bp.route("/phone/remove", methods=["POST"])
 @jwt_required()
 def remove_phone():

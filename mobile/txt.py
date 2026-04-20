@@ -10,7 +10,7 @@ User Journey
 # • Land on home feed
 Login Options
 # • Email and password login
-• Phone number login
+# • Phone number login
 # • Google SSO (Sign in with Google)
 # • Apple SSO (Sign in with Apple)
 • Biometric login — Face ID / fingerprint

@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Image } from 'react-native';
+import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Image, ScrollView } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
@@ -168,6 +168,222 @@ export function PhoneModal({ visible, onClose, onSuccess }) {
               </TouchableOpacity>
             )}
           </View>
+        </BlurView>
+      </View>
+    </Modal>
+  );
+}
+
+export function ChangePasswordModal({ visible, onClose, userEmail, hasPassword, onSuccess }) {
+  const [step, setStep] = useState('form'); // form | otp | done
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const inputRefs = useRef([]);
+  const cooldownRef = useRef(null);
+
+  const reset = () => {
+    setStep('form');
+    setCurrentPassword(''); setNewPassword(''); setConfirmPassword('');
+    setOtp(['', '', '', '', '', '']);
+    setError(''); setShowCurrent(false); setShowNew(false); setShowConfirm(false);
+    setResendCooldown(0);
+    if (cooldownRef.current) clearInterval(cooldownRef.current);
+  };
+
+  const handleClose = () => { reset(); onClose(); };
+
+  const startCooldown = () => {
+    setResendCooldown(60);
+    cooldownRef.current = setInterval(() => {
+      setResendCooldown(prev => {
+        if (prev <= 1) { clearInterval(cooldownRef.current); return 0; }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const handleOtpChange = (val, idx) => {
+    if (!/^[0-9]?$/.test(val)) return;
+    const next = [...otp];
+    next[idx] = val;
+    setOtp(next);
+    setError('');
+    if (val && idx < 5) inputRefs.current[idx + 1]?.focus();
+  };
+
+  const handleOtpKeyPress = (e, idx) => {
+    if (e.nativeEvent.key === 'Backspace' && !otp[idx] && idx > 0)
+      inputRefs.current[idx - 1]?.focus();
+  };
+
+  const sendOtp = async () => {
+    if (hasPassword && !currentPassword) { setError('Please enter your current password'); return; }
+    if (newPassword.length < 6) { setError('New password must be at least 6 characters'); return; }
+    if (newPassword !== confirmPassword) { setError('Passwords do not match'); return; }
+    setError(''); setLoading(true);
+    try {
+      await api.post('/auth/change-password', {
+        current_password: currentPassword,
+        new_password: newPassword,
+      });
+      setStep('otp');
+      startCooldown();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to send verification code.');
+    } finally { setLoading(false); }
+  };
+
+  const verifyOtp = async () => {
+    const code = otp.join('');
+    if (code.length < 6) { setError('Please enter the complete 6-digit code'); return; }
+    setError(''); setLoading(true);
+    try {
+      await api.post('/auth/change-password', {
+        current_password: currentPassword,
+        new_password: newPassword,
+        otp: code,
+      });
+      onSuccess?.();
+      setStep('done');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Invalid code. Please try again.');
+    } finally { setLoading(false); }
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose}>
+      <View style={s.overlay}>
+        <BlurView intensity={20} tint="dark" style={s.sheet}>
+          <LinearGradient colors={['rgba(124,58,237,0.1)', 'rgba(15,23,42,0.98)']} style={StyleSheet.absoluteFill} />
+          <View style={s.handle} />
+          <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          <View style={s.inner}>
+            <TouchableOpacity style={s.closeBtn} onPress={handleClose}>
+              <Ionicons name="close" size={22} color={colors.muted} />
+            </TouchableOpacity>
+
+            <View style={s.iconWrap}>
+              <LinearGradient colors={step === 'done' ? ['#10b981', '#059669'] : ['#7c3aed', '#3b82f6']} style={s.iconGrad}>
+                <Ionicons name={step === 'done' ? 'checkmark' : step === 'otp' ? 'keypad-outline' : 'key-outline'} size={26} color="#fff" />
+              </LinearGradient>
+            </View>
+
+            <Text style={s.title}>
+              {step === 'form' ? 'Change Password' : step === 'otp' ? 'Verify Your Email' : 'Password Changed!'}
+            </Text>
+            <Text style={s.sub}>
+              {step === 'form'
+                ? 'Choose a strong password to keep your account secure.'
+                : step === 'otp'
+                ? `We sent a 6-digit code to ${userEmail}. Enter it to confirm your password change.`
+                : 'Your password has been updated successfully.'}
+            </Text>
+
+            {error ? (
+              <View style={s.errorBox}>
+                <Ionicons name="alert-circle" size={14} color="#f87171" />
+                <Text style={s.errorText}>{error}</Text>
+              </View>
+            ) : null}
+
+            {step === 'form' && (
+              <>
+                {hasPassword && (
+                  <>
+                    <Text style={s.label}>Current Password</Text>
+                    <View style={s.inputWrap}>
+                      <Ionicons name="lock-closed-outline" size={17} color={colors.muted} />
+                      <TextInput
+                        style={s.input}
+                        placeholder="Enter current password"
+                        placeholderTextColor={colors.dim}
+                        secureTextEntry={!showCurrent}
+                        value={currentPassword}
+                        onChangeText={v => { setCurrentPassword(v); setError(''); }}
+                      />
+                      <TouchableOpacity onPress={() => setShowCurrent(p => !p)} style={{ padding: 4 }}>
+                        <Ionicons name={showCurrent ? 'eye-off-outline' : 'eye-outline'} size={17} color={colors.muted} />
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                )}
+                <Text style={s.label}>New Password</Text>
+                <View style={s.inputWrap}>
+                  <Ionicons name="lock-open-outline" size={17} color={colors.muted} />
+                  <TextInput
+                    style={s.input}
+                    placeholder="Min. 6 characters"
+                    placeholderTextColor={colors.dim}
+                    secureTextEntry={!showNew}
+                    value={newPassword}
+                    onChangeText={v => { setNewPassword(v); setError(''); }}
+                  />
+                  <TouchableOpacity onPress={() => setShowNew(p => !p)} style={{ padding: 4 }}>
+                    <Ionicons name={showNew ? 'eye-off-outline' : 'eye-outline'} size={17} color={colors.muted} />
+                  </TouchableOpacity>
+                </View>
+                <Text style={s.label}>Confirm New Password</Text>
+                <View style={s.inputWrap}>
+                  <Ionicons name="lock-open-outline" size={17} color={colors.muted} />
+                  <TextInput
+                    style={s.input}
+                    placeholder="Repeat new password"
+                    placeholderTextColor={colors.dim}
+                    secureTextEntry={!showConfirm}
+                    value={confirmPassword}
+                    onChangeText={v => { setConfirmPassword(v); setError(''); }}
+                  />
+                  <TouchableOpacity onPress={() => setShowConfirm(p => !p)} style={{ padding: 4 }}>
+                    <Ionicons name={showConfirm ? 'eye-off-outline' : 'eye-outline'} size={17} color={colors.muted} />
+                  </TouchableOpacity>
+                </View>
+                <GradientButton label="Send Verification Code" onPress={sendOtp} loading={loading} style={{ marginTop: 4 }} />
+              </>
+            )}
+
+            {step === 'otp' && (
+              <>
+                <View style={s.otpRow}>
+                  {otp.map((digit, idx) => (
+                    <TextInput
+                      key={idx}
+                      ref={r => inputRefs.current[idx] = r}
+                      style={[s.otpBox, digit ? s.otpBoxFilled : null]}
+                      value={digit}
+                      onChangeText={v => handleOtpChange(v, idx)}
+                      onKeyPress={e => handleOtpKeyPress(e, idx)}
+                      keyboardType="number-pad"
+                      maxLength={1}
+                      selectTextOnFocus
+                    />
+                  ))}
+                </View>
+                <GradientButton label="Confirm Change" onPress={verifyOtp} loading={loading} style={{ marginTop: 8 }} />
+                <TouchableOpacity style={s.resendBtn} onPress={sendOtp} disabled={resendCooldown > 0}>
+                  <Text style={[s.resendText, { color: resendCooldown > 0 ? colors.dim : '#7c3aed' }]}>
+                    {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Didn't get it? Resend"}
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
+
+            {step === 'done' && (
+              <TouchableOpacity onPress={handleClose} style={s.doneBtn}>
+                <LinearGradient colors={['#10b981', '#059669']} style={s.doneBtnGrad}>
+                  <Text style={s.doneBtnText}>Done</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            )}
+          </View>
+          </ScrollView>
         </BlurView>
       </View>
     </Modal>
