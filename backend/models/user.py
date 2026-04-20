@@ -12,7 +12,7 @@ class User(db.Model):
     password = db.Column(db.String(200), nullable=True)  # nullable for Google OAuth users
     role = db.Column(db.String(20), default="member")  # admin | member | historian
     is_verified = db.Column(db.Boolean, default=False)
-    verification_token = db.Column(db.String(200), nullable=True)
+    verification_token = db.Column(db.String(500), nullable=True)
     avatar_url = db.Column(db.String(300), nullable=True)
     bio = db.Column(db.String(300), nullable=True)
     website = db.Column(db.String(200), nullable=True)
@@ -40,9 +40,13 @@ class User(db.Model):
     post_comments = db.relationship("PostComment", backref="commenter", lazy=True)
 
     def to_dict(self):
-        from models.social import Connection
-        connection_count = Connection.query.filter_by(following_id=self.id).count()
-        interest_count = Connection.query.filter_by(follower_id=self.id).count()
+        try:
+            from models.social import Connection
+            connection_count = Connection.query.filter_by(following_id=self.id).count()
+            interest_count = Connection.query.filter_by(follower_id=self.id).count()
+        except Exception:
+            connection_count = 0
+            interest_count = 0
         return {
             "id": self.id,
             "name": self.name,

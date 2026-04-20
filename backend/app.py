@@ -83,6 +83,7 @@ def _run_migrations():
     migrations = [
         # Drop unique constraint on phone - same phone can be on multiple accounts
         "DROP INDEX IF EXISTS idx_users_phone",
+        "ALTER TABLE users ALTER COLUMN verification_token TYPE VARCHAR(500)",
         # Stories table
         "ALTER TABLE stories ADD COLUMN IF NOT EXISTS music_url VARCHAR(300)",
         "ALTER TABLE stories ADD COLUMN IF NOT EXISTS music_name VARCHAR(200)",
