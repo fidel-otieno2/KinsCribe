@@ -510,7 +510,7 @@ def send_phone_otp():
             is_verified=False
         )
         db.session.add(user)
-    user.verification_token = f"phone_otp:{otp}:{expiry}:{phone}"
+    user.verification_token = f"phone_otp:{otp}:{expiry}"
     db.session.commit()
 
     display_phone = phone[:4] + '*' * (len(phone) - 8) + phone[-4:] if len(phone) > 8 else phone
@@ -561,7 +561,7 @@ def verify_phone_otp():
         return jsonify({"error": "No OTP pending. Please request a new code."}), 400
 
     try:
-        parts = token.split(":")
+        parts = token.split(":", 2)
         stored_otp = parts[1]
         expiry_str = parts[2]
         if stored_otp != otp:
