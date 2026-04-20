@@ -41,6 +41,9 @@ def _send_email(subject, recipients, html):
         raise e
 
 
+
+
+def _tokens(user):
     return {
         "access_token": create_access_token(identity=str(user.id)),
         "refresh_token": create_refresh_token(identity=str(user.id)),
@@ -76,12 +79,12 @@ def register():
             existing_email.verification_token = f"otp:{otp}:{expiry}"
             db.session.commit()
             try:
-        _send_email(
-            "Verify your KinsCribe account",
-            [email],
-            _otp_email_html(existing_email.name, otp)
-        )
-        return jsonify({"message": "OTP resent to your email.", "requires_otp": True, "email": email}), 200
+                _send_email(
+                    "Verify your KinsCribe account",
+                    [email],
+                    _otp_email_html(existing_email.name, otp)
+                )
+                return jsonify({"message": "OTP resent to your email.", "requires_otp": True, "email": email}), 200
             except Exception:
                 existing_email.is_verified = True
                 existing_email.verification_token = None
