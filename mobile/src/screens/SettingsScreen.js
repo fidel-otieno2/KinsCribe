@@ -81,6 +81,8 @@ export default function SettingsScreen({ navigation }) {
   const [biometricEnabled, setBiometricEnabled] = useState(false);
   const [showPhoneModal, setShowPhoneModal] = useState(false);
   const [show2FAModal, setShow2FAModal] = useState(false);
+  const [showRemovePhoneModal, setShowRemovePhoneModal] = useState(false);
+  const [removingPhone, setRemovingPhone] = useState(false);
 
   // Notification toggles
   const [notifLikes, setNotifLikes] = useState(true);
@@ -248,6 +250,17 @@ export default function SettingsScreen({ navigation }) {
     ]
   );
 
+  const handleRemovePhone = async () => {
+    setRemovingPhone(true);
+    try {
+      const { data } = await api.post('/auth/phone/remove');
+      await refreshUser();
+      setShowRemovePhoneModal(false);
+      success('Phone number removed');
+    } catch { error('Failed to remove phone number'); }
+    finally { setRemovingPhone(false); }
+  };
+
   return (
     <View style={[s.container, { backgroundColor: theme.bg }]}>
       <Toast visible={toast.visible} type={toast.type} message={toast.message} onHide={hide} />
@@ -314,9 +327,20 @@ export default function SettingsScreen({ navigation }) {
             icon="phone-portrait-outline" 
             iconColor="#10b981"
             label="Phone Number" 
-            value={user?.phone ? `${user.phone.slice(-4).padStart(user.phone.length, '*')}` : 'Not added'}
+            value={user?.phone ? `••••${user.phone.slice(-4)}` : 'Not added'}
             onPress={() => setShowPhoneModal(true)} 
           />
+          {user?.phone && (
+            <>
+              <Divider />
+              <Row
+                icon="trash-outline"
+                iconColor="#f87171"
+                label="Remove Phone Number"
+                onPress={() => setShowRemovePhoneModal(true)}
+              />
+            </>
+          )}
           <Divider />
           <Row icon="key-outline" label="Change Password" onPress={() => Alert.alert('Reset Password', 'A reset link will be sent to your email', [
             { text: 'Cancel', style: 'cancel' },
@@ -500,6 +524,47 @@ export default function SettingsScreen({ navigation }) {
         onClose={() => setShow2FAModal(false)}
         onSuccess={refreshUser}
       />
+
+      {/* Remove Phone Confirmation Modal */}
+      <Modal visible={showRemovePhoneModal} transparent animationType="fade" onRequestClose={() => setShowRemovePhoneModal(false)}>
+        <View style={s.modalOverlay}>
+          <BlurView intensity={20} tint="dark" style={s.confirmModal}>
+            <LinearGradient colors={['rgba(248,113,113,0.08)', 'rgba(15,23,42,0.98)']} style={StyleSheet.absoluteFill} />
+            <View style={s.confirmIconWrap}>
+              <LinearGradient colors={['#f87171', '#ef4444']} style={s.confirmIcon}>
+                <Ionicons name="trash-outline" size={26} color="#fff" />
+              </LinearGradient>
+            </View>
+            <Text style={s.confirmTitle}>Remove Phone Number</Text>
+            <Text style={s.confirmSub}>
+              Are you sure you want to remove{`\n`}
+              <Text style={{ color: colors.text, fontWeight: '700' }}>{user?.phone}</Text>
+              {`\n`}from your account?
+            </Text>
+            <View style={s.confirmBtns}>
+              <TouchableOpacity
+                style={s.confirmCancelBtn}
+                onPress={() => setShowRemovePhoneModal(false)}
+                activeOpacity={0.8}
+              >
+                <Text style={s.confirmCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={s.confirmRemoveBtn}
+                onPress={handleRemovePhone}
+                disabled={removingPhone}
+                activeOpacity={0.8}
+              >
+                <LinearGradient colors={['#f87171', '#ef4444']} style={s.confirmRemoveBtnGrad}>
+                  {removingPhone
+                    ? <ActivityIndicator color="#fff" size="small" />
+                    : <Text style={s.confirmRemoveText}>Remove</Text>}
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </BlurView>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -537,4 +602,16 @@ const s = StyleSheet.create({
   quietEdit: { color: colors.primary, fontSize: 12, fontWeight: '700' },
   sessionRow: { flexDirection: 'row', alignItems: 'center', padding: 15, gap: 12 },
   revokeBtn: { color: '#f87171', fontSize: 12, fontWeight: '700' },
+  modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.7)', paddingHorizontal: 32 },
+  confirmModal: { width: '100%', borderRadius: 24, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(248,113,113,0.2)', paddingBottom: 24 },
+  confirmIconWrap: { alignItems: 'center', marginTop: 28, marginBottom: 16 },
+  confirmIcon: { width: 64, height: 64, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  confirmTitle: { fontSize: 20, fontWeight: '800', color: colors.text, textAlign: 'center', marginBottom: 10 },
+  confirmSub: { fontSize: 13, color: colors.muted, textAlign: 'center', lineHeight: 20, paddingHorizontal: 24, marginBottom: 28 },
+  confirmBtns: { flexDirection: 'row', gap: 12, paddingHorizontal: 20 },
+  confirmCancelBtn: { flex: 1, paddingVertical: 13, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border2, alignItems: 'center', backgroundColor: 'rgba(30,41,59,0.8)' },
+  confirmCancelText: { color: colors.text, fontWeight: '600', fontSize: 15 },
+  confirmRemoveBtn: { flex: 1, borderRadius: radius.md, overflow: 'hidden' },
+  confirmRemoveBtnGrad: { paddingVertical: 13, alignItems: 'center', justifyContent: 'center' },
+  confirmRemoveText: { color: '#fff', fontWeight: '700', fontSize: 15 },
 });

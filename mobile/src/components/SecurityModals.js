@@ -1,8 +1,5 @@
 import React, { useState, useRef } from 'react';
-import {
-  Modal, View, Text, TextInput, TouchableOpacity, 
-  StyleSheet, ActivityIndicator, Alert, Image
-} from 'react-native';
+import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,9 +8,8 @@ import api from '../api/axios';
 import GradientButton from './GradientButton';
 import PhoneInput from './PhoneInput';
 
-// Phone Number Modal
 export function PhoneModal({ visible, onClose, onSuccess }) {
-  const [step, setStep] = useState('phone'); // phone | otp
+  const [step, setStep] = useState('phone'); // phone | otp | done
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
@@ -28,61 +24,27 @@ export function PhoneModal({ visible, onClose, onSuccess }) {
     setOtp(['', '', '', '', '', '']);
     setError('');
     setResendCooldown(0);
-    if (cooldownRef.current) {
-      clearInterval(cooldownRef.current);
-    }
+    if (cooldownRef.current) clearInterval(cooldownRef.current);
   };
 
-  const handleClose = () => {
-    reset();
-    onClose();
-  };
-
-  const formatPhoneNumber = (value) => {
-    const cleaned = value.replace(/\D/g, '');
-    const match = cleaned.match(/^(\d{0,3})(\d{0,3})(\d{0,4})$/);
-    if (match) {
-      return !match[2] ? match[1] : `(${match[1]}) ${match[2]}${match[3] ? `-${match[3]}` : ''}`;
-    }
-    return value;
-  };
+  const handleClose = () => { reset(); onClose(); };
 
   const sendOTP = async () => {
-    if (!phone.trim()) {
-      setError('Please enter your phone number');
-      return;
-    }
-
-    if (!phone.startsWith('+')) {
+    if (!phone.trim() || !phone.startsWith('+')) {
       setError('Please select a country and enter a valid phone number');
       return;
     }
-
     setError('');
     setLoading(true);
-
     try {
       const { data } = await api.post('/auth/phone/send-add-otp', { phone });
       setStep('otp');
       startCooldown();
-      
-      // Handle email response
-      if (data.email_sent) {
-        console.log('✅ Email sent successfully');
-        // Email was sent successfully
-      } else {
-        // Email failed, show OTP as fallback
-        console.log('⚠️ Email failed, showing OTP:', data.otp);
-        if (data.otp) {
-          Alert.alert(
-            'Email Service Unavailable', 
-            `Email couldn't be sent. Your verification code is: ${data.otp}\n\nPlease enter this code to continue.`, 
-            [{ text: 'OK' }]
-          );
-        }
+      if (!data.email_sent && data.otp) {
+        setError(`Email unavailable. Use this code: ${data.otp}`);
       }
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to send verification code. Please try again.');
+      setError(err.response?.data?.error || 'Failed to send code. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -92,10 +54,7 @@ export function PhoneModal({ visible, onClose, onSuccess }) {
     setResendCooldown(60);
     cooldownRef.current = setInterval(() => {
       setResendCooldown(prev => {
-        if (prev <= 1) {
-          clearInterval(cooldownRef.current);
-          return 0;
-        }
+        if (prev <= 1) { clearInterval(cooldownRef.current); return 0; }
         return prev - 1;
       });
     }, 1000);
@@ -118,23 +77,13 @@ export function PhoneModal({ visible, onClose, onSuccess }) {
 
   const verifyOTP = async () => {
     const code = otp.join('');
-    if (code.length < 6) {
-      setError('Please enter the complete 6-digit code');
-      return;
-    }
-
+    if (code.length < 6) { setError('Please enter the complete 6-digit code'); return; }
     setError('');
     setLoading(true);
-
     try {
-      await api.post('/auth/phone/add', {
-        phone,
-        otp: code
-      });
-
+      await api.post('/auth/phone/add', { phone, otp: code });
       onSuccess?.();
-      handleClose();
-      Alert.alert('Success', 'Phone number added successfully!');
+      setStep('done');
     } catch (err) {
       setError(err.response?.data?.error || 'Invalid code. Please try again.');
     } finally {
@@ -154,18 +103,20 @@ export function PhoneModal({ visible, onClose, onSuccess }) {
             </TouchableOpacity>
 
             <View style={s.iconWrap}>
-              <LinearGradient colors={['#10b981', '#059669']} style={s.iconGrad}>
-                <Ionicons name="phone-portrait-outline" size={26} color="#fff" />
+              <LinearGradient colors={step === 'done' ? ['#10b981', '#059669'] : ['#10b981', '#059669']} style={s.iconGrad}>
+                <Ionicons name={step === 'done' ? 'checkmark' : 'phone-portrait-outline'} size={26} color="#fff" />
               </LinearGradient>
             </View>
 
             <Text style={s.title}>
-              {step === 'phone' ? 'Add Phone Number' : 'Verify Phone Number'}
+              {step === 'phone' ? 'Add Phone Number' : step === 'otp' ? 'Enter Verification Code' : 'Phone Added!'}
             </Text>
             <Text style={s.sub}>
               {step === 'phone'
-                ? "Add your phone number for enhanced security. We'll send a verification code to your email."
-                : `We sent a 6-digit code to your email`}
+                ? "We'll send a verification code to your email."
+                : step === 'otp'
+                ? 'Enter the 6-digit code sent to your email.'
+                : 'Your phone number has been added to your account.'}
             </Text>
 
             {error ? (
@@ -175,24 +126,15 @@ export function PhoneModal({ visible, onClose, onSuccess }) {
               </View>
             ) : null}
 
-            {step === 'phone' ? (
+            {step === 'phone' && (
               <>
                 <Text style={s.label}>Phone Number</Text>
-                <PhoneInput
-                  value={phone}
-                  onChangeText={setPhone}
-                  placeholder="Enter phone number"
-                  error={error}
-                  style={{ marginBottom: 16 }}
-                />
-                <GradientButton
-                  label={loading ? 'Sending...' : 'Send Code'}
-                  onPress={sendOTP}
-                  loading={loading}
-                  style={{ marginTop: 4 }}
-                />
+                <PhoneInput value={phone} onChangeText={setPhone} placeholder="Enter phone number" style={{ marginBottom: 16 }} />
+                <GradientButton label="Send Code" onPress={sendOTP} loading={loading} style={{ marginTop: 4 }} />
               </>
-            ) : (
+            )}
+
+            {step === 'otp' && (
               <>
                 <View style={s.otpRow}>
                   {otp.map((digit, idx) => (
@@ -209,24 +151,21 @@ export function PhoneModal({ visible, onClose, onSuccess }) {
                     />
                   ))}
                 </View>
-
-                <GradientButton
-                  label={loading ? 'Verifying...' : 'Verify Code'}
-                  onPress={verifyOTP}
-                  loading={loading}
-                  style={{ marginTop: 8 }}
-                />
-
-                <TouchableOpacity 
-                  style={s.resendBtn} 
-                  onPress={sendOTP} 
-                  disabled={resendCooldown > 0}
-                >
+                <GradientButton label="Verify Code" onPress={verifyOTP} loading={loading} style={{ marginTop: 8 }} />
+                <TouchableOpacity style={s.resendBtn} onPress={sendOTP} disabled={resendCooldown > 0}>
                   <Text style={[s.resendText, { color: resendCooldown > 0 ? colors.dim : '#10b981' }]}>
-                    {resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : "Didn't get it? Resend code"}
+                    {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Didn't get it? Resend"}
                   </Text>
                 </TouchableOpacity>
               </>
+            )}
+
+            {step === 'done' && (
+              <TouchableOpacity onPress={handleClose} style={s.doneBtn}>
+                <LinearGradient colors={['#10b981', '#059669']} style={s.doneBtnGrad}>
+                  <Text style={s.doneBtnText}>Done</Text>
+                </LinearGradient>
+              </TouchableOpacity>
             )}
           </View>
         </BlurView>
@@ -235,9 +174,8 @@ export function PhoneModal({ visible, onClose, onSuccess }) {
   );
 }
 
-// 2FA Setup Modal
 export function TwoFactorModal({ visible, onClose, onSuccess }) {
-  const [step, setStep] = useState('setup'); // setup | verify | backup
+  const [step, setStep] = useState('setup'); // setup | verify | backup | done
   const [qrCode, setQrCode] = useState('');
   const [secret, setSecret] = useState('');
   const [code, setCode] = useState('');
@@ -245,55 +183,34 @@ export function TwoFactorModal({ visible, onClose, onSuccess }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const setup2FA = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const { data } = await api.post('/auth/2fa/setup');
-      setQrCode(data.qr_code);
-      setSecret(data.secret);
-      setStep('verify');
-    } catch (err) {
-      setError(err.response?.data?.error || 'Failed to setup 2FA');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const verify2FA = async () => {
-    if (!code.trim() || code.length !== 6) {
-      setError('Please enter a valid 6-digit code');
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-    try {
-      const { data } = await api.post('/auth/2fa/verify', { code });
-      setBackupCodes(data.backup_codes);
-      setStep('backup');
-    } catch (err) {
-      setError(err.response?.data?.error || 'Invalid code. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleClose = () => {
-    setStep('setup');
-    setQrCode('');
-    setSecret('');
-    setCode('');
-    setBackupCodes([]);
-    setError('');
+    setStep('setup'); setQrCode(''); setSecret('');
+    setCode(''); setBackupCodes([]); setError('');
     onClose();
   };
 
-  const handleComplete = () => {
-    onSuccess?.();
-    handleClose();
-    Alert.alert('Success', '2FA has been enabled for your account!');
+  const setup2FA = async () => {
+    setLoading(true); setError('');
+    try {
+      const { data } = await api.post('/auth/2fa/setup');
+      setQrCode(data.qr_code); setSecret(data.secret); setStep('verify');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to setup 2FA');
+    } finally { setLoading(false); }
   };
+
+  const verify2FA = async () => {
+    if (!code.trim() || code.length !== 6) { setError('Please enter a valid 6-digit code'); return; }
+    setLoading(true); setError('');
+    try {
+      const { data } = await api.post('/auth/2fa/verify', { code });
+      setBackupCodes(data.backup_codes); setStep('backup');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Invalid code. Please try again.');
+    } finally { setLoading(false); }
+  };
+
+  const handleComplete = () => { onSuccess?.(); setStep('done'); };
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose}>
@@ -307,90 +224,56 @@ export function TwoFactorModal({ visible, onClose, onSuccess }) {
             </TouchableOpacity>
 
             <View style={s.iconWrap}>
-              <LinearGradient colors={['#7c3aed', '#3b82f6']} style={s.iconGrad}>
-                <Ionicons name="shield-checkmark-outline" size={26} color="#fff" />
+              <LinearGradient colors={step === 'done' ? ['#10b981', '#059669'] : ['#7c3aed', '#3b82f6']} style={s.iconGrad}>
+                <Ionicons name={step === 'done' ? 'checkmark' : 'shield-checkmark-outline'} size={26} color="#fff" />
               </LinearGradient>
             </View>
 
             {step === 'setup' && (
               <>
-                <Text style={s.title}>Enable Two-Factor Authentication</Text>
-                <Text style={s.sub}>
-                  Add an extra layer of security to your account with 2FA.
-                </Text>
-                <GradientButton
-                  label={loading ? 'Setting up...' : 'Setup 2FA'}
-                  onPress={setup2FA}
-                  loading={loading}
-                  style={{ marginTop: 20 }}
-                />
+                <Text style={s.title}>Two-Factor Authentication</Text>
+                <Text style={s.sub}>Add an extra layer of security to your account.</Text>
+                <GradientButton label="Setup 2FA" onPress={setup2FA} loading={loading} style={{ marginTop: 20 }} />
               </>
             )}
 
             {step === 'verify' && (
               <>
                 <Text style={s.title}>Scan QR Code</Text>
-                <Text style={s.sub}>
-                  Use your authenticator app to scan this QR code, then enter the 6-digit code.
-                </Text>
-
-                {qrCode && (
-                  <View style={s.qrContainer}>
-                    <Image source={{ uri: qrCode }} style={s.qrImage} />
-                  </View>
-                )}
-
+                <Text style={s.sub}>Scan with your authenticator app, then enter the 6-digit code.</Text>
+                {qrCode && <View style={s.qrContainer}><Image source={{ uri: qrCode }} style={s.qrImage} /></View>}
                 <Text style={s.secretLabel}>Manual Entry Key:</Text>
                 <Text style={s.secretText}>{secret}</Text>
-
-                {error ? (
-                  <View style={s.errorBox}>
-                    <Ionicons name="alert-circle" size={14} color="#f87171" />
-                    <Text style={s.errorText}>{error}</Text>
-                  </View>
-                ) : null}
-
+                {error ? <View style={s.errorBox}><Ionicons name="alert-circle" size={14} color="#f87171" /><Text style={s.errorText}>{error}</Text></View> : null}
                 <Text style={s.label}>Verification Code</Text>
                 <View style={s.inputWrap}>
                   <Ionicons name="keypad-outline" size={17} color={colors.muted} />
-                  <TextInput
-                    style={s.input}
-                    placeholder="123456"
-                    placeholderTextColor={colors.dim}
-                    keyboardType="number-pad"
-                    value={code}
-                    onChangeText={setCode}
-                    maxLength={6}
-                  />
+                  <TextInput style={s.input} placeholder="123456" placeholderTextColor={colors.dim} keyboardType="number-pad" value={code} onChangeText={setCode} maxLength={6} />
                 </View>
-
-                <GradientButton
-                  label={loading ? 'Verifying...' : 'Verify & Enable'}
-                  onPress={verify2FA}
-                  loading={loading}
-                  style={{ marginTop: 4 }}
-                />
+                <GradientButton label="Verify & Enable" onPress={verify2FA} loading={loading} style={{ marginTop: 4 }} />
               </>
             )}
 
             {step === 'backup' && (
               <>
                 <Text style={s.title}>Save Backup Codes</Text>
-                <Text style={s.sub}>
-                  Store these backup codes in a safe place. You can use them to access your account if you lose your authenticator device.
-                </Text>
-
+                <Text style={s.sub}>Store these in a safe place. Use them if you lose your authenticator.</Text>
                 <View style={s.backupContainer}>
-                  {backupCodes.map((code, index) => (
-                    <Text key={index} style={s.backupCode}>{code}</Text>
-                  ))}
+                  {backupCodes.map((c, i) => <Text key={i} style={s.backupCode}>{c}</Text>)}
                 </View>
+                <GradientButton label="I've Saved My Codes" onPress={handleComplete} style={{ marginTop: 20 }} />
+              </>
+            )}
 
-                <GradientButton
-                  label="I've Saved My Codes"
-                  onPress={handleComplete}
-                  style={{ marginTop: 20 }}
-                />
+            {step === 'done' && (
+              <>
+                <Text style={s.title}>2FA Enabled!</Text>
+                <Text style={s.sub}>Your account is now protected with two-factor authentication.</Text>
+                <TouchableOpacity onPress={handleClose} style={s.doneBtn}>
+                  <LinearGradient colors={['#10b981', '#059669']} style={s.doneBtnGrad}>
+                    <Text style={s.doneBtnText}>Done</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
               </>
             )}
           </View>
@@ -420,6 +303,9 @@ const s = StyleSheet.create({
   otpBoxFilled: { borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.1)' },
   resendBtn: { alignSelf: 'center', marginTop: 16, padding: 8 },
   resendText: { fontSize: 13, fontWeight: '600' },
+  doneBtn: { borderRadius: radius.md, overflow: 'hidden', marginTop: 20 },
+  doneBtnGrad: { paddingVertical: 14, alignItems: 'center' },
+  doneBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
   qrContainer: { alignItems: 'center', marginVertical: 20 },
   qrImage: { width: 200, height: 200, borderRadius: 12 },
   secretLabel: { fontSize: 12, color: colors.muted, fontWeight: '600', marginTop: 10, marginBottom: 4 },

@@ -452,6 +452,8 @@ def update_profile():
         user.interests = data.get("interests", "")
     if "is_private" in data:
         user.is_private = bool(data["is_private"])
+    if "phone" in data:
+        user.phone = data["phone"] or None
     db.session.commit()
     return jsonify({"user": user.to_dict()})
 
@@ -807,6 +809,15 @@ def send_add_phone_otp():
         return jsonify({"message": f"Verification code sent to {user.email}", "phone": phone, "email_sent": True})
     except Exception as e:
         return jsonify({"message": f"Email service unavailable. OTP: {otp}", "phone": phone, "otp": otp, "email_sent": False, "error": str(e)})
+
+
+@auth_bp.route("/phone/remove", methods=["POST"])
+@jwt_required()
+def remove_phone():
+    user = User.query.get(int(get_jwt_identity()))
+    user.phone = None
+    db.session.commit()
+    return jsonify({"message": "Phone number removed", "user": user.to_dict()})
 
 
 @auth_bp.route("/test-email", methods=["GET"])
