@@ -79,6 +79,8 @@ export default function SettingsScreen({ navigation }) {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [biometricEnabled, setBiometricEnabled] = useState(false);
+  const [biometricType, setBiometricType] = useState('biometric'); // face | fingerprint | biometric
+  const [availableTypes, setAvailableTypes] = useState([]);
   const [showPhoneModal, setShowPhoneModal] = useState(false);
   const [show2FAModal, setShow2FAModal] = useState(false);
   const [showRemovePhoneModal, setShowRemovePhoneModal] = useState(false);
@@ -120,6 +122,14 @@ export default function SettingsScreen({ navigation }) {
     try {
       const enabled = await AsyncStorage.getItem('biometric_enabled');
       setBiometricEnabled(enabled === 'true');
+      const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
+      setAvailableTypes(types);
+      const hasFace = types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION);
+      const hasFingerprint = types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT);
+      if (hasFace && hasFingerprint) setBiometricType('both');
+      else if (hasFace) setBiometricType('face');
+      else if (hasFingerprint) setBiometricType('fingerprint');
+      else setBiometricType('biometric');
     } catch {}
   };
 
@@ -127,18 +137,28 @@ export default function SettingsScreen({ navigation }) {
     try {
       const available = await LocalAuthentication.hasHardwareAsync();
       const enrolled = await LocalAuthentication.isEnrolledAsync();
-      
-      if (!available || !enrolled) {
+
+      if (!available) {
         Alert.alert(
-          'Biometric Not Available',
-          'Please set up Face ID or Fingerprint in your device settings first.',
+          'Not Supported',
+          'Your device does not support biometric authentication.',
           [{ text: 'OK' }]
         );
         return;
       }
 
+      if (!enrolled) {
+        const hasFace = availableTypes.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION);
+        const hasFingerprint = availableTypes.includes(LocalAuthentication.AuthenticationType.FINGERPRINT);
+        let message = 'Please set up biometrics in your device settings first.\n\n';
+        if (hasFingerprint) message += '• Go to Settings → Security → Fingerprint\n';
+        if (hasFace) message += '• Go to Settings → Security → Face Recognition\n';
+        message += '\nThen come back and enable biometric login.';
+        Alert.alert('Biometric Not Set Up', message, [{ text: 'OK' }]);
+        return;
+      }
+
       if (biometricEnabled) {
-        // Disable biometric
         Alert.alert(
           'Disable Biometric Login?',
           'You will need to enter your password to sign in.',
@@ -157,16 +177,23 @@ export default function SettingsScreen({ navigation }) {
           ]
         );
       } else {
-        // Enable biometric
         const result = await LocalAuthentication.authenticateAsync({
           promptMessage: 'Authenticate to enable biometric login',
           fallbackLabel: 'Use password',
+          disableDeviceFallback: false,
         });
-        
         if (result.success) {
-          await AsyncStorage.setItem('biometric_enabled', 'true');
-          setBiometricEnabled(true);
-          success('Biometric login enabled');
+          const existingCredentials = await AsyncStorage.getItem('biometric_credentials');
+          if (existingCredentials) {
+            await AsyncStorage.setItem('biometric_enabled', 'true');
+            setBiometricEnabled(true);
+            success('Biometric login enabled');
+          } else {
+            // Mark as enabled - credentials will be saved on next password login
+            await AsyncStorage.setItem('biometric_enabled', 'true');
+            setBiometricEnabled(true);
+            success('Biometric enabled! Sign out and back in with your password to fully activate it.');
+          }
         }
       }
     } catch (err) {
@@ -342,15 +369,20 @@ export default function SettingsScreen({ navigation }) {
           <Divider />
           <Row icon="key-outline" label="Change Password" onPress={() => setShowChangePasswordModal(true)} />
           <Divider />
-          <Row icon="shield-checkmark-outline" iconColor="#10b981" label="Two-Factor Authentication" onPress={() => setShow2FAModal(true)} />
+          <Row icon="shield-checkmark-outline" iconColor={user?.two_factor_enabled ? '#10b981' : '#94a3b8'} label="Two-Factor Authentication" value={user?.two_factor_enabled ? 'Enabled' : 'Disabled'} onPress={() => setShow2FAModal(true)} />
           <Divider />
-          <Row 
-            icon="finger-print" 
-            iconColor="#7c3aed" 
-            label="Biometric Login" 
-            toggle 
-            toggled={biometricEnabled} 
-            onPress={toggleBiometric} 
+          <Row
+            icon={biometricType === 'face' ? 'scan-outline' : 'finger-print'}
+            iconColor="#7c3aed"
+            label={
+              biometricType === 'both' ? 'Face ID & Fingerprint Login' :
+              biometricType === 'face' ? 'Face ID Login' :
+              biometricType === 'fingerprint' ? 'Fingerprint Login' :
+              'Biometric Login'
+            }
+            toggle
+            toggled={biometricEnabled}
+            onPress={toggleBiometric}
           />
           <Divider />
           <Row icon="people-outline" iconColor="#3b82f6" label="My Family" onPress={() => { navigation.goBack(); navigation.navigate('Family'); }} />
@@ -512,10 +544,11 @@ export default function SettingsScreen({ navigation }) {
         onSuccess={refreshUser}
       />
       
-      <TwoFactorModal 
-        visible={show2FAModal} 
+      <TwoFactorModal
+        visible={show2FAModal}
         onClose={() => setShow2FAModal(false)}
         onSuccess={refreshUser}
+        isEnabled={user?.two_factor_enabled}
       />
 
       {/* Remove Phone Confirmation Modal */}

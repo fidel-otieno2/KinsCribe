@@ -85,6 +85,9 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     const { data } = await api.post('/auth/login', { email, password });
+    if (data.requires_2fa) {
+      return { requires_2fa: true, user_id: data.user_id };
+    }
     await AsyncStorage.setItem('access_token', data.access_token);
     await AsyncStorage.setItem('refresh_token', data.refresh_token);
     await AsyncStorage.setItem(ACTIVE_ACCOUNT_KEY, data.user.id.toString());
@@ -208,7 +211,12 @@ export function AuthProvider({ children }) {
     }
 
     // Full logout - no other accounts available
+    // Preserve biometric settings across logout
+    const biometricEnabled = await AsyncStorage.getItem('biometric_enabled');
+    const biometricCredentials = await AsyncStorage.getItem('biometric_credentials');
     await AsyncStorage.clear();
+    if (biometricEnabled) await AsyncStorage.setItem('biometric_enabled', biometricEnabled);
+    if (biometricCredentials) await AsyncStorage.setItem('biometric_credentials', biometricCredentials);
     setUser(null);
   };
 

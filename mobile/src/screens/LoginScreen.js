@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, KeyboardAvoidingView, Platform,
@@ -30,6 +30,17 @@ const isBiometricAvailable = async () => {
   }
 };
 
+const getBiometricType = async () => {
+  try {
+    const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
+    if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) return 'face';
+    if (types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) return 'fingerprint';
+    return 'biometric';
+  } catch {
+    return 'biometric';
+  }
+};
+
 const authenticateAsync = async (options) => {
   try {
     return await LocalAuthentication.authenticateAsync(options);
@@ -46,7 +57,7 @@ const HERO_HEIGHT = height * 0.32;
 // ── Phone Login Modal ─────────────────────────────────────────
 function PhoneLoginModal({ visible, onClose }) {
   const { theme } = useTheme();
-  const { login } = useAuth();
+  const { loginWithGoogle } = useAuth();
   const [step, setStep] = useState('phone'); // phone | otp
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
@@ -180,7 +191,7 @@ function PhoneLoginModal({ visible, onClose }) {
       await AsyncStorage.setItem('access_token', data.access_token);
       await AsyncStorage.setItem('refresh_token', data.refresh_token);
       
-      login(data.user);
+      loginWithGoogle(data);
       handleClose();
       
       if (data.is_new_user) {
@@ -568,6 +579,89 @@ const fp = StyleSheet.create({
   doneBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
 });
 
+// ── 2FA Login Modal ──────────────────────────────────────────
+function TwoFALoginModal({ visible, userId, onClose, onSuccess }) {
+  const { theme } = useTheme();
+  const [code, setCode] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [useBackup, setUseBackup] = useState(false);
+
+  const reset = () => { setCode(''); setError(''); setUseBackup(false); };
+  const handleClose = () => { reset(); onClose(); };
+
+  const verify = async () => {
+    if (!code.trim()) { setError('Please enter the code'); return; }
+    setError(''); setLoading(true);
+    try {
+      const { data } = await api.post('/auth/2fa/login', { user_id: userId, code: code.trim() });
+      reset();
+      onSuccess(data);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Invalid code. Please try again.');
+    } finally { setLoading(false); }
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose}>
+      <KeyboardAvoidingView style={pl.overlay} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <BlurView intensity={20} tint="dark" style={pl.sheet}>
+          <LinearGradient colors={['rgba(124,58,237,0.1)', 'rgba(15,23,42,0.98)']} style={StyleSheet.absoluteFill} />
+          <View style={pl.handle} />
+          <View style={pl.inner}>
+            <TouchableOpacity style={pl.closeBtn} onPress={handleClose}>
+              <Ionicons name="close" size={22} color={theme.muted} />
+            </TouchableOpacity>
+            <View style={pl.iconWrap}>
+              <LinearGradient colors={['#7c3aed', '#3b82f6']} style={pl.iconGrad}>
+                <Ionicons name="shield-checkmark-outline" size={26} color="#fff" />
+              </LinearGradient>
+            </View>
+            <Text style={pl.title}>Two-Factor Authentication</Text>
+            <Text style={pl.sub}>
+              {useBackup
+                ? 'Enter one of your backup codes to access your account.'
+                : 'Enter the 6-digit code from your authenticator app.'}
+            </Text>
+            {error ? (
+              <View style={pl.errorBox}>
+                <Ionicons name="alert-circle" size={14} color="#f87171" />
+                <Text style={pl.errorText}>{error}</Text>
+              </View>
+            ) : null}
+            <Text style={pl.label}>{useBackup ? 'Backup Code' : 'Authenticator Code'}</Text>
+            <View style={pl.inputWrap}>
+              <Ionicons name={useBackup ? 'key-outline' : 'keypad-outline'} size={17} color={theme.muted} />
+              <TextInput
+                style={[pl.input, { color: theme.text }]}
+                placeholder={useBackup ? 'e.g. A1B2C3D4' : '000000'}
+                placeholderTextColor={theme.dim}
+                keyboardType={useBackup ? 'default' : 'number-pad'}
+                autoCapitalize="characters"
+                maxLength={useBackup ? 8 : 6}
+                value={code}
+                onChangeText={v => { setCode(v); setError(''); }}
+              />
+            </View>
+            <TouchableOpacity style={pl.btn} onPress={verify} disabled={loading} activeOpacity={0.85}>
+              <LinearGradient colors={['#7c3aed', '#3b82f6']} style={pl.btnGrad}>
+                {loading
+                  ? <ActivityIndicator color="#fff" size="small" />
+                  : <Text style={pl.btnText}>Verify</Text>}
+              </LinearGradient>
+            </TouchableOpacity>
+            <TouchableOpacity style={pl.resendBtn} onPress={() => { setUseBackup(p => !p); setCode(''); setError(''); }}>
+              <Text style={[pl.resendText, { color: '#7c3aed' }]}>
+                {useBackup ? 'Use authenticator app instead' : "Can't access app? Use backup code"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </BlurView>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
 export default function LoginScreen({ navigation }) {
   const { login, loginWithGoogle } = useAuth();
   const { theme, isDark } = useTheme();
@@ -577,10 +671,15 @@ export default function LoginScreen({ navigation }) {
   const [biometricLoading, setBiometricLoading] = useState(false);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricEnabled, setBiometricEnabled] = useState(false);
+  const [biometricType, setBiometricType] = useState('biometric');
+  const [showBiometricPrompt, setShowBiometricPrompt] = useState(false);
+  const [pendingBiometricCredentials, setPendingBiometricCredentials] = useState(null);
   const [error, setError] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [showForgot, setShowForgot] = useState(false);
   const [showPhoneLogin, setShowPhoneLogin] = useState(false);
+  const [show2FA, setShow2FA] = useState(false);
+  const [twoFAUserId, setTwoFAUserId] = useState(null);
 
   const [request, response, promptAsync] = Google.useAuthRequest({
     androidClientId: '474767363654-6knta78fh5ibd8q0a6894o8euqrs90js.apps.googleusercontent.com',
@@ -590,6 +689,11 @@ export default function LoginScreen({ navigation }) {
 
   useEffect(() => {
     checkBiometric();
+    const interval = setInterval(checkBiometric, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
     if (response?.type === 'success') {
       const accessToken =
         response.authentication?.accessToken ||
@@ -631,33 +735,42 @@ export default function LoginScreen({ navigation }) {
     const available = await isBiometricAvailable();
     const enabled = await AsyncStorage.getItem('biometric_enabled');
     const savedCredentials = await AsyncStorage.getItem('biometric_credentials');
-    
+    const type = await getBiometricType();
     setBiometricAvailable(available);
-    setBiometricEnabled(available && enabled === 'true' && !!savedCredentials);
+    setBiometricType(type);
+    // Show as enabled if device has biometrics AND user has previously enabled it
+    // Don't require savedCredentials - they may have been cleared
+    setBiometricEnabled(available && enabled === 'true');
   };
 
   const handleBiometricLogin = async () => {
     setBiometricLoading(true);
     setError('');
     try {
+      const savedCredentials = await AsyncStorage.getItem('biometric_credentials');
+      if (!savedCredentials) {
+        await AsyncStorage.removeItem('biometric_enabled');
+        setBiometricEnabled(false);
+        setError('Biometric session expired. Please sign in with password once to re-link.');
+        return;
+      }
       const result = await authenticateAsync({
         promptMessage: 'Sign in to KinsCribe',
         fallbackLabel: 'Use password',
         cancelLabel: 'Cancel',
       });
       if (result.success) {
-        const savedCredentials = await AsyncStorage.getItem('biometric_credentials');
-        if (savedCredentials) {
-          const { email, password } = JSON.parse(savedCredentials);
-          await login(email, password);
-        } else {
-          setError('Biometric credentials not found. Please sign in with password first.');
+        const { email, password } = JSON.parse(savedCredentials);
+        const loginResult = await login(email, password);
+        if (loginResult?.requires_2fa) {
+          setTwoFAUserId(loginResult.user_id);
+          setShow2FA(true);
         }
       }
-    } catch { 
-      setError('Biometric authentication failed.'); 
-    } finally { 
-      setBiometricLoading(false); 
+    } catch {
+      setError('Biometric authentication failed.');
+    } finally {
+      setBiometricLoading(false);
     }
   };
 
@@ -665,33 +778,22 @@ export default function LoginScreen({ navigation }) {
     setError('');
     setLoading(true);
     try {
-      await login(form.email, form.password);
-      
-      // Ask user if they want to enable biometric login
+      const result = await login(form.email, form.password);
+
+      if (result?.requires_2fa) {
+        setTwoFAUserId(result.user_id);
+        setShow2FA(true);
+        return;
+      }
+
       if (await isBiometricAvailable()) {
         const biometricEnabled = await AsyncStorage.getItem('biometric_enabled');
         if (biometricEnabled !== 'true') {
           setTimeout(() => {
-            Alert.alert(
-              'Enable Biometric Login?',
-              'Would you like to use Face ID/Fingerprint for faster login next time?',
-              [
-                { text: 'Not Now', style: 'cancel' },
-                {
-                  text: 'Enable',
-                  onPress: async () => {
-                    await AsyncStorage.setItem('biometric_enabled', 'true');
-                    await AsyncStorage.setItem('biometric_credentials', JSON.stringify({
-                      email: form.email,
-                      password: form.password
-                    }));
-                  }
-                }
-              ]
-            );
-          }, 1000);
+            setPendingBiometricCredentials({ email: form.email, password: form.password });
+            setShowBiometricPrompt(true);
+          }, 800);
         } else {
-          // Update saved credentials
           await AsyncStorage.setItem('biometric_credentials', JSON.stringify({
             email: form.email,
             password: form.password
@@ -778,18 +880,34 @@ export default function LoginScreen({ navigation }) {
             <GradientButton label="Sign In" onPress={handleLogin} loading={loading} style={{ marginTop: 4 }} />
 
             {/* Biometric */}
-            {biometricEnabled && (
-              <TouchableOpacity 
-                style={[s.biometricBtn, { borderColor: theme.border2, backgroundColor: theme.bgCard }]} 
-                onPress={handleBiometricLogin} 
-                disabled={biometricLoading} 
+            {biometricAvailable && (
+              <TouchableOpacity
+                style={[s.biometricBtn, { borderColor: biometricEnabled ? 'rgba(124,58,237,0.4)' : theme.border2, backgroundColor: theme.bgCard }]}
+                onPress={biometricEnabled ? handleBiometricLogin : () => {
+                  setPendingBiometricCredentials(null);
+                  setShowBiometricPrompt(true);
+                }}
+                disabled={biometricLoading}
                 activeOpacity={0.8}
               >
                 {biometricLoading
                   ? <ActivityIndicator size="small" color={theme.primary} />
                   : <>
-                      <Ionicons name="finger-print" size={22} color={theme.primary} />
-                      <Text style={[s.biometricText, { color: theme.text }]}>Sign in with Face ID / Fingerprint</Text>
+                      <Ionicons
+                        name={biometricType === 'face' ? 'scan-outline' : 'finger-print'}
+                        size={22}
+                        color={biometricEnabled ? theme.primary : theme.muted}
+                      />
+                      <Text style={[s.biometricText, { color: biometricEnabled ? theme.text : theme.muted }]}>
+                        {biometricEnabled
+                          ? biometricType === 'face' ? 'Sign in with Face ID' : 'Sign in with Fingerprint'
+                          : biometricType === 'face' ? 'Enable Face ID login' : 'Enable Fingerprint login'}
+                      </Text>
+                      {!biometricEnabled && (
+                        <View style={{ backgroundColor: 'rgba(124,58,237,0.15)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 }}>
+                          <Text style={{ color: '#7c3aed', fontSize: 10, fontWeight: '700' }}>SET UP</Text>
+                        </View>
+                      )}
                     </>
                 }
               </TouchableOpacity>
@@ -851,6 +969,77 @@ export default function LoginScreen({ navigation }) {
 
       <ForgotPasswordModal visible={showForgot} onClose={() => setShowForgot(false)} />
       <PhoneLoginModal visible={showPhoneLogin} onClose={() => setShowPhoneLogin(false)} />
+      <TwoFALoginModal
+        visible={show2FA}
+        userId={twoFAUserId}
+        onClose={() => setShow2FA(false)}
+        onSuccess={(data) => {
+          loginWithGoogle(data);
+          setShow2FA(false);
+        }}
+      />
+
+      {/* Biometric Enable Prompt */}
+      <Modal visible={showBiometricPrompt} transparent animationType="fade" onRequestClose={() => setShowBiometricPrompt(false)}>
+        <View style={bm.overlay}>
+          <BlurView intensity={20} tint="dark" style={bm.card}>
+            <LinearGradient colors={['rgba(124,58,237,0.12)', 'rgba(15,23,42,0.98)']} style={StyleSheet.absoluteFill} />
+            <LinearGradient colors={['#7c3aed', '#3b82f6']} style={bm.iconWrap}>
+              <Ionicons name={biometricType === 'face' ? 'scan-outline' : 'finger-print'} size={36} color="#fff" />
+            </LinearGradient>
+            <Text style={bm.title}>Enable {biometricType === 'face' ? 'Face ID' : 'Fingerprint'} Login</Text>
+            <Text style={bm.sub}>
+              Sign in faster next time using{`\n`}{biometricType === 'face' ? 'Face ID' : 'your fingerprint'}.
+            </Text>
+            <View style={bm.features}>
+              {[
+                { icon: 'flash-outline', text: 'One tap sign in' },
+                { icon: 'shield-checkmark-outline', text: 'Secure & encrypted' },
+                { icon: 'eye-off-outline', text: 'No password needed' },
+              ].map((f, i) => (
+                <View key={i} style={bm.featureRow}>
+                  <View style={bm.featureIcon}>
+                    <Ionicons name={f.icon} size={16} color="#7c3aed" />
+                  </View>
+                  <Text style={bm.featureText}>{f.text}</Text>
+                </View>
+              ))}
+            </View>
+            <TouchableOpacity
+              style={bm.enableBtn}
+              activeOpacity={0.85}
+              onPress={async () => {
+                if (pendingBiometricCredentials) {
+                  await AsyncStorage.setItem('biometric_enabled', 'true');
+                  await AsyncStorage.setItem('biometric_credentials', JSON.stringify(pendingBiometricCredentials));
+                  setShowBiometricPrompt(false);
+                  setPendingBiometricCredentials(null);
+                  setBiometricEnabled(true);
+                } else {
+                  // User tapped setup from login screen - need to sign in first
+                  setShowBiometricPrompt(false);
+                  setError('Sign in with your password first, then biometric login will be offered automatically.');
+                }
+              }}
+            >
+              <LinearGradient colors={['#7c3aed', '#3b82f6']} style={bm.enableBtnGrad}>
+                <Ionicons name={biometricType === 'face' ? 'scan-outline' : 'finger-print'} size={18} color="#fff" />
+                <Text style={bm.enableBtnText}>Enable {biometricType === 'face' ? 'Face ID' : 'Fingerprint'} Login</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={bm.skipBtn}
+              onPress={() => {
+                setShowBiometricPrompt(false);
+                setPendingBiometricCredentials(null);
+              }}
+            >
+              <Text style={bm.skipText}>Not Now</Text>
+            </TouchableOpacity>
+          </BlurView>
+        </View>
+      </Modal>
+
     </KeyboardAvoidingView>
   );
 }
@@ -891,4 +1080,21 @@ const s = StyleSheet.create({
   footerLink: { color: '#7c3aed', fontSize: 14, fontWeight: '700' },
   inviteRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   inviteText: { color: colors.dim, fontSize: 13 },
+});
+
+const bm = StyleSheet.create({
+  overlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.75)', paddingHorizontal: 28 },
+  card: { width: '100%', borderRadius: 28, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(124,58,237,0.25)', paddingBottom: 28, alignItems: 'center' },
+  iconWrap: { width: 80, height: 80, borderRadius: 26, alignItems: 'center', justifyContent: 'center', marginTop: 32, marginBottom: 20 },
+  title: { fontSize: 22, fontWeight: '800', color: colors.text, textAlign: 'center', marginBottom: 8 },
+  sub: { fontSize: 14, color: colors.muted, textAlign: 'center', lineHeight: 21, marginBottom: 24, paddingHorizontal: 16 },
+  features: { width: '100%', paddingHorizontal: 24, gap: 12, marginBottom: 28 },
+  featureRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  featureIcon: { width: 34, height: 34, borderRadius: 10, backgroundColor: 'rgba(124,58,237,0.15)', alignItems: 'center', justifyContent: 'center' },
+  featureText: { fontSize: 14, color: colors.text, fontWeight: '500' },
+  enableBtn: { width: '85%', borderRadius: radius.md, overflow: 'hidden', marginBottom: 12 },
+  enableBtnGrad: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14 },
+  enableBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  skipBtn: { paddingVertical: 10, paddingHorizontal: 24 },
+  skipText: { color: colors.muted, fontSize: 14, fontWeight: '500' },
 });

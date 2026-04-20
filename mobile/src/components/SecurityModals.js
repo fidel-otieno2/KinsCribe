@@ -385,18 +385,20 @@ export function ChangePasswordModal({ visible, onClose, userEmail, hasPassword, 
   );
 }
 
-export function TwoFactorModal({ visible, onClose, onSuccess }) {
-  const [step, setStep] = useState('setup'); // setup | verify | backup | done
+export function TwoFactorModal({ visible, onClose, onSuccess, isEnabled }) {
+  const [step, setStep] = useState('init'); // init | verify | backup | done | disable
   const [qrCode, setQrCode] = useState('');
   const [secret, setSecret] = useState('');
   const [code, setCode] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [backupCodes, setBackupCodes] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const handleClose = () => {
-    setStep('setup'); setQrCode(''); setSecret('');
-    setCode(''); setBackupCodes([]); setError('');
+    setStep('init'); setQrCode(''); setSecret('');
+    setCode(''); setPassword(''); setBackupCodes([]); setError('');
     onClose();
   };
 
@@ -421,7 +423,21 @@ export function TwoFactorModal({ visible, onClose, onSuccess }) {
     } finally { setLoading(false); }
   };
 
+  const disable2FA = async () => {
+    setLoading(true); setError('');
+    try {
+      await api.post('/auth/2fa/disable', { password });
+      onSuccess?.();
+      setStep('done');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to disable 2FA.');
+    } finally { setLoading(false); }
+  };
+
   const handleComplete = () => { onSuccess?.(); setStep('done'); };
+
+  // Show disable UI if 2FA already enabled
+  const initStep = isEnabled ? 'disable' : 'setup';
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose}>
@@ -435,12 +451,48 @@ export function TwoFactorModal({ visible, onClose, onSuccess }) {
             </TouchableOpacity>
 
             <View style={s.iconWrap}>
-              <LinearGradient colors={step === 'done' ? ['#10b981', '#059669'] : ['#7c3aed', '#3b82f6']} style={s.iconGrad}>
-                <Ionicons name={step === 'done' ? 'checkmark' : 'shield-checkmark-outline'} size={26} color="#fff" />
+              <LinearGradient
+                colors={step === 'done' ? ['#10b981', '#059669'] : isEnabled ? ['#f87171', '#ef4444'] : ['#7c3aed', '#3b82f6']}
+                style={s.iconGrad}
+              >
+                <Ionicons
+                  name={step === 'done' ? 'checkmark' : isEnabled ? 'shield-off-outline' : 'shield-checkmark-outline'}
+                  size={26} color="#fff"
+                />
               </LinearGradient>
             </View>
 
-            {step === 'setup' && (
+            {/* DISABLE FLOW */}
+            {isEnabled && step === 'init' && (
+              <>
+                <Text style={s.title}>Disable 2FA</Text>
+                <Text style={s.sub}>Enter your password to disable two-factor authentication.</Text>
+                {error ? <View style={s.errorBox}><Ionicons name="alert-circle" size={14} color="#f87171" /><Text style={s.errorText}>{error}</Text></View> : null}
+                <Text style={s.label}>Password</Text>
+                <View style={s.inputWrap}>
+                  <Ionicons name="lock-closed-outline" size={17} color={colors.muted} />
+                  <TextInput
+                    style={s.input}
+                    placeholder="Enter your password"
+                    placeholderTextColor={colors.dim}
+                    secureTextEntry={!showPassword}
+                    value={password}
+                    onChangeText={v => { setPassword(v); setError(''); }}
+                  />
+                  <TouchableOpacity onPress={() => setShowPassword(p => !p)} style={{ padding: 4 }}>
+                    <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={17} color={colors.muted} />
+                  </TouchableOpacity>
+                </View>
+                <TouchableOpacity style={s.doneBtn} onPress={disable2FA} disabled={loading} activeOpacity={0.85}>
+                  <LinearGradient colors={['#f87171', '#ef4444']} style={s.doneBtnGrad}>
+                    {loading ? <ActivityIndicator color="#fff" size="small" /> : <Text style={s.doneBtnText}>Disable 2FA</Text>}
+                  </LinearGradient>
+                </TouchableOpacity>
+              </>
+            )}
+
+            {/* SETUP FLOW */}
+            {!isEnabled && step === 'init' && (
               <>
                 <Text style={s.title}>Two-Factor Authentication</Text>
                 <Text style={s.sub}>Add an extra layer of security to your account.</Text>
@@ -478,8 +530,12 @@ export function TwoFactorModal({ visible, onClose, onSuccess }) {
 
             {step === 'done' && (
               <>
-                <Text style={s.title}>2FA Enabled!</Text>
-                <Text style={s.sub}>Your account is now protected with two-factor authentication.</Text>
+                <Text style={s.title}>{isEnabled ? '2FA Disabled' : '2FA Enabled!'}</Text>
+                <Text style={s.sub}>
+                  {isEnabled
+                    ? 'Two-factor authentication has been disabled.'
+                    : 'Your account is now protected with two-factor authentication.'}
+                </Text>
                 <TouchableOpacity onPress={handleClose} style={s.doneBtn}>
                   <LinearGradient colors={['#10b981', '#059669']} style={s.doneBtnGrad}>
                     <Text style={s.doneBtnText}>Done</Text>

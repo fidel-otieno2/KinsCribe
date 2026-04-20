@@ -380,6 +380,10 @@ def login():
     if not bcrypt.check_password_hash(user.password, data["password"]):
         return jsonify({"error": "Incorrect password"}), 401
 
+    # If 2FA is enabled, return challenge instead of tokens
+    if user.two_factor_enabled:
+        return jsonify({"requires_2fa": True, "user_id": user.id})
+
     return jsonify(_tokens(user))
 
 
@@ -722,24 +726,57 @@ def verify_2fa_setup():
 @auth_bp.route("/2fa/disable", methods=["POST"])
 @jwt_required()
 def disable_2fa():
-    """Disable 2FA for user account"""
     user = User.query.get(int(get_jwt_identity()))
     data = request.json or {}
     password = data.get("password", "")
-    
+
     if not user.two_factor_enabled:
         return jsonify({"error": "2FA is not enabled"}), 400
-    
-    # Verify password
+
     if user.password and not bcrypt.check_password_hash(user.password, password):
         return jsonify({"error": "Incorrect password"}), 401
-    
-    # Disable 2FA
+
     user.two_factor_enabled = False
     user.two_factor_secret = None
     user.backup_codes = None
     db.session.commit()
-    
+    return jsonify({"message": "2FA disabled successfully"})
+
+
+@auth_bp.route("/2fa/login", methods=["POST"])
+def verify_2fa_login():
+    """Verify 2FA code or backup code during login"""
+    import pyotp
+    import json
+
+    data = request.json or {}
+    user_id = data.get("user_id")
+    code = data.get("code", "").strip()
+
+    if not user_id or not code:
+        return jsonify({"error": "user_id and code are required"}), 400
+
+    user = User.query.get(int(user_id))
+    if not user or not user.two_factor_enabled:
+        return jsonify({"error": "2FA not enabled for this account"}), 400
+
+    # Try TOTP code first
+    totp = pyotp.TOTP(user.two_factor_secret)
+    if totp.verify(code, valid_window=1):
+        return jsonify({**_tokens(user), "message": "2FA verified"})
+
+    # Try backup codes
+    try:
+        backup_codes = json.loads(user.backup_codes or "[]")
+        if code.upper() in backup_codes:
+            backup_codes.remove(code.upper())
+            user.backup_codes = json.dumps(backup_codes)
+            db.session.commit()
+            return jsonify({**_tokens(user), "message": "2FA verified with backup code"})
+    except Exception:
+        pass
+
+    return jsonify({"error": "Invalid code"}), 401
 @auth_bp.route("/phone/add", methods=["POST"])
 @jwt_required()
 def add_phone_number():

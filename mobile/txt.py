@@ -1,7 +1,7 @@
 F1T27BZ5CC8764WMWSB6A54T
 . Entry Flow
 User Journey
-• Splash / welcome screen
+# • Splash / welcome screen
 # • Login or Sign up
 # • Phone or email verification (OTP)
 # • Profile setup wizard
@@ -13,17 +13,17 @@ Login Options
 # • Phone number login
 # • Google SSO (Sign in with Google)
 # • Apple SSO (Sign in with Apple)
-• Biometric login — Face ID / fingerprint
+# • Biometric login — Face ID / fingerprint
 • Forgot password / reset via email or phone
-• Two-factor authentication (2FA)
-Account Creation
-• Username selection with availability check
-• Profile photo upload
-• Display name and bio
-• Website link
-• Interest / category picker
-• Follow suggestions during onboarding
-• Privacy mode selection: public or private account
+# • Two-factor authentication (2FA)
+# Account Creation
+# # • Username selection with availability check
+# • Profile photo upload
+# • Display name and bio
+# • Website link
+# • Interest / category picker
+# • Follow suggestions during onboarding
+# • Privacy mode selection: public or private account
 2. Public Home Feed (Like Instagram)
 Feed• Photo posts — single image and carousel (multiple images)
 • Video posts — reels-style short video
