@@ -58,6 +58,7 @@ class User(db.Model):
             "is_private": self.is_private,
             "account_type": self.account_type,
             "two_factor_enabled": self.two_factor_enabled,
+            "has_password": bool(self.password),
             "family_id": self.family_id,
             "connection_count": connection_count,
             "interest_count": interest_count,

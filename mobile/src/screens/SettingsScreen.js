@@ -647,7 +647,7 @@ export default function SettingsScreen({ navigation }) {
         visible={showChangePasswordModal}
         onClose={() => setShowChangePasswordModal(false)}
         userEmail={user?.email}
-        hasPassword={!!user?.password}
+        hasPassword={user?.has_password}
         onSuccess={() => success('Password changed successfully!')}
       />
 
