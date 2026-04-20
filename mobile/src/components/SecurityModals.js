@@ -225,13 +225,12 @@ export function ChangePasswordModal({ visible, onClose, userEmail, hasPassword, 
   };
 
   const sendOtp = async () => {
-    if (hasPassword && !currentPassword) { setError('Please enter your current password'); return; }
     if (newPassword.length < 6) { setError('New password must be at least 6 characters'); return; }
     if (newPassword !== confirmPassword) { setError('Passwords do not match'); return; }
     setError(''); setLoading(true);
     try {
       await api.post('/auth/change-password', {
-        current_password: currentPassword,
+        current_password: currentPassword || undefined,
         new_password: newPassword,
       });
       setStep('otp');
@@ -296,25 +295,21 @@ export function ChangePasswordModal({ visible, onClose, userEmail, hasPassword, 
 
             {step === 'form' && (
               <>
-                {hasPassword && (
-                  <>
-                    <Text style={s.label}>Current Password</Text>
-                    <View style={s.inputWrap}>
-                      <Ionicons name="lock-closed-outline" size={17} color={colors.muted} />
-                      <TextInput
-                        style={s.input}
-                        placeholder="Enter current password"
-                        placeholderTextColor={colors.dim}
-                        secureTextEntry={!showCurrent}
-                        value={currentPassword}
-                        onChangeText={v => { setCurrentPassword(v); setError(''); }}
-                      />
-                      <TouchableOpacity onPress={() => setShowCurrent(p => !p)} style={{ padding: 4 }}>
-                        <Ionicons name={showCurrent ? 'eye-off-outline' : 'eye-outline'} size={17} color={colors.muted} />
-                      </TouchableOpacity>
-                    </View>
-                  </>
-                )}
+                <Text style={s.label}>Current Password (if you have one)</Text>
+                <View style={s.inputWrap}>
+                  <Ionicons name="lock-closed-outline" size={17} color={colors.muted} />
+                  <TextInput
+                    style={s.input}
+                    placeholder="Leave blank if signing in with Google"
+                    placeholderTextColor={colors.dim}
+                    secureTextEntry={!showCurrent}
+                    value={currentPassword}
+                    onChangeText={v => { setCurrentPassword(v); setError(''); }}
+                  />
+                  <TouchableOpacity onPress={() => setShowCurrent(p => !p)} style={{ padding: 4 }}>
+                    <Ionicons name={showCurrent ? 'eye-off-outline' : 'eye-outline'} size={17} color={colors.muted} />
+                  </TouchableOpacity>
+                </View>
                 <Text style={s.label}>New Password</Text>
                 <View style={s.inputWrap}>
                   <Ionicons name="lock-open-outline" size={17} color={colors.muted} />

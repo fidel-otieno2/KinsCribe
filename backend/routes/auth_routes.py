@@ -831,8 +831,6 @@ def change_password():
             return jsonify({"error": "Current password is required"}), 400
         if not bcrypt.check_password_hash(user.password, current_password):
             return jsonify({"error": "Current password is incorrect"}), 401
-
-    # Step 1: No OTP yet — send OTP to email
     if not otp:
         code = str(random.randint(100000, 999999))
         expiry = (datetime.utcnow() + timedelta(minutes=10)).isoformat()
