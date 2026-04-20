@@ -541,6 +541,7 @@ def send_phone_otp():
 @auth_bp.route("/phone/verify-otp", methods=["POST"])
 def verify_phone_otp():
     from datetime import datetime
+    import traceback
 
     data = request.json or {}
     phone = data.get("phone", "").strip()
@@ -548,38 +549,47 @@ def verify_phone_otp():
     otp = data.get("otp", "").strip()
     name = data.get("name", "").strip()
 
+    print(f"📱 verify_phone_otp called: phone={phone}, email={email}, otp={otp}")
+
     if not phone or not otp or not email:
         return jsonify({"error": "Phone, email and OTP are required"}), 400
 
-    # Look up user by email and verify OTP from DB
-    user = User.query.filter_by(email=email).first()
-    if not user:
-        return jsonify({"error": "No verification pending for this email"}), 404
-
-    token = user.verification_token or ""
-    if not token.startswith("phone_otp:"):
-        return jsonify({"error": "No OTP pending. Please request a new code."}), 400
-
     try:
+        user = User.query.filter_by(email=email).first()
+        print(f"📱 User found: {user is not None}, token: {user.verification_token if user else 'N/A'}")
+        
+        if not user:
+            return jsonify({"error": "No verification pending for this email"}), 404
+
+        token = user.verification_token or ""
+        if not token.startswith("phone_otp:"):
+            return jsonify({"error": "No OTP pending. Please request a new code."}), 400
+
         parts = token.split(":", 2)
         stored_otp = parts[1]
         expiry_str = parts[2]
+        print(f"📱 stored_otp={stored_otp}, expiry={expiry_str}, provided={otp}")
+        
         if stored_otp != otp:
             return jsonify({"error": "Incorrect OTP"}), 400
         if datetime.utcnow() > datetime.fromisoformat(expiry_str):
             return jsonify({"error": "OTP has expired"}), 400
-    except Exception:
-        return jsonify({"error": "Invalid OTP"}), 400
 
-    is_new_user = user.name == "Phone User"
-    if is_new_user and name:
-        user.name = name
-    user.phone = phone
-    user.is_verified = True
-    user.verification_token = None
-    db.session.commit()
+        is_new_user = user.name == "Phone User"
+        if is_new_user and name:
+            user.name = name
+        user.phone = phone
+        user.is_verified = True
+        user.verification_token = None
+        db.session.commit()
 
-    return jsonify({**_tokens(user), "is_new_user": is_new_user, "message": "Phone verified successfully!"})
+        print(f"📱 Phone verified successfully for {email}")
+        return jsonify({**_tokens(user), "is_new_user": is_new_user, "message": "Phone verified successfully!"})
+
+    except Exception as e:
+        print(f"📱 verify_phone_otp ERROR: {str(e)}")
+        print(traceback.format_exc())
+        return jsonify({"error": f"Server error: {str(e)}"}), 500
 
 
 @auth_bp.route("/apple", methods=["POST"])
