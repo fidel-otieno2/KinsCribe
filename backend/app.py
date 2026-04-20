@@ -47,8 +47,7 @@ def create_app():
     app.register_blueprint(search_bp, url_prefix="/api/search")
 
     with app.app_context():
-        import threading
-        threading.Thread(target=_safe_migrate, daemon=True).start()
+        _safe_migrate()
 
     @app.errorhandler(Exception)
     def handle_exception(e):
@@ -60,9 +59,7 @@ def create_app():
 
 
 def _safe_migrate():
-    """Run db.create_all + migrations in background so startup is instant."""
-    import time
-    time.sleep(2)  # Let the app fully start first
+    """Run db.create_all + migrations synchronously before app starts."""
     try:
         with app.app_context():
             db.create_all()

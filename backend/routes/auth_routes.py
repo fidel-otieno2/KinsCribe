@@ -916,6 +916,32 @@ def send_add_phone_otp():
         })
 
 
+@auth_bp.route("/test-email", methods=["GET"])
+def test_email():
+    """Test email configuration"""
+    config_info = {
+        "MAIL_SERVER": os.getenv('MAIL_SERVER'),
+        "MAIL_PORT": os.getenv('MAIL_PORT'),
+        "MAIL_USERNAME": os.getenv('MAIL_USERNAME'),
+        "MAIL_DEFAULT_SENDER": os.getenv('MAIL_DEFAULT_SENDER'),
+        "MAIL_PASSWORD_SET": bool(os.getenv('MAIL_PASSWORD')),
+        "MAIL_USE_TLS": os.getenv('MAIL_USE_TLS'),
+    }
+    
+    test_email = request.args.get('to')
+    if not test_email:
+        return jsonify({"config": config_info, "hint": "Add ?to=youremail@gmail.com to send a test email"})
+    
+    try:
+        msg = Message("KinsCribe Email Test", recipients=[test_email])
+        msg.html = "<h2>Email is working!</h2><p>Your KinsCribe email service is configured correctly.</p>"
+        mail.send(msg)
+        return jsonify({"success": True, "message": f"Test email sent to {test_email}", "config": config_info})
+    except Exception as e:
+        import traceback
+        return jsonify({"success": False, "error": str(e), "traceback": traceback.format_exc(), "config": config_info}), 500
+
+
 @auth_bp.route("/refresh", methods=["POST"])
 @jwt_required(refresh=True)
 def refresh():
