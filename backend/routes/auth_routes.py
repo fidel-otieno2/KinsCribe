@@ -477,13 +477,8 @@ def deactivate_account():
     return jsonify({"message": "Account deactivated"})
 
 
-# In-memory OTP store keyed by "phone:email" -> {otp, expiry}
-_phone_otp_store = {}
-
-
 @auth_bp.route("/phone/send-otp", methods=["POST"])
 def send_phone_otp():
-    """Send OTP via email for phone number verification"""
     import random
     from datetime import datetime, timedelta
 
@@ -503,9 +498,21 @@ def send_phone_otp():
         return jsonify({"error": "Invalid phone number format"}), 400
 
     otp = str(random.randint(100000, 999999))
-    expiry = datetime.utcnow() + timedelta(minutes=10)
-    _phone_otp_store[f"{phone}:{email}"] = {"otp": otp, "expiry": expiry}
-    
+    expiry = (datetime.utcnow() + timedelta(minutes=10)).isoformat()
+
+    # Store OTP in DB - find or create user by email
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        user = User(
+            name="Phone User",
+            email=email,
+            phone=phone,
+            is_verified=False
+        )
+        db.session.add(user)
+    user.verification_token = f"phone_otp:{otp}:{expiry}:{phone}"
+    db.session.commit()
+
     display_phone = phone[:4] + '*' * (len(phone) - 8) + phone[-4:] if len(phone) > 8 else phone
 
     try:
@@ -528,16 +535,11 @@ def send_phone_otp():
         )
         return jsonify({"message": f"Verification code sent to {email}", "phone": phone, "email": email, "email_sent": True})
     except Exception as e:
-        return jsonify({
-            "message": f"Email service unavailable. OTP: {otp}",
-            "phone": phone, "email": email, "otp": otp, "email_sent": False,
-            "error": f"Failed to send email: {str(e)}"
-        })
+        return jsonify({"message": f"Email service unavailable. OTP: {otp}", "phone": phone, "email": email, "otp": otp, "email_sent": False, "error": str(e)})
 
 
 @auth_bp.route("/phone/verify-otp", methods=["POST"])
 def verify_phone_otp():
-    """Verify phone OTP and login/register user by email"""
     from datetime import datetime
 
     data = request.json or {}
@@ -549,32 +551,32 @@ def verify_phone_otp():
     if not phone or not otp or not email:
         return jsonify({"error": "Phone, email and OTP are required"}), 400
 
-    key = f"{phone}:{email}"
-    entry = _phone_otp_store.get(key)
-    if not entry:
-        return jsonify({"error": "No OTP pending for this phone/email combination"}), 400
-    if entry["otp"] != otp:
-        return jsonify({"error": "Incorrect OTP"}), 400
-    if datetime.utcnow() > entry["expiry"]:
-        _phone_otp_store.pop(key, None)
-        return jsonify({"error": "OTP has expired"}), 400
-
-    _phone_otp_store.pop(key, None)
-
-    # Find or create user by email (phone can be shared across emails)
+    # Look up user by email and verify OTP from DB
     user = User.query.filter_by(email=email).first()
-    is_new_user = user is None
-    if is_new_user:
-        user = User(
-            name=name or "Phone User",
-            email=email,
-            phone=phone,
-            is_verified=True
-        )
-        db.session.add(user)
-    else:
-        user.phone = phone
-        user.is_verified = True
+    if not user:
+        return jsonify({"error": "No verification pending for this email"}), 404
+
+    token = user.verification_token or ""
+    if not token.startswith("phone_otp:"):
+        return jsonify({"error": "No OTP pending. Please request a new code."}), 400
+
+    try:
+        parts = token.split(":")
+        stored_otp = parts[1]
+        expiry_str = parts[2]
+        if stored_otp != otp:
+            return jsonify({"error": "Incorrect OTP"}), 400
+        if datetime.utcnow() > datetime.fromisoformat(expiry_str):
+            return jsonify({"error": "OTP has expired"}), 400
+    except Exception:
+        return jsonify({"error": "Invalid OTP"}), 400
+
+    is_new_user = user.name == "Phone User"
+    if is_new_user and name:
+        user.name = name
+    user.phone = phone
+    user.is_verified = True
+    user.verification_token = None
     db.session.commit()
 
     return jsonify({**_tokens(user), "is_new_user": is_new_user, "message": "Phone verified successfully!"})
