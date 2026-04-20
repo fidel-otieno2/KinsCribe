@@ -4,7 +4,15 @@ import api from '../api/axios';
 
 const AuthContext = createContext();
 
-const ACCOUNTS_KEY = 'saved_accounts'; // [{id, name, username, avatar, email, access_token, refresh_token}]
+const clearStoragePreserveBiometrics = async () => {
+  const biometricEnabled = await AsyncStorage.getItem('biometric_enabled');
+  const biometricCredentials = await AsyncStorage.getItem('biometric_credentials');
+  await AsyncStorage.clear();
+  if (biometricEnabled) await AsyncStorage.setItem('biometric_enabled', biometricEnabled);
+  if (biometricCredentials) await AsyncStorage.setItem('biometric_credentials', biometricCredentials);
+};
+
+ // [{id, name, username, avatar, email, access_token, refresh_token}]
 const ACTIVE_ACCOUNT_KEY = 'active_account_id';
 
 export function AuthProvider({ children }) {
@@ -32,7 +40,7 @@ export function AuthProvider({ children }) {
             await AsyncStorage.setItem(ACTIVE_ACCOUNT_KEY, data.id.toString());
           }
         } catch {
-          await AsyncStorage.clear();
+          await clearStoragePreserveBiometrics();
         } finally {
           clearTimeout(timeout);
           setLoading(false);
@@ -182,7 +190,7 @@ export function AuthProvider({ children }) {
       if (updated.length > 0) {
         await switchAccount(updated[0].id);
       } else {
-        await AsyncStorage.clear();
+        await clearStoragePreserveBiometrics();
         setUser(null);
       }
     }
@@ -211,12 +219,7 @@ export function AuthProvider({ children }) {
     }
 
     // Full logout - no other accounts available
-    // Preserve biometric settings across logout
-    const biometricEnabled = await AsyncStorage.getItem('biometric_enabled');
-    const biometricCredentials = await AsyncStorage.getItem('biometric_credentials');
-    await AsyncStorage.clear();
-    if (biometricEnabled) await AsyncStorage.setItem('biometric_enabled', biometricEnabled);
-    if (biometricCredentials) await AsyncStorage.setItem('biometric_credentials', biometricCredentials);
+    await clearStoragePreserveBiometrics();
     setUser(null);
   };
 

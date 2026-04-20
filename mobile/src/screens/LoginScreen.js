@@ -747,24 +747,24 @@ export default function LoginScreen({ navigation }) {
     setBiometricLoading(true);
     setError('');
     try {
-      const savedCredentials = await AsyncStorage.getItem('biometric_credentials');
-      if (!savedCredentials) {
-        await AsyncStorage.removeItem('biometric_enabled');
-        setBiometricEnabled(false);
-        setError('Biometric session expired. Please sign in with password once to re-link.');
-        return;
-      }
       const result = await authenticateAsync({
         promptMessage: 'Sign in to KinsCribe',
         fallbackLabel: 'Use password',
         cancelLabel: 'Cancel',
       });
       if (result.success) {
-        const { email, password } = JSON.parse(savedCredentials);
-        const loginResult = await login(email, password);
-        if (loginResult?.requires_2fa) {
-          setTwoFAUserId(loginResult.user_id);
-          setShow2FA(true);
+        const savedCredentials = await AsyncStorage.getItem('biometric_credentials');
+        if (savedCredentials) {
+          const { email, password } = JSON.parse(savedCredentials);
+          const loginResult = await login(email, password);
+          if (loginResult?.requires_2fa) {
+            setTwoFAUserId(loginResult.user_id);
+            setShow2FA(true);
+          }
+        } else {
+          await AsyncStorage.removeItem('biometric_enabled');
+          setBiometricEnabled(false);
+          setError('Please sign in with your password once to re-link biometric login.');
         }
       }
     } catch {
