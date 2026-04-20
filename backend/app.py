@@ -81,6 +81,8 @@ def _run_migrations():
 
     # PostgreSQL migrations - check if column exists before adding
     migrations = [
+        # Drop unique constraint on phone - same phone can be on multiple accounts
+        "DROP INDEX IF EXISTS idx_users_phone",
         # Stories table
         "ALTER TABLE stories ADD COLUMN IF NOT EXISTS music_url VARCHAR(300)",
         "ALTER TABLE stories ADD COLUMN IF NOT EXISTS music_name VARCHAR(200)",
@@ -106,7 +108,6 @@ def _run_migrations():
         # Conversations table
         "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS name VARCHAR(100)",
         # Indexes
-        "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone ON users(phone)",
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_apple_id ON users(apple_id)",
     ]
 

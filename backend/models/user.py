@@ -8,7 +8,7 @@ class User(db.Model):
     name = db.Column(db.String(100), nullable=False)
     username = db.Column(db.String(50), unique=True, nullable=True)
     email = db.Column(db.String(120), unique=True, nullable=True)  # Made nullable for phone-only users
-    phone = db.Column(db.String(20), unique=True, nullable=True)  # Added phone number
+    phone = db.Column(db.String(20), nullable=True)  # One phone can be linked to many emails
     password = db.Column(db.String(200), nullable=True)  # nullable for Google OAuth users
     role = db.Column(db.String(20), default="member")  # admin | member | historian
     is_verified = db.Column(db.Boolean, default=False)

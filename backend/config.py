@@ -23,7 +23,7 @@ class Config:
     JWT_REFRESH_TOKEN_EXPIRES = 2592000
     JWT_IDENTITY_CLAIM = "sub"
 
-    MAIL_SERVER = os.getenv("MAIL_SERVER", "smtp-relay.brevo.com")
+    MAIL_SERVER = os.getenv("MAIL_SERVER", "smtp.gmail.com")
     MAIL_PORT = int(os.getenv("MAIL_PORT", 587))
     MAIL_USE_TLS = True
     MAIL_USE_SSL = False

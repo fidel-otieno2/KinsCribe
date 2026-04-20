@@ -23,7 +23,24 @@ cloudinary.config(
 )
 
 
-def _tokens(user):
+def _send_email(subject, recipients, html):
+    """Send email with proper sender configuration"""
+    try:
+        sender = os.getenv('MAIL_FROM_NAME', 'KinsCribe')
+        sender_email = os.getenv('MAIL_FROM_EMAIL') or os.getenv('MAIL_USERNAME')
+        msg = Message(
+            subject,
+            recipients=recipients,
+            sender=(sender, sender_email)
+        )
+        msg.html = html
+        mail.send(msg)
+        return True
+    except Exception as e:
+        print(f"📧 Email send error: {str(e)}")
+        raise e
+
+
     return {
         "access_token": create_access_token(identity=str(user.id)),
         "refresh_token": create_refresh_token(identity=str(user.id)),
@@ -59,10 +76,12 @@ def register():
             existing_email.verification_token = f"otp:{otp}:{expiry}"
             db.session.commit()
             try:
-                msg = Message("Verify your KinsCribe account", recipients=[email])
-                msg.html = _otp_email_html(existing_email.name, otp)
-                mail.send(msg)
-                return jsonify({"message": "OTP resent to your email.", "requires_otp": True, "email": email}), 200
+        _send_email(
+            "Verify your KinsCribe account",
+            [email],
+            _otp_email_html(existing_email.name, otp)
+        )
+        return jsonify({"message": "OTP resent to your email.", "requires_otp": True, "email": email}), 200
             except Exception:
                 existing_email.is_verified = True
                 existing_email.verification_token = None
@@ -97,10 +116,11 @@ def register():
         print(f"  MAIL_DEFAULT_SENDER: {os.getenv('MAIL_DEFAULT_SENDER')}")
         print(f"  MAIL_PASSWORD configured: {'Yes' if os.getenv('MAIL_PASSWORD') else 'No'}")
         
-        msg = Message("Verify your KinsCribe account", recipients=[email])
-        msg.html = _otp_email_html(name, otp)
-        print(f"📧 Attempting to send registration email to: {email}")
-        mail.send(msg)
+        _send_email(
+            "Verify your KinsCribe account",
+            [email],
+            _otp_email_html(name, otp)
+        )
         print(f"📧 Registration email sent successfully!")
         return jsonify({"message": "OTP sent to your email.", "requires_otp": True, "email": email}), 201
     except Exception as e:
@@ -180,8 +200,10 @@ def resend_otp():
     db.session.commit()
 
     try:
-        msg = Message("Your new KinsCribe verification code", recipients=[user.email])
-        msg.html = f"""
+        _send_email(
+            "Your new KinsCribe verification code",
+            [user.email],
+            f"""
         <div style="font-family:sans-serif;max-width:480px;margin:auto;background:#0f172a;color:#f1f5f9;padding:32px;border-radius:16px">
           <h2 style="color:#7c3aed">KinsCribe</h2>
           <p>Your new verification code:</p>
@@ -191,7 +213,7 @@ def resend_otp():
           <p style="color:#94a3b8;font-size:13px">Expires in 15 minutes.</p>
         </div>
         """
-        mail.send(msg)
+        )
         return jsonify({"message": "New OTP sent."})
     except Exception as e:
         return jsonify({"error": f"Failed to send email: {str(e)}"}), 500
@@ -278,8 +300,10 @@ def forgot_password():
     db.session.commit()
 
     try:
-        msg = Message("Your KinsCribe password reset code", recipients=[user.email])
-        msg.html = f"""
+        _send_email(
+            "Your KinsCribe password reset code",
+            [user.email],
+            f"""
         <div style="font-family:sans-serif;max-width:480px;margin:auto;background:#0f172a;color:#f1f5f9;padding:32px;border-radius:16px">
           <h2 style="color:#7c3aed;margin-bottom:4px">KinsCribe</h2>
           <p style="color:#94a3b8;margin-top:0">Password Reset</p>
@@ -292,7 +316,7 @@ def forgot_password():
           <p style="color:#94a3b8;font-size:13px">If you didn't request this, you can safely ignore this email.</p>
         </div>
         """
-        mail.send(msg)
+        )
         return jsonify({"message": "A 6-digit reset code was sent to your email."}), 200
     except Exception as e:
         print(f"Mail error: {e}")
@@ -448,68 +472,42 @@ def deactivate_account():
     return jsonify({"message": "Account deactivated"})
 
 
+# In-memory OTP store keyed by "phone:email" -> {otp, expiry}
+_phone_otp_store = {}
+
+
 @auth_bp.route("/phone/send-otp", methods=["POST"])
 def send_phone_otp():
     """Send OTP via email for phone number verification"""
     import random
     from datetime import datetime, timedelta
-    
+
     data = request.json or {}
     phone = data.get("phone", "").strip()
     email = data.get("email", "").strip().lower()
-    
+
     if not phone:
         return jsonify({"error": "Phone number is required"}), 400
-    
     if not email:
         return jsonify({"error": "Email is required for phone verification"}), 400
-    
-    # Validate international phone format
     if not phone.startswith('+'):
         return jsonify({"error": "Phone number must include country code (e.g., +254729569010)"}), 400
-    
-    # Remove + and validate digits
+
     phone_digits = phone[1:]
     if not phone_digits.isdigit() or len(phone_digits) < 7 or len(phone_digits) > 15:
         return jsonify({"error": "Invalid phone number format"}), 400
-    
-    # Generate 6-digit OTP
+
     otp = str(random.randint(100000, 999999))
-    expiry = (datetime.utcnow() + timedelta(minutes=10)).isoformat()
+    expiry = datetime.utcnow() + timedelta(minutes=10)
+    _phone_otp_store[f"{phone}:{email}"] = {"otp": otp, "expiry": expiry}
     
-    # Check if user exists
-    user = User.query.filter_by(phone=phone).first()
-    if not user:
-        # Create new user for phone registration
-        user = User(
-            name="Phone User",  # Will be updated during profile setup
-            email=email,
-            phone=phone,
-            verification_token=f"phone_otp:{otp}:{expiry}",
-            is_verified=False
-        )
-        db.session.add(user)
-    else:
-        user.verification_token = f"phone_otp:{otp}:{expiry}"
-        if not user.email:
-            user.email = email
-    
-    db.session.commit()
-    
-    # Format phone for display (mask middle digits)
     display_phone = phone[:4] + '*' * (len(phone) - 8) + phone[-4:] if len(phone) > 8 else phone
-    
-    # Send OTP via email
+
     try:
-        # Debug email configuration
-        print(f"📧 Email config check:")
-        print(f"  MAIL_SERVER: {os.getenv('MAIL_SERVER')}")
-        print(f"  MAIL_USERNAME: {os.getenv('MAIL_USERNAME')}")
-        print(f"  MAIL_DEFAULT_SENDER: {os.getenv('MAIL_DEFAULT_SENDER')}")
-        print(f"  MAIL_PASSWORD configured: {'Yes' if os.getenv('MAIL_PASSWORD') else 'No'}")
-        
-        msg = Message("Your KinsCribe Phone Verification Code", recipients=[email])
-        msg.html = f"""
+        _send_email(
+            "Your KinsCribe Phone Verification Code",
+            [email],
+            f"""
         <div style="font-family:sans-serif;max-width:480px;margin:auto;background:#0f172a;color:#f1f5f9;padding:32px;border-radius:16px">
           <h2 style="color:#7c3aed;margin-bottom:4px">KinsCribe</h2>
           <p style="color:#94a3b8;margin-top:0">Phone Verification</p>
@@ -522,109 +520,59 @@ def send_phone_otp():
           <p style="color:#94a3b8;font-size:13px">If you didn't request this verification, please ignore this email.</p>
         </div>
         """
-        
-        print(f"📧 Attempting to send email to: {email}")
-        mail.send(msg)
-        print(f"📧 Email sent successfully!")
-        
-        return jsonify({
-            "message": f"Verification code sent to {email}",
-            "phone": phone,
-            "email": email,
-            "email_sent": True
-        })
-        
+        )
+        return jsonify({"message": f"Verification code sent to {email}", "phone": phone, "email": email, "email_sent": True})
     except Exception as e:
-        print(f"📧 Email failed with error: {str(e)}")
-        print(f"📧 Email error type: {type(e).__name__}")
-        import traceback
-        print(f"📧 Full traceback: {traceback.format_exc()}")
-        
         return jsonify({
             "message": f"Email service unavailable. OTP: {otp}",
-            "phone": phone,
-            "email": email,
-            "otp": otp,
-            "email_sent": False,
+            "phone": phone, "email": email, "otp": otp, "email_sent": False,
             "error": f"Failed to send email: {str(e)}"
         })
 
 
 @auth_bp.route("/phone/verify-otp", methods=["POST"])
 def verify_phone_otp():
-    """Verify phone OTP sent via email and login/register user"""
+    """Verify phone OTP and login/register user by email"""
     from datetime import datetime
-    
+
     data = request.json or {}
     phone = data.get("phone", "").strip()
     email = data.get("email", "").strip().lower()
     otp = data.get("otp", "").strip()
-    name = data.get("name", "").strip()  # For new registrations
-    
-    if not phone or not otp:
-        return jsonify({"error": "Phone and OTP are required"}), 400
-    
-    if not email:
-        return jsonify({"error": "Email is required for verification"}), 400
-    
-    # Validate international phone format
-    if not phone.startswith('+'):
-        return jsonify({"error": "Invalid phone format"}), 400
-    
-    user = User.query.filter_by(phone=phone).first()
-    if not user:
-        return jsonify({"error": "Phone number not found"}), 404
-    
-    token = user.verification_token or ""
-    if not token.startswith("phone_otp:"):
-        return jsonify({"error": "No OTP pending for this phone"}), 400
-    
-    try:
-        _, stored_otp, expiry_str = token.split(":", 2)
-        if stored_otp != otp:
-            return jsonify({"error": "Incorrect OTP"}), 400
-        if datetime.utcnow() > datetime.fromisoformat(expiry_str):
-            return jsonify({"error": "OTP has expired"}), 400
-    except Exception:
-        return jsonify({"error": "Invalid OTP"}), 400
-    
-    # Update user info for new registrations
-    is_new_user = user.name == "Phone User"
-    if is_new_user and name:
-        user.name = name
-    
-    # Ensure email is set
-    if not user.email:
-        user.email = email
-    
-    user.is_verified = True
-    user.verification_token = None
-    db.session.commit()
-    
-    # Send welcome email for new users
+    name = data.get("name", "").strip()
+
+    if not phone or not otp or not email:
+        return jsonify({"error": "Phone, email and OTP are required"}), 400
+
+    key = f"{phone}:{email}"
+    entry = _phone_otp_store.get(key)
+    if not entry:
+        return jsonify({"error": "No OTP pending for this phone/email combination"}), 400
+    if entry["otp"] != otp:
+        return jsonify({"error": "Incorrect OTP"}), 400
+    if datetime.utcnow() > entry["expiry"]:
+        _phone_otp_store.pop(key, None)
+        return jsonify({"error": "OTP has expired"}), 400
+
+    _phone_otp_store.pop(key, None)
+
+    # Find or create user by email (phone can be shared across emails)
+    user = User.query.filter_by(email=email).first()
+    is_new_user = user is None
     if is_new_user:
-        try:
-            msg = Message("Welcome to KinsCribe!", recipients=[user.email])
-            msg.html = f"""
-            <div style="font-family:sans-serif;max-width:480px;margin:auto;background:#0f172a;color:#f1f5f9;padding:32px;border-radius:16px">
-              <h2 style="color:#7c3aed;margin-bottom:4px">KinsCribe</h2>
-              <p style="color:#94a3b8;margin-top:0">Welcome!</p>
-              <hr style="border-color:#1e293b;margin:20px 0">
-              <p>Hi <strong>{user.name}</strong>! 🎉</p>
-              <p>Welcome to KinsCribe! Your account has been created successfully.</p>
-              <p>Start capturing and sharing your family memories today!</p>
-              <p style="color:#94a3b8;font-size:13px">Download the app and explore all the features.</p>
-            </div>
-            """
-            mail.send(msg)
-        except Exception as e:
-            print(f"Welcome email failed: {e}")
-    
-    return jsonify({
-        **_tokens(user),
-        "is_new_user": is_new_user,
-        "message": "Phone verified successfully!"
-    })
+        user = User(
+            name=name or "Phone User",
+            email=email,
+            phone=phone,
+            is_verified=True
+        )
+        db.session.add(user)
+    else:
+        user.phone = phone
+        user.is_verified = True
+    db.session.commit()
+
+    return jsonify({**_tokens(user), "is_new_user": is_new_user, "message": "Phone verified successfully!"})
 
 
 @auth_bp.route("/apple", methods=["POST"])
@@ -778,33 +726,20 @@ def disable_2fa():
 @auth_bp.route("/phone/add", methods=["POST"])
 @jwt_required()
 def add_phone_number():
-    """Add phone number to existing account"""
-    import random
-    from datetime import datetime, timedelta
-    
+    from datetime import datetime
+
     user = User.query.get(int(get_jwt_identity()))
     data = request.json or {}
     phone = data.get("phone", "").strip()
     otp = data.get("otp", "").strip()
-    
+
     if not phone or not otp:
         return jsonify({"error": "Phone and OTP are required"}), 400
-    
-    # Normalize phone
-    phone = ''.join(filter(str.isdigit, phone))
-    if not phone.startswith('1') and len(phone) == 10:
-        phone = '1' + phone
-    
-    # Check if phone is already used
-    existing = User.query.filter(User.phone == phone, User.id != user.id).first()
-    if existing:
-        return jsonify({"error": "This phone number is already registered"}), 409
-    
-    # Verify OTP (stored in verification_token temporarily)
+
     token = user.verification_token or ""
     if not token.startswith("phone_otp:"):
         return jsonify({"error": "No OTP pending for phone verification"}), 400
-    
+
     try:
         _, stored_otp, expiry_str = token.split(":", 2)
         if stored_otp != otp:
@@ -813,107 +748,62 @@ def add_phone_number():
             return jsonify({"error": "OTP has expired"}), 400
     except Exception:
         return jsonify({"error": "Invalid OTP"}), 400
-    
-    # Add phone to user account
+
     user.phone = phone
     user.verification_token = None
     db.session.commit()
-    
-    return jsonify({
-        "message": "Phone number added successfully",
-        "user": user.to_dict()
-    })
+    return jsonify({"message": "Phone number added successfully", "user": user.to_dict()})
 
 
 @auth_bp.route("/phone/send-add-otp", methods=["POST"])
 @jwt_required()
 def send_add_phone_otp():
-    """Send OTP via email to add phone number to existing account"""
     import random
     from datetime import datetime, timedelta
-    
+
     user = User.query.get(int(get_jwt_identity()))
     data = request.json or {}
     phone = data.get("phone", "").strip()
-    
+
     if not phone:
         return jsonify({"error": "Phone number is required"}), 400
-    
     if not user.email:
-        return jsonify({"error": "Email is required for phone verification"}), 400
-    
-    # Validate international phone format
+        return jsonify({"error": "No email on your account for verification"}), 400
     if not phone.startswith('+'):
         return jsonify({"error": "Phone number must include country code (e.g., +254729569010)"}), 400
-    
-    # Remove + and validate digits
+
     phone_digits = phone[1:]
     if not phone_digits.isdigit() or len(phone_digits) < 7 or len(phone_digits) > 15:
         return jsonify({"error": "Invalid phone number format"}), 400
-    
-    # Check if phone is already used
-    existing = User.query.filter(User.phone == phone, User.id != user.id).first()
-    if existing:
-        return jsonify({"error": "This phone number is already registered"}), 409
-    
-    # Generate OTP
+
     otp = str(random.randint(100000, 999999))
     expiry = (datetime.utcnow() + timedelta(minutes=10)).isoformat()
-    
-    # Store OTP temporarily
     user.verification_token = f"phone_otp:{otp}:{expiry}"
     db.session.commit()
-    
-    # Format phone for display
+
     display_phone = phone[:4] + '*' * (len(phone) - 8) + phone[-4:] if len(phone) > 8 else phone
-    
-    # Send OTP via email
+
     try:
-        # Debug email configuration
-        print(f"📧 Add Phone Email config check:")
-        print(f"  MAIL_SERVER: {os.getenv('MAIL_SERVER')}")
-        print(f"  MAIL_USERNAME: {os.getenv('MAIL_USERNAME')}")
-        print(f"  MAIL_DEFAULT_SENDER: {os.getenv('MAIL_DEFAULT_SENDER')}")
-        print(f"  MAIL_PASSWORD configured: {'Yes' if os.getenv('MAIL_PASSWORD') else 'No'}")
-        
-        msg = Message("Add Phone Number to KinsCribe", recipients=[user.email])
-        msg.html = f"""
-        <div style="font-family:sans-serif;max-width:480px;margin:auto;background:#0f172a;color:#f1f5f9;padding:32px;border-radius:16px">
-          <h2 style="color:#7c3aed;margin-bottom:4px">KinsCribe</h2>
-          <p style="color:#94a3b8;margin-top:0">Add Phone Number</p>
-          <hr style="border-color:#1e293b;margin:20px 0">
-          <p>Hi <strong>{user.name}</strong>!</p>
-          <p>Use the code below to add phone number <strong>{display_phone}</strong> to your account. It expires in <strong>10 minutes</strong>.</p>
-          <div style="background:#1e293b;border-radius:12px;padding:24px;text-align:center;margin:24px 0">
-            <span style="font-size:40px;font-weight:900;letter-spacing:12px;color:#7c3aed">{otp}</span>
-          </div>
-          <p style="color:#94a3b8;font-size:13px">If you didn't request this, please ignore this email.</p>
-        </div>
-        """
-        
-        print(f"📧 Attempting to send add phone email to: {user.email}")
-        mail.send(msg)
-        print(f"📧 Add phone email sent successfully!")
-        
-        return jsonify({
-            "message": f"Verification code sent to {user.email}",
-            "phone": phone,
-            "email_sent": True
-        })
-        
+        _send_email(
+            "Add Phone Number to KinsCribe",
+            [user.email],
+            f"""
+            <div style="font-family:sans-serif;max-width:480px;margin:auto;background:#0f172a;color:#f1f5f9;padding:32px;border-radius:16px">
+              <h2 style="color:#7c3aed;margin-bottom:4px">KinsCribe</h2>
+              <p style="color:#94a3b8;margin-top:0">Add Phone Number</p>
+              <hr style="border-color:#1e293b;margin:20px 0">
+              <p>Hi <strong>{user.name}</strong>!</p>
+              <p>Use the code below to add <strong>{display_phone}</strong> to your account. Expires in <strong>10 minutes</strong>.</p>
+              <div style="background:#1e293b;border-radius:12px;padding:24px;text-align:center;margin:24px 0">
+                <span style="font-size:40px;font-weight:900;letter-spacing:12px;color:#7c3aed">{otp}</span>
+              </div>
+              <p style="color:#94a3b8;font-size:13px">If you didn't request this, please ignore this email.</p>
+            </div>
+            """
+        )
+        return jsonify({"message": f"Verification code sent to {user.email}", "phone": phone, "email_sent": True})
     except Exception as e:
-        print(f"📧 Add Phone Email failed with error: {str(e)}")
-        print(f"📧 Add Phone Email error type: {type(e).__name__}")
-        import traceback
-        print(f"📧 Add Phone Full traceback: {traceback.format_exc()}")
-        
-        return jsonify({
-            "message": f"Email service unavailable. OTP: {otp}",
-            "phone": phone,
-            "otp": otp,
-            "email_sent": False,
-            "error": f"Failed to send email: {str(e)}"
-        })
+        return jsonify({"message": f"Email service unavailable. OTP: {otp}", "phone": phone, "otp": otp, "email_sent": False, "error": str(e)})
 
 
 @auth_bp.route("/test-email", methods=["GET"])
