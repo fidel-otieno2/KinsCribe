@@ -123,6 +123,20 @@ def _run_migrations():
         "ALTER TABLE posts ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMP",
         "ALTER TABLE posts ADD COLUMN IF NOT EXISTS view_count INTEGER DEFAULT 0",
         "ALTER TABLE posts ADD COLUMN IF NOT EXISTS share_count INTEGER DEFAULT 0",
+        # Post comments table migrations
+        "ALTER TABLE post_comments ADD COLUMN IF NOT EXISTS parent_id INTEGER",
+        "ALTER TABLE post_comments ADD COLUMN IF NOT EXISTS likes INTEGER DEFAULT 0",
+        # Post saves table migrations
+        "ALTER TABLE post_saves ADD COLUMN IF NOT EXISTS collection VARCHAR(100) DEFAULT 'Saved'",
+        "ALTER TABLE post_saves ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW()",
+        # Public stories table migrations
+        "ALTER TABLE public_stories ADD COLUMN IF NOT EXISTS music_url VARCHAR(300)",
+        "ALTER TABLE public_stories ADD COLUMN IF NOT EXISTS music_name VARCHAR(200)",
+        "ALTER TABLE public_stories ADD COLUMN IF NOT EXISTS sticker_data TEXT",
+        "ALTER TABLE public_stories ADD COLUMN IF NOT EXISTS privacy VARCHAR(20) DEFAULT 'public'",
+        "ALTER TABLE public_stories ADD COLUMN IF NOT EXISTS view_count INTEGER DEFAULT 0",
+        "ALTER TABLE public_stories ADD COLUMN IF NOT EXISTS bg_color VARCHAR(20)",
+        "ALTER TABLE public_stories ADD COLUMN IF NOT EXISTS text_content TEXT",
         # Indexes
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_apple_id ON users(apple_id)",
     ]
