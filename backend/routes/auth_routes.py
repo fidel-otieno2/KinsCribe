@@ -1140,7 +1140,8 @@ def public_profile(username):
     </body>
     </html>
     """
-    return html, 200, {{'Content-Type': 'text/html'}}
+    from flask import Response
+    return Response(html, status=200, mimetype='text/html')
 
 
 @auth_bp.route("/refresh", methods=["POST"])
