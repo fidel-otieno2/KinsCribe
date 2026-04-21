@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  View, StyleSheet, ScrollView, TouchableOpacity,
   Image, ActivityIndicator,
 } from 'react-native';
+import AppText from '../components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../api/axios';
@@ -32,8 +33,8 @@ export default function OnThisDayScreen({ navigation }) {
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <View>
-          <Text style={s.headerTitle}>On This Day</Text>
-          {date ? <Text style={s.headerSub}>{date}</Text> : null}
+          <AppText style={s.headerTitle}>On This Day</AppText>
+          {date ? <AppText style={s.headerSub}>{date}</AppText> : null}
         </View>
       </View>
 
@@ -44,12 +45,12 @@ export default function OnThisDayScreen({ navigation }) {
           <LinearGradient colors={['rgba(124,58,237,0.2)', 'rgba(59,130,246,0.1)']} style={s.emptyIcon}>
             <Ionicons name="calendar-outline" size={40} color={colors.dim} />
           </LinearGradient>
-          <Text style={s.emptyTitle}>No memories yet</Text>
-          <Text style={s.emptySub}>Family stories from this day in past years will appear here.</Text>
+          <AppText style={s.emptyTitle}>No memories yet</AppText>
+          <AppText style={s.emptySub}>Family stories from this day in past years will appear here.</AppText>
         </View>
       ) : (
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
-          <Text style={s.intro}>Memories from this day in past years 🕰️</Text>
+          <AppText style={s.intro}>Memories from this day in past years 🕰️</AppText>
           {stories.map(story => (
             <View key={story.id} style={s.card}>
               <LinearGradient colors={['rgba(124,58,237,0.1)', 'rgba(15,23,42,0.8)']} style={StyleSheet.absoluteFill} />
@@ -57,23 +58,23 @@ export default function OnThisDayScreen({ navigation }) {
                 <Image source={{ uri: story.media_url }} style={s.media} resizeMode="cover" />
               )}
               <View style={s.cardBody}>
-                <Text style={s.year}>
+                <AppText style={s.year}>
                   {story.story_date
                     ? new Date(story.story_date).getFullYear()
                     : new Date(story.created_at).getFullYear()}
-                </Text>
-                <Text style={s.title}>{story.title}</Text>
-                {story.content ? <Text style={s.content} numberOfLines={3}>{story.content}</Text> : null}
+                </AppText>
+                <AppText style={s.title}>{story.title}</AppText>
+                {story.content ? <AppText style={s.content} numberOfLines={3}>{story.content}</AppText> : null}
                 <View style={s.meta}>
                   <View style={[s.avatar, { backgroundColor: colors.primary }]}>
                     {story.author_avatar
                       ? <Image source={{ uri: story.author_avatar }} style={{ width: 24, height: 24, borderRadius: 12 }} />
-                      : <Text style={s.avatarLetter}>{story.author_name?.[0]?.toUpperCase()}</Text>}
+                      : <AppText style={s.avatarLetter}>{story.author_name?.[0]?.toUpperCase()}</AppText>}
                   </View>
-                  <Text style={s.author}>{story.author_name}</Text>
+                  <AppText style={s.author}>{story.author_name}</AppText>
                   <View style={s.stats}>
                     <Ionicons name="heart" size={12} color={colors.muted} />
-                    <Text style={s.statText}>{story.like_count}</Text>
+                    <AppText style={s.statText}>{story.like_count}</AppText>
                   </View>
                 </View>
               </View>

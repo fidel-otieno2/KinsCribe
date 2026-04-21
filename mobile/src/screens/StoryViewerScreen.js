@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import {
-  View, Text, StyleSheet, Image, TouchableOpacity,
+  View, StyleSheet, Image, TouchableOpacity,
   Dimensions, StatusBar, Animated, TextInput,
   KeyboardAvoidingView, Platform, ActivityIndicator,
   Modal, FlatList,
 } from 'react-native';
+import AppText from '../components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
@@ -112,7 +113,7 @@ export default function StoryViewerScreen({ route, navigation }) {
       {/* Text content */}
       {story.text_content ? (
         <View style={s.textOverlay}>
-          <Text style={s.storyText}>{story.text_content}</Text>
+          <AppText style={s.storyText}>{story.text_content}</AppText>
         </View>
       ) : null}
 
@@ -137,13 +138,13 @@ export default function StoryViewerScreen({ route, navigation }) {
           <View style={s.avatar}>
             {group.author_avatar
               ? <Image source={{ uri: group.author_avatar }} style={s.avatarImg} />
-              : <Text style={s.avatarLetter}>{group.author_name?.[0]?.toUpperCase()}</Text>}
+              : <AppText style={s.avatarLetter}>{group.author_name?.[0]?.toUpperCase()}</AppText>}
           </View>
           <View>
-            <Text style={s.authorName}>{group.author_name}</Text>
-            <Text style={s.storyTime}>
+            <AppText style={s.authorName}>{group.author_name}</AppText>
+            <AppText style={s.storyTime}>
               {new Date(story.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-            </Text>
+            </AppText>
           </View>
         </View>
         <View style={s.headerRight}>
@@ -168,7 +169,7 @@ export default function StoryViewerScreen({ route, navigation }) {
       {story.music_name && (
         <View style={s.musicPill}>
           <Ionicons name="musical-notes" size={12} color="#fff" />
-          <Text style={s.musicText} numberOfLines={1}>{story.music_name}</Text>
+          <AppText style={s.musicText} numberOfLines={1}>{story.music_name}</AppText>
         </View>
       )}
 
@@ -176,7 +177,7 @@ export default function StoryViewerScreen({ route, navigation }) {
       {isOwn && (
         <TouchableOpacity style={s.viewCount} onPress={loadViews}>
           <Ionicons name="eye-outline" size={14} color="rgba(255,255,255,0.8)" />
-          <Text style={s.viewCountText}>{story.view_count || 0} views</Text>
+          <AppText style={s.viewCountText}>{story.view_count || 0} views</AppText>
         </TouchableOpacity>
       )}
 
@@ -201,7 +202,7 @@ export default function StoryViewerScreen({ route, navigation }) {
               <View style={s.replyEmojis}>
                 {['❤️', '😂', '😮', '😢', '👏'].map(e => (
                   <TouchableOpacity key={e} onPress={() => setReplyText(e)}>
-                    <Text style={{ fontSize: 20 }}>{e}</Text>
+                    <AppText style={{ fontSize: 20 }}>{e}</AppText>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -216,7 +217,7 @@ export default function StoryViewerScreen({ route, navigation }) {
           <View style={s.viewsSheet}>
             <View style={s.viewsHandle} />
             <View style={s.viewsHeader}>
-              <Text style={s.viewsTitle}>Viewed by {views.length}</Text>
+              <AppText style={s.viewsTitle}>Viewed by {views.length}</AppText>
               <TouchableOpacity onPress={() => setShowViews(false)}>
                 <Ionicons name="close" size={22} color={colors.muted} />
               </TouchableOpacity>
@@ -224,7 +225,7 @@ export default function StoryViewerScreen({ route, navigation }) {
             {views.length === 0 ? (
               <View style={{ alignItems: 'center', padding: 40 }}>
                 <Ionicons name="eye-off-outline" size={40} color={colors.dim} />
-                <Text style={{ color: colors.muted, marginTop: 10 }}>No views yet</Text>
+                <AppText style={{ color: colors.muted, marginTop: 10 }}>No views yet</AppText>
               </View>
             ) : (
               views.map((v, i) => (
@@ -232,11 +233,11 @@ export default function StoryViewerScreen({ route, navigation }) {
                   <View style={s.viewAvatar}>
                     {v.avatar_url
                       ? <Image source={{ uri: v.avatar_url }} style={{ width: 40, height: 40, borderRadius: 20 }} />
-                      : <Text style={s.viewAvatarLetter}>{v.name?.[0]?.toUpperCase()}</Text>}
+                      : <AppText style={s.viewAvatarLetter}>{v.name?.[0]?.toUpperCase()}</AppText>}
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={s.viewName}>{v.name}</Text>
-                    <Text style={s.viewTime}>{v.viewed_at ? new Date(v.viewed_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : ''}</Text>
+                    <AppText style={s.viewName}>{v.name}</AppText>
+                    <AppText style={s.viewTime}>{v.viewed_at ? new Date(v.viewed_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : ''}</AppText>
                   </View>
                 </View>
               ))

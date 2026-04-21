@@ -1,4 +1,5 @@
-import { TouchableOpacity, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import AppText from './AppText';
 import { LinearGradient } from 'expo-linear-gradient';
 import { gradients, shadows, radius } from '../theme';
 
@@ -8,7 +9,7 @@ export default function GradientButton({ onPress, label, loading, style, textSty
       <LinearGradient colors={gradients.primary} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.gradient}>
         {loading
           ? <ActivityIndicator color="#F5F0E8" />
-          : <Text style={[s.label, textStyle]}>{label}</Text>}
+          : <AppText style={[s.label, textStyle]}>{label}</AppText>}
       </LinearGradient>
     </TouchableOpacity>
   );

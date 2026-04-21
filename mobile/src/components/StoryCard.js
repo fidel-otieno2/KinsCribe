@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, Image,
+  View, TouchableOpacity, StyleSheet, Image,
   Modal, Alert, Share, ActivityIndicator, TextInput,
   FlatList, KeyboardAvoidingView, Platform, Animated,
   Pressable,
 } from 'react-native';
+import AppText from './AppText';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Audio } from 'expo-av';
@@ -73,8 +74,8 @@ function AudioPlayer({ uri }) {
           <View style={[ap.fill, { width: `${pct}%` }]} />
         </View>
         <View style={ap.times}>
-          <Text style={ap.time}>{fmt(progress)}</Text>
-          <Text style={ap.time}>{fmt(duration)}</Text>
+          <AppText style={ap.time}>{fmt(progress)}</AppText>
+          <AppText style={ap.time}>{fmt(duration)}</AppText>
         </View>
       </View>
     </View>
@@ -231,22 +232,22 @@ export default function StoryCard({ story, onUpdate, isVisible = true, navigatio
               <View style={s.avatarInner}>
                 {story.author_avatar
                   ? <Image source={{ uri: story.author_avatar }} style={s.avatarImg} />
-                  : <Text style={s.avatarLetter}>{story.author_name?.[0]?.toUpperCase() || 'U'}</Text>}
+                  : <AppText style={s.avatarLetter}>{story.author_name?.[0]?.toUpperCase() || 'U'}</AppText>}
               </View>
             </LinearGradient>
           </TouchableOpacity>
 
           <TouchableOpacity style={{ flex: 1 }} onPress={goToProfile} activeOpacity={0.8}>
-            <Text style={s.username}>{story.author_name || 'Unknown'}</Text>
+            <AppText style={s.username}>{story.author_name || 'Unknown'}</AppText>
             <View style={s.metaRow}>
               {story.location ? (
                 <>
                   <Ionicons name="location-outline" size={11} color={colors.muted} />
-                  <Text style={s.metaText}>{story.location}</Text>
-                  <Text style={s.metaDot}>·</Text>
+                  <AppText style={s.metaText}>{story.location}</AppText>
+                  <AppText style={s.metaDot}>·</AppText>
                 </>
               ) : null}
-              <Text style={s.metaText}>{timeAgo(story.created_at)}</Text>
+              <AppText style={s.metaText}>{timeAgo(story.created_at)}</AppText>
             </View>
           </TouchableOpacity>
 
@@ -269,7 +270,7 @@ export default function StoryCard({ story, onUpdate, isVisible = true, navigatio
             {!mediaUrl && !isAudio && (
               <View style={s.noMedia}>
                 <Ionicons name="image-outline" size={36} color={colors.dim} />
-                <Text style={{ color: colors.dim, marginTop: 6 }}>No media</Text>
+                <AppText style={{ color: colors.dim, marginTop: 6 }}>No media</AppText>
               </View>
             )}
 
@@ -277,7 +278,7 @@ export default function StoryCard({ story, onUpdate, isVisible = true, navigatio
             {mediaUrl && !isAudio && story.music_name && (
               <View style={s.musicPill}>
                 <Ionicons name="musical-notes" size={12} color="#fff" />
-                <Text style={s.musicPillText} numberOfLines={1}>{story.music_name}</Text>
+                <AppText style={s.musicPillText} numberOfLines={1}>{story.music_name}</AppText>
               </View>
             )}
 
@@ -311,16 +312,16 @@ export default function StoryCard({ story, onUpdate, isVisible = true, navigatio
 
         {/* ── LIKES ── */}
         {likeCount > 0 && (
-          <Text style={s.likeCount}>{likeCount.toLocaleString()} {likeCount === 1 ? 'like' : 'likes'}</Text>
+          <AppText style={s.likeCount}>{likeCount.toLocaleString()} {likeCount === 1 ? 'like' : 'likes'}</AppText>
         )}
 
         {/* ── CAPTION ── */}
         <View style={s.captionWrap}>
-          <Text style={s.caption}>
-            <Text style={s.captionUser}>{story.author_name} </Text>
-            <Text style={s.captionText}>{story.title}</Text>
-          </Text>
-          {story.content ? <Text style={s.captionBody}>{story.content}</Text> : null}
+          <AppText style={s.caption}>
+            <AppText style={s.captionUser}>{story.author_name} </AppText>
+            <AppText style={s.captionText}>{story.title}</AppText>
+          </AppText>
+          {story.content ? <AppText style={s.captionBody}>{story.content}</AppText> : null}
         </View>
 
         {/* ── MUSIC ROW (below caption) ── */}
@@ -329,7 +330,7 @@ export default function StoryCard({ story, onUpdate, isVisible = true, navigatio
             <LinearGradient colors={['#7c3aed', '#3b82f6']} style={s.musicIcon}>
               <Ionicons name="musical-notes" size={10} color="#fff" />
             </LinearGradient>
-            <Text style={s.musicRowText} numberOfLines={1}>{story.music_name}</Text>
+            <AppText style={s.musicRowText} numberOfLines={1}>{story.music_name}</AppText>
           </View>
         )}
 
@@ -337,25 +338,25 @@ export default function StoryCard({ story, onUpdate, isVisible = true, navigatio
         {story.summary ? (
           <View style={s.aiBox}>
             <Ionicons name="sparkles" size={12} color={colors.primary} />
-            <Text style={s.aiText}>{story.summary}</Text>
+            <AppText style={s.aiText}>{story.summary}</AppText>
           </View>
         ) : null}
 
         {/* ── TAGS ── */}
         {story.tags?.length > 0 && (
           <View style={s.tagsRow}>
-            {story.tags.map((t, i) => <Text key={i} style={s.tag}>#{t} </Text>)}
+            {story.tags.map((t, i) => <AppText key={i} style={s.tag}>#{t} </AppText>)}
           </View>
         )}
 
         {/* ── VIEW COMMENTS ── */}
         {commentCount > 0 && (
           <TouchableOpacity onPress={openComments}>
-            <Text style={s.viewComments}>View all {commentCount} comments</Text>
+            <AppText style={s.viewComments}>View all {commentCount} comments</AppText>
           </TouchableOpacity>
         )}
 
-        <Text style={s.timestamp}>{timeAgo(story.created_at).toUpperCase()}</Text>
+        <AppText style={s.timestamp}>{timeAgo(story.created_at).toUpperCase()}</AppText>
       </View>
 
       {/* ── THREE DOTS MENU ── */}
@@ -367,29 +368,29 @@ export default function StoryCard({ story, onUpdate, isVisible = true, navigatio
             {isOwner && (
               <TouchableOpacity style={s.menuItem} onPress={handleDelete}>
                 <Ionicons name="trash-outline" size={22} color="#e11d48" />
-                <Text style={[s.menuText, { color: '#e11d48' }]}>Delete Story</Text>
+                <AppText style={[s.menuText, { color: '#e11d48' }]}>Delete Story</AppText>
               </TouchableOpacity>
             )}
 
             <TouchableOpacity style={s.menuItem} onPress={handleShare}>
               <Ionicons name="share-outline" size={22} color={colors.text} />
-              <Text style={s.menuText}>Share</Text>
+              <AppText style={s.menuText}>Share</AppText>
             </TouchableOpacity>
 
             <TouchableOpacity style={s.menuItem} onPress={toggleSave}>
               <Ionicons name={saved ? 'bookmark' : 'bookmark-outline'} size={22} color={colors.text} />
-              <Text style={s.menuText}>{saved ? 'Remove from Saved' : 'Save'}</Text>
+              <AppText style={s.menuText}>{saved ? 'Remove from Saved' : 'Save'}</AppText>
             </TouchableOpacity>
 
             {!isOwner && (
               <TouchableOpacity style={s.menuItem} onPress={handleReport}>
                 <Ionicons name="flag-outline" size={22} color={colors.muted} />
-                <Text style={[s.menuText, { color: colors.muted }]}>Report</Text>
+                <AppText style={[s.menuText, { color: colors.muted }]}>Report</AppText>
               </TouchableOpacity>
             )}
 
             <TouchableOpacity style={[s.menuItem, { borderTopWidth: 0.5, borderTopColor: colors.border }]} onPress={() => setShowMenu(false)}>
-              <Text style={[s.menuText, { textAlign: 'center', flex: 1 }]}>Cancel</Text>
+              <AppText style={[s.menuText, { textAlign: 'center', flex: 1 }]}>Cancel</AppText>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
@@ -401,7 +402,7 @@ export default function StoryCard({ story, onUpdate, isVisible = true, navigatio
           <View style={s.commentsSheet}>
             <View style={s.sheetHandle} />
             <View style={s.commentsHeader}>
-              <Text style={s.commentsTitle}>Comments</Text>
+              <AppText style={s.commentsTitle}>Comments</AppText>
               <TouchableOpacity onPress={() => setShowComments(false)}>
                 <Ionicons name="close" size={24} color={colors.text} />
               </TouchableOpacity>
@@ -416,21 +417,21 @@ export default function StoryCard({ story, onUpdate, isVisible = true, navigatio
                 style={{ flex: 1 }}
                 contentContainerStyle={{ padding: 16 }}
                 ListEmptyComponent={
-                  <Text style={{ color: colors.dim, textAlign: 'center', marginTop: 20 }}>No comments yet. Be first!</Text>
+                  <AppText style={{ color: colors.dim, textAlign: 'center', marginTop: 20 }}>No comments yet. Be first!</AppText>
                 }
                 renderItem={({ item }) => (
                   <View style={s.commentRow}>
                     <TouchableOpacity onPress={() => navigation?.navigate('UserProfile', { userId: item.user_id, userName: item.author_name })}>
                       <View style={s.commentAvatar}>
-                        <Text style={s.commentAvatarText}>{item.author_name?.[0] || 'U'}</Text>
+                        <AppText style={s.commentAvatarText}>{item.author_name?.[0] || 'U'}</AppText>
                       </View>
                     </TouchableOpacity>
                     <View style={{ flex: 1 }}>
-                      <Text style={s.commentText}>
-                        <Text style={s.commentName} onPress={() => navigation?.navigate('UserProfile', { userId: item.user_id, userName: item.author_name })}>{item.author_name} </Text>
+                      <AppText style={s.commentText}>
+                        <AppText style={s.commentName} onPress={() => navigation?.navigate('UserProfile', { userId: item.user_id, userName: item.author_name })}>{item.author_name} </AppText>
                         {item.text}
-                      </Text>
-                      <Text style={s.commentTime}>{timeAgo(item.created_at)}</Text>
+                      </AppText>
+                      <AppText style={s.commentTime}>{timeAgo(item.created_at)}</AppText>
                     </View>
                   </View>
                 )}
@@ -439,7 +440,7 @@ export default function StoryCard({ story, onUpdate, isVisible = true, navigatio
 
             <View style={s.commentInputRow}>
               <View style={s.commentAvatar}>
-                <Text style={s.commentAvatarText}>{user?.name?.[0] || 'U'}</Text>
+                <AppText style={s.commentAvatarText}>{user?.name?.[0] || 'U'}</AppText>
               </View>
               <TextInput
                 style={s.commentInput}
@@ -452,7 +453,7 @@ export default function StoryCard({ story, onUpdate, isVisible = true, navigatio
               <TouchableOpacity onPress={postComment} disabled={posting || !commentText.trim()}>
                 {posting
                   ? <ActivityIndicator size="small" color={colors.primary} />
-                  : <Text style={[s.postBtn, !commentText.trim() && { opacity: 0.4 }]}>Post</Text>}
+                  : <AppText style={[s.postBtn, !commentText.trim() && { opacity: 0.4 }]}>Post</AppText>}
               </TouchableOpacity>
             </View>
           </View>

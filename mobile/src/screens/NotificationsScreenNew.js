@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity, StyleSheet,
+  View, FlatList, TouchableOpacity, StyleSheet,
   ActivityIndicator, RefreshControl, Alert, Image,
 } from 'react-native';
+import AppText from '../components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -152,9 +153,9 @@ export default function NotificationsScreen({ navigation }) {
               />
             ) : (
               <View style={[s.avatarPlaceholder, { backgroundColor: colors.primary }]}>
-                <Text style={s.avatarLetter}>
+                <AppText style={s.avatarLetter}>
                   {item.from_user_name?.[0]?.toUpperCase() || '?'}
-                </Text>
+                </AppText>
               </View>
             )}
             
@@ -164,17 +165,17 @@ export default function NotificationsScreen({ navigation }) {
           </View>
 
           <View style={s.textSection}>
-            <Text style={[s.notificationTitle, { color: theme.text }]}>
+            <AppText style={[s.notificationTitle, { color: theme.text }]}>
               {item.title}
-            </Text>
+            </AppText>
             {item.message && (
-              <Text style={[s.notificationMessage, { color: theme.muted }]}>
+              <AppText style={[s.notificationMessage, { color: theme.muted }]}>
                 {item.message}
-              </Text>
+              </AppText>
             )}
-            <Text style={[s.timeAgo, { color: theme.dim }]}>
+            <AppText style={[s.timeAgo, { color: theme.dim }]}>
               {timeAgo}
-            </Text>
+            </AppText>
           </View>
 
           {!item.is_read && (
@@ -188,10 +189,10 @@ export default function NotificationsScreen({ navigation }) {
   const renderEmpty = () => (
     <View style={s.emptyState}>
       <Ionicons name="notifications-outline" size={64} color={theme.dim} />
-      <Text style={[s.emptyTitle, { color: theme.text }]}>No notifications yet</Text>
-      <Text style={[s.emptyMessage, { color: theme.muted }]}>
+      <AppText style={[s.emptyTitle, { color: theme.text }]}>No notifications yet</AppText>
+      <AppText style={[s.emptyMessage, { color: theme.muted }]}>
         When people interact with your posts, you'll see it here
-      </Text>
+      </AppText>
     </View>
   );
 
@@ -220,11 +221,11 @@ export default function NotificationsScreen({ navigation }) {
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         
-        <Text style={s.headerTitle}>Notifications</Text>
+        <AppText style={s.headerTitle}>Notifications</AppText>
         
         {unreadCount > 0 && (
           <TouchableOpacity onPress={handleMarkAllRead} style={s.markAllBtn}>
-            <Text style={s.markAllText}>Mark all read</Text>
+            <AppText style={s.markAllText}>Mark all read</AppText>
           </TouchableOpacity>
         )}
       </View>
@@ -233,9 +234,9 @@ export default function NotificationsScreen({ navigation }) {
       {unreadCount > 0 && (
         <View style={s.unreadBanner}>
           <Ionicons name="notifications" size={16} color={colors.primary} />
-          <Text style={[s.unreadBannerText, { color: theme.text }]}>
+          <AppText style={[s.unreadBannerText, { color: theme.text }]}>
             {unreadCount} unread notification{unreadCount !== 1 ? 's' : ''}
-          </Text>
+          </AppText>
         </View>
       )}
 

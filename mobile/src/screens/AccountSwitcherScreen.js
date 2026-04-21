@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView,
+  View, StyleSheet, TouchableOpacity, ScrollView,
   Image, Alert, ActivityIndicator, Modal, TextInput,
 } from 'react-native';
+import AppText from '../components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
@@ -80,7 +81,7 @@ export default function AccountSwitcherScreen({ navigation }) {
         <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={s.headerTitle}>Switch Account</Text>
+        <AppText style={s.headerTitle}>Switch Account</AppText>
       </View>
 
       <ScrollView contentContainerStyle={s.scroll}>
@@ -97,7 +98,7 @@ export default function AccountSwitcherScreen({ navigation }) {
                   <View style={s.avatarInner}>
                     {account.avatar
                       ? <Image source={{ uri: account.avatar }} style={s.avatarImg} />
-                      : <Text style={s.avatarLetter}>{account.name?.[0]?.toUpperCase()}</Text>}
+                      : <AppText style={s.avatarLetter}>{account.name?.[0]?.toUpperCase()}</AppText>}
                   </View>
                 </LinearGradient>
               )}
@@ -105,20 +106,20 @@ export default function AccountSwitcherScreen({ navigation }) {
                 <View style={[s.avatarInner, { backgroundColor: colors.bgSecondary }]}>
                   {account.avatar
                     ? <Image source={{ uri: account.avatar }} style={s.avatarImg} />
-                    : <Text style={s.avatarLetter}>{account.name?.[0]?.toUpperCase()}</Text>}
+                    : <AppText style={s.avatarLetter}>{account.name?.[0]?.toUpperCase()}</AppText>}
                 </View>
               )}
             </View>
 
             <View style={{ flex: 1 }}>
-              <Text style={[s.accountName, { color: theme.text }]}>{account.name}</Text>
-              <Text style={[s.accountUsername, { color: theme.muted }]}>@{account.username || account.email}</Text>
+              <AppText style={[s.accountName, { color: theme.text }]}>{account.name}</AppText>
+              <AppText style={[s.accountUsername, { color: theme.muted }]}>@{account.username || account.email}</AppText>
             </View>
 
             {account.isCurrent ? (
               <View style={s.activeBadge}>
                 <Ionicons name="checkmark-circle" size={20} color="#10b981" />
-                <Text style={s.activeText}>Active</Text>
+                <AppText style={s.activeText}>Active</AppText>
               </View>
             ) : switching === account.id ? (
               <ActivityIndicator size="small" color={colors.primary} />
@@ -135,7 +136,7 @@ export default function AccountSwitcherScreen({ navigation }) {
           onPress={() => setShowAddModal(true)}
         >
           <Ionicons name="add-circle-outline" size={22} color={colors.primary} />
-          <Text style={s.addBtnText}>Add Account</Text>
+          <AppText style={s.addBtnText}>Add Account</AppText>
         </TouchableOpacity>
       </ScrollView>
 
@@ -149,14 +150,14 @@ export default function AccountSwitcherScreen({ navigation }) {
         <View style={s.modalOverlay}>
           <View style={[s.modalContent, { backgroundColor: theme.bg }]}>
             <View style={s.modalHeader}>
-              <Text style={[s.modalTitle, { color: theme.text }]}>Add Account</Text>
+              <AppText style={[s.modalTitle, { color: theme.text }]}>Add Account</AppText>
               <TouchableOpacity onPress={() => setShowAddModal(false)} style={s.modalClose}>
                 <Ionicons name="close" size={24} color={colors.muted} />
               </TouchableOpacity>
             </View>
 
             <View style={s.modalBody}>
-              <Text style={[s.inputLabel, { color: theme.text }]}>Email</Text>
+              <AppText style={[s.inputLabel, { color: theme.text }]}>Email</AppText>
               <TextInput
                 style={[s.input, { backgroundColor: theme.bgSecondary, color: theme.text, borderColor: theme.border2 }]}
                 value={addForm.email}
@@ -168,7 +169,7 @@ export default function AccountSwitcherScreen({ navigation }) {
                 autoCorrect={false}
               />
 
-              <Text style={[s.inputLabel, { color: theme.text }]}>Password</Text>
+              <AppText style={[s.inputLabel, { color: theme.text }]}>Password</AppText>
               <TextInput
                 style={[s.input, { backgroundColor: theme.bgSecondary, color: theme.text, borderColor: theme.border2 }]}
                 value={addForm.password}

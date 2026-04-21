@@ -1,8 +1,9 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity,
+  View, StyleSheet, FlatList, TouchableOpacity,
   Image, ActivityIndicator, TextInput, Alert,
 } from 'react-native';
+import AppText from '../components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -15,7 +16,7 @@ function Avatar({ uri, name, size = 48 }) {
     <Image source={{ uri }} style={{ width: size, height: size, borderRadius: size / 2 }} />
   ) : (
     <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }}>
-      <Text style={{ color: '#fff', fontWeight: '700', fontSize: size * 0.38 }}>{name?.[0]?.toUpperCase() || '?'}</Text>
+      <AppText style={{ color: '#fff', fontWeight: '700', fontSize: size * 0.38 }}>{name?.[0]?.toUpperCase() || '?'}</AppText>
     </View>
   );
 }
@@ -69,9 +70,9 @@ export default function ConnectionCRMScreen({ navigation }) {
     >
       <Avatar uri={item.avatar_url} name={item.name} size={48} />
       <View style={s.info}>
-        <Text style={s.name}>{item.name}</Text>
-        <Text style={s.handle}>@{item.username || 'user'}</Text>
-        {item.bio ? <Text style={s.bio} numberOfLines={1}>{item.bio}</Text> : null}
+        <AppText style={s.name}>{item.name}</AppText>
+        <AppText style={s.handle}>@{item.username || 'user'}</AppText>
+        {item.bio ? <AppText style={s.bio} numberOfLines={1}>{item.bio}</AppText> : null}
       </View>
       <View style={s.actions}>
         <TouchableOpacity
@@ -102,20 +103,20 @@ export default function ConnectionCRMScreen({ navigation }) {
         <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={s.headerTitle}>My Network</Text>
+        <AppText style={s.headerTitle}>My Network</AppText>
       </View>
 
       {/* Tabs */}
       <View style={s.tabRow}>
         <TouchableOpacity style={[s.tabBtn, tab === 'connections' && s.tabBtnActive]} onPress={() => setTab('connections')}>
-          <Text style={[s.tabText, tab === 'connections' && s.tabTextActive]}>
+          <AppText style={[s.tabText, tab === 'connections' && s.tabTextActive]}>
             Connections ({connections.length})
-          </Text>
+          </AppText>
         </TouchableOpacity>
         <TouchableOpacity style={[s.tabBtn, tab === 'interests' && s.tabBtnActive]} onPress={() => setTab('interests')}>
-          <Text style={[s.tabText, tab === 'interests' && s.tabTextActive]}>
+          <AppText style={[s.tabText, tab === 'interests' && s.tabTextActive]}>
             Following ({interests.length})
-          </Text>
+          </AppText>
         </TouchableOpacity>
       </View>
 
@@ -143,7 +144,7 @@ export default function ConnectionCRMScreen({ navigation }) {
           ListEmptyComponent={
             <View style={s.empty}>
               <Ionicons name="people-outline" size={48} color={colors.dim} />
-              <Text style={s.emptyText}>{query ? 'No results' : tab === 'connections' ? 'No connections yet' : 'Not following anyone yet'}</Text>
+              <AppText style={s.emptyText}>{query ? 'No results' : tab === 'connections' ? 'No connections yet' : 'Not following anyone yet'}</AppText>
             </View>
           }
         />

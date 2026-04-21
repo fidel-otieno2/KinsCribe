@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from "react";
 import {
   View,
-  Text,
   FlatList,
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
   Alert,
 } from "react-native";
+import AppText from '../components/AppText';
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import GlassCard from "../components/GlassCard";
@@ -71,9 +71,9 @@ export default function StorybookGeneratorScreen({ navigation }) {
     <View style={s.container}>
       <Toast visible={toast.visible} type={toast.type} message={toast.message} onHide={hide} />
       <View style={s.header}>
-        <Text style={s.title}>Create Storybook</Text>
-        <Text style={s.subtitle}>Select stories for your family book</Text>
-        <Text style={s.count}>{selected.length} selected</Text>
+        <AppText style={s.title}>Create Storybook</AppText>
+        <AppText style={s.subtitle}>Select stories for your family book</AppText>
+        <AppText style={s.count}>{selected.length} selected</AppText>
       </View>
 
       <FlatList
@@ -118,9 +118,9 @@ export default function StorybookGeneratorScreen({ navigation }) {
             <ActivityIndicator color="#fff" />
           ) : (
             <>
-              <Text style={s.btnText}>
+              <AppText style={s.btnText}>
                 Generate Storybook ({selected.length}/10)
-              </Text>
+              </AppText>
               <Ionicons name="book" size={20} color="#fff" />
             </>
           )}

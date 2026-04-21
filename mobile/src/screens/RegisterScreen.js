@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity,
+  View, TextInput, TouchableOpacity,
   StyleSheet, KeyboardAvoidingView, Platform,
   ScrollView, Image, Dimensions, StatusBar, ActivityIndicator,
 } from 'react-native';
+import AppText from '../components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
@@ -197,8 +198,8 @@ export default function RegisterScreen({ navigation }) {
           </BlurView>
         </TouchableOpacity>
         <View style={s.heroText}>
-          <Text style={s.appName}>KinsCribe</Text>
-          <Text style={s.heroSub}>{otpStep ? 'Verify your email ✉️' : "Join your family's story ✨"}</Text>
+          <AppText style={s.appName}>KinsCribe</AppText>
+          <AppText style={s.heroSub}>{otpStep ? 'Verify your email ✉️' : "Join your family's story ✨"}</AppText>
         </View>
       </View>
 
@@ -214,16 +215,16 @@ export default function RegisterScreen({ navigation }) {
                   <Ionicons name="mail-open-outline" size={28} color="#fff" />
                 </LinearGradient>
               </View>
-              <Text style={[s.cardTitle, { color: theme.text, textAlign: 'center' }]}>Check your email</Text>
-              <Text style={[s.cardSub, { color: theme.muted, textAlign: 'center' }]}>
+              <AppText style={[s.cardTitle, { color: theme.text, textAlign: 'center' }]}>Check your email</AppText>
+              <AppText style={[s.cardSub, { color: theme.muted, textAlign: 'center' }]}>
                 We sent a 6-digit code to{' '}
-                <Text style={{ color: theme.text, fontWeight: '700' }}>{form.email}</Text>
-              </Text>
+                <AppText style={{ color: theme.text, fontWeight: '700' }}>{form.email}</AppText>
+              </AppText>
 
               {otpError ? (
                 <View style={s.errorBox}>
                   <Ionicons name="alert-circle" size={16} color="#f87171" />
-                  <Text style={s.errorText}>{otpError}</Text>
+                  <AppText style={s.errorText}>{otpError}</AppText>
                 </View>
               ) : null}
 
@@ -256,9 +257,9 @@ export default function RegisterScreen({ navigation }) {
                 onPress={handleResendOtp}
                 disabled={resendCooldown > 0}
               >
-                <Text style={[s.resendText, { color: resendCooldown > 0 ? theme.dim : '#7c3aed' }]}>
+                <AppText style={[s.resendText, { color: resendCooldown > 0 ? theme.dim : '#7c3aed' }]}>
                   {resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : "Didn't get it? Resend code"}
-                </Text>
+                </AppText>
               </TouchableOpacity>
             </View>
           </BlurView>
@@ -267,40 +268,40 @@ export default function RegisterScreen({ navigation }) {
           <BlurView intensity={20} tint="dark" style={s.card}>
             <LinearGradient colors={['rgba(59,130,246,0.08)', 'rgba(15,23,42,0.7)']} style={StyleSheet.absoluteFill} />
             <View style={s.cardInner}>
-              <Text style={[s.cardTitle, { color: theme.text }]}>Create Account</Text>
-              <Text style={[s.cardSub, { color: theme.muted }]}>Start preserving your family memories</Text>
+              <AppText style={[s.cardTitle, { color: theme.text }]}>Create Account</AppText>
+              <AppText style={[s.cardSub, { color: theme.muted }]}>Start preserving your family memories</AppText>
 
               {error ? (
                 <View style={s.errorBox}>
                   <Ionicons name="alert-circle" size={16} color="#f87171" />
-                  <Text style={s.errorText}>{error}</Text>
+                  <AppText style={s.errorText}>{error}</AppText>
                 </View>
               ) : null}
 
-              <Text style={[s.label, { color: theme.muted }]}>Full Name</Text>
+              <AppText style={[s.label, { color: theme.muted }]}>Full Name</AppText>
               <View style={[s.inputWrap, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]}>
                 <Ionicons name="person-outline" size={18} color={theme.muted} />
                 <TextInput style={[s.input, { color: theme.text }]} placeholder="e.g. Fidel Otieno" placeholderTextColor={theme.dim} autoCapitalize="words" value={form.name} onChangeText={set('name')} />
               </View>
 
-              <Text style={[s.label, { color: theme.muted }]}>Username</Text>
+              <AppText style={[s.label, { color: theme.muted }]}>Username</AppText>
               <View style={[s.inputWrap, { backgroundColor: theme.bgCard, borderColor: usernameStatus === 'taken' ? '#f87171' : usernameStatus === 'available' ? '#10b981' : theme.border2 }]}>
-                <Text style={[s.atSign, { color: theme.muted }]}>@</Text>
+                <AppText style={[s.atSign, { color: theme.muted }]}>@</AppText>
                 <TextInput style={[s.input, { flex: 1, color: theme.text }]} placeholder="yourname" placeholderTextColor={theme.dim} autoCapitalize="none" value={form.username} onChangeText={v => set('username')(v.toLowerCase().replace(/\s/g, ''))} />
                 {usernameStatus === 'checking' && <ActivityIndicator size="small" color={theme.muted} />}
                 {usernameStatus === 'available' && <Ionicons name="checkmark-circle" size={18} color="#10b981" />}
                 {usernameStatus === 'taken' && <Ionicons name="close-circle" size={18} color="#f87171" />}
               </View>
-              {usernameStatus === 'taken' && <Text style={s.usernameErr}>Username already taken</Text>}
-              {usernameStatus === 'available' && <Text style={s.usernameOk}>Username available!</Text>}
+              {usernameStatus === 'taken' && <AppText style={s.usernameErr}>Username already taken</AppText>}
+              {usernameStatus === 'available' && <AppText style={s.usernameOk}>Username available!</AppText>}
 
-              <Text style={[s.label, { color: theme.muted }]}>Email</Text>
+              <AppText style={[s.label, { color: theme.muted }]}>Email</AppText>
               <View style={[s.inputWrap, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]}>
                 <Ionicons name="mail-outline" size={18} color={theme.muted} />
                 <TextInput style={[s.input, { color: theme.text }]} placeholder="you@example.com" placeholderTextColor={theme.dim} keyboardType="email-address" autoCapitalize="none" value={form.email} onChangeText={set('email')} />
               </View>
 
-              <Text style={[s.label, { color: theme.muted }]}>Password</Text>
+              <AppText style={[s.label, { color: theme.muted }]}>Password</AppText>
               <View style={[s.inputWrap, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]}>
                 <Ionicons name="lock-closed-outline" size={18} color={theme.muted} />
                 <TextInput style={[s.input, { flex: 1, color: theme.text }]} placeholder="Min. 6 characters" placeholderTextColor={theme.dim} secureTextEntry={!showPass} value={form.password} onChangeText={set('password')} />
@@ -314,9 +315,9 @@ export default function RegisterScreen({ navigation }) {
                   {[1, 2, 3, 4].map(i => (
                     <View key={i} style={[s.strengthBar, { backgroundColor: form.password.length >= i * 3 ? (form.password.length >= 10 ? '#10b981' : form.password.length >= 6 ? '#f59e0b' : '#e11d48') : theme.border }]} />
                   ))}
-                  <Text style={[s.strengthText, { color: theme.muted }]}>
+                  <AppText style={[s.strengthText, { color: theme.muted }]}>
                     {form.password.length < 6 ? 'Too short' : form.password.length < 10 ? 'Good' : 'Strong'}
-                  </Text>
+                  </AppText>
                 </View>
               )}
 
@@ -324,7 +325,7 @@ export default function RegisterScreen({ navigation }) {
 
               <View style={s.dividerRow}>
                 <View style={[s.dividerLine, { backgroundColor: theme.border }]} />
-                <Text style={[s.dividerText, { color: theme.dim }]}>OR</Text>
+                <AppText style={[s.dividerText, { color: theme.dim }]}>OR</AppText>
                 <View style={[s.dividerLine, { backgroundColor: theme.border }]} />
               </View>
 
@@ -337,22 +338,22 @@ export default function RegisterScreen({ navigation }) {
                       <Path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
                       <Path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
                     </Svg>
-                    <Text style={s.googleText}>Continue with Google</Text>
+                    <AppText style={s.googleText}>Continue with Google</AppText>
                   </>
                 )}
               </TouchableOpacity>
 
-              <Text style={s.terms}>
-                By signing up you agree to our <Text style={s.termsLink}>Terms of Service</Text> and <Text style={s.termsLink}>Privacy Policy</Text>
-              </Text>
+              <AppText style={s.terms}>
+                By signing up you agree to our <AppText style={s.termsLink}>Terms of Service</AppText> and <AppText style={s.termsLink}>Privacy Policy</AppText>
+              </AppText>
             </View>
           </BlurView>
         )}
 
         <View style={s.footer}>
-          <Text style={[s.footerText, { color: theme.muted }]}>Already have an account? </Text>
+          <AppText style={[s.footerText, { color: theme.muted }]}>Already have an account? </AppText>
           <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-            <Text style={s.footerLink}>Sign in</Text>
+            <AppText style={s.footerLink}>Sign in</AppText>
           </TouchableOpacity>
         </View>
       </ScrollView>

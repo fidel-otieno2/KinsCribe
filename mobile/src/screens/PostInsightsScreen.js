@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView,
+  View, StyleSheet, TouchableOpacity, ScrollView,
   ActivityIndicator, Dimensions,
 } from 'react-native';
+import AppText from '../components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../api/axios';
@@ -17,9 +18,9 @@ function StatCard({ label, value, icon, color, sub }) {
       <View style={[s.statIcon, { backgroundColor: `${color}33` }]}>
         <Ionicons name={icon} size={20} color={color} />
       </View>
-      <Text style={s.statValue}>{typeof value === 'number' ? value.toLocaleString() : value}</Text>
-      <Text style={s.statLabel}>{label}</Text>
-      {sub && <Text style={s.statSub}>{sub}</Text>}
+      <AppText style={s.statValue}>{typeof value === 'number' ? value.toLocaleString() : value}</AppText>
+      <AppText style={s.statLabel}>{label}</AppText>
+      {sub && <AppText style={s.statSub}>{sub}</AppText>}
     </View>
   );
 }
@@ -28,11 +29,11 @@ function Bar({ label, value, max, color }) {
   const pct = max > 0 ? (value / max) * 100 : 0;
   return (
     <View style={s.barRow}>
-      <Text style={s.barLabel}>{label}</Text>
+      <AppText style={s.barLabel}>{label}</AppText>
       <View style={s.barTrack}>
         <LinearGradient colors={[color, `${color}88`]} style={[s.barFill, { width: `${pct}%` }]} />
       </View>
-      <Text style={s.barValue}>{value}</Text>
+      <AppText style={s.barValue}>{value}</AppText>
     </View>
   );
 }
@@ -63,12 +64,12 @@ export default function PostInsightsScreen({ navigation }) {
         <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={s.headerTitle}>Insights</Text>
+        <AppText style={s.headerTitle}>Insights</AppText>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
 
-        <Text style={s.sectionTitle}>Profile Overview</Text>
+        <AppText style={s.sectionTitle}>Profile Overview</AppText>
         <View style={s.statsGrid}>
           <StatCard label="Posts" value={profile?.total_posts || 0} icon="grid-outline" color="#7c3aed" />
           <StatCard label="Connections" value={profile?.connections || 0} icon="people-outline" color="#3b82f6" />
@@ -78,7 +79,7 @@ export default function PostInsightsScreen({ navigation }) {
           <StatCard label="Saves" value={profile?.total_saves || 0} icon="bookmark" color="#10b981" />
         </View>
 
-        <Text style={s.sectionTitle}>Engagement Breakdown</Text>
+        <AppText style={s.sectionTitle}>Engagement Breakdown</AppText>
         <View style={s.barCard}>
           <LinearGradient colors={['rgba(124,58,237,0.1)', 'rgba(15,23,42,0.8)']} style={StyleSheet.absoluteFill} />
           <Bar label="Likes" value={profile?.total_likes || 0} max={maxVal} color="#e11d48" />
@@ -86,7 +87,7 @@ export default function PostInsightsScreen({ navigation }) {
           <Bar label="Saves" value={profile?.total_saves || 0} max={maxVal} color="#10b981" />
         </View>
 
-        <Text style={s.sectionTitle}>Growth Tips</Text>
+        <AppText style={s.sectionTitle}>Growth Tips</AppText>
         {[
           { icon: '📸', tip: 'Post consistently — aim for 3-5 posts per week', color: '#7c3aed' },
           { icon: '🕐', tip: 'Post when your connections are most active (evenings)', color: '#3b82f6' },
@@ -96,13 +97,13 @@ export default function PostInsightsScreen({ navigation }) {
         ].map((item, i) => (
           <View key={i} style={s.tipRow}>
             <View style={[s.tipIcon, { backgroundColor: `${item.color}22` }]}>
-              <Text style={{ fontSize: 18 }}>{item.icon}</Text>
+              <AppText style={{ fontSize: 18 }}>{item.icon}</AppText>
             </View>
-            <Text style={s.tipText}>{item.tip}</Text>
+            <AppText style={s.tipText}>{item.tip}</AppText>
           </View>
         ))}
 
-        <Text style={s.sectionTitle}>Best Time to Post</Text>
+        <AppText style={s.sectionTitle}>Best Time to Post</AppText>
         <View style={s.timeCard}>
           <LinearGradient colors={['rgba(124,58,237,0.15)', 'rgba(59,130,246,0.1)']} style={StyleSheet.absoluteFill} />
           {[
@@ -112,20 +113,20 @@ export default function PostInsightsScreen({ navigation }) {
             { time: '9pm - 11pm', label: 'Night', score: 80 },
           ].map(t => (
             <View key={t.time} style={s.timeRow}>
-              <Text style={s.timeLabel}>{t.time}</Text>
-              <Text style={s.timePeriod}>{t.label}</Text>
+              <AppText style={s.timeLabel}>{t.time}</AppText>
+              <AppText style={s.timePeriod}>{t.label}</AppText>
               <View style={s.timeBarTrack}>
                 <LinearGradient colors={['#7c3aed', '#3b82f6']} style={[s.timeBarFill, { width: `${t.score}%` }]} />
               </View>
-              <Text style={s.timeScore}>{t.score}%</Text>
+              <AppText style={s.timeScore}>{t.score}%</AppText>
             </View>
           ))}
         </View>
 
-        <Text style={s.sectionTitle}>Audience Demographics</Text>
+        <AppText style={s.sectionTitle}>Audience Demographics</AppText>
         <View style={s.demoCard}>
           <LinearGradient colors={['rgba(59,130,246,0.1)', 'rgba(15,23,42,0.8)']} style={StyleSheet.absoluteFill} />
-          <Text style={s.demoNote}>📊 Based on your connections’ profile data</Text>
+          <AppText style={s.demoNote}>📊 Based on your connections’ profile data</AppText>
           {[
             { label: 'Age 18-24', pct: 28, color: '#7c3aed' },
             { label: 'Age 25-34', pct: 42, color: '#3b82f6' },
@@ -133,11 +134,11 @@ export default function PostInsightsScreen({ navigation }) {
             { label: 'Age 45+',   pct: 12, color: '#f59e0b' },
           ].map(d => (
             <View key={d.label} style={s.barRow}>
-              <Text style={s.barLabel}>{d.label}</Text>
+              <AppText style={s.barLabel}>{d.label}</AppText>
               <View style={s.barTrack}>
                 <LinearGradient colors={[d.color, `${d.color}88`]} style={[s.barFill, { width: `${d.pct}%` }]} />
               </View>
-              <Text style={s.barValue}>{d.pct}%</Text>
+              <AppText style={s.barValue}>{d.pct}%</AppText>
             </View>
           ))}
         </View>

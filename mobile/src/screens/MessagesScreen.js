@@ -1,8 +1,9 @@
 import { useEffect, useState, useCallback } from "react";
 import {
-  View, Text, FlatList, TouchableOpacity, StyleSheet,
+  View, FlatList, TouchableOpacity, StyleSheet,
   Image, ActivityIndicator, StatusBar, TextInput, Alert,
 } from "react-native";
+import AppText from '../components/AppText';
 import { useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -25,7 +26,7 @@ function Avatar({ uri, name, size = 48 }) {
     <Image source={{ uri }} style={{ width: size, height: size, borderRadius: size / 2 }} />
   ) : (
     <View style={[s.avatarFallback, { width: size, height: size, borderRadius: size / 2 }]}>
-      <Text style={[s.avatarLetter, { fontSize: size * 0.38 }]}>{name?.[0]?.toUpperCase() || "?"}</Text>
+      <AppText style={[s.avatarLetter, { fontSize: size * 0.38 }]}>{name?.[0]?.toUpperCase() || "?"}</AppText>
     </View>
   );
 }
@@ -155,18 +156,18 @@ export default function MessagesScreen({ navigation }) {
           <View style={s.rowTop}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               {isPinned && <Ionicons name="pin" size={12} color={theme.primary} />}
-              <Text style={[s.rowName, { color: theme.text }, unread && s.rowNameUnread]}>{other?.name || "User"}</Text>
+              <AppText style={[s.rowName, { color: theme.text }, unread && s.rowNameUnread]}>{other?.name || "User"}</AppText>
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               {isMuted && <Ionicons name="notifications-off-outline" size={12} color={theme.dim} />}
-              <Text style={[s.rowTime, { color: theme.dim }]}>{timeAgo(lastMsg?.created_at)}</Text>
+              <AppText style={[s.rowTime, { color: theme.dim }]}>{timeAgo(lastMsg?.created_at)}</AppText>
             </View>
           </View>
           <View style={s.rowBottom}>
-            <Text style={[s.rowLast, { color: theme.muted }, unread && { color: theme.text, fontWeight: '600' }]} numberOfLines={1}>
+            <AppText style={[s.rowLast, { color: theme.muted }, unread && { color: theme.text, fontWeight: '600' }]} numberOfLines={1}>
               {lastMsg ? (lastMsg.media_url ? "📎 Media" : lastMsg.text) : "Start a conversation"}
-            </Text>
-            {unread && !isMuted && <View style={[s.unreadDot, { backgroundColor: theme.primary }]}><Text style={s.unreadCount}>{item.unread_count}</Text></View>}
+            </AppText>
+            {unread && !isMuted && <View style={[s.unreadDot, { backgroundColor: theme.primary }]}><AppText style={s.unreadCount}>{item.unread_count}</AppText></View>}
           </View>
         </View>
       </TouchableOpacity>
@@ -179,7 +180,7 @@ export default function MessagesScreen({ navigation }) {
 
       {/* Header */}
       <View style={s.header}>
-        <Text style={[s.title, { color: theme.text }]}>Messages</Text>
+        <AppText style={[s.title, { color: theme.text }]}>Messages</AppText>
         <TouchableOpacity onPress={() => navigation.navigate("Search")}>
           <Ionicons name="person-add-outline" size={24} color={theme.text} />
         </TouchableOpacity>
@@ -208,7 +209,7 @@ export default function MessagesScreen({ navigation }) {
           {searching ? (
             <ActivityIndicator color={theme.primary} style={{ marginTop: 20 }} />
           ) : searchResults.length === 0 ? (
-            <Text style={[s.emptyText, { color: theme.muted }]}>No users found</Text>
+            <AppText style={[s.emptyText, { color: theme.muted }]}>No users found</AppText>
           ) : (
             searchResults.map(u => (
               <TouchableOpacity
@@ -220,15 +221,15 @@ export default function MessagesScreen({ navigation }) {
               >
                 <Avatar uri={u.avatar_url} name={u.name} size={46} />
                 <View style={{ flex: 1, marginLeft: 12 }}>
-                  <Text style={[s.rowName, { color: theme.text }]}>{u.name}</Text>
-                  <Text style={[s.rowLast, { color: theme.muted }]}>@{u.username || 'user'}</Text>
+                  <AppText style={[s.rowName, { color: theme.text }]}>{u.name}</AppText>
+                  <AppText style={[s.rowLast, { color: theme.muted }]}>@{u.username || 'user'}</AppText>
                 </View>
                 {openingDM === u.id ? (
                   <ActivityIndicator size="small" color={theme.primary} />
                 ) : (
                   <View style={s.dmBtn}>
                     <Ionicons name="chatbubble-outline" size={16} color={theme.primary} />
-                    <Text style={[s.dmBtnText, { color: theme.primary }]}>Message</Text>
+                    <AppText style={[s.dmBtnText, { color: theme.primary }]}>Message</AppText>
                   </View>
                 )}
               </TouchableOpacity>
@@ -240,25 +241,25 @@ export default function MessagesScreen({ navigation }) {
           {/* Family Chat */}
           {familyConv && (
             <View style={s.section}>
-              <Text style={[s.sectionLabel, { color: theme.dim }]}>Family</Text>
+              <AppText style={[s.sectionLabel, { color: theme.dim }]}>Family</AppText>
               <TouchableOpacity style={s.familyRow} onPress={() => openConv(familyConv)} activeOpacity={0.8}>
                 <LinearGradient colors={["#2D5A27", "#4A7C3F", "#C4A35A"]} style={s.familyIcon}>
                   <Ionicons name="people" size={22} color="#fff" />
                 </LinearGradient>
                 <View style={s.rowInfo}>
                   <View style={s.rowTop}>
-                    <Text style={[s.rowName, { color: theme.text }]}>Family Chat</Text>
-                    <Text style={[s.rowTime, { color: theme.dim }]}>{timeAgo(familyConv.last_message?.created_at)}</Text>
+                    <AppText style={[s.rowName, { color: theme.text }]}>Family Chat</AppText>
+                    <AppText style={[s.rowTime, { color: theme.dim }]}>{timeAgo(familyConv.last_message?.created_at)}</AppText>
                   </View>
                   <View style={s.rowBottom}>
-                    <Text style={[s.rowLast, { color: theme.muted }]} numberOfLines={1}>
+                    <AppText style={[s.rowLast, { color: theme.muted }]} numberOfLines={1}>
                       {familyConv.last_message
                         ? `${familyConv.last_message.sender_name}: ${familyConv.last_message.media_url ? "📎 Media" : familyConv.last_message.text}`
                         : "Family group chat"}
-                    </Text>
+                    </AppText>
                     {familyConv.unread_count > 0 && (
                       <View style={[s.unreadDot, { backgroundColor: theme.primary }]}>
-                        <Text style={s.unreadCount}>{familyConv.unread_count}</Text>
+                        <AppText style={s.unreadCount}>{familyConv.unread_count}</AppText>
                       </View>
                     )}
                   </View>
@@ -269,7 +270,7 @@ export default function MessagesScreen({ navigation }) {
 
           {/* DMs */}
           <View style={s.section}>
-            <Text style={[s.sectionLabel, { color: theme.dim }]}>Direct Messages</Text>
+            <AppText style={[s.sectionLabel, { color: theme.dim }]}>Direct Messages</AppText>
           </View>
 
           {loading ? (
@@ -277,8 +278,8 @@ export default function MessagesScreen({ navigation }) {
           ) : conversations.length === 0 ? (
             <View style={s.emptyWrap}>
               <Ionicons name="chatbubbles-outline" size={48} color={theme.dim} />
-              <Text style={[s.emptyTitle, { color: theme.text }]}>No messages yet</Text>
-              <Text style={[s.emptyText, { color: theme.muted }]}>Search for people above to start a conversation</Text>
+              <AppText style={[s.emptyTitle, { color: theme.text }]}>No messages yet</AppText>
+              <AppText style={[s.emptyText, { color: theme.muted }]}>Search for people above to start a conversation</AppText>
             </View>
           ) : (
             <FlatList

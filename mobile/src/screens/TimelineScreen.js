@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import {
-  View, Text, FlatList, StyleSheet,
+  View, FlatList, StyleSheet,
   ActivityIndicator, Image, TouchableOpacity
 } from 'react-native';
+import AppText from '../components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
@@ -26,16 +27,16 @@ function TimelineStoryCard({ story }) {
           <View style={s.avatar}>
             {story.author_avatar
               ? <Image source={{ uri: story.author_avatar }} style={s.avatarImg} />
-              : <Text style={s.avatarText}>{story.author_name?.[0] || 'U'}</Text>}
+              : <AppText style={s.avatarText}>{story.author_name?.[0] || 'U'}</AppText>}
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={s.authorName}>{story.author_name || 'Unknown'}</Text>
-            <Text style={s.dateText}>{date}</Text>
+            <AppText style={s.authorName}>{story.author_name || 'Unknown'}</AppText>
+            <AppText style={s.dateText}>{date}</AppText>
           </View>
           <View style={[s.privacyBadge, story.privacy === 'family' ? s.badgeFamily : story.privacy === 'public' ? s.badgePublic : s.badgePrivate]}>
-            <Text style={[s.privacyText, { color: story.privacy === 'family' ? colors.green : story.privacy === 'public' ? '#60a5fa' : colors.muted }]}>
+            <AppText style={[s.privacyText, { color: story.privacy === 'family' ? colors.green : story.privacy === 'public' ? '#60a5fa' : colors.muted }]}>
               {story.privacy}
-            </Text>
+            </AppText>
           </View>
         </View>
 
@@ -47,22 +48,22 @@ function TimelineStoryCard({ story }) {
           <View style={s.videoThumb}>
             <LinearGradient colors={['rgba(124,58,237,0.3)', 'rgba(59,130,246,0.2)']} style={StyleSheet.absoluteFill} />
             <Ionicons name="play-circle" size={40} color="#fff" />
-            <Text style={s.videoLabel}>Video Story</Text>
+            <AppText style={s.videoLabel}>Video Story</AppText>
           </View>
         )}
         {story.media_url && story.media_type === 'audio' && (
           <View style={s.audioThumb}>
             <Ionicons name="musical-notes" size={24} color="#7c3aed" />
-            <Text style={s.audioLabel}>Audio Story</Text>
+            <AppText style={s.audioLabel}>Audio Story</AppText>
           </View>
         )}
 
         {/* Title & content */}
-        <Text style={s.storyTitle}>{story.title}</Text>
+        <AppText style={s.storyTitle}>{story.title}</AppText>
         {(story.summary || story.content) ? (
-          <Text style={s.storyContent} numberOfLines={2}>
+          <AppText style={s.storyContent} numberOfLines={2}>
             {story.summary || story.content}
-          </Text>
+          </AppText>
         ) : null}
 
         {/* Tags */}
@@ -70,7 +71,7 @@ function TimelineStoryCard({ story }) {
           <View style={s.tagsRow}>
             {story.tags.slice(0, 4).map((tag, i) => (
               <View key={i} style={s.tag}>
-                <Text style={s.tagText}>#{tag}</Text>
+                <AppText style={s.tagText}>#{tag}</AppText>
               </View>
             ))}
           </View>
@@ -80,16 +81,16 @@ function TimelineStoryCard({ story }) {
         <View style={s.cardFooter}>
           <View style={s.countRow}>
             <Ionicons name="heart" size={14} color="#e0245e" />
-            <Text style={s.countText}>{story.like_count || 0}</Text>
+            <AppText style={s.countText}>{story.like_count || 0}</AppText>
           </View>
           <View style={s.countRow}>
             <Ionicons name="chatbubble" size={14} color="#3b82f6" />
-            <Text style={s.countText}>{story.comment_count || 0}</Text>
+            <AppText style={s.countText}>{story.comment_count || 0}</AppText>
           </View>
           {story.ai_processed && (
             <View style={s.aiBadge}>
               <Ionicons name="sparkles" size={11} color="#7c3aed" />
-              <Text style={s.aiText}> AI Enhanced</Text>
+              <AppText style={s.aiText}> AI Enhanced</AppText>
             </View>
           )}
         </View>
@@ -153,7 +154,7 @@ export default function TimelineScreen() {
         <LinearGradient colors={['#7c3aed', '#3b82f6']} style={s.yearDot} />
         <BlurView intensity={20} tint="dark" style={s.yearLabelWrap}>
           <LinearGradient colors={['rgba(124,58,237,0.3)', 'rgba(59,130,246,0.2)']} style={StyleSheet.absoluteFill} />
-          <Text style={s.yearLabel}>{year}</Text>
+          <AppText style={s.yearLabel}>{year}</AppText>
         </BlurView>
       </View>
 
@@ -175,19 +176,19 @@ export default function TimelineScreen() {
       <BlurView intensity={20} tint="dark" style={s.header}>
         <LinearGradient colors={['rgba(15,23,42,0.9)', 'rgba(15,23,42,0.7)']} style={StyleSheet.absoluteFill} />
         <View style={s.headerContent}>
-          <Text style={s.headerTitle}>Family Timeline</Text>
+          <AppText style={s.headerTitle}>Family Timeline</AppText>
           {!loading && stats.total > 0 && (
             <View style={s.statsBar}>
               <View style={s.statItem}>
                 <Ionicons name="library-outline" size={14} color="#7c3aed" />
-                <Text style={s.statText}>{stats.total} stories</Text>
+                <AppText style={s.statText}>{stats.total} stories</AppText>
               </View>
               {stats.earliest && (
                 <>
                   <View style={s.statDivider} />
-                  <Text style={s.statText}>{stats.earliest}</Text>
+                  <AppText style={s.statText}>{stats.earliest}</AppText>
                   <Ionicons name="arrow-forward-circle-outline" size={14} color={colors.muted} />
-                  <Text style={s.statText}>{stats.latest}</Text>
+                  <AppText style={s.statText}>{stats.latest}</AppText>
                 </>
               )}
             </View>
@@ -205,12 +206,12 @@ export default function TimelineScreen() {
               <LinearGradient colors={['rgba(124,58,237,0.3)', 'rgba(59,130,246,0.2)']} style={StyleSheet.absoluteFill} />
               <View style={s.onThisDayHeader}>
                 <Ionicons name="calendar" size={18} color="#a78bfa" />
-                <Text style={s.onThisDayTitle}>On This Day</Text>
+                <AppText style={s.onThisDayTitle}>On This Day</AppText>
               </View>
               {onThisDay.map(story => (
                 <View key={story.id} style={s.onThisDayItem}>
-                  <Text style={s.onThisDayYear}>{new Date(story.story_date).getFullYear()}</Text>
-                  <Text style={s.onThisDayStory} numberOfLines={1}>{story.title}</Text>
+                  <AppText style={s.onThisDayYear}>{new Date(story.story_date).getFullYear()}</AppText>
+                  <AppText style={s.onThisDayStory} numberOfLines={1}>{story.title}</AppText>
                 </View>
               ))}
             </View>
@@ -221,11 +222,11 @@ export default function TimelineScreen() {
           <LinearGradient colors={['rgba(124,58,237,0.2)', 'rgba(59,130,246,0.1)']} style={s.emptyIcon}>
             <Ionicons name="time-outline" size={40} color="#7c3aed" />
           </LinearGradient>
-          <Text style={s.emptyTitle}>No stories yet</Text>
-          <Text style={s.emptySub}>
+          <AppText style={s.emptyTitle}>No stories yet</AppText>
+          <AppText style={s.emptySub}>
             Stories appear here when posted.{'\n'}
             Add a date when posting to place them{'\n'}on the timeline by year.
-          </Text>
+          </AppText>
         </View>
       ) : (
         <FlatList

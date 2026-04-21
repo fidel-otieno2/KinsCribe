@@ -2,7 +2,8 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { StatusBar } from "expo-status-bar";
-import { ActivityIndicator, View, Text } from "react-native";
+import { ActivityIndicator, View } from "react-native";
+import AppText from "./src/components/AppText";
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useState, useRef } from "react";
 import * as Notifications from "expo-notifications";
@@ -118,7 +119,7 @@ function MainTabs() {
               <Ionicons name={focused ? "home" : "home-outline"} size={24} color={color} />
               {notifUnread > 0 && (
                 <View style={tabBadge.dot}>
-                  <Text style={tabBadge.dotText}>{notifUnread > 9 ? "9+" : notifUnread}</Text>
+                  <AppText style={tabBadge.dotText}>{notifUnread > 9 ? "9+" : notifUnread}</AppText>
                 </View>
               )}
             </View>
@@ -155,7 +156,7 @@ function MainTabs() {
               <Ionicons name={focused ? "chatbubbles" : "chatbubbles-outline"} size={24} color={color} />
               {msgUnread > 0 && (
                 <View style={tabBadge.dot}>
-                  <Text style={tabBadge.dotText}>{msgUnread > 9 ? "9+" : msgUnread}</Text>
+                  <AppText style={tabBadge.dotText}>{msgUnread > 9 ? "9+" : msgUnread}</AppText>
                 </View>
               )}
             </View>

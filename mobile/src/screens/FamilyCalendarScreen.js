@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView,
+  View, StyleSheet, TouchableOpacity, ScrollView,
   ActivityIndicator, Alert, TextInput, Modal, Dimensions,
 } from 'react-native';
+import AppText from '../components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
@@ -48,38 +49,38 @@ function AddEventModal({ visible, onClose, onSave, selectedDate }) {
         <View style={m.sheet}>
           <LinearGradient colors={['rgba(124,58,237,0.1)', '#0f172a']} style={StyleSheet.absoluteFill} />
           <View style={m.handle} />
-          <Text style={m.title}>Add Event</Text>
-          {selectedDate && <Text style={m.dateLabel}>{selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</Text>}
+          <AppText style={m.title}>Add Event</AppText>
+          {selectedDate && <AppText style={m.dateLabel}>{selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</AppText>}
 
-          <Text style={m.label}>Event Type</Text>
+          <AppText style={m.label}>Event Type</AppText>
           <View style={m.typeRow}>
             {EVENT_TYPES.map(t => (
               <TouchableOpacity key={t.key} style={[m.typeBtn, form.event_type === t.key && { borderColor: t.color, backgroundColor: `${t.color}22` }]} onPress={() => { set('event_type', t.key); set('color', t.color); }}>
-                <Text style={[m.typeBtnText, form.event_type === t.key && { color: t.color }]}>{t.label}</Text>
+                <AppText style={[m.typeBtnText, form.event_type === t.key && { color: t.color }]}>{t.label}</AppText>
               </TouchableOpacity>
             ))}
           </View>
 
-          <Text style={m.label}>Title *</Text>
+          <AppText style={m.label}>Title *</AppText>
           <TextInput style={[m.input, { backgroundColor: theme.bgCard, color: theme.text, borderColor: theme.border2 }]} placeholder="e.g. Dad's Birthday" placeholderTextColor={theme.dim} value={form.title} onChangeText={v => set('title', v)} />
 
-          <Text style={m.label}>Description (optional)</Text>
+          <AppText style={m.label}>Description (optional)</AppText>
           <TextInput style={[m.input, { height: 70, backgroundColor: theme.bgCard, color: theme.text, borderColor: theme.border2 }]} placeholder="Add details..." placeholderTextColor={theme.dim} multiline value={form.description} onChangeText={v => set('description', v)} />
 
           <TouchableOpacity style={m.recurringRow} onPress={() => set('is_recurring', !form.is_recurring)}>
             <View style={[m.checkbox, form.is_recurring && m.checkboxActive]}>
               {form.is_recurring && <Ionicons name="checkmark" size={13} color="#fff" />}
             </View>
-            <Text style={m.recurringLabel}>Repeat yearly (e.g. birthdays)</Text>
+            <AppText style={m.recurringLabel}>Repeat yearly (e.g. birthdays)</AppText>
           </TouchableOpacity>
 
           <TouchableOpacity style={m.saveBtn} onPress={handleSave} disabled={loading}>
             <LinearGradient colors={['#7c3aed', '#3b82f6']} style={m.saveBtnGrad}>
-              {loading ? <ActivityIndicator color="#fff" size="small" /> : <Text style={m.saveBtnText}>Save Event</Text>}
+              {loading ? <ActivityIndicator color="#fff" size="small" /> : <AppText style={m.saveBtnText}>Save Event</AppText>}
             </LinearGradient>
           </TouchableOpacity>
           <TouchableOpacity style={m.cancelBtn} onPress={onClose}>
-            <Text style={m.cancelText}>Cancel</Text>
+            <AppText style={m.cancelText}>Cancel</AppText>
           </TouchableOpacity>
         </View>
       </BlurView>
@@ -190,7 +191,7 @@ export default function FamilyCalendarScreen({ navigation }) {
         <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
           <Ionicons name="arrow-back" size={24} color={theme.text} />
         </TouchableOpacity>
-        <Text style={[s.headerTitle, { color: theme.text }]}>Family Calendar</Text>
+        <AppText style={[s.headerTitle, { color: theme.text }]}>Family Calendar</AppText>
         <TouchableOpacity style={s.addBtn} onPress={() => { setSelectedDate(new Date()); setShowAdd(true); }}>
           <Ionicons name="add" size={22} color="#fff" />
         </TouchableOpacity>
@@ -203,8 +204,8 @@ export default function FamilyCalendarScreen({ navigation }) {
           <View style={s.onThisDay}>
             <LinearGradient colors={['rgba(124,58,237,0.3)', 'rgba(59,130,246,0.2)']} style={s.onThisDayGrad}>
               <Ionicons name="sparkles" size={16} color="#a78bfa" />
-              <Text style={s.onThisDayTitle}>On This Day</Text>
-              <Text style={s.onThisDayCount}>{onThisDay.length} {onThisDay.length === 1 ? 'memory' : 'memories'}</Text>
+              <AppText style={s.onThisDayTitle}>On This Day</AppText>
+              <AppText style={s.onThisDayCount}>{onThisDay.length} {onThisDay.length === 1 ? 'memory' : 'memories'}</AppText>
             </LinearGradient>
           </View>
         )}
@@ -214,7 +215,7 @@ export default function FamilyCalendarScreen({ navigation }) {
           <TouchableOpacity onPress={prevMonth} style={s.navBtn}>
             <Ionicons name="chevron-back" size={22} color={theme.text} />
           </TouchableOpacity>
-          <Text style={[s.monthTitle, { color: theme.text }]}>{MONTHS[currentMonth]} {currentYear}</Text>
+          <AppText style={[s.monthTitle, { color: theme.text }]}>{MONTHS[currentMonth]} {currentYear}</AppText>
           <TouchableOpacity onPress={nextMonth} style={s.navBtn}>
             <Ionicons name="chevron-forward" size={22} color={theme.text} />
           </TouchableOpacity>
@@ -222,7 +223,7 @@ export default function FamilyCalendarScreen({ navigation }) {
 
         {/* Day headers */}
         <View style={s.dayHeaders}>
-          {DAYS.map(d => <Text key={d} style={[s.dayHeader, { color: theme.muted }]}>{d}</Text>)}
+          {DAYS.map(d => <AppText key={d} style={[s.dayHeader, { color: theme.muted }]}>{d}</AppText>)}
         </View>
 
         {/* Calendar grid */}
@@ -242,7 +243,7 @@ export default function FamilyCalendarScreen({ navigation }) {
               >
                 {day && (
                   <>
-                    <Text style={[s.cellDay, { color: theme.text }, isToday(day) && s.cellDayToday]}>{day}</Text>
+                    <AppText style={[s.cellDay, { color: theme.text }, isToday(day) && s.cellDayToday]}>{day}</AppText>
                     <View style={s.eventDots}>
                       {dayEvents.slice(0, 3).map((e, i) => (
                         <View key={i} style={[s.eventDot, { backgroundColor: e.color || colors.primary }]} />
@@ -258,19 +259,19 @@ export default function FamilyCalendarScreen({ navigation }) {
         {/* Upcoming events */}
         {upcoming.length > 0 && (
           <View style={s.section}>
-            <Text style={[s.sectionTitle, { color: theme.muted }]}>Upcoming Events</Text>
+            <AppText style={[s.sectionTitle, { color: theme.muted }]}>Upcoming Events</AppText>
             {upcoming.map(event => (
               <TouchableOpacity key={event.id} style={[s.eventRow, { borderBottomColor: theme.border }]} onLongPress={() => deleteEvent(event)} activeOpacity={0.8}>
                 <View style={[s.eventColorBar, { backgroundColor: event.color || theme.primary }]} />
                 <View style={{ flex: 1 }}>
-                  <Text style={[s.eventTitle, { color: theme.text }]}>{event.title}</Text>
-                  <Text style={[s.eventDate, { color: theme.muted }]}>
+                  <AppText style={[s.eventTitle, { color: theme.text }]}>{event.title}</AppText>
+                  <AppText style={[s.eventDate, { color: theme.muted }]}>
                     {new Date(event.event_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
                     {event.is_recurring && ' · Yearly'}
-                  </Text>
+                  </AppText>
                 </View>
                 <View style={[s.eventTypeBadge, { backgroundColor: `${event.color || colors.primary}22` }]}>
-                  <Text style={[s.eventTypeText, { color: event.color || colors.primary }]}>{event.event_type}</Text>
+                  <AppText style={[s.eventTypeText, { color: event.color || colors.primary }]}>{event.event_type}</AppText>
                 </View>
               </TouchableOpacity>
             ))}
@@ -280,16 +281,16 @@ export default function FamilyCalendarScreen({ navigation }) {
         {/* This month's events */}
         {events.length > 0 && (
           <View style={s.section}>
-            <Text style={[s.sectionTitle, { color: theme.muted }]}>{MONTHS[currentMonth]} Events</Text>
+            <AppText style={[s.sectionTitle, { color: theme.muted }]}>{MONTHS[currentMonth]} Events</AppText>
             {events.map(event => (
               <TouchableOpacity key={event.id} style={[s.eventRow, { borderBottomColor: theme.border }]} onLongPress={() => deleteEvent(event)} activeOpacity={0.8}>
                 <View style={[s.eventColorBar, { backgroundColor: event.color || theme.primary }]} />
                 <View style={{ flex: 1 }}>
-                  <Text style={[s.eventTitle, { color: theme.text }]}>{event.title}</Text>
-                  <Text style={[s.eventDate, { color: theme.muted }]}>
+                  <AppText style={[s.eventTitle, { color: theme.text }]}>{event.title}</AppText>
+                  <AppText style={[s.eventDate, { color: theme.muted }]}>
                     {new Date(event.event_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                     {event.description ? ` · ${event.description}` : ''}
-                  </Text>
+                  </AppText>
                 </View>
                 <TouchableOpacity onPress={() => deleteEvent(event)} style={{ padding: 8 }}>
                   <Ionicons name="trash-outline" size={16} color={theme.dim} />
@@ -301,8 +302,8 @@ export default function FamilyCalendarScreen({ navigation }) {
 
         {events.length === 0 && !loading && (
           <View style={s.emptyMonth}>
-            <Text style={[s.emptyMonthText, { color: theme.muted }]}>No events in {MONTHS[currentMonth]}</Text>
-            <Text style={[s.emptyMonthSub, { color: theme.dim }]}>Tap + to add a family event</Text>
+            <AppText style={[s.emptyMonthText, { color: theme.muted }]}>No events in {MONTHS[currentMonth]}</AppText>
+            <AppText style={[s.emptyMonthSub, { color: theme.dim }]}>Tap + to add a family event</AppText>
           </View>
         )}
       </ScrollView>

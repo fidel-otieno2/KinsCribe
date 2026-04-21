@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  View, StyleSheet, ScrollView, TouchableOpacity,
   Switch, Alert, TextInput, Image, ActivityIndicator,
   Modal, FlatList,
 } from 'react-native';
+import AppText from '../components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,7 +13,7 @@ import * as LocalAuthentication from 'expo-local-authentication';
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../context/AuthContext';
-import { useTheme } from '../context/ThemeContext';
+import { useTheme, FONT_SIZES, FONT_TYPES, LANGUAGES } from '../context/ThemeContext';
 import api from '../api/axios';
 import { colors, radius } from '../theme';
 import Toast from '../components/Toast';
@@ -42,11 +43,11 @@ function Row({ icon, iconColor = '#7c3aed', label, value, onPress, toggle, toggl
       <View style={[s.rowIcon, { backgroundColor: `${iconColor}22` }]}>
         <Ionicons name={icon} size={18} color={iconColor} />
       </View>
-      <Text style={[s.rowLabel, danger && { color: '#f87171' }]}>{label}</Text>
+      <AppText style={[s.rowLabel, danger && { color: '#f87171' }]}>{label}</AppText>
       {toggle ? (
         <Switch value={toggled} onValueChange={onPress} trackColor={{ true: '#7c3aed', false: colors.border2 }} thumbColor="#fff" />
       ) : value ? (
-        <Text style={s.rowValue}>{value}</Text>
+        <AppText style={s.rowValue}>{value}</AppText>
       ) : chevron ? (
         <Ionicons name="chevron-forward" size={16} color={colors.dim} />
       ) : null}
@@ -57,7 +58,7 @@ function Row({ icon, iconColor = '#7c3aed', label, value, onPress, toggle, toggl
 function Section({ title, children }) {
   return (
     <View style={s.section}>
-      <Text style={s.sectionTitle}>{title}</Text>
+      <AppText style={s.sectionTitle}>{title}</AppText>
       <BlurView intensity={15} tint="dark" style={s.card}>
         <View style={s.cardInner}>{children}</View>
       </BlurView>
@@ -71,7 +72,11 @@ function Divider() {
 
 export default function SettingsScreen({ navigation }) {
   const { user, refreshUser, logout } = useAuth();
-  const { theme, mode, setThemeMode, isDark } = useTheme();
+  const { theme, mode, setThemeMode, isDark, fontSize, fontSizeObj, saveFontSize, fontType, fontTypeObj, saveFontType, language, languageObj, saveLanguage } = useTheme();
+  const [showFontSizeModal, setShowFontSizeModal]   = useState(false);
+  const [showFontTypeModal, setShowFontTypeModal]   = useState(false);
+  const [showLanguageModal, setShowLanguageModal]   = useState(false);
+  const [langSearch, setLangSearch]                 = useState('');
   const { toast, hide, success, error } = useToast();
   const [name, setName] = useState(user?.name || '');
   const [bio, setBio] = useState(user?.bio || '');
@@ -544,10 +549,10 @@ export default function SettingsScreen({ navigation }) {
         <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={s.headerTitle}>Settings</Text>
+        <AppText style={s.headerTitle}>Settings</AppText>
         {editMode && (
           <TouchableOpacity onPress={saveProfile} disabled={saving}>
-            {saving ? <ActivityIndicator color={colors.primary} size="small" /> : <Text style={s.saveBtn}>Save</Text>}
+            {saving ? <ActivityIndicator color={colors.primary} size="small" /> : <AppText style={s.saveBtn}>Save</AppText>}
           </TouchableOpacity>
         )}
       </View>
@@ -561,7 +566,7 @@ export default function SettingsScreen({ navigation }) {
               <View style={s.avatarInner}>
                 {uploading ? <ActivityIndicator color="#fff" /> :
                   user?.avatar_url ? <Image source={{ uri: user.avatar_url }} style={s.avatarImg} /> :
-                  <Text style={s.avatarLetter}>{user?.name?.[0]?.toUpperCase()}</Text>}
+                  <AppText style={s.avatarLetter}>{user?.name?.[0]?.toUpperCase()}</AppText>}
               </View>
             </LinearGradient>
             <View style={s.cameraBtn}>
@@ -569,7 +574,7 @@ export default function SettingsScreen({ navigation }) {
             </View>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => setEditMode(!editMode)}>
-            <Text style={s.editProfileBtn}>{editMode ? 'Cancel' : 'Edit Profile'}</Text>
+            <AppText style={s.editProfileBtn}>{editMode ? 'Cancel' : 'Edit Profile'}</AppText>
           </TouchableOpacity>
         </View>
 
@@ -577,17 +582,17 @@ export default function SettingsScreen({ navigation }) {
         {editMode && (
           <Section title="Edit Profile">
             <View style={s.editField}>
-              <Text style={s.editLabel}>Display Name</Text>
+              <AppText style={s.editLabel}>Display Name</AppText>
               <TextInput style={s.editInput} value={name} onChangeText={setName} placeholderTextColor={colors.dim} />
             </View>
             <Divider />
             <View style={s.editField}>
-              <Text style={s.editLabel}>Username</Text>
+              <AppText style={s.editLabel}>Username</AppText>
               <TextInput style={s.editInput} value={username} onChangeText={v => setUsername(v.toLowerCase().replace(/\s/g, ''))} autoCapitalize="none" placeholderTextColor={colors.dim} />
             </View>
             <Divider />
             <View style={s.editField}>
-              <Text style={s.editLabel}>Bio</Text>
+              <AppText style={s.editLabel}>Bio</AppText>
               <TextInput style={[s.editInput, { minHeight: 60 }]} value={bio} onChangeText={setBio} multiline placeholderTextColor={colors.dim} placeholder="Tell people about yourself..." />
             </View>
           </Section>
@@ -646,12 +651,12 @@ export default function SettingsScreen({ navigation }) {
               <Ionicons name="lock-closed-outline" size={18} color="#7c3aed" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={s.rowLabel}>Private Account</Text>
-              <Text style={s.rowSubLabel}>
+              <AppText style={s.rowLabel}>Private Account</AppText>
+              <AppText style={s.rowSubLabel}>
                 {privateAccount
                   ? 'Only approved followers see your posts'
                   : 'Anyone can see your posts and follow you'}
-              </Text>
+              </AppText>
             </View>
             <Switch
               value={privateAccount}
@@ -666,12 +671,12 @@ export default function SettingsScreen({ navigation }) {
               <Ionicons name="eye-outline" size={18} color="#10b981" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={s.rowLabel}>Show Activity Status</Text>
-              <Text style={s.rowSubLabel}>
+              <AppText style={s.rowLabel}>Show Activity Status</AppText>
+              <AppText style={s.rowSubLabel}>
                 {showActivity
                   ? 'Others can see when you were last active'
                   : 'Your activity status is hidden from everyone'}
-              </Text>
+              </AppText>
             </View>
             <Switch
               value={showActivity}
@@ -686,12 +691,12 @@ export default function SettingsScreen({ navigation }) {
               <Ionicons name="chatbubble-outline" size={18} color="#3b82f6" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={s.rowLabel}>Allow Direct Messages</Text>
-              <Text style={s.rowSubLabel}>
+              <AppText style={s.rowLabel}>Allow Direct Messages</AppText>
+              <AppText style={s.rowSubLabel}>
                 {allowDMs
                   ? 'Anyone can send you a message'
                   : 'Only people you follow can message you'}
-              </Text>
+              </AppText>
             </View>
             <Switch
               value={allowDMs}
@@ -706,8 +711,8 @@ export default function SettingsScreen({ navigation }) {
               <Ionicons name="ban-outline" size={18} color="#f87171" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[s.rowLabel, { color: '#f87171' }]}>Blocked Accounts</Text>
-              <Text style={s.rowSubLabel}>Manage people you have blocked</Text>
+              <AppText style={[s.rowLabel, { color: '#f87171' }]}>Blocked Accounts</AppText>
+              <AppText style={s.rowSubLabel}>Manage people you have blocked</AppText>
             </View>
             <Ionicons name="chevron-forward" size={16} color={colors.dim} />
           </TouchableOpacity>
@@ -730,8 +735,8 @@ export default function SettingsScreen({ navigation }) {
                     : <Ionicons name={icon} size={18} color={color} />}
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={s.rowLabel}>{label}</Text>
-                  <Text style={s.rowSubLabel}>{sub}</Text>
+                  <AppText style={s.rowLabel}>{label}</AppText>
+                  <AppText style={s.rowSubLabel}>{sub}</AppText>
                 </View>
                 <Switch
                   value={val}
@@ -751,10 +756,10 @@ export default function SettingsScreen({ navigation }) {
               <Ionicons name="moon-outline" size={18} color="#6366f1" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={s.rowLabel}>Quiet Hours (DND)</Text>
-              <Text style={s.rowSubLabel}>
+              <AppText style={s.rowLabel}>Quiet Hours (DND)</AppText>
+              <AppText style={s.rowSubLabel}>
                 {quietHours ? `Silent ${fmtTime(quietFrom)} – ${fmtTime(quietTo)}` : 'Silence notifications during set hours'}
-              </Text>
+              </AppText>
             </View>
             <Switch
               value={quietHours}
@@ -766,14 +771,14 @@ export default function SettingsScreen({ navigation }) {
           {quietHours && (
             <View style={s.quietRow}>
               <Ionicons name="time-outline" size={14} color={colors.muted} />
-              <Text style={s.quietText}>From</Text>
+              <AppText style={s.quietText}>From</AppText>
               <TouchableOpacity style={s.quietTimeBtn} onPress={() => openQuietPicker('from')}>
-                <Text style={s.quietTimeBtnText}>{fmtTime(quietFrom)}</Text>
+                <AppText style={s.quietTimeBtnText}>{fmtTime(quietFrom)}</AppText>
                 <Ionicons name="chevron-down" size={12} color="#6366f1" />
               </TouchableOpacity>
-              <Text style={s.quietText}>to</Text>
+              <AppText style={s.quietText}>to</AppText>
               <TouchableOpacity style={s.quietTimeBtn} onPress={() => openQuietPicker('to')}>
-                <Text style={s.quietTimeBtnText}>{fmtTime(quietTo)}</Text>
+                <AppText style={s.quietTimeBtnText}>{fmtTime(quietTo)}</AppText>
                 <Ionicons name="chevron-down" size={12} color="#6366f1" />
               </TouchableOpacity>
             </View>
@@ -787,8 +792,8 @@ export default function SettingsScreen({ navigation }) {
               <Ionicons name="phone-portrait-outline" size={18} color="#06b6d4" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={s.rowLabel}>Manage Sessions</Text>
-              <Text style={s.rowSubLabel}>See and sign out devices logged into your account</Text>
+              <AppText style={s.rowLabel}>Manage Sessions</AppText>
+              <AppText style={s.rowSubLabel}>See and sign out devices logged into your account</AppText>
             </View>
             <Ionicons name="chevron-forward" size={16} color={colors.dim} />
           </TouchableOpacity>
@@ -796,11 +801,12 @@ export default function SettingsScreen({ navigation }) {
 
         {/* Appearance */}
         <Section title="Appearance">
+          {/* Theme */}
           <View style={s.row}>
             <View style={[s.rowIcon, { backgroundColor: 'rgba(196,163,90,0.15)' }]}>
               <Ionicons name="color-palette-outline" size={18} color={colors.gold} />
             </View>
-            <Text style={s.rowLabel}>Theme</Text>
+            <AppText style={s.rowLabel}>Theme</AppText>
             <View style={th.themeRow}>
               {[
                 { key: 'dark', icon: 'moon', label: 'Dark' },
@@ -812,22 +818,39 @@ export default function SettingsScreen({ navigation }) {
                   style={[th.themeBtn, mode === opt.key && th.themeBtnActive]}
                   onPress={() => setThemeMode(opt.key)}
                 >
-                  <Ionicons
-                    name={opt.icon}
-                    size={16}
-                    color={mode === opt.key ? '#F5F0E8' : colors.muted}
-                  />
-                  <Text style={[th.themeBtnText, mode === opt.key && th.themeBtnTextActive]}>
-                    {opt.label}
-                  </Text>
+                  <Ionicons name={opt.icon} size={16} color={mode === opt.key ? '#F5F0E8' : colors.muted} />
+                  <AppText style={[th.themeBtnText, mode === opt.key && th.themeBtnTextActive]}>{opt.label}</AppText>
                 </TouchableOpacity>
               ))}
             </View>
           </View>
           <Divider />
-          <Row icon="text-outline" iconColor={colors.muted} label="Font Size" value="Default" onPress={() => Alert.alert('Font Size', 'Coming soon')} />
+          {/* Font Size */}
+          <Row
+            icon="text-outline"
+            iconColor="#a78bfa"
+            label="Font Size"
+            value={fontSizeObj.label}
+            onPress={() => setShowFontSizeModal(true)}
+          />
           <Divider />
-          <Row icon="language-outline" iconColor="#06b6d4" label="Language" value="English" onPress={() => Alert.alert('Language', 'Coming soon')} />
+          {/* Font Type */}
+          <Row
+            icon="brush-outline"
+            iconColor="#f59e0b"
+            label="Font Style"
+            value={fontTypeObj.label}
+            onPress={() => setShowFontTypeModal(true)}
+          />
+          <Divider />
+          {/* Language */}
+          <Row
+            icon="language-outline"
+            iconColor="#06b6d4"
+            label="Language"
+            value={`${languageObj.flag} ${languageObj.native}`}
+            onPress={() => { setLangSearch(''); setShowLanguageModal(true); }}
+          />
         </Section>
 
         {/* Data & Storage */}
@@ -846,8 +869,8 @@ export default function SettingsScreen({ navigation }) {
               <Ionicons name="star" size={18} color="#f59e0b" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={s.rowLabel}>Current Plan</Text>
-              <Text style={[s.rowValue, { fontSize: 12, marginTop: 2 }]}>Free</Text>
+              <AppText style={s.rowLabel}>Current Plan</AppText>
+              <AppText style={[s.rowValue, { fontSize: 12, marginTop: 2 }]}>Free</AppText>
             </View>
           </View>
           <Divider />
@@ -855,7 +878,7 @@ export default function SettingsScreen({ navigation }) {
             <View style={[s.rowIcon, { backgroundColor: 'rgba(124,58,237,0.15)' }]}>
               <Ionicons name="diamond-outline" size={18} color="#7c3aed" />
             </View>
-            <Text style={[s.rowLabel, { color: '#7c3aed' }]}>Upgrade to Premium</Text>
+            <AppText style={[s.rowLabel, { color: '#7c3aed' }]}>Upgrade to Premium</AppText>
             <Ionicons name="chevron-forward" size={16} color="#7c3aed" />
           </TouchableOpacity>
         </Section>
@@ -906,19 +929,19 @@ export default function SettingsScreen({ navigation }) {
                 <Ionicons name="trash-outline" size={26} color="#fff" />
               </LinearGradient>
             </View>
-            <Text style={s.confirmTitle}>Remove Phone Number</Text>
-            <Text style={s.confirmSub}>
+            <AppText style={s.confirmTitle}>Remove Phone Number</AppText>
+            <AppText style={s.confirmSub}>
               Are you sure you want to remove{`\n`}
-              <Text style={{ color: colors.text, fontWeight: '700' }}>{user?.phone}</Text>
+              <AppText style={{ color: colors.text, fontWeight: '700' }}>{user?.phone}</AppText>
               {`\n`}from your account?
-            </Text>
+            </AppText>
             <View style={s.confirmBtns}>
               <TouchableOpacity
                 style={s.confirmCancelBtn}
                 onPress={() => setShowRemovePhoneModal(false)}
                 activeOpacity={0.8}
               >
-                <Text style={s.confirmCancelText}>Cancel</Text>
+                <AppText style={s.confirmCancelText}>Cancel</AppText>
               </TouchableOpacity>
               <TouchableOpacity
                 style={s.confirmRemoveBtn}
@@ -929,7 +952,7 @@ export default function SettingsScreen({ navigation }) {
                 <LinearGradient colors={['#f87171', '#ef4444']} style={s.confirmRemoveBtnGrad}>
                   {removingPhone
                     ? <ActivityIndicator color="#fff" size="small" />
-                    : <Text style={s.confirmRemoveText}>Remove</Text>}
+                    : <AppText style={s.confirmRemoveText}>Remove</AppText>}
                 </LinearGradient>
               </TouchableOpacity>
             </View>
@@ -947,15 +970,15 @@ export default function SettingsScreen({ navigation }) {
                 <Ionicons name="log-out-outline" size={26} color="#fff" />
               </LinearGradient>
             </View>
-            <Text style={s.confirmTitle}>Log Out</Text>
-            <Text style={s.confirmSub}>Are you sure you want to log out of your account?</Text>
+            <AppText style={s.confirmTitle}>Log Out</AppText>
+            <AppText style={s.confirmSub}>Are you sure you want to log out of your account?</AppText>
             <View style={s.confirmBtns}>
               <TouchableOpacity style={s.confirmCancelBtn} onPress={() => setShowLogoutModal(false)} activeOpacity={0.8}>
-                <Text style={s.confirmCancelText}>Cancel</Text>
+                <AppText style={s.confirmCancelText}>Cancel</AppText>
               </TouchableOpacity>
               <TouchableOpacity style={s.confirmRemoveBtn} onPress={logout} activeOpacity={0.8}>
                 <LinearGradient colors={['#f87171', '#ef4444']} style={s.confirmRemoveBtnGrad}>
-                  <Text style={s.confirmRemoveText}>Log Out</Text>
+                  <AppText style={s.confirmRemoveText}>Log Out</AppText>
                 </LinearGradient>
               </TouchableOpacity>
             </View>
@@ -973,15 +996,15 @@ export default function SettingsScreen({ navigation }) {
                 <Ionicons name="log-out-outline" size={26} color="#fff" />
               </LinearGradient>
             </View>
-            <Text style={s.confirmTitle}>Log Out</Text>
-            <Text style={s.confirmSub}>Are you sure you want to log out of your account?</Text>
+            <AppText style={s.confirmTitle}>Log Out</AppText>
+            <AppText style={s.confirmSub}>Are you sure you want to log out of your account?</AppText>
             <View style={s.confirmBtns}>
               <TouchableOpacity style={s.confirmCancelBtn} onPress={() => setShowLogoutModal(false)} activeOpacity={0.8}>
-                <Text style={s.confirmCancelText}>Cancel</Text>
+                <AppText style={s.confirmCancelText}>Cancel</AppText>
               </TouchableOpacity>
               <TouchableOpacity style={s.confirmRemoveBtn} onPress={logout} activeOpacity={0.8}>
                 <LinearGradient colors={['#f87171', '#ef4444']} style={s.confirmRemoveBtnGrad}>
-                  <Text style={s.confirmRemoveText}>Log Out</Text>
+                  <AppText style={s.confirmRemoveText}>Log Out</AppText>
                 </LinearGradient>
               </TouchableOpacity>
             </View>
@@ -999,20 +1022,20 @@ export default function SettingsScreen({ navigation }) {
                 <Ionicons name="warning-outline" size={26} color="#fff" />
               </LinearGradient>
             </View>
-            <Text style={s.confirmTitle}>Delete Account</Text>
-            <Text style={s.confirmSub}>
+            <AppText style={s.confirmTitle}>Delete Account</AppText>
+            <AppText style={s.confirmSub}>
               This will permanently delete your account and all your data.{`\n\n`}
-              <Text style={{ color: '#f87171', fontWeight: '700' }}>This cannot be undone.</Text>
-            </Text>
+              <AppText style={{ color: '#f87171', fontWeight: '700' }}>This cannot be undone.</AppText>
+            </AppText>
             <View style={s.confirmBtns}>
               <TouchableOpacity style={s.confirmCancelBtn} onPress={() => setShowDeleteModal(false)} activeOpacity={0.8}>
-                <Text style={s.confirmCancelText}>Cancel</Text>
+                <AppText style={s.confirmCancelText}>Cancel</AppText>
               </TouchableOpacity>
               <TouchableOpacity style={s.confirmRemoveBtn} onPress={confirmDeleteAccount} disabled={deletingAccount} activeOpacity={0.8}>
                 <LinearGradient colors={['#f87171', '#ef4444']} style={s.confirmRemoveBtnGrad}>
                   {deletingAccount
                     ? <ActivityIndicator color="#fff" size="small" />
-                    : <Text style={s.confirmRemoveText}>Delete</Text>}
+                    : <AppText style={s.confirmRemoveText}>Delete</AppText>}
                 </LinearGradient>
               </TouchableOpacity>
             </View>
@@ -1043,8 +1066,8 @@ export default function SettingsScreen({ navigation }) {
                   <Ionicons name="shield-checkmark-outline" size={18} color="#06b6d4" />
                 </View>
                 <View>
-                  <Text style={s.sessionsTitle}>Active Sessions</Text>
-                  <Text style={s.sessionsSubtitle}>{sessions.length} device{sessions.length !== 1 ? 's' : ''} logged in</Text>
+                  <AppText style={s.sessionsTitle}>Active Sessions</AppText>
+                  <AppText style={s.sessionsSubtitle}>{sessions.length} device{sessions.length !== 1 ? 's' : ''} logged in</AppText>
                 </View>
               </View>
               <TouchableOpacity onPress={() => setShowSessionsModal(false)} style={s.blockedCloseBtn}>
@@ -1055,15 +1078,15 @@ export default function SettingsScreen({ navigation }) {
             {loadingSessions ? (
               <View style={s.blockedLoading}>
                 <ActivityIndicator color="#06b6d4" size="large" />
-                <Text style={s.blockedLoadingText}>Loading sessions...</Text>
+                <AppText style={s.blockedLoadingText}>Loading sessions...</AppText>
               </View>
             ) : sessions.length === 0 ? (
               <View style={s.blockedEmpty}>
                 <LinearGradient colors={['rgba(6,182,212,0.12)', 'rgba(6,182,212,0.04)']} style={s.blockedEmptyIcon}>
                   <Ionicons name="phone-portrait-outline" size={40} color="#06b6d4" />
                 </LinearGradient>
-                <Text style={s.blockedEmptyTitle}>No sessions found</Text>
-                <Text style={s.blockedEmptyText}>Your active login sessions will appear here.</Text>
+                <AppText style={s.blockedEmptyTitle}>No sessions found</AppText>
+                <AppText style={s.blockedEmptyText}>Your active login sessions will appear here.</AppText>
               </View>
             ) : (
               <ScrollView style={s.blockedList} showsVerticalScrollIndicator={false}>
@@ -1088,11 +1111,11 @@ export default function SettingsScreen({ navigation }) {
                       {/* Info */}
                       <View style={{ flex: 1 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <Text style={s.sessionDevice}>{sess.device_name}</Text>
+                          <AppText style={s.sessionDevice}>{sess.device_name}</AppText>
                           {sess.is_current && (
                             <View style={s.currentBadge}>
                               <View style={s.currentDot} />
-                              <Text style={s.currentBadgeText}>This device</Text>
+                              <AppText style={s.currentBadgeText}>This device</AppText>
                             </View>
                           )}
                         </View>
@@ -1100,16 +1123,16 @@ export default function SettingsScreen({ navigation }) {
                           {sess.ip_address && (
                             <View style={s.sessionMetaItem}>
                               <Ionicons name="location-outline" size={11} color={colors.dim} />
-                              <Text style={s.sessionMetaText}>{sess.ip_address}</Text>
+                              <AppText style={s.sessionMetaText}>{sess.ip_address}</AppText>
                             </View>
                           )}
                           <View style={s.sessionMetaItem}>
                             <Ionicons name="time-outline" size={11} color={colors.dim} />
-                            <Text style={s.sessionMetaText}>{_sessionTimeAgo(sess.last_active)}</Text>
+                            <AppText style={s.sessionMetaText}>{_sessionTimeAgo(sess.last_active)}</AppText>
                           </View>
                           <View style={s.sessionMetaItem}>
                             <Ionicons name="calendar-outline" size={11} color={colors.dim} />
-                            <Text style={s.sessionMetaText}>Signed in {_sessionTimeAgo(sess.created_at)}</Text>
+                            <AppText style={s.sessionMetaText}>Signed in {_sessionTimeAgo(sess.created_at)}</AppText>
                           </View>
                         </View>
                       </View>
@@ -1124,7 +1147,7 @@ export default function SettingsScreen({ navigation }) {
                         >
                           {revokingId === sess.id
                             ? <ActivityIndicator size="small" color="#f87171" />
-                            : <Text style={s.revokeBtnText}>Sign out</Text>}
+                            : <AppText style={s.revokeBtnText}>Sign out</AppText>}
                         </TouchableOpacity>
                       )}
                     </View>
@@ -1143,7 +1166,7 @@ export default function SettingsScreen({ navigation }) {
                       ? <ActivityIndicator color="#f87171" size="small" />
                       : <>
                           <Ionicons name="log-out-outline" size={16} color="#f87171" />
-                          <Text style={s.revokeAllBtnText}>Sign out all other devices</Text>
+                          <AppText style={s.revokeAllBtnText}>Sign out all other devices</AppText>
                         </>}
                   </TouchableOpacity>
                 )}
@@ -1162,25 +1185,25 @@ export default function SettingsScreen({ navigation }) {
             <View style={s.blockedHandle} />
             <View style={s.quietPickerHeader}>
               <TouchableOpacity onPress={() => setShowQuietPicker(false)}>
-                <Text style={s.quietPickerCancel}>Cancel</Text>
+                <AppText style={s.quietPickerCancel}>Cancel</AppText>
               </TouchableOpacity>
-              <Text style={s.quietPickerTitle}>
+              <AppText style={s.quietPickerTitle}>
                 {editingQuiet === 'from' ? 'Start Time' : 'End Time'}
-              </Text>
+              </AppText>
               <TouchableOpacity onPress={saveQuietTime}>
-                <Text style={s.quietPickerDone}>Done</Text>
+                <AppText style={s.quietPickerDone}>Done</AppText>
               </TouchableOpacity>
             </View>
 
             {/* Current selection display */}
             <View style={s.quietPickerDisplay}>
               <LinearGradient colors={['rgba(99,102,241,0.2)', 'rgba(99,102,241,0.05)']} style={s.quietPickerDisplayGrad}>
-                <Text style={s.quietPickerDisplayTime}>
+                <AppText style={s.quietPickerDisplayTime}>
                   {(() => { const h = pickerH % 12 || 12; const ampm = pickerH < 12 ? 'AM' : 'PM'; return `${h}:${String(pickerM).padStart(2,'0')} ${ampm}`; })()}
-                </Text>
-                <Text style={s.quietPickerDisplayLabel}>
+                </AppText>
+                <AppText style={s.quietPickerDisplayLabel}>
                   {editingQuiet === 'from' ? 'Notifications silent from this time' : 'Notifications resume at this time'}
-                </Text>
+                </AppText>
               </LinearGradient>
             </View>
 
@@ -1188,7 +1211,7 @@ export default function SettingsScreen({ navigation }) {
             <View style={s.quietWheelsRow}>
               {/* Hour wheel */}
               <View style={s.quietWheelWrap}>
-                <Text style={s.quietWheelLabel}>Hour</Text>
+                <AppText style={s.quietWheelLabel}>Hour</AppText>
                 <FlatList
                   data={Array.from({ length: 12 }, (_, i) => i + 1)}
                   keyExtractor={i => String(i)}
@@ -1213,19 +1236,19 @@ export default function SettingsScreen({ navigation }) {
                         setPickerH(isAM ? (item === 12 ? 0 : item) : (item === 12 ? 12 : item + 12));
                       }}
                     >
-                      <Text style={[(pickerH % 12 || 12) === item ? s.quietWheelTextActive : s.quietWheelText]}>
+                      <AppText style={[(pickerH % 12 || 12) === item ? s.quietWheelTextActive : s.quietWheelText]}>
                         {String(item).padStart(2, '0')}
-                      </Text>
+                      </AppText>
                     </TouchableOpacity>
                   )}
                 />
               </View>
 
-              <Text style={s.quietWheelColon}>:</Text>
+              <AppText style={s.quietWheelColon}>:</AppText>
 
               {/* Minute wheel */}
               <View style={s.quietWheelWrap}>
-                <Text style={s.quietWheelLabel}>Min</Text>
+                <AppText style={s.quietWheelLabel}>Min</AppText>
                 <FlatList
                   data={[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55]}
                   keyExtractor={i => String(i)}
@@ -1245,9 +1268,9 @@ export default function SettingsScreen({ navigation }) {
                       style={[s.quietWheelItem, pickerM === item && s.quietWheelItemActive]}
                       onPress={() => setPickerM(item)}
                     >
-                      <Text style={[pickerM === item ? s.quietWheelTextActive : s.quietWheelText]}>
+                      <AppText style={[pickerM === item ? s.quietWheelTextActive : s.quietWheelText]}>
                         {String(item).padStart(2, '0')}
-                      </Text>
+                      </AppText>
                     </TouchableOpacity>
                   )}
                 />
@@ -1255,7 +1278,7 @@ export default function SettingsScreen({ navigation }) {
 
               {/* AM/PM wheel */}
               <View style={s.quietWheelWrap}>
-                <Text style={s.quietWheelLabel}>AM/PM</Text>
+                <AppText style={s.quietWheelLabel}>AM/PM</AppText>
                 <View style={s.quietAmPmWrap}>
                   {['AM', 'PM'].map(period => (
                     <TouchableOpacity
@@ -1266,9 +1289,9 @@ export default function SettingsScreen({ navigation }) {
                         if (period === 'PM' && pickerH < 12) setPickerH(pickerH + 12);
                       }}
                     >
-                      <Text style={[s.quietAmPmText, ((period === 'AM') === (pickerH < 12)) && s.quietAmPmTextActive]}>
+                      <AppText style={[s.quietAmPmText, ((period === 'AM') === (pickerH < 12)) && s.quietAmPmTextActive]}>
                         {period}
-                      </Text>
+                      </AppText>
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -1296,45 +1319,45 @@ export default function SettingsScreen({ navigation }) {
                 <Ionicons name={pendingActivity ? 'eye' : 'eye-off'} size={26} color="#fff" />
               </LinearGradient>
             </View>
-            <Text style={s.confirmTitle}>
+            <AppText style={s.confirmTitle}>
               {pendingActivity ? 'Show Activity Status?' : 'Hide Activity Status?'}
-            </Text>
+            </AppText>
             <View style={s.privacyInfoBox}>
               {pendingActivity ? (
                 <>
                   <View style={s.privacyInfoRow}>
                     <Ionicons name="checkmark-circle" size={16} color="#34d399" />
-                    <Text style={s.privacyInfoText}>People you chat with can see when you were last active</Text>
+                    <AppText style={s.privacyInfoText}>People you chat with can see when you were last active</AppText>
                   </View>
                   <View style={s.privacyInfoRow}>
                     <Ionicons name="checkmark-circle" size={16} color="#34d399" />
-                    <Text style={s.privacyInfoText}>Shows "Active now" or "Active X mins ago" in messages</Text>
+                    <AppText style={s.privacyInfoText}>Shows "Active now" or "Active X mins ago" in messages</AppText>
                   </View>
                   <View style={s.privacyInfoRow}>
                     <Ionicons name="information-circle" size={16} color="#94a3b8" />
-                    <Text style={s.privacyInfoText}>You will also be able to see others' activity status</Text>
+                    <AppText style={s.privacyInfoText}>You will also be able to see others' activity status</AppText>
                   </View>
                 </>
               ) : (
                 <>
                   <View style={s.privacyInfoRow}>
                     <Ionicons name="checkmark-circle" size={16} color="#a78bfa" />
-                    <Text style={s.privacyInfoText}>No one can see when you were last active</Text>
+                    <AppText style={s.privacyInfoText}>No one can see when you were last active</AppText>
                   </View>
                   <View style={s.privacyInfoRow}>
                     <Ionicons name="checkmark-circle" size={16} color="#a78bfa" />
-                    <Text style={s.privacyInfoText}>"Active" indicator will be hidden in messages</Text>
+                    <AppText style={s.privacyInfoText}>"Active" indicator will be hidden in messages</AppText>
                   </View>
                   <View style={s.privacyInfoRow}>
                     <Ionicons name="information-circle" size={16} color="#94a3b8" />
-                    <Text style={s.privacyInfoText}>You will also not be able to see others' activity status</Text>
+                    <AppText style={s.privacyInfoText}>You will also not be able to see others' activity status</AppText>
                   </View>
                 </>
               )}
             </View>
             <View style={[s.confirmBtns, { marginTop: 8 }]}>
               <TouchableOpacity style={s.confirmCancelBtn} onPress={() => setShowActivityModal(false)} activeOpacity={0.8}>
-                <Text style={s.confirmCancelText}>Cancel</Text>
+                <AppText style={s.confirmCancelText}>Cancel</AppText>
               </TouchableOpacity>
               <TouchableOpacity style={s.confirmRemoveBtn} onPress={confirmActivityChange} disabled={savingActivity} activeOpacity={0.8}>
                 <LinearGradient
@@ -1343,7 +1366,7 @@ export default function SettingsScreen({ navigation }) {
                 >
                   {savingActivity
                     ? <ActivityIndicator color="#fff" size="small" />
-                    : <Text style={s.confirmRemoveText}>{pendingActivity ? 'Show Status' : 'Hide Status'}</Text>}
+                    : <AppText style={s.confirmRemoveText}>{pendingActivity ? 'Show Status' : 'Hide Status'}</AppText>}
                 </LinearGradient>
               </TouchableOpacity>
             </View>
@@ -1367,41 +1390,41 @@ export default function SettingsScreen({ navigation }) {
                 <Ionicons name={pendingDMs ? 'chatbubble' : 'chatbubble-outline'} size={26} color="#fff" />
               </LinearGradient>
             </View>
-            <Text style={s.confirmTitle}>
+            <AppText style={s.confirmTitle}>
               {pendingDMs ? 'Allow Direct Messages?' : 'Restrict Direct Messages?'}
-            </Text>
+            </AppText>
             <View style={s.privacyInfoBox}>
               {pendingDMs ? (
                 <>
                   <View style={s.privacyInfoRow}>
                     <Ionicons name="checkmark-circle" size={16} color="#60a5fa" />
-                    <Text style={s.privacyInfoText}>Anyone on KinsCribe can send you a message</Text>
+                    <AppText style={s.privacyInfoText}>Anyone on KinsCribe can send you a message</AppText>
                   </View>
                   <View style={s.privacyInfoRow}>
                     <Ionicons name="checkmark-circle" size={16} color="#60a5fa" />
-                    <Text style={s.privacyInfoText}>Messages from strangers go to your inbox directly</Text>
+                    <AppText style={s.privacyInfoText}>Messages from strangers go to your inbox directly</AppText>
                   </View>
                 </>
               ) : (
                 <>
                   <View style={s.privacyInfoRow}>
                     <Ionicons name="checkmark-circle" size={16} color="#a78bfa" />
-                    <Text style={s.privacyInfoText}>Only people you follow can send you messages</Text>
+                    <AppText style={s.privacyInfoText}>Only people you follow can send you messages</AppText>
                   </View>
                   <View style={s.privacyInfoRow}>
                     <Ionicons name="checkmark-circle" size={16} color="#a78bfa" />
-                    <Text style={s.privacyInfoText}>Others will see a "Can't send message" notice</Text>
+                    <AppText style={s.privacyInfoText}>Others will see a "Can't send message" notice</AppText>
                   </View>
                   <View style={s.privacyInfoRow}>
                     <Ionicons name="information-circle" size={16} color="#94a3b8" />
-                    <Text style={s.privacyInfoText}>Existing conversations are not affected</Text>
+                    <AppText style={s.privacyInfoText}>Existing conversations are not affected</AppText>
                   </View>
                 </>
               )}
             </View>
             <View style={[s.confirmBtns, { marginTop: 8 }]}>
               <TouchableOpacity style={s.confirmCancelBtn} onPress={() => setShowDMsModal(false)} activeOpacity={0.8}>
-                <Text style={s.confirmCancelText}>Cancel</Text>
+                <AppText style={s.confirmCancelText}>Cancel</AppText>
               </TouchableOpacity>
               <TouchableOpacity style={s.confirmRemoveBtn} onPress={confirmDMsChange} disabled={savingDMs} activeOpacity={0.8}>
                 <LinearGradient
@@ -1410,10 +1433,139 @@ export default function SettingsScreen({ navigation }) {
                 >
                   {savingDMs
                     ? <ActivityIndicator color="#fff" size="small" />
-                    : <Text style={s.confirmRemoveText}>{pendingDMs ? 'Allow DMs' : 'Restrict DMs'}</Text>}
+                    : <AppText style={s.confirmRemoveText}>{pendingDMs ? 'Allow DMs' : 'Restrict DMs'}</AppText>}
                 </LinearGradient>
               </TouchableOpacity>
             </View>
+          </BlurView>
+        </View>
+      </Modal>
+
+      {/* ── Font Size Modal ─────────────────────────────── */}
+      <Modal visible={showFontSizeModal} transparent animationType="slide" onRequestClose={() => setShowFontSizeModal(false)}>
+        <View style={s.blockedOverlay}>
+          <BlurView intensity={20} tint="dark" style={s.appearSheet}>
+            <LinearGradient colors={['rgba(167,139,250,0.1)', 'rgba(15,23,42,0.98)']} style={StyleSheet.absoluteFill} />
+            <View style={s.blockedHandle} />
+            <View style={s.appearHeader}>
+              <AppText style={s.appearTitle}>Font Size</AppText>
+              <TouchableOpacity onPress={() => setShowFontSizeModal(false)} style={s.blockedCloseBtn}>
+                <Ionicons name="close" size={22} color={colors.muted} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={{ paddingHorizontal: 20 }} showsVerticalScrollIndicator={false}>
+              {FONT_SIZES.map(opt => (
+                <TouchableOpacity
+                  key={opt.key}
+                  style={[s.appearOption, fontSize === opt.key && s.appearOptionActive]}
+                  onPress={() => { saveFontSize(opt.key); setShowFontSizeModal(false); success(`Font size set to ${opt.label}`); }}
+                  activeOpacity={0.8}
+                >
+                  <View style={{ flex: 1 }}>
+                    <AppText style={[s.appearOptionLabel, fontSize === opt.key && s.appearOptionLabelActive, { fontSize: Math.round(14 * opt.scale) }]}>
+                      {opt.label}
+                    </AppText>
+                    <AppText style={[s.appearOptionSub, { fontSize: Math.round(11 * opt.scale) }]}>The quick brown fox jumps over the lazy dog</AppText>
+                  </View>
+                  {fontSize === opt.key && <Ionicons name="checkmark-circle" size={22} color="#a78bfa" />}
+                </TouchableOpacity>
+              ))}
+              <View style={{ height: 32 }} />
+            </ScrollView>
+          </BlurView>
+        </View>
+      </Modal>
+
+      {/* ── Font Type Modal ─────────────────────────────── */}
+      <Modal visible={showFontTypeModal} transparent animationType="slide" onRequestClose={() => setShowFontTypeModal(false)}>
+        <View style={s.blockedOverlay}>
+          <BlurView intensity={20} tint="dark" style={s.appearSheet}>
+            <LinearGradient colors={['rgba(245,158,11,0.1)', 'rgba(15,23,42,0.98)']} style={StyleSheet.absoluteFill} />
+            <View style={s.blockedHandle} />
+            <View style={s.appearHeader}>
+              <AppText style={s.appearTitle}>Font Style</AppText>
+              <TouchableOpacity onPress={() => setShowFontTypeModal(false)} style={s.blockedCloseBtn}>
+                <Ionicons name="close" size={22} color={colors.muted} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={{ paddingHorizontal: 20 }} showsVerticalScrollIndicator={false}>
+              {FONT_TYPES.map(opt => (
+                <TouchableOpacity
+                  key={opt.key}
+                  style={[s.appearOption, fontType === opt.key && s.appearOptionActiveGold]}
+                  onPress={() => { saveFontType(opt.key); setShowFontTypeModal(false); success(`Font style set to ${opt.label}`); }}
+                  activeOpacity={0.8}
+                >
+                  <View style={{ flex: 1 }}>
+                    <AppText style={[s.appearOptionLabel, fontType === opt.key && s.appearOptionLabelActiveGold, opt.style]}>
+                      {opt.label}
+                    </AppText>
+                    <AppText style={[s.appearOptionSub, opt.style]}>KinsCribe — your family story</AppText>
+                  </View>
+                  {fontType === opt.key && <Ionicons name="checkmark-circle" size={22} color="#f59e0b" />}
+                </TouchableOpacity>
+              ))}
+              <View style={{ height: 32 }} />
+            </ScrollView>
+          </BlurView>
+        </View>
+      </Modal>
+
+      {/* ── Language Modal ──────────────────────────────── */}
+      <Modal visible={showLanguageModal} transparent animationType="slide" onRequestClose={() => setShowLanguageModal(false)}>
+        <View style={s.blockedOverlay}>
+          <BlurView intensity={20} tint="dark" style={[s.appearSheet, { maxHeight: '90%' }]}>
+            <LinearGradient colors={['rgba(6,182,212,0.1)', 'rgba(15,23,42,0.98)']} style={StyleSheet.absoluteFill} />
+            <View style={s.blockedHandle} />
+            <View style={s.appearHeader}>
+              <AppText style={s.appearTitle}>Language</AppText>
+              <TouchableOpacity onPress={() => setShowLanguageModal(false)} style={s.blockedCloseBtn}>
+                <Ionicons name="close" size={22} color={colors.muted} />
+              </TouchableOpacity>
+            </View>
+            {/* Search */}
+            <View style={s.langSearchWrap}>
+              <Ionicons name="search-outline" size={16} color={colors.muted} />
+              <TextInput
+                style={s.langSearchInput}
+                placeholder="Search language..."
+                placeholderTextColor={colors.dim}
+                value={langSearch}
+                onChangeText={setLangSearch}
+                autoCorrect={false}
+              />
+              {langSearch.length > 0 && (
+                <TouchableOpacity onPress={() => setLangSearch('')}>
+                  <Ionicons name="close-circle" size={16} color={colors.muted} />
+                </TouchableOpacity>
+              )}
+            </View>
+            <FlatList
+              data={LANGUAGES.filter(l =>
+                langSearch.length === 0 ||
+                l.label.toLowerCase().includes(langSearch.toLowerCase()) ||
+                l.native.toLowerCase().includes(langSearch.toLowerCase()) ||
+                l.code.toLowerCase().includes(langSearch.toLowerCase())
+              )}
+              keyExtractor={item => item.code}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}
+              keyboardShouldPersistTaps="handled"
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[s.langOption, language === item.code && s.langOptionActive]}
+                  onPress={() => { saveLanguage(item.code); setShowLanguageModal(false); success(`Language set to ${item.label}`); }}
+                  activeOpacity={0.8}
+                >
+                  <AppText style={s.langFlag}>{item.flag}</AppText>
+                  <View style={{ flex: 1 }}>
+                    <AppText style={[s.langLabel, language === item.code && s.langLabelActive]}>{item.label}</AppText>
+                    <AppText style={s.langNative}>{item.native}</AppText>
+                  </View>
+                  {language === item.code && <Ionicons name="checkmark-circle" size={20} color="#06b6d4" />}
+                </TouchableOpacity>
+              )}
+            />
           </BlurView>
         </View>
       </Modal>
@@ -1430,8 +1582,8 @@ export default function SettingsScreen({ navigation }) {
                   <Ionicons name="ban" size={18} color="#f87171" />
                 </View>
                 <View>
-                  <Text style={s.blockedTitle}>Blocked Accounts</Text>
-                  <Text style={s.blockedSubtitle}>{blockedUsers.length} {blockedUsers.length === 1 ? 'account' : 'accounts'} blocked</Text>
+                  <AppText style={s.blockedTitle}>Blocked Accounts</AppText>
+                  <AppText style={s.blockedSubtitle}>{blockedUsers.length} {blockedUsers.length === 1 ? 'account' : 'accounts'} blocked</AppText>
                 </View>
               </View>
               <TouchableOpacity onPress={() => setShowBlockedModal(false)} style={s.blockedCloseBtn}>
@@ -1442,15 +1594,15 @@ export default function SettingsScreen({ navigation }) {
             {loadingBlocked ? (
               <View style={s.blockedLoading}>
                 <ActivityIndicator color="#f87171" size="large" />
-                <Text style={s.blockedLoadingText}>Loading blocked accounts...</Text>
+                <AppText style={s.blockedLoadingText}>Loading blocked accounts...</AppText>
               </View>
             ) : blockedUsers.length === 0 ? (
               <View style={s.blockedEmpty}>
                 <LinearGradient colors={['rgba(248,113,113,0.12)', 'rgba(248,113,113,0.04)']} style={s.blockedEmptyIcon}>
                   <Ionicons name="shield-checkmark-outline" size={40} color="#f87171" />
                 </LinearGradient>
-                <Text style={s.blockedEmptyTitle}>No blocked accounts</Text>
-                <Text style={s.blockedEmptyText}>People you block won't be able to see your posts or contact you.</Text>
+                <AppText style={s.blockedEmptyTitle}>No blocked accounts</AppText>
+                <AppText style={s.blockedEmptyText}>People you block won't be able to see your posts or contact you.</AppText>
               </View>
             ) : (
               <ScrollView style={s.blockedList} showsVerticalScrollIndicator={false}>
@@ -1459,12 +1611,12 @@ export default function SettingsScreen({ navigation }) {
                     <View style={s.blockedAvatar}>
                       {b.blocked_avatar
                         ? <Image source={{ uri: b.blocked_avatar }} style={{ width: '100%', height: '100%' }} />
-                        : <Text style={s.blockedAvatarLetter}>{b.blocked_name?.[0]?.toUpperCase() || '?'}</Text>}
+                        : <AppText style={s.blockedAvatarLetter}>{b.blocked_name?.[0]?.toUpperCase() || '?'}</AppText>}
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={s.blockedName}>{b.blocked_name}</Text>
+                      <AppText style={s.blockedName}>{b.blocked_name}</AppText>
                       {b.blocked_username && (
-                        <Text style={s.blockedUsername}>@{b.blocked_username}</Text>
+                        <AppText style={s.blockedUsername}>@{b.blocked_username}</AppText>
                       )}
                     </View>
                     <TouchableOpacity
@@ -1475,7 +1627,7 @@ export default function SettingsScreen({ navigation }) {
                     >
                       {unblocking === b.blocked_id
                         ? <ActivityIndicator size="small" color="#f87171" />
-                        : <Text style={s.unblockBtnText}>Unblock</Text>}
+                        : <AppText style={s.unblockBtnText}>Unblock</AppText>}
                     </TouchableOpacity>
                   </View>
                 ))}
@@ -1503,46 +1655,46 @@ export default function SettingsScreen({ navigation }) {
               </LinearGradient>
             </View>
 
-            <Text style={s.confirmTitle}>
+            <AppText style={s.confirmTitle}>
               {pendingPrivate ? 'Switch to Private?' : 'Switch to Public?'}
-            </Text>
+            </AppText>
 
             {pendingPrivate ? (
               <View style={s.privacyInfoBox}>
                 <View style={s.privacyInfoRow}>
                   <Ionicons name="checkmark-circle" size={16} color="#a78bfa" />
-                  <Text style={s.privacyInfoText}>Only approved followers can see your posts and stories</Text>
+                  <AppText style={s.privacyInfoText}>Only approved followers can see your posts and stories</AppText>
                 </View>
                 <View style={s.privacyInfoRow}>
                   <Ionicons name="checkmark-circle" size={16} color="#a78bfa" />
-                  <Text style={s.privacyInfoText}>New followers must send a request — you approve or decline</Text>
+                  <AppText style={s.privacyInfoText}>New followers must send a request — you approve or decline</AppText>
                 </View>
                 <View style={s.privacyInfoRow}>
                   <Ionicons name="checkmark-circle" size={16} color="#a78bfa" />
-                  <Text style={s.privacyInfoText}>Your profile won't appear in public search results</Text>
+                  <AppText style={s.privacyInfoText}>Your profile won't appear in public search results</AppText>
                 </View>
                 <View style={s.privacyInfoRow}>
                   <Ionicons name="checkmark-circle" size={16} color="#a78bfa" />
-                  <Text style={s.privacyInfoText}>Existing followers keep access</Text>
+                  <AppText style={s.privacyInfoText}>Existing followers keep access</AppText>
                 </View>
               </View>
             ) : (
               <View style={s.privacyInfoBox}>
                 <View style={s.privacyInfoRow}>
                   <Ionicons name="checkmark-circle" size={16} color="#34d399" />
-                  <Text style={s.privacyInfoText}>Anyone can see your posts and stories</Text>
+                  <AppText style={s.privacyInfoText}>Anyone can see your posts and stories</AppText>
                 </View>
                 <View style={s.privacyInfoRow}>
                   <Ionicons name="checkmark-circle" size={16} color="#34d399" />
-                  <Text style={s.privacyInfoText}>Anyone can follow you without approval</Text>
+                  <AppText style={s.privacyInfoText}>Anyone can follow you without approval</AppText>
                 </View>
                 <View style={s.privacyInfoRow}>
                   <Ionicons name="checkmark-circle" size={16} color="#34d399" />
-                  <Text style={s.privacyInfoText}>Your profile appears in search and explore</Text>
+                  <AppText style={s.privacyInfoText}>Your profile appears in search and explore</AppText>
                 </View>
                 <View style={s.privacyInfoRow}>
                   <Ionicons name="checkmark-circle" size={16} color="#34d399" />
-                  <Text style={s.privacyInfoText}>Pending follow requests will be auto-approved</Text>
+                  <AppText style={s.privacyInfoText}>Pending follow requests will be auto-approved</AppText>
                 </View>
               </View>
             )}
@@ -1553,7 +1705,7 @@ export default function SettingsScreen({ navigation }) {
                 onPress={() => setShowPrivacyModal(false)}
                 activeOpacity={0.8}
               >
-                <Text style={s.confirmCancelText}>Cancel</Text>
+                <AppText style={s.confirmCancelText}>Cancel</AppText>
               </TouchableOpacity>
               <TouchableOpacity
                 style={s.confirmRemoveBtn}
@@ -1567,9 +1719,9 @@ export default function SettingsScreen({ navigation }) {
                 >
                   {savingPrivacy
                     ? <ActivityIndicator color="#fff" size="small" />
-                    : <Text style={s.confirmRemoveText}>
+                    : <AppText style={s.confirmRemoveText}>
                         {pendingPrivate ? 'Set Private' : 'Set Public'}
-                      </Text>}
+                      </AppText>}
                 </LinearGradient>
               </TouchableOpacity>
             </View>
@@ -1606,6 +1758,26 @@ const s = StyleSheet.create({
   rowValue: { fontSize: 13, color: colors.muted },
   rowSubLabel: { fontSize: 11, color: colors.muted, marginTop: 2, lineHeight: 15 },
   divider: { height: 0.5, backgroundColor: colors.border, marginLeft: 61 },
+  // Appearance modals
+  appearSheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, overflow: 'hidden', maxHeight: '80%', minHeight: 300 },
+  appearHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 0.5, borderBottomColor: 'rgba(255,255,255,0.07)' },
+  appearTitle: { fontSize: 17, fontWeight: '800', color: colors.text },
+  appearOption: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, borderRadius: 14, marginBottom: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)', backgroundColor: 'rgba(255,255,255,0.03)' },
+  appearOptionActive: { borderColor: 'rgba(167,139,250,0.5)', backgroundColor: 'rgba(167,139,250,0.08)' },
+  appearOptionActiveGold: { borderColor: 'rgba(245,158,11,0.5)', backgroundColor: 'rgba(245,158,11,0.08)' },
+  appearOptionLabel: { fontSize: 15, fontWeight: '600', color: colors.text, marginBottom: 3 },
+  appearOptionLabelActive: { color: '#a78bfa' },
+  appearOptionLabelActiveGold: { color: '#f59e0b' },
+  appearOptionSub: { fontSize: 12, color: colors.muted },
+  // Language
+  langSearchWrap: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 20, marginBottom: 10, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+  langSearchInput: { flex: 1, color: colors.text, fontSize: 14 },
+  langOption: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 12, marginBottom: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', backgroundColor: 'rgba(255,255,255,0.02)' },
+  langOptionActive: { borderColor: 'rgba(6,182,212,0.45)', backgroundColor: 'rgba(6,182,212,0.08)' },
+  langFlag: { fontSize: 24 },
+  langLabel: { fontSize: 14, fontWeight: '600', color: colors.text },
+  langLabelActive: { color: '#06b6d4' },
+  langNative: { fontSize: 12, color: colors.muted, marginTop: 1 },
   editField: { padding: 14 },
   editLabel: { fontSize: 11, color: colors.muted, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
   editInput: { color: colors.text, fontSize: 15, borderBottomWidth: 1, borderBottomColor: colors.border2, paddingBottom: 6 },

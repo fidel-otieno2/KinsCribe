@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, TextInput, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import AppText from '../components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
@@ -40,14 +41,14 @@ export default function FamilyGateScreen() {
           <LinearGradient colors={['#7c3aed', '#3b82f6']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.logoIcon}>
             <Ionicons name="people" size={28} color="#fff" />
           </LinearGradient>
-          <Text style={s.logo}>KinsCribe</Text>
+          <AppText style={s.logo}>KinsCribe</AppText>
         </View>
 
         {!view ? (
           <BlurView intensity={25} tint="dark" style={s.card}>
             <View style={s.cardInner}>
-              <Text style={s.title}>Welcome, {user?.name?.split(' ')[0]}! 👋</Text>
-              <Text style={s.sub}>Join or create a family group to get started</Text>
+              <AppText style={s.title}>Welcome, {user?.name?.split(' ')[0]}! 👋</AppText>
+              <AppText style={s.sub}>Join or create a family group to get started</AppText>
 
               <TouchableOpacity style={s.option} onPress={() => setView('create')} activeOpacity={0.8}>
                 <LinearGradient colors={['rgba(124,58,237,0.2)', 'rgba(59,130,246,0.1)']} style={s.optGradient}>
@@ -55,8 +56,8 @@ export default function FamilyGateScreen() {
                     <Ionicons name="add-circle" size={28} color="#7c3aed" />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={s.optTitle}>Create a Family</Text>
-                    <Text style={s.optSub}>Start a new group and invite members</Text>
+                    <AppText style={s.optTitle}>Create a Family</AppText>
+                    <AppText style={s.optSub}>Start a new group and invite members</AppText>
                   </View>
                   <Ionicons name="chevron-forward" size={20} color={colors.muted} />
                 </LinearGradient>
@@ -68,8 +69,8 @@ export default function FamilyGateScreen() {
                     <Ionicons name="key" size={28} color="#3b82f6" />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={s.optTitle}>Join with Invite Code</Text>
-                    <Text style={s.optSub}>Enter a code from your family admin</Text>
+                    <AppText style={s.optTitle}>Join with Invite Code</AppText>
+                    <AppText style={s.optSub}>Enter a code from your family admin</AppText>
                   </View>
                   <Ionicons name="chevron-forward" size={20} color={colors.muted} />
                 </LinearGradient>
@@ -79,25 +80,25 @@ export default function FamilyGateScreen() {
         ) : (
           <BlurView intensity={25} tint="dark" style={s.card}>
             <View style={s.cardInner}>
-              <Text style={s.title}>{view === 'create' ? 'Create Your Family' : 'Join a Family'}</Text>
+              <AppText style={s.title}>{view === 'create' ? 'Create Your Family' : 'Join a Family'}</AppText>
 
               {error ? (
                 <View style={s.errorBox}>
                   <Ionicons name="alert-circle" size={16} color="#f87171" />
-                  <Text style={s.errorText}>{error}</Text>
+                  <AppText style={s.errorText}>{error}</AppText>
                 </View>
               ) : null}
 
               {view === 'create' ? (
                 <>
-                  <Text style={s.inputLabel}>Family Name</Text>
+                  <AppText style={s.inputLabel}>Family Name</AppText>
                   <View style={s.inputWrap}>
                     <Ionicons name="home-outline" size={18} color={colors.muted} style={{ marginRight: 10 }} />
                     <TextInput style={[s.input, { flex: 1 }]} placeholder="e.g. The Otieno Family"
                       placeholderTextColor={colors.dim} value={createForm.name}
                       onChangeText={v => setCreateForm({ ...createForm, name: v })} />
                   </View>
-                  <Text style={s.inputLabel}>Description (optional)</Text>
+                  <AppText style={s.inputLabel}>Description (optional)</AppText>
                   <View style={s.inputWrap}>
                     <Ionicons name="text-outline" size={18} color={colors.muted} style={{ marginRight: 10 }} />
                     <TextInput style={[s.input, { flex: 1 }]} placeholder="A brief description..."
@@ -108,7 +109,7 @@ export default function FamilyGateScreen() {
                 </>
               ) : (
                 <>
-                  <Text style={s.inputLabel}>Invite Code</Text>
+                  <AppText style={s.inputLabel}>Invite Code</AppText>
                   <TextInput style={s.codeInput} placeholder="AB12CD34" placeholderTextColor={colors.dim}
                     autoCapitalize="characters" value={inviteCode}
                     onChangeText={v => setInviteCode(v.toUpperCase())} />
@@ -117,7 +118,7 @@ export default function FamilyGateScreen() {
               )}
 
               <TouchableOpacity onPress={() => { setView(null); setError(''); }} style={{ marginTop: 16, alignItems: 'center' }}>
-                <Text style={{ color: colors.muted, fontSize: 14 }}>← Back</Text>
+                <AppText style={{ color: colors.muted, fontSize: 14 }}>← Back</AppText>
               </TouchableOpacity>
             </View>
           </BlurView>

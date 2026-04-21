@@ -1,9 +1,10 @@
 import { useEffect, useState, useCallback, useRef, memo } from "react";
 import {
-  View, Text, FlatList, TouchableOpacity, StyleSheet,
+  View, FlatList, TouchableOpacity, StyleSheet,
   ActivityIndicator, Image, RefreshControl,
   Modal, TextInput, Alert, Dimensions, ScrollView,
 } from "react-native";
+import AppText from '../components/AppText';
 import { StatusBar } from "expo-status-bar";
 import { useFocusEffect } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -64,13 +65,13 @@ function JoinFamilyModal({ visible, onClose, onJoined }) {
           <LinearGradient colors={["#7c3aed", "#3b82f6"]} style={jf.iconWrap}>
             <Ionicons name="key" size={28} color="#fff" />
           </LinearGradient>
-          <Text style={jf.title}>Join a Family</Text>
-          <Text style={jf.sub}>Enter the 8-character invite code from your family admin</Text>
+          <AppText style={jf.title}>Join a Family</AppText>
+          <AppText style={jf.sub}>Enter the 8-character invite code from your family admin</AppText>
 
           {error ? (
             <View style={jf.errorBox}>
               <Ionicons name="alert-circle" size={14} color="#f87171" />
-              <Text style={jf.errorText}>{error}</Text>
+              <AppText style={jf.errorText}>{error}</AppText>
             </View>
           ) : null}
 
@@ -88,7 +89,7 @@ function JoinFamilyModal({ visible, onClose, onJoined }) {
             <LinearGradient colors={["#7c3aed", "#3b82f6"]} style={jf.joinBtnGrad}>
               {loading
                 ? <ActivityIndicator color="#fff" size="small" />
-                : <Text style={jf.joinBtnText}>Join Family</Text>}
+                : <AppText style={jf.joinBtnText}>Join Family</AppText>}
             </LinearGradient>
           </TouchableOpacity>
         </View>
@@ -152,7 +153,7 @@ function SharePostModal({ visible, postId, onClose }) {
         <View style={[sp.sheet, { backgroundColor: theme.surface }]}>
           <View style={[sp.handle, { backgroundColor: theme.border }]} />
           <View style={[sp.header, { borderBottomColor: theme.border }]}>
-            <Text style={[sp.title, { color: theme.text }]}>Share Post</Text>
+            <AppText style={[sp.title, { color: theme.text }]}>Share Post</AppText>
             <TouchableOpacity onPress={onClose}><Ionicons name="close" size={22} color={theme.muted} /></TouchableOpacity>
           </View>
           <View style={[sp.searchWrap, { backgroundColor: theme.bgSecondary }]}>
@@ -163,11 +164,11 @@ function SharePostModal({ visible, postId, onClose }) {
             {users.map(u => (
               <View key={u.id} style={sp.userRow}>
                 <View style={[sp.avatar, { backgroundColor: colors.primary }]}>
-                  {u.avatar_url ? <Image source={{ uri: u.avatar_url }} style={{ width: 40, height: 40, borderRadius: 20 }} /> : <Text style={sp.avatarLetter}>{u.name?.[0]?.toUpperCase()}</Text>}
+                  {u.avatar_url ? <Image source={{ uri: u.avatar_url }} style={{ width: 40, height: 40, borderRadius: 20 }} /> : <AppText style={sp.avatarLetter}>{u.name?.[0]?.toUpperCase()}</AppText>}
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={[sp.userName, { color: theme.text }]}>{u.name}</Text>
-                  <Text style={[sp.userHandle, { color: theme.muted }]}>@{u.username || "user"}</Text>
+                  <AppText style={[sp.userName, { color: theme.text }]}>{u.name}</AppText>
+                  <AppText style={[sp.userHandle, { color: theme.muted }]}>@{u.username || "user"}</AppText>
                 </View>
                 <TouchableOpacity
                   style={[sp.sendBtn, sent.has(u.id) && sp.sentBtn]}
@@ -176,7 +177,7 @@ function SharePostModal({ visible, postId, onClose }) {
                 >
                   {sending === u.id ? <ActivityIndicator size="small" color="#fff" /> :
                     sent.has(u.id) ? <Ionicons name="checkmark" size={16} color="#fff" /> :
-                    <Text style={sp.sendBtnText}>Send</Text>}
+                    <AppText style={sp.sendBtnText}>Send</AppText>}
                 </TouchableOpacity>
               </View>
             ))}
@@ -289,8 +290,8 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation, isVisible 
     const parts = text.split(/(#\w+)/);
     return parts.map((part, i) => 
       part.startsWith('#') 
-        ? <Text key={i} style={{ color: '#3b82f6', fontWeight: '600' }}>{part}</Text>
-        : <Text key={i}>{part}</Text>
+        ? <AppText key={i} style={{ color: '#3b82f6', fontWeight: '600' }}>{part}</AppText>
+        : <AppText key={i}>{part}</AppText>
     );
   };
 
@@ -313,12 +314,12 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation, isVisible 
           <View style={[pc.avatarInner, { backgroundColor: theme.primary, borderColor: theme.bg }]}>
             {post.author_avatar
               ? <Image source={{ uri: post.author_avatar }} style={pc.avatarImg} />
-              : <Text style={pc.avatarLetter}>{post.author_name?.[0]?.toUpperCase() || "?"}</Text>}
+              : <AppText style={pc.avatarLetter}>{post.author_name?.[0]?.toUpperCase() || "?"}</AppText>}
           </View>
         </LinearGradient>
         <View style={{ flex: 1 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-            <Text style={[pc.authorName, { color: theme.text }]}>{post.author_name}</Text>
+            <AppText style={[pc.authorName, { color: theme.text }]}>{post.author_name}</AppText>
             {post.author_verified_badge && (
               <Ionicons name="checkmark-circle" size={14} color="#3b82f6" />
             )}
@@ -327,16 +328,16 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation, isVisible 
             {post.location ? (
               <>
                 <Ionicons name="location-outline" size={11} color={theme.muted} />
-                <Text style={[pc.metaText, { color: theme.muted }]}>{post.location}</Text>
-                <Text style={[pc.dot, { color: theme.dim }]}>·</Text>
+                <AppText style={[pc.metaText, { color: theme.muted }]}>{post.location}</AppText>
+                <AppText style={[pc.dot, { color: theme.dim }]}>·</AppText>
               </>
             ) : null}
-            <Text style={[pc.metaText, { color: theme.muted }]}>{timeAgo(post.created_at)}</Text>
+            <AppText style={[pc.metaText, { color: theme.muted }]}>{timeAgo(post.created_at)}</AppText>
             {post.privacy === "connections" && (
-              <><Text style={[pc.dot, { color: theme.dim }]}>·</Text><Ionicons name="people-outline" size={11} color={theme.muted} /></>
+              <><AppText style={[pc.dot, { color: theme.dim }]}>·</AppText><Ionicons name="people-outline" size={11} color={theme.muted} /></>
             )}
             {post.is_sponsored && (
-              <><Text style={[pc.dot, { color: theme.dim }]}>·</Text><Text style={pc.sponsoredLabel}>Sponsored</Text></>
+              <><AppText style={[pc.dot, { color: theme.dim }]}>·</AppText><AppText style={pc.sponsoredLabel}>Sponsored</AppText></>
             )}
           </View>
         </View>
@@ -453,19 +454,19 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation, isVisible 
 
           {/* Likes */}
           {likeCount > 0 && (
-            <Text style={pc.likeCount}>{likeCount.toLocaleString()} {likeCount === 1 ? "like" : "likes"}</Text>
+            <AppText style={pc.likeCount}>{likeCount.toLocaleString()} {likeCount === 1 ? "like" : "likes"}</AppText>
           )}
 
           {/* Caption */}
           {post.caption ? (
             <View style={pc.captionWrap}>
-              <Text style={pc.caption} numberOfLines={showFullCaption ? undefined : 2}>
-                <Text style={pc.captionName}>{post.author_name} </Text>
+              <AppText style={pc.caption} numberOfLines={showFullCaption ? undefined : 2}>
+                <AppText style={pc.captionName}>{post.author_name} </AppText>
                 {renderHashtags(post.caption)}
-              </Text>
+              </AppText>
               {post.caption.length > 100 && (
                 <TouchableOpacity onPress={() => setShowFullCaption(!showFullCaption)}>
-                  <Text style={pc.moreText}>{showFullCaption ? 'less' : 'more'}</Text>
+                  <AppText style={pc.moreText}>{showFullCaption ? 'less' : 'more'}</AppText>
                 </TouchableOpacity>
               )}
             </View>
@@ -474,11 +475,11 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation, isVisible 
           {/* View comments */}
           {post.comment_count > 0 && (
             <TouchableOpacity onPress={openComments}>
-              <Text style={pc.viewComments}>View all {post.comment_count} comments</Text>
+              <AppText style={pc.viewComments}>View all {post.comment_count} comments</AppText>
             </TouchableOpacity>
           )}
 
-          <Text style={pc.timestamp}>{timeAgo(post.created_at).toUpperCase()}</Text>
+          <AppText style={pc.timestamp}>{timeAgo(post.created_at).toUpperCase()}</AppText>
         </>
       )}
 
@@ -515,7 +516,7 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation, isVisible 
           <View style={[pc.commentsSheet, { backgroundColor: theme.surface }]}>
             <View style={[pc.sheetHandle, { backgroundColor: theme.border }]} />
             <View style={[pc.commentsHeader, { borderBottomColor: theme.border }]}>
-              <Text style={[pc.commentsTitle, { color: theme.text }]}>Comments</Text>
+              <AppText style={[pc.commentsTitle, { color: theme.text }]}>Comments</AppText>
               <TouchableOpacity onPress={() => setShowComments(false)}>
                 <Ionicons name="close" size={24} color={theme.text} />
               </TouchableOpacity>
@@ -528,17 +529,17 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation, isVisible 
                 keyExtractor={(_, i) => String(i)}
                 style={{ flex: 1 }}
                 contentContainerStyle={{ padding: 16 }}
-                ListEmptyComponent={<Text style={{ color: theme.dim, textAlign: "center", marginTop: 20 }}>No comments yet</Text>}
+                ListEmptyComponent={<AppText style={{ color: theme.dim, textAlign: "center", marginTop: 20 }}>No comments yet</AppText>}
                 renderItem={({ item }) => (
                   <View style={pc.commentRow}>
                     <View style={[pc.commentAvatar, { backgroundColor: theme.primary }]}>
-                      <Text style={pc.commentAvatarText}>{item.author_name?.[0] || "U"}</Text>
+                      <AppText style={pc.commentAvatarText}>{item.author_name?.[0] || "U"}</AppText>
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={[pc.commentText, { color: theme.text }]}>
-                        <Text style={[pc.commentName, { color: theme.text }]}>{item.author_name} </Text>
+                      <AppText style={[pc.commentText, { color: theme.text }]}>
+                        <AppText style={[pc.commentName, { color: theme.text }]}>{item.author_name} </AppText>
                         {item.text}
-                      </Text>
+                      </AppText>
                     </View>
                   </View>
                 )}
@@ -546,7 +547,7 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation, isVisible 
             )}
             <View style={[pc.commentInputRow, { borderTopColor: theme.border }]}>
               <View style={[pc.commentAvatar, { backgroundColor: theme.primary }]}>
-                <Text style={pc.commentAvatarText}>{user?.name?.[0] || "U"}</Text>
+                <AppText style={pc.commentAvatarText}>{user?.name?.[0] || "U"}</AppText>
               </View>
               <TextInput
                 style={[pc.commentInput, { color: theme.text }]}
@@ -558,7 +559,7 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation, isVisible 
               <TouchableOpacity onPress={postComment} disabled={posting || !commentText.trim()}>
                 {posting
                   ? <ActivityIndicator size="small" color={theme.primary} />
-                  : <Text style={[pc.postBtn, !commentText.trim() && { opacity: 0.4 }]}>Post</Text>}
+                  : <AppText style={[pc.postBtn, !commentText.trim() && { opacity: 0.4 }]}>Post</AppText>}
               </TouchableOpacity>
             </View>
           </View>
@@ -737,7 +738,7 @@ export default function FeedScreen({ navigation }) {
                   <Ionicons name="add" size={22} color={theme.text} />
                 </View>
               </View>
-              <Text style={[s.storyLabel, { color: theme.text }]}>Your Story</Text>
+              <AppText style={[s.storyLabel, { color: theme.text }]}>Your Story</AppText>
             </TouchableOpacity>
             {storyGroups.map((group, idx) => (
               <TouchableOpacity
@@ -754,13 +755,13 @@ export default function FeedScreen({ navigation }) {
                     {group.author_avatar
                       ? <Image source={{ uri: group.author_avatar }} style={s.storyAvatar} />
                       : <View style={[s.storyAvatarFallback, { backgroundColor: theme.primary }]}>
-                          <Text style={s.storyAvatarLetter}>{group.author_name?.[0]?.toUpperCase()}</Text>
+                          <AppText style={s.storyAvatarLetter}>{group.author_name?.[0]?.toUpperCase()}</AppText>
                         </View>}
                   </View>
                 </LinearGradient>
-                <Text style={[s.storyLabel, { color: theme.text }]} numberOfLines={1}>
+                <AppText style={[s.storyLabel, { color: theme.text }]} numberOfLines={1}>
                   {group.author_name?.split(' ')[0] || 'User'}
-                </Text>
+                </AppText>
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -779,12 +780,12 @@ export default function FeedScreen({ navigation }) {
               <Ionicons name="people" size={22} color="#fff" />
             </View>
             <View>
-              <Text style={s.familyBannerTitle}>
+              <AppText style={s.familyBannerTitle}>
                 {user?.family_id ? "Your Family" : "Join a Family"}
-              </Text>
-              <Text style={s.familyBannerSub}>
+              </AppText>
+              <AppText style={s.familyBannerSub}>
                 {user?.family_id ? "View family stories & chat" : "Enter invite code to join"}
-              </Text>
+              </AppText>
             </View>
           </View>
           <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.8)" />
@@ -793,7 +794,7 @@ export default function FeedScreen({ navigation }) {
 
       {posts.length > 0 && (
         <View style={s.feedLabel}>
-          <Text style={s.feedLabelText}>Your Feed</Text>
+          <AppText style={s.feedLabelText}>Your Feed</AppText>
         </View>
       )}
     </View>
@@ -811,14 +812,14 @@ export default function FeedScreen({ navigation }) {
             style={s.logoIcon}
             resizeMode="cover"
           />
-          <Text style={[s.logo, { color: theme.text }]}>KinsCribe</Text>
+          <AppText style={[s.logo, { color: theme.text }]}>KinsCribe</AppText>
         </View>
         <View style={s.headerRight}>
           <TouchableOpacity onPress={() => navigation.navigate("Notifications")} style={s.headerBtn}>
             <Ionicons name="notifications-outline" size={25} color={theme.text} />
             {unreadCount > 0 && (
               <View style={s.badge}>
-                <Text style={s.badgeText}>{unreadCount > 9 ? "9+" : unreadCount}</Text>
+                <AppText style={s.badgeText}>{unreadCount > 9 ? "9+" : unreadCount}</AppText>
               </View>
             )}
           </TouchableOpacity>
@@ -860,10 +861,10 @@ export default function FeedScreen({ navigation }) {
             <View style={s.emptyWrap}>
               <LinearGradient colors={["rgba(124,58,237,0.15)", "rgba(59,130,246,0.1)"]} style={s.emptyCard}>
                 <Ionicons name="people-outline" size={52} color={theme.primary} />
-                <Text style={[s.emptyTitle, { color: theme.text }]}>Your feed is empty</Text>
-                <Text style={[s.emptySub, { color: theme.muted }]}>
+                <AppText style={[s.emptyTitle, { color: theme.text }]}>Your feed is empty</AppText>
+                <AppText style={[s.emptySub, { color: theme.muted }]}>
                   Connect with people on the Discover tab to see their posts here
-                </Text>
+                </AppText>
                 <TouchableOpacity
                   style={s.discoverBtn}
                   onPress={() => navigation.navigate("Search")}
@@ -871,7 +872,7 @@ export default function FeedScreen({ navigation }) {
                 >
                   <LinearGradient colors={["#7c3aed", "#3b82f6"]} style={s.discoverBtnGrad}>
                     <Ionicons name="compass-outline" size={18} color="#fff" />
-                    <Text style={s.discoverBtnText}>Discover People</Text>
+                    <AppText style={s.discoverBtnText}>Discover People</AppText>
                   </LinearGradient>
                 </TouchableOpacity>
               </LinearGradient>
@@ -894,8 +895,8 @@ export default function FeedScreen({ navigation }) {
             <LinearGradient colors={['#7c3aed', '#3b82f6']} style={bm.iconWrap}>
               <Ionicons name={biometricType === 'face' ? 'scan-outline' : 'finger-print'} size={36} color="#fff" />
             </LinearGradient>
-            <Text style={bm.title}>Enable {biometricType === 'face' ? 'Face ID' : 'Fingerprint'} Login</Text>
-            <Text style={bm.sub}>Sign in faster next time using{`\n`}{biometricType === 'face' ? 'Face ID' : 'your fingerprint'}.</Text>
+            <AppText style={bm.title}>Enable {biometricType === 'face' ? 'Face ID' : 'Fingerprint'} Login</AppText>
+            <AppText style={bm.sub}>Sign in faster next time using{`\n`}{biometricType === 'face' ? 'Face ID' : 'your fingerprint'}.</AppText>
             <View style={bm.features}>
               {[
                 { icon: 'flash-outline', text: 'One tap sign in' },
@@ -906,7 +907,7 @@ export default function FeedScreen({ navigation }) {
                   <View style={bm.featureIcon}>
                     <Ionicons name={f.icon} size={16} color="#7c3aed" />
                   </View>
-                  <Text style={bm.featureText}>{f.text}</Text>
+                  <AppText style={bm.featureText}>{f.text}</AppText>
                 </View>
               ))}
             </View>
@@ -920,11 +921,11 @@ export default function FeedScreen({ navigation }) {
             >
               <LinearGradient colors={['#7c3aed', '#3b82f6']} style={bm.enableBtnGrad}>
                 <Ionicons name={biometricType === 'face' ? 'scan-outline' : 'finger-print'} size={18} color="#fff" />
-                <Text style={bm.enableBtnText}>Enable {biometricType === 'face' ? 'Face ID' : 'Fingerprint'} Login</Text>
+                <AppText style={bm.enableBtnText}>Enable {biometricType === 'face' ? 'Face ID' : 'Fingerprint'} Login</AppText>
               </LinearGradient>
             </TouchableOpacity>
             <TouchableOpacity style={bm.skipBtn} onPress={() => setShowBiometricPrompt(false)}>
-              <Text style={bm.skipText}>Not Now</Text>
+              <AppText style={bm.skipText}>Not Now</AppText>
             </TouchableOpacity>
           </BlurView>
         </View>

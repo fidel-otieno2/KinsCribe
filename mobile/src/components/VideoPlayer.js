@@ -1,8 +1,9 @@
 import { useRef, useState, useEffect } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet,
+  View, TouchableOpacity, StyleSheet,
   Animated, Image, Dimensions,
 } from 'react-native';
+import AppText from './AppText';
 import { Video, ResizeMode, Audio } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -178,13 +179,13 @@ export default function VideoPlayer({
               color={liked ? '#e11d48' : '#fff'}
             />
           </Animated.View>
-          <Text style={s.actionCount}>{likeCount > 0 ? likeCount : ''}</Text>
+          <AppText style={s.actionCount}>{likeCount > 0 ? likeCount : ''}</AppText>
         </TouchableOpacity>
 
         {/* Comment */}
         <TouchableOpacity style={s.actionItem} onPress={onComment}>
           <Ionicons name="chatbubble-ellipses-outline" size={28} color="#fff" />
-          <Text style={s.actionCount}>{commentCount > 0 ? commentCount : ''}</Text>
+          <AppText style={s.actionCount}>{commentCount > 0 ? commentCount : ''}</AppText>
         </TouchableOpacity>
 
         {/* Share */}
@@ -210,34 +211,34 @@ export default function VideoPlayer({
             {authorAvatar
               ? <Image source={{ uri: authorAvatar }} style={s.avatar} />
               : <View style={[s.avatar, s.avatarFallback]}>
-                  <Text style={s.avatarLetter}>{authorName?.[0]?.toUpperCase()}</Text>
+                  <AppText style={s.avatarLetter}>{authorName?.[0]?.toUpperCase()}</AppText>
                 </View>}
           </View>
-          <Text style={s.authorName}>{authorName}</Text>
+          <AppText style={s.authorName}>{authorName}</AppText>
         </View>
 
         {/* Caption */}
         {caption ? (
           <TouchableOpacity onPress={() => setShowCaption(v => !v)} activeOpacity={0.9}>
-            <Text
+            <AppText
               style={s.caption}
               numberOfLines={showCaption ? undefined : 2}
             >
               {caption}
-            </Text>
+            </AppText>
             {caption.length > 80 && !showCaption && (
-              <Text style={s.moreText}>more</Text>
+              <AppText style={s.moreText}>more</AppText>
             )}
           </TouchableOpacity>
         ) : null}
 
         {/* Progress bar + time */}
         <View style={s.progressRow}>
-          <Text style={s.timeText}>{fmt(progress)}</Text>
+          <AppText style={s.timeText}>{fmt(progress)}</AppText>
           <View style={s.progressTrack}>
             <View style={[s.progressFill, { width: `${pct}%` }]} />
           </View>
-          <Text style={s.timeText}>{fmt(duration)}</Text>
+          <AppText style={s.timeText}>{fmt(duration)}</AppText>
         </View>
       </View>
     </View>

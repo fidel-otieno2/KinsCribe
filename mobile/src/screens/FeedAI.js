@@ -1,8 +1,9 @@
 import { useState, useRef } from 'react';
 import {
-  View, Text, TextInput, FlatList, TouchableOpacity,
+  View, TextInput, FlatList, TouchableOpacity,
   StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator
 } from 'react-native';
+import AppText from '../components/AppText';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, radius } from '../theme';
@@ -58,9 +59,9 @@ export default function FeedAI({ navigation }) {
         </LinearGradient>
       )}
       <View style={[s.bubble, item.role === 'user' ? s.userBubble : s.aiBubble]}>
-        <Text style={[s.bubbleText, item.role === 'user' ? s.userText : s.aiText]}>
+        <AppText style={[s.bubbleText, item.role === 'user' ? s.userText : s.aiText]}>
           {item.text}
-        </Text>
+        </AppText>
       </View>
     </View>
   );
@@ -81,8 +82,8 @@ export default function FeedAI({ navigation }) {
             <Ionicons name="sparkles" size={16} color="#fff" />
           </LinearGradient>
           <View>
-            <Text style={s.headerTitle}>KinsCribe AI</Text>
-            <Text style={s.headerSub}>Family memory assistant</Text>
+            <AppText style={s.headerTitle}>KinsCribe AI</AppText>
+            <AppText style={s.headerSub}>Family memory assistant</AppText>
           </View>
         </View>
       </View>
@@ -91,7 +92,7 @@ export default function FeedAI({ navigation }) {
       <View style={s.quickRow}>
         {QUICK_PROMPTS.map(q => (
           <TouchableOpacity key={q.label} style={s.quickBtn} onPress={() => sendMessage(q.message)}>
-            <Text style={s.quickText}>{q.label}</Text>
+            <AppText style={s.quickText}>{q.label}</AppText>
           </TouchableOpacity>
         ))}
       </View>

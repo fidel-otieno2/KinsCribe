@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, Image, ActivityIndicator,
+  View, TouchableOpacity, StyleSheet, Image, ActivityIndicator,
   Alert, TextInput, ScrollView, Dimensions, FlatList,
 } from 'react-native';
+import AppText from '../components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
@@ -39,7 +40,7 @@ const STEPS = ['Photo', 'Profile', 'Interests', 'Privacy', 'Discover'];
 function StepIndicator({ current, total }) {
   return (
     <View style={s.stepWrap}>
-      <Text style={s.stepText}>Step {current} of {total}</Text>
+      <AppText style={s.stepText}>Step {current} of {total}</AppText>
       <View style={s.stepBar}>
         {Array.from({ length: total }).map((_, i) => (
           <View key={i} style={[s.stepDot, i < current && s.stepDotActive]} />
@@ -79,8 +80,8 @@ function PhotoStep({ onNext }) {
 
   return (
     <View style={s.stepContent}>
-      <Text style={s.stepTitle}>Add a profile photo</Text>
-      <Text style={s.stepSub}>Help your family and connections recognize you</Text>
+      <AppText style={s.stepTitle}>Add a profile photo</AppText>
+      <AppText style={s.stepSub}>Help your family and connections recognize you</AppText>
 
       <TouchableOpacity onPress={pickImage} activeOpacity={0.85} style={s.avatarWrap}>
         {image ? (
@@ -89,7 +90,7 @@ function PhotoStep({ onNext }) {
           <View style={s.avatarPlaceholder}>
             <LinearGradient colors={['rgba(45,90,39,0.3)', 'rgba(196,163,90,0.2)']} style={StyleSheet.absoluteFill} />
             <Ionicons name="camera" size={40} color={colors.primary} />
-            <Text style={s.addPhotoText}>Tap to add photo</Text>
+            <AppText style={s.addPhotoText}>Tap to add photo</AppText>
           </View>
         )}
         <View style={s.editBadge}>
@@ -101,7 +102,7 @@ function PhotoStep({ onNext }) {
 
       {image && (
         <TouchableOpacity onPress={pickImage} style={{ marginBottom: 8 }}>
-          <Text style={s.changeText}>Change Photo</Text>
+          <AppText style={s.changeText}>Change Photo</AppText>
         </TouchableOpacity>
       )}
 
@@ -112,7 +113,7 @@ function PhotoStep({ onNext }) {
         style={{ width: '100%', marginTop: 16 }}
       />
       <TouchableOpacity onPress={onNext} style={{ marginTop: 14 }}>
-        <Text style={s.skip}>Skip for now</Text>
+        <AppText style={s.skip}>Skip for now</AppText>
       </TouchableOpacity>
     </View>
   );
@@ -139,12 +140,12 @@ function ProfileStep({ onNext, required }) {
 
   return (
     <View style={s.stepContent}>
-      <Text style={s.stepTitle}>Tell us about yourself</Text>
-      <Text style={s.stepSub}>Add a bio and website so people know who you are</Text>
+      <AppText style={s.stepTitle}>Tell us about yourself</AppText>
+      <AppText style={s.stepSub}>Add a bio and website so people know who you are</AppText>
 
-      {error ? <Text style={s.stepError}>{error}</Text> : null}
+      {error ? <AppText style={s.stepError}>{error}</AppText> : null}
 
-      <Text style={s.fieldLabel}>Bio {required && <Text style={{ color: '#e11d48' }}>*</Text>}</Text>
+      <AppText style={s.fieldLabel}>Bio {required && <AppText style={{ color: '#e11d48' }}>*</AppText>}</AppText>
       <TextInput
         style={[s.input, { height: 90, textAlignVertical: 'top' }]}
         placeholder="Write a short bio..."
@@ -154,9 +155,9 @@ function ProfileStep({ onNext, required }) {
         value={bio}
         onChangeText={v => { setBio(v); setError(''); }}
       />
-      <Text style={s.charCount}>{bio.length}/150</Text>
+      <AppText style={s.charCount}>{bio.length}/150</AppText>
 
-      <Text style={s.fieldLabel}>Website (optional)</Text>
+      <AppText style={s.fieldLabel}>Website (optional)</AppText>
       <View style={s.inputRow}>
         <Ionicons name="link-outline" size={18} color={colors.muted} />
         <TextInput
@@ -173,7 +174,7 @@ function ProfileStep({ onNext, required }) {
       <GradientButton label="Continue" onPress={handleNext} loading={saving} style={{ width: '100%', marginTop: 20 }} />
       {!required && (
         <TouchableOpacity onPress={onNext} style={{ marginTop: 14 }}>
-          <Text style={s.skip}>Skip for now</Text>
+          <AppText style={s.skip}>Skip for now</AppText>
         </TouchableOpacity>
       )}
     </View>
@@ -206,10 +207,10 @@ function InterestsStep({ onNext, required }) {
 
   return (
     <View style={s.stepContent}>
-      <Text style={s.stepTitle}>What interests you?</Text>
-      <Text style={s.stepSub}>Pick at least 3 topics to personalise your feed</Text>
+      <AppText style={s.stepTitle}>What interests you?</AppText>
+      <AppText style={s.stepSub}>Pick at least 3 topics to personalise your feed</AppText>
 
-      {error ? <Text style={s.stepError}>{error}</Text> : null}
+      {error ? <AppText style={s.stepError}>{error}</AppText> : null}
 
       <View style={s.interestsGrid}>
         {INTERESTS.map(item => (
@@ -219,10 +220,10 @@ function InterestsStep({ onNext, required }) {
             onPress={() => toggle(item.key)}
             activeOpacity={0.8}
           >
-            <Text style={s.interestIcon}>{item.icon}</Text>
-            <Text style={[s.interestLabel, selected.has(item.key) && s.interestLabelActive]}>
+            <AppText style={s.interestIcon}>{item.icon}</AppText>
+            <AppText style={[s.interestLabel, selected.has(item.key) && s.interestLabelActive]}>
               {item.label}
-            </Text>
+            </AppText>
             {selected.has(item.key) && (
               <View style={s.interestCheck}>
                 <Ionicons name="checkmark" size={10} color="#fff" />
@@ -232,7 +233,7 @@ function InterestsStep({ onNext, required }) {
         ))}
       </View>
 
-      <Text style={s.selectedCount}>{selected.size} selected {required && <Text style={{ color: selected.size >= 3 ? '#10b981' : '#f59e0b' }}>({selected.size < 3 ? `${3 - selected.size} more needed` : '✓'})</Text>}</Text>
+      <AppText style={s.selectedCount}>{selected.size} selected {required && <AppText style={{ color: selected.size >= 3 ? '#10b981' : '#f59e0b' }}>({selected.size < 3 ? `${3 - selected.size} more needed` : '✓'})</AppText>}</AppText>
 
       <GradientButton
         label="Continue"
@@ -259,8 +260,8 @@ function PrivacyStep({ onNext }) {
 
   return (
     <View style={s.stepContent}>
-      <Text style={s.stepTitle}>Choose your privacy</Text>
-      <Text style={s.stepSub}>You can change this anytime in settings</Text>
+      <AppText style={s.stepTitle}>Choose your privacy</AppText>
+      <AppText style={s.stepSub}>You can change this anytime in settings</AppText>
 
       <TouchableOpacity
         style={[s.privacyCard, !isPrivate && s.privacyCardActive]}
@@ -271,8 +272,8 @@ function PrivacyStep({ onNext }) {
           <Ionicons name="globe-outline" size={26} color={colors.primary} />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={s.privacyTitle}>Public Account</Text>
-          <Text style={s.privacySub}>Anyone can see your posts and follow you</Text>
+          <AppText style={s.privacyTitle}>Public Account</AppText>
+          <AppText style={s.privacySub}>Anyone can see your posts and follow you</AppText>
         </View>
         <View style={[s.radioOuter, !isPrivate && s.radioOuterActive]}>
           {!isPrivate && <View style={s.radioInner} />}
@@ -288,8 +289,8 @@ function PrivacyStep({ onNext }) {
           <Ionicons name="lock-closed-outline" size={26} color={colors.gold} />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={s.privacyTitle}>Private Account</Text>
-          <Text style={s.privacySub}>Only approved followers can see your posts</Text>
+          <AppText style={s.privacyTitle}>Private Account</AppText>
+          <AppText style={s.privacySub}>Only approved followers can see your posts</AppText>
         </View>
         <View style={[s.radioOuter, isPrivate && s.radioOuterActive]}>
           {isPrivate && <View style={s.radioInner} />}
@@ -326,15 +327,15 @@ function DiscoverStep({ onDone }) {
 
   return (
     <View style={s.stepContent}>
-      <Text style={s.stepTitle}>People you may know</Text>
-      <Text style={s.stepSub}>Connect with people to build your feed</Text>
+      <AppText style={s.stepTitle}>People you may know</AppText>
+      <AppText style={s.stepSub}>Connect with people to build your feed</AppText>
 
       {loading ? (
         <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />
       ) : suggestions.length === 0 ? (
         <View style={s.noSuggestions}>
           <Ionicons name="people-outline" size={48} color={colors.dim} />
-          <Text style={s.noSuggestionsText}>No suggestions yet</Text>
+          <AppText style={s.noSuggestionsText}>No suggestions yet</AppText>
         </View>
       ) : (
         <ScrollView style={{ width: '100%' }} showsVerticalScrollIndicator={false}>
@@ -343,19 +344,19 @@ function DiscoverStep({ onDone }) {
               <View style={s.suggestionAvatar}>
                 {u.avatar_url
                   ? <Image source={{ uri: u.avatar_url }} style={{ width: 46, height: 46, borderRadius: 23 }} />
-                  : <Text style={s.suggestionAvatarLetter}>{u.name?.[0]?.toUpperCase()}</Text>}
+                  : <AppText style={s.suggestionAvatarLetter}>{u.name?.[0]?.toUpperCase()}</AppText>}
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={s.suggestionName}>{u.name}</Text>
-                <Text style={s.suggestionHandle}>@{u.username || 'user'}</Text>
+                <AppText style={s.suggestionName}>{u.name}</AppText>
+                <AppText style={s.suggestionHandle}>@{u.username || 'user'}</AppText>
               </View>
               <TouchableOpacity
                 style={[s.followBtn, followed.has(u.id) && s.followBtnActive]}
                 onPress={() => toggleFollow(u.id)}
               >
-                <Text style={[s.followBtnText, followed.has(u.id) && s.followBtnTextActive]}>
+                <AppText style={[s.followBtnText, followed.has(u.id) && s.followBtnTextActive]}>
                   {followed.has(u.id) ? 'Connected' : 'Connect'}
-                </Text>
+                </AppText>
               </TouchableOpacity>
             </View>
           ))}
@@ -368,7 +369,7 @@ function DiscoverStep({ onDone }) {
         style={{ width: '100%', marginTop: 20 }}
       />
       <TouchableOpacity onPress={onDone} style={{ marginTop: 14 }}>
-        <Text style={s.skip}>Skip for now</Text>
+        <AppText style={s.skip}>Skip for now</AppText>
       </TouchableOpacity>
     </View>
   );
@@ -408,7 +409,7 @@ export default function SetupProfileScreen({ navigation }) {
       {isReturning && (
         <View style={s.returnBanner}>
           <Ionicons name="information-circle" size={16} color="#f59e0b" />
-          <Text style={s.returnBannerText}>Complete your profile to continue using KinsCribe</Text>
+          <AppText style={s.returnBannerText}>Complete your profile to continue using KinsCribe</AppText>
         </View>
       )}
 

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, TextInput
+  View, StyleSheet, TouchableOpacity, TextInput
 } from 'react-native';
+import AppText from './AppText';
 import { Ionicons } from '@expo/vector-icons';
 import CountryPicker from './CountryPicker';
 import { colors, radius } from '../theme';
@@ -88,8 +89,8 @@ export default function PhoneInput({
           onPress={() => !disabled && setShowCountryPicker(true)}
           disabled={disabled}
         >
-          <Text style={styles.flag}>{selectedCountry.flag}</Text>
-          <Text style={styles.countryCode}>{selectedCountry.code}</Text>
+          <AppText style={styles.flag}>{selectedCountry.flag}</AppText>
+          <AppText style={styles.countryCode}>{selectedCountry.code}</AppText>
           <Ionicons 
             name="chevron-down" 
             size={16} 
@@ -118,7 +119,7 @@ export default function PhoneInput({
       {error && (
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle" size={16} color={colors.error} />
-          <Text style={styles.errorText}>{error}</Text>
+          <AppText style={styles.errorText}>{error}</AppText>
         </View>
       )}
 

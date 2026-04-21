@@ -1,9 +1,10 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity,
+  View, StyleSheet, FlatList, TouchableOpacity,
   ActivityIndicator, Image, RefreshControl, Animated,
   Modal, ScrollView,
 } from 'react-native';
+import AppText from '../components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
@@ -39,7 +40,7 @@ function Avatar({ url, name, size = 48 }) {
     <View style={{ width: size, height: size, borderRadius: size / 2, overflow: 'hidden', backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }}>
       {url
         ? <Image source={{ uri: url }} style={{ width: size, height: size }} />
-        : <Text style={{ color: '#fff', fontWeight: '700', fontSize: size * 0.38 }}>{name?.[0]?.toUpperCase() || '?'}</Text>}
+        : <AppText style={{ color: '#fff', fontWeight: '700', fontSize: size * 0.38 }}>{name?.[0]?.toUpperCase() || '?'}</AppText>}
     </View>
   );
 }
@@ -93,11 +94,11 @@ function NotifRow({ item, onPress, index, onAccept, onDecline }) {
         </View>
 
         <View style={s.textWrap}>
-          <Text style={s.rowText} numberOfLines={2}>
-            <Text style={s.actorName}>{item.actor_name} </Text>
-            <Text style={s.action}>{item.title?.replace(item.actor_name, '').trim() || cfg.label}</Text>
-          </Text>
-          {item.body ? <Text style={s.bodyText} numberOfLines={1}>"{item.body}"</Text> : null}
+          <AppText style={s.rowText} numberOfLines={2}>
+            <AppText style={s.actorName}>{item.actor_name} </AppText>
+            <AppText style={s.action}>{item.title?.replace(item.actor_name, '').trim() || cfg.label}</AppText>
+          </AppText>
+          {item.body ? <AppText style={s.bodyText} numberOfLines={1}>"{item.body}"</AppText> : null}
 
           {/* Follow request inline actions */}
           {item.type === 'follow_request' ? (
@@ -106,22 +107,22 @@ function NotifRow({ item, onPress, index, onAccept, onDecline }) {
                 style={s.acceptBtn}
                 onPress={() => onAccept(item)}
               >
-                <Text style={s.acceptBtnText}>Confirm</Text>
+                <AppText style={s.acceptBtnText}>Confirm</AppText>
               </TouchableOpacity>
               <TouchableOpacity
                 style={s.declineBtn}
                 onPress={() => onDecline(item)}
               >
-                <Text style={s.declineBtnText}>Delete</Text>
+                <AppText style={s.declineBtnText}>Delete</AppText>
               </TouchableOpacity>
             </View>
           ) : (
             <View style={s.metaRow}>
               <View style={[s.sourcePill, { backgroundColor: cfg.sourceBg + '55', borderColor: cfg.sourceBg + '99' }]}>
                 <View style={[s.sourceDot, { backgroundColor: cfg.sourceColor }]} />
-                <Text style={[s.sourceText, { color: cfg.sourceColor }]}>{cfg.source}</Text>
+                <AppText style={[s.sourceText, { color: cfg.sourceColor }]}>{cfg.source}</AppText>
               </View>
-              <Text style={s.time}>{timeAgo(item.created_at)}</Text>
+              <AppText style={s.time}>{timeAgo(item.created_at)}</AppText>
             </View>
           )}
         </View>
@@ -243,8 +244,8 @@ export default function NotificationsScreen({ navigation }) {
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
-          <Text style={s.headerTitle}>Notifications</Text>
-          {unreadCount > 0 && <Text style={s.headerSub}>{unreadCount} unread</Text>}
+          <AppText style={s.headerTitle}>Notifications</AppText>
+          {unreadCount > 0 && <AppText style={s.headerSub}>{unreadCount} unread</AppText>}
         </View>
         <TouchableOpacity
           style={s.markAllBtn}
@@ -273,10 +274,10 @@ export default function NotificationsScreen({ navigation }) {
                 size={14}
                 color={tab === t.key ? '#fff' : colors.muted}
               />
-              <Text style={[s.tabText, tab === t.key && s.tabTextActive]}>{t.label}</Text>
+              <AppText style={[s.tabText, tab === t.key && s.tabTextActive]}>{t.label}</AppText>
               {count > 0 && (
                 <View style={s.tabBadge}>
-                  <Text style={s.tabBadgeText}>{count > 9 ? '9+' : count}</Text>
+                  <AppText style={s.tabBadgeText}>{count > 9 ? '9+' : count}</AppText>
                 </View>
               )}
             </TouchableOpacity>
@@ -287,15 +288,15 @@ export default function NotificationsScreen({ navigation }) {
       {loading ? (
         <View style={s.loadingWrap}>
           <ActivityIndicator color={colors.primary} size="large" />
-          <Text style={s.loadingText}>Loading notifications...</Text>
+          <AppText style={s.loadingText}>Loading notifications...</AppText>
         </View>
       ) : filtered.length === 0 ? (
         <View style={s.empty}>
           <LinearGradient colors={['rgba(124,58,237,0.2)', 'rgba(59,130,246,0.08)']} style={s.emptyIconWrap}>
             <Ionicons name="notifications-off-outline" size={44} color={colors.dim} />
           </LinearGradient>
-          <Text style={s.emptyTitle}>All caught up!</Text>
-          <Text style={s.emptyBody}>Activity from your family, posts and connections will appear here.</Text>
+          <AppText style={s.emptyTitle}>All caught up!</AppText>
+          <AppText style={s.emptyBody}>Activity from your family, posts and connections will appear here.</AppText>
         </View>
       ) : (
         <FlatList
@@ -346,20 +347,20 @@ export default function NotificationsScreen({ navigation }) {
                   </View>
                 </View>
 
-                <Text style={s.detailName}>{showDetail.actor_name}</Text>
-                <Text style={s.detailAction}>{showDetail.title}</Text>
+                <AppText style={s.detailName}>{showDetail.actor_name}</AppText>
+                <AppText style={s.detailAction}>{showDetail.title}</AppText>
                 {showDetail.body ? (
                   <View style={s.detailBodyWrap}>
-                    <Text style={s.detailBody}>"{showDetail.body}"</Text>
+                    <AppText style={s.detailBody}>"{showDetail.body}"</AppText>
                   </View>
                 ) : null}
 
                 <View style={s.detailMeta}>
                   <View style={[s.sourcePill, { backgroundColor: cfg.sourceBg + '55', borderColor: cfg.sourceBg + '99' }]}>
                     <View style={[s.sourceDot, { backgroundColor: cfg.sourceColor }]} />
-                    <Text style={[s.sourceText, { color: cfg.sourceColor }]}>{cfg.source}</Text>
+                    <AppText style={[s.sourceText, { color: cfg.sourceColor }]}>{cfg.source}</AppText>
                   </View>
-                  <Text style={s.detailTime}>{timeAgo(showDetail.created_at)}</Text>
+                  <AppText style={s.detailTime}>{timeAgo(showDetail.created_at)}</AppText>
                 </View>
 
                 {(showDetail.story_media || showDetail.post_media) && (
@@ -377,7 +378,7 @@ export default function NotificationsScreen({ navigation }) {
                   >
                     <LinearGradient colors={['#7c3aed', '#3b82f6']} style={s.detailViewBtnGrad}>
                       <Ionicons name="arrow-forward" size={16} color="#fff" />
-                      <Text style={s.detailViewBtnText}>View</Text>
+                      <AppText style={s.detailViewBtnText}>View</AppText>
                     </LinearGradient>
                   </TouchableOpacity>
                   {showDetail.actor_id && (
@@ -389,7 +390,7 @@ export default function NotificationsScreen({ navigation }) {
                       }}
                     >
                       <Ionicons name="person-outline" size={16} color={colors.text} />
-                      <Text style={s.detailProfileBtnText}>Profile</Text>
+                      <AppText style={s.detailProfileBtnText}>Profile</AppText>
                     </TouchableOpacity>
                   )}
                 </View>

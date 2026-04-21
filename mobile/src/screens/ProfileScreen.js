@@ -1,9 +1,10 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity, StyleSheet,
+  View, FlatList, TouchableOpacity, StyleSheet,
   Image, ActivityIndicator, Alert, RefreshControl,
   ScrollView, Dimensions, Share, Modal,
 } from 'react-native';
+import AppText from '../components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -117,7 +118,7 @@ export default function ProfileScreen({ navigation }) {
         <Image source={{ uri: item.media_url }} style={s.gridImg} resizeMode="cover" />
       ) : (
         <View style={[s.gridImg, s.gridText]}>
-          <Text style={s.gridCaption} numberOfLines={4}>{item.caption}</Text>
+          <AppText style={s.gridCaption} numberOfLines={4}>{item.caption}</AppText>
         </View>
       )}
       {item.media_type === 'carousel' && (
@@ -133,7 +134,7 @@ export default function ProfileScreen({ navigation }) {
       {item.like_count > 0 && (
         <View style={s.gridLikes}>
           <Ionicons name="heart" size={10} color="#fff" />
-          <Text style={s.gridLikesText}>{item.like_count}</Text>
+          <AppText style={s.gridLikesText}>{item.like_count}</AppText>
         </View>
       )}
     </TouchableOpacity>
@@ -149,7 +150,7 @@ export default function ProfileScreen({ navigation }) {
     <View>
       {/* Top bar */}
       <View style={s.topBar}>
-        <Text style={[s.username, { color: theme.text }]}>@{user?.username || user?.name}</Text>
+        <AppText style={[s.username, { color: theme.text }]}>@{user?.username || user?.name}</AppText>
         <View style={s.topBarRight}>
           <TouchableOpacity onPress={() => navigation.navigate('Settings')} style={s.iconBtn}>
             <Ionicons name="settings-outline" size={22} color={theme.text} />
@@ -167,7 +168,7 @@ export default function ProfileScreen({ navigation }) {
             <View style={[s.avatarInner, { backgroundColor: theme.primary, borderColor: theme.bg }]}>
               {uploading ? <ActivityIndicator color="#fff" /> :
                 user?.avatar_url ? <Image source={{ uri: user.avatar_url }} style={s.avatarImg} /> :
-                <Text style={s.avatarLetter}>{user?.name?.[0]?.toUpperCase()}</Text>}
+                <AppText style={s.avatarLetter}>{user?.name?.[0]?.toUpperCase()}</AppText>}
             </View>
           </LinearGradient>
           <View style={s.cameraBtn}>
@@ -177,16 +178,16 @@ export default function ProfileScreen({ navigation }) {
 
         <View style={s.statsRow}>
           <View style={s.stat}>
-            <Text style={[s.statNum, { color: theme.text }]}>{stats.posts}</Text>
-            <Text style={[s.statLabel, { color: theme.muted }]}>Posts</Text>
+            <AppText style={[s.statNum, { color: theme.text }]}>{stats.posts}</AppText>
+            <AppText style={[s.statLabel, { color: theme.muted }]}>Posts</AppText>
           </View>
           <TouchableOpacity style={s.stat} onPress={() => {}}>
-            <Text style={[s.statNum, { color: theme.text }]}>{stats.connections}</Text>
-            <Text style={[s.statLabel, { color: theme.muted }]}>Connections</Text>
+            <AppText style={[s.statNum, { color: theme.text }]}>{stats.connections}</AppText>
+            <AppText style={[s.statLabel, { color: theme.muted }]}>Connections</AppText>
           </TouchableOpacity>
           <TouchableOpacity style={s.stat} onPress={() => {}}>
-            <Text style={[s.statNum, { color: theme.text }]}>{stats.interests}</Text>
-            <Text style={[s.statLabel, { color: theme.muted }]}>Interests</Text>
+            <AppText style={[s.statNum, { color: theme.text }]}>{stats.interests}</AppText>
+            <AppText style={[s.statLabel, { color: theme.muted }]}>Interests</AppText>
           </TouchableOpacity>
         </View>
       </View>
@@ -194,22 +195,22 @@ export default function ProfileScreen({ navigation }) {
       {/* Bio */}
       <View style={s.bioWrap}>
         <View style={s.nameRow}>
-          <Text style={[s.name, { color: theme.text }]}>{user?.name}</Text>
+          <AppText style={[s.name, { color: theme.text }]}>{user?.name}</AppText>
           {user?.verified_badge && (
             <Ionicons name="checkmark-circle" size={16} color="#3b82f6" />
           )}
           <View style={s.roleBadge}>
             <Ionicons name="shield-checkmark" size={11} color="#7c3aed" />
-            <Text style={s.roleText}>{user?.role}</Text>
+            <AppText style={s.roleText}>{user?.role}</AppText>
           </View>
         </View>
-        {user?.bio ? <Text style={[s.bio, { color: theme.muted }]}>{user.bio}</Text> : null}
+        {user?.bio ? <AppText style={[s.bio, { color: theme.muted }]}>{user.bio}</AppText> : null}
       </View>
 
       {/* Action buttons */}
       <View style={s.actionRow}>
         <TouchableOpacity style={[s.editBtn, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]} onPress={() => navigation.navigate('Settings')}>
-          <Text style={[s.editBtnText, { color: theme.text }]}>Edit Profile</Text>
+          <AppText style={[s.editBtnText, { color: theme.text }]}>Edit Profile</AppText>
         </TouchableOpacity>
         <TouchableOpacity style={[s.shareBtn, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]} onPress={handleShare}>
           <Ionicons name="share-outline" size={18} color={theme.text} />
@@ -235,7 +236,7 @@ export default function ProfileScreen({ navigation }) {
             <View style={[s.highlightCircle, s.highlightAdd, { backgroundColor: theme.bgSecondary, borderColor: theme.border2 }]}>
               <Ionicons name="add" size={22} color={theme.primary} />
             </View>
-            <Text style={[s.highlightLabel, { color: theme.text }]}>New</Text>
+            <AppText style={[s.highlightLabel, { color: theme.text }]}>New</AppText>
           </TouchableOpacity>
           {highlights.map(h => (
             <TouchableOpacity key={h.id} style={s.highlightItem}>
@@ -246,7 +247,7 @@ export default function ProfileScreen({ navigation }) {
                     : <Ionicons name="star" size={20} color="#fff" />}
                 </View>
               </LinearGradient>
-              <Text style={[s.highlightLabel, { color: theme.text }]} numberOfLines={1}>{h.title}</Text>
+              <AppText style={[s.highlightLabel, { color: theme.text }]} numberOfLines={1}>{h.title}</AppText>
             </TouchableOpacity>
           ))}
         </ScrollView>
@@ -282,8 +283,8 @@ export default function ProfileScreen({ navigation }) {
       <Modal visible={showQR} transparent animationType="fade" onRequestClose={() => setShowQR(false)}>
         <TouchableOpacity style={s.qrOverlay} activeOpacity={1} onPress={() => setShowQR(false)}>
           <View style={[s.qrCard, { backgroundColor: theme.bgCard }]}>
-            <Text style={[s.qrTitle, { color: theme.text }]}>Scan to visit profile</Text>
-            <Text style={[s.qrSub, { color: theme.muted }]}>@{user?.username || user?.name}</Text>
+            <AppText style={[s.qrTitle, { color: theme.text }]}>Scan to visit profile</AppText>
+            <AppText style={[s.qrSub, { color: theme.muted }]}>@{user?.username || user?.name}</AppText>
             <View style={s.qrBox}>
               <QRCode value={qrValue} size={200} color="#7c3aed" backgroundColor="#fff" />
             </View>
@@ -305,12 +306,12 @@ export default function ProfileScreen({ navigation }) {
               name={tab === 'saved' ? 'bookmark-outline' : tab === 'reels' ? 'film-outline' : tab === 'tagged' ? 'at-outline' : tab === 'liked' ? 'heart-outline' : 'camera-outline'}
               size={48} color={theme.dim}
             />
-            <Text style={[s.emptyTitle, { color: theme.muted }]}>
+            <AppText style={[s.emptyTitle, { color: theme.muted }]}>
               {tab === 'saved' ? 'No saved posts' : tab === 'reels' ? 'No reels yet' : tab === 'tagged' ? 'No tagged posts yet' : tab === 'liked' ? 'No liked posts yet' : 'No posts yet'}
-            </Text>
+            </AppText>
             {tab === 'posts' && (
               <TouchableOpacity style={s.createBtn} onPress={() => navigation.navigate('Create')}>
-                <Text style={s.createBtnText}>Create your first post</Text>
+                <AppText style={s.createBtnText}>Create your first post</AppText>
               </TouchableOpacity>
             )}
           </View>
@@ -320,12 +321,12 @@ export default function ProfileScreen({ navigation }) {
               <TouchableOpacity key={item.id} style={[s.listItem, { borderBottomColor: theme.border }]} activeOpacity={0.85}>
                 {item.media_url && <Image source={{ uri: item.media_url }} style={s.listImg} resizeMode="cover" />}
                 <View style={s.listInfo}>
-                  <Text style={[s.listCaption, { color: theme.text }]} numberOfLines={2}>{item.caption}</Text>
+                  <AppText style={[s.listCaption, { color: theme.text }]} numberOfLines={2}>{item.caption}</AppText>
                   <View style={s.listMeta}>
                     <Ionicons name="heart" size={13} color={colors.muted} />
-                    <Text style={[s.listMetaText, { color: theme.muted }]}>{item.like_count}</Text>
+                    <AppText style={[s.listMetaText, { color: theme.muted }]}>{item.like_count}</AppText>
                     <Ionicons name="chatbubble-outline" size={13} color={colors.muted} />
-                    <Text style={[s.listMetaText, { color: theme.muted }]}>{item.comment_count}</Text>
+                    <AppText style={[s.listMetaText, { color: theme.muted }]}>{item.comment_count}</AppText>
                   </View>
                 </View>
               </TouchableOpacity>

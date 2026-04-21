@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, Modal, FlatList,
+  View, StyleSheet, TouchableOpacity, Modal, FlatList,
   TextInput, SafeAreaView, StatusBar
 } from 'react-native';
+import AppText from './AppText';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radius } from '../theme';
 
@@ -228,10 +229,10 @@ export default function CountryPicker({
         onClose();
       }}
     >
-      <Text style={styles.flag}>{item.flag}</Text>
+      <AppText style={styles.flag}>{item.flag}</AppText>
       <View style={styles.countryInfo}>
-        <Text style={styles.countryName}>{item.country}</Text>
-        <Text style={styles.countryCode}>{item.code}</Text>
+        <AppText style={styles.countryName}>{item.country}</AppText>
+        <AppText style={styles.countryCode}>{item.code}</AppText>
       </View>
       {selectedCountry?.iso === item.iso && (
         <Ionicons name="checkmark" size={20} color={colors.primary} />
@@ -254,7 +255,7 @@ export default function CountryPicker({
           <TouchableOpacity onPress={onClose} style={styles.closeButton}>
             <Ionicons name="close" size={24} color={colors.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Select Country</Text>
+          <AppText style={styles.headerTitle}>Select Country</AppText>
           <View style={styles.placeholder} />
         </View>
 

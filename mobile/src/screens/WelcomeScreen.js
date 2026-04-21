@@ -1,7 +1,8 @@
 import {
-  View, Text, StyleSheet, TouchableOpacity, Image,
+  View, StyleSheet, TouchableOpacity, Image,
   Dimensions, StatusBar,
 } from 'react-native';
+import AppText from '../components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
@@ -35,13 +36,13 @@ export default function WelcomeScreen({ navigation }) {
         <View style={s.heroTextWrap}>
           <BlurView intensity={30} tint="dark" style={s.badge}>
             <Ionicons name="leaf" size={12} color={colors.primaryLight} />
-            <Text style={s.badgeText}>AI-Powered Family Stories</Text>
+            <AppText style={s.badgeText}>AI-Powered Family Stories</AppText>
           </BlurView>
 
-          <Text style={s.appName}>KinsCribe</Text>
-          <Text style={s.tagline}>
+          <AppText style={s.appName}>KinsCribe</AppText>
+          <AppText style={s.tagline}>
             Preserve your family's roots{'\\n'}across generations
-          </Text>
+          </AppText>
         </View>
       </View>
 
@@ -60,7 +61,7 @@ export default function WelcomeScreen({ navigation }) {
               <View style={[s.featureIcon, { backgroundColor: `${color}22` }]}>
                 <Ionicons name={icon} size={18} color={color} />
               </View>
-              <Text style={s.featureLabel}>{label}</Text>
+              <AppText style={s.featureLabel}>{label}</AppText>
             </View>
           ))}
         </View>
@@ -80,8 +81,8 @@ export default function WelcomeScreen({ navigation }) {
             onPress={() => navigation.navigate('Login')}
             activeOpacity={0.8}
           >
-            <Text style={s.signInBtnText}>Already have an account? </Text>
-            <Text style={s.signInBtnHighlight}>Sign In</Text>
+            <AppText style={s.signInBtnText}>Already have an account? </AppText>
+            <AppText style={s.signInBtnHighlight}>Sign In</AppText>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -91,12 +92,12 @@ export default function WelcomeScreen({ navigation }) {
           >
             <View style={s.inviteBtnInner}>
               <Ionicons name="key-outline" size={16} color={colors.gold} />
-              <Text style={s.inviteBtnText}>Join with Invite Code</Text>
+              <AppText style={s.inviteBtnText}>Join with Invite Code</AppText>
             </View>
           </TouchableOpacity>
         </View>
 
-        <Text style={s.footer}>Your stories. Your family. Forever. 🌿</Text>
+        <AppText style={s.footer}>Your stories. Your family. Forever. 🌿</AppText>
       </View>
     </View>
   );

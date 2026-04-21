@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
-import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Image, ScrollView } from 'react-native';
+import { Modal, View, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Image, ScrollView } from 'react-native';
+import AppText from './AppText';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
@@ -108,27 +109,27 @@ export function PhoneModal({ visible, onClose, onSuccess }) {
               </LinearGradient>
             </View>
 
-            <Text style={s.title}>
+            <AppText style={s.title}>
               {step === 'phone' ? 'Add Phone Number' : step === 'otp' ? 'Enter Verification Code' : 'Phone Added!'}
-            </Text>
-            <Text style={s.sub}>
+            </AppText>
+            <AppText style={s.sub}>
               {step === 'phone'
                 ? "We'll send a verification code to your email."
                 : step === 'otp'
                 ? 'Enter the 6-digit code sent to your email.'
                 : 'Your phone number has been added to your account.'}
-            </Text>
+            </AppText>
 
             {error ? (
               <View style={s.errorBox}>
                 <Ionicons name="alert-circle" size={14} color="#f87171" />
-                <Text style={s.errorText}>{error}</Text>
+                <AppText style={s.errorText}>{error}</AppText>
               </View>
             ) : null}
 
             {step === 'phone' && (
               <>
-                <Text style={s.label}>Phone Number</Text>
+                <AppText style={s.label}>Phone Number</AppText>
                 <PhoneInput value={phone} onChangeText={setPhone} placeholder="Enter phone number" style={{ marginBottom: 16 }} />
                 <GradientButton label="Send Code" onPress={sendOTP} loading={loading} style={{ marginTop: 4 }} />
               </>
@@ -153,9 +154,9 @@ export function PhoneModal({ visible, onClose, onSuccess }) {
                 </View>
                 <GradientButton label="Verify Code" onPress={verifyOTP} loading={loading} style={{ marginTop: 8 }} />
                 <TouchableOpacity style={s.resendBtn} onPress={sendOTP} disabled={resendCooldown > 0}>
-                  <Text style={[s.resendText, { color: resendCooldown > 0 ? colors.dim : '#10b981' }]}>
+                  <AppText style={[s.resendText, { color: resendCooldown > 0 ? colors.dim : '#10b981' }]}>
                     {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Didn't get it? Resend"}
-                  </Text>
+                  </AppText>
                 </TouchableOpacity>
               </>
             )}
@@ -163,7 +164,7 @@ export function PhoneModal({ visible, onClose, onSuccess }) {
             {step === 'done' && (
               <TouchableOpacity onPress={handleClose} style={s.doneBtn}>
                 <LinearGradient colors={['#10b981', '#059669']} style={s.doneBtnGrad}>
-                  <Text style={s.doneBtnText}>Done</Text>
+                  <AppText style={s.doneBtnText}>Done</AppText>
                 </LinearGradient>
               </TouchableOpacity>
             )}
@@ -275,27 +276,27 @@ export function ChangePasswordModal({ visible, onClose, userEmail, hasPassword, 
               </LinearGradient>
             </View>
 
-            <Text style={s.title}>
+            <AppText style={s.title}>
               {step === 'form' ? 'Change Password' : step === 'otp' ? 'Verify Your Email' : 'Password Changed!'}
-            </Text>
-            <Text style={s.sub}>
+            </AppText>
+            <AppText style={s.sub}>
               {step === 'form'
                 ? 'Choose a strong password to keep your account secure.'
                 : step === 'otp'
                 ? `We sent a 6-digit code to ${userEmail}. Enter it to confirm your password change.`
                 : 'Your password has been updated successfully.'}
-            </Text>
+            </AppText>
 
             {error ? (
               <View style={s.errorBox}>
                 <Ionicons name="alert-circle" size={14} color="#f87171" />
-                <Text style={s.errorText}>{error}</Text>
+                <AppText style={s.errorText}>{error}</AppText>
               </View>
             ) : null}
 
             {step === 'form' && (
               <>
-                <Text style={s.label}>Current Password (if you have one)</Text>
+                <AppText style={s.label}>Current Password (if you have one)</AppText>
                 <View style={s.inputWrap}>
                   <Ionicons name="lock-closed-outline" size={17} color={colors.muted} />
                   <TextInput
@@ -310,7 +311,7 @@ export function ChangePasswordModal({ visible, onClose, userEmail, hasPassword, 
                     <Ionicons name={showCurrent ? 'eye-off-outline' : 'eye-outline'} size={17} color={colors.muted} />
                   </TouchableOpacity>
                 </View>
-                <Text style={s.label}>New Password</Text>
+                <AppText style={s.label}>New Password</AppText>
                 <View style={s.inputWrap}>
                   <Ionicons name="lock-open-outline" size={17} color={colors.muted} />
                   <TextInput
@@ -325,7 +326,7 @@ export function ChangePasswordModal({ visible, onClose, userEmail, hasPassword, 
                     <Ionicons name={showNew ? 'eye-off-outline' : 'eye-outline'} size={17} color={colors.muted} />
                   </TouchableOpacity>
                 </View>
-                <Text style={s.label}>Confirm New Password</Text>
+                <AppText style={s.label}>Confirm New Password</AppText>
                 <View style={s.inputWrap}>
                   <Ionicons name="lock-open-outline" size={17} color={colors.muted} />
                   <TextInput
@@ -363,9 +364,9 @@ export function ChangePasswordModal({ visible, onClose, userEmail, hasPassword, 
                 </View>
                 <GradientButton label="Confirm Change" onPress={verifyOtp} loading={loading} style={{ marginTop: 8 }} />
                 <TouchableOpacity style={s.resendBtn} onPress={sendOtp} disabled={resendCooldown > 0}>
-                  <Text style={[s.resendText, { color: resendCooldown > 0 ? colors.dim : '#7c3aed' }]}>
+                  <AppText style={[s.resendText, { color: resendCooldown > 0 ? colors.dim : '#7c3aed' }]}>
                     {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Didn't get it? Resend"}
-                  </Text>
+                  </AppText>
                 </TouchableOpacity>
               </>
             )}
@@ -373,7 +374,7 @@ export function ChangePasswordModal({ visible, onClose, userEmail, hasPassword, 
             {step === 'done' && (
               <TouchableOpacity onPress={handleClose} style={s.doneBtn}>
                 <LinearGradient colors={['#10b981', '#059669']} style={s.doneBtnGrad}>
-                  <Text style={s.doneBtnText}>Done</Text>
+                  <AppText style={s.doneBtnText}>Done</AppText>
                 </LinearGradient>
               </TouchableOpacity>
             )}
@@ -465,10 +466,10 @@ export function TwoFactorModal({ visible, onClose, onSuccess, isEnabled }) {
             {/* DISABLE FLOW */}
             {isEnabled && step === 'init' && (
               <>
-                <Text style={s.title}>Disable 2FA</Text>
-                <Text style={s.sub}>Enter your password to disable two-factor authentication.</Text>
-                {error ? <View style={s.errorBox}><Ionicons name="alert-circle" size={14} color="#f87171" /><Text style={s.errorText}>{error}</Text></View> : null}
-                <Text style={s.label}>Password</Text>
+                <AppText style={s.title}>Disable 2FA</AppText>
+                <AppText style={s.sub}>Enter your password to disable two-factor authentication.</AppText>
+                {error ? <View style={s.errorBox}><Ionicons name="alert-circle" size={14} color="#f87171" /><AppText style={s.errorText}>{error}</AppText></View> : null}
+                <AppText style={s.label}>Password</AppText>
                 <View style={s.inputWrap}>
                   <Ionicons name="lock-closed-outline" size={17} color={colors.muted} />
                   <TextInput
@@ -485,7 +486,7 @@ export function TwoFactorModal({ visible, onClose, onSuccess, isEnabled }) {
                 </View>
                 <TouchableOpacity style={s.doneBtn} onPress={disable2FA} disabled={loading} activeOpacity={0.85}>
                   <LinearGradient colors={['#f87171', '#ef4444']} style={s.doneBtnGrad}>
-                    {loading ? <ActivityIndicator color="#fff" size="small" /> : <Text style={s.doneBtnText}>Disable 2FA</Text>}
+                    {loading ? <ActivityIndicator color="#fff" size="small" /> : <AppText style={s.doneBtnText}>Disable 2FA</AppText>}
                   </LinearGradient>
                 </TouchableOpacity>
               </>
@@ -494,21 +495,21 @@ export function TwoFactorModal({ visible, onClose, onSuccess, isEnabled }) {
             {/* SETUP FLOW */}
             {!isEnabled && step === 'init' && (
               <>
-                <Text style={s.title}>Two-Factor Authentication</Text>
-                <Text style={s.sub}>Add an extra layer of security to your account.</Text>
+                <AppText style={s.title}>Two-Factor Authentication</AppText>
+                <AppText style={s.sub}>Add an extra layer of security to your account.</AppText>
                 <GradientButton label="Setup 2FA" onPress={setup2FA} loading={loading} style={{ marginTop: 20 }} />
               </>
             )}
 
             {step === 'verify' && (
               <>
-                <Text style={s.title}>Scan QR Code</Text>
-                <Text style={s.sub}>Scan with your authenticator app, then enter the 6-digit code.</Text>
+                <AppText style={s.title}>Scan QR Code</AppText>
+                <AppText style={s.sub}>Scan with your authenticator app, then enter the 6-digit code.</AppText>
                 {qrCode && <View style={s.qrContainer}><Image source={{ uri: qrCode }} style={s.qrImage} /></View>}
-                <Text style={s.secretLabel}>Manual Entry Key:</Text>
-                <Text style={s.secretText}>{secret}</Text>
-                {error ? <View style={s.errorBox}><Ionicons name="alert-circle" size={14} color="#f87171" /><Text style={s.errorText}>{error}</Text></View> : null}
-                <Text style={s.label}>Verification Code</Text>
+                <AppText style={s.secretLabel}>Manual Entry Key:</AppText>
+                <AppText style={s.secretText}>{secret}</AppText>
+                {error ? <View style={s.errorBox}><Ionicons name="alert-circle" size={14} color="#f87171" /><AppText style={s.errorText}>{error}</AppText></View> : null}
+                <AppText style={s.label}>Verification Code</AppText>
                 <View style={s.inputWrap}>
                   <Ionicons name="keypad-outline" size={17} color={colors.muted} />
                   <TextInput style={s.input} placeholder="123456" placeholderTextColor={colors.dim} keyboardType="number-pad" value={code} onChangeText={setCode} maxLength={6} />
@@ -519,10 +520,10 @@ export function TwoFactorModal({ visible, onClose, onSuccess, isEnabled }) {
 
             {step === 'backup' && (
               <>
-                <Text style={s.title}>Save Backup Codes</Text>
-                <Text style={s.sub}>Store these in a safe place. Use them if you lose your authenticator.</Text>
+                <AppText style={s.title}>Save Backup Codes</AppText>
+                <AppText style={s.sub}>Store these in a safe place. Use them if you lose your authenticator.</AppText>
                 <View style={s.backupContainer}>
-                  {backupCodes.map((c, i) => <Text key={i} style={s.backupCode}>{c}</Text>)}
+                  {backupCodes.map((c, i) => <AppText key={i} style={s.backupCode}>{c}</AppText>)}
                 </View>
                 <GradientButton label="I've Saved My Codes" onPress={handleComplete} style={{ marginTop: 20 }} />
               </>
@@ -530,15 +531,15 @@ export function TwoFactorModal({ visible, onClose, onSuccess, isEnabled }) {
 
             {step === 'done' && (
               <>
-                <Text style={s.title}>{isEnabled ? '2FA Disabled' : '2FA Enabled!'}</Text>
-                <Text style={s.sub}>
+                <AppText style={s.title}>{isEnabled ? '2FA Disabled' : '2FA Enabled!'}</AppText>
+                <AppText style={s.sub}>
                   {isEnabled
                     ? 'Two-factor authentication has been disabled.'
                     : 'Your account is now protected with two-factor authentication.'}
-                </Text>
+                </AppText>
                 <TouchableOpacity onPress={handleClose} style={s.doneBtn}>
                   <LinearGradient colors={['#10b981', '#059669']} style={s.doneBtnGrad}>
-                    <Text style={s.doneBtnText}>Done</Text>
+                    <AppText style={s.doneBtnText}>Done</AppText>
                   </LinearGradient>
                 </TouchableOpacity>
               </>

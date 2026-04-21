@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, Animated,
+  View, TouchableOpacity, StyleSheet, Animated,
   Alert, TextInput, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator
 } from 'react-native';
+import AppText from '../components/AppText';
 import { Audio } from 'expo-av';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -157,10 +158,10 @@ export default function VoiceRecorderScreen({ navigation }) {
         <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={s.headerTitle}>Voice Story</Text>
+        <AppText style={s.headerTitle}>Voice Story</AppText>
         {step === 'record' && recordedUri && (
           <TouchableOpacity style={s.nextBtn} onPress={() => setStep('details')}>
-            <Text style={s.nextBtnText}>Next</Text>
+            <AppText style={s.nextBtnText}>Next</AppText>
             <Ionicons name="arrow-forward" size={16} color="#fff" />
           </TouchableOpacity>
         )}
@@ -184,8 +185,8 @@ export default function VoiceRecorderScreen({ navigation }) {
           </View>
 
           {/* Timer */}
-          <Text style={s.timer}>{formatTime(isRecording ? duration : duration)}</Text>
-          {isRecording && <Text style={s.recLabel}>● REC</Text>}
+          <AppText style={s.timer}>{formatTime(isRecording ? duration : duration)}</AppText>
+          {isRecording && <AppText style={s.recLabel}>● REC</AppText>}
 
           {/* Controls */}
           <View style={s.controls}>
@@ -221,9 +222,9 @@ export default function VoiceRecorderScreen({ navigation }) {
             )}
           </View>
 
-          <Text style={s.hint}>
+          <AppText style={s.hint}>
             {isRecording ? 'Tap to stop recording' : recordedUri ? 'Preview or tap Next to continue' : 'Tap the mic to start recording'}
-          </Text>
+          </AppText>
         </View>
       )}
 
@@ -243,33 +244,33 @@ export default function VoiceRecorderScreen({ navigation }) {
                   <View key={i} style={[s.miniBar, { height: 4 + Math.sin(i * 0.8) * 12 + 8 }]} />
                 ))}
               </View>
-              <Text style={s.audioDuration}>{formatTime(duration)}</Text>
+              <AppText style={s.audioDuration}>{formatTime(duration)}</AppText>
             </View>
           </View>
 
-          <Text style={s.label}>Title *</Text>
+          <AppText style={s.label}>Title *</AppText>
           <TextInput style={s.input} placeholder="Give your voice story a title..."
             placeholderTextColor={colors.dim} value={form.title}
             onChangeText={v => setForm(f => ({ ...f, title: v }))} />
 
-          <Text style={s.label}>Description (optional)</Text>
+          <AppText style={s.label}>Description (optional)</AppText>
           <TextInput style={[s.input, s.textarea]} multiline placeholder="What is this voice story about?"
             placeholderTextColor={colors.dim} value={form.content}
             onChangeText={v => setForm(f => ({ ...f, content: v }))} />
 
-          <Text style={s.label}>When did this happen? (optional)</Text>
+          <AppText style={s.label}>When did this happen? (optional)</AppText>
           <TextInput style={s.input} placeholder="YYYY-MM-DD"
             placeholderTextColor={colors.dim} value={form.story_date}
             onChangeText={v => setForm(f => ({ ...f, story_date: v }))} />
 
-          <Text style={s.label}>Privacy</Text>
+          <AppText style={s.label}>Privacy</AppText>
           <View style={s.privacyRow}>
             {['family', 'private', 'public'].map(p => (
               <TouchableOpacity key={p} style={[s.privacyTab, form.privacy === p && s.privacyTabActive]}
                 onPress={() => setForm(f => ({ ...f, privacy: p }))}>
-                <Text style={[s.privacyText, form.privacy === p && { color: '#fff' }]}>
+                <AppText style={[s.privacyText, form.privacy === p && { color: '#fff' }]}>
                   {p === 'family' ? '👨‍👩‍👧 Family' : p === 'private' ? '🔒 Private' : '🌍 Public'}
-                </Text>
+                </AppText>
               </TouchableOpacity>
             ))}
           </View>
@@ -278,7 +279,7 @@ export default function VoiceRecorderScreen({ navigation }) {
             <LinearGradient colors={['#7c3aed', '#3b82f6']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.postBtnGrad}>
               {posting
                 ? <ActivityIndicator color="#fff" />
-                : <><Ionicons name="sparkles" size={18} color="#fff" /><Text style={s.postBtnText}>Post & Enhance with AI</Text></>}
+                : <><Ionicons name="sparkles" size={18} color="#fff" /><AppText style={s.postBtnText}>Post & Enhance with AI</AppText></>}
             </LinearGradient>
           </TouchableOpacity>
         </ScrollView>

@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
-  View, Text, FlatList, TouchableOpacity, StyleSheet,
+  View, FlatList, TouchableOpacity, StyleSheet,
   TextInput, KeyboardAvoidingView, Platform, Image,
   ActivityIndicator, StatusBar, Alert,
 } from "react-native";
+import AppText from '../components/AppText';
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
@@ -24,7 +25,7 @@ function Avatar({ uri, name, size = 32 }) {
     <Image source={{ uri }} style={{ width: size, height: size, borderRadius: size / 2 }} />
   ) : (
     <View style={[cs.avatarFallback, { width: size, height: size, borderRadius: size / 2 }]}>
-      <Text style={{ color: "#fff", fontWeight: "700", fontSize: size * 0.38 }}>{name?.[0]?.toUpperCase() || "?"}</Text>
+      <AppText style={{ color: "#fff", fontWeight: "700", fontSize: size * 0.38 }}>{name?.[0]?.toUpperCase() || "?"}</AppText>
     </View>
   );
 }
@@ -198,15 +199,15 @@ export default function ChatScreen({ route, navigation }) {
         )}
 
         <View style={[cs.bubble, isMe ? cs.bubbleMe : cs.bubbleThem]}>
-          {showName && <Text style={cs.senderName}>{item.sender_name}</Text>}
+          {showName && <AppText style={cs.senderName}>{item.sender_name}</AppText>}
 
           {/* Reply preview */}
           {item.reply_to_id && (
             <View style={cs.replyPreview}>
               <View style={cs.replyBar} />
               <View>
-                <Text style={cs.replyName}>{item.reply_to_sender}</Text>
-                <Text style={cs.replyText} numberOfLines={1}>{item.reply_to_text}</Text>
+                <AppText style={cs.replyName}>{item.reply_to_sender}</AppText>
+                <AppText style={cs.replyText} numberOfLines={1}>{item.reply_to_text}</AppText>
               </View>
             </View>
           )}
@@ -217,19 +218,19 @@ export default function ChatScreen({ route, navigation }) {
           )}
 
           {/* Text */}
-          {item.text ? <Text style={[cs.msgText, isMe && cs.msgTextMe]}>{item.text}</Text> : null}
+          {item.text ? <AppText style={[cs.msgText, isMe && cs.msgTextMe]}>{item.text}</AppText> : null}
 
-          <Text style={[cs.msgTime, isMe && cs.msgTimeMe]}>
+          <AppText style={[cs.msgTime, isMe && cs.msgTimeMe]}>
             {timeStr(item.created_at)}{isMe && (item.is_read ? " ✓✓" : " ✓")}
-          </Text>
+          </AppText>
 
           {/* Reactions */}
           {Object.keys(reactionGroups).length > 0 && (
             <View style={cs.reactionsRow}>
               {Object.entries(reactionGroups).map(([emoji, count]) => (
                 <TouchableOpacity key={emoji} style={cs.reactionPill} onPress={() => reactToMessage(item.id, emoji)}>
-                  <Text style={cs.reactionEmoji}>{emoji}</Text>
-                  {count > 1 && <Text style={cs.reactionCount}>{count}</Text>}
+                  <AppText style={cs.reactionEmoji}>{emoji}</AppText>
+                  {count > 1 && <AppText style={cs.reactionCount}>{count}</AppText>}
                 </TouchableOpacity>
               ))}
             </View>
@@ -254,7 +255,7 @@ export default function ChatScreen({ route, navigation }) {
             <View style={cs.reactionPickerRow}>
               {REACTIONS.map(e => (
                 <TouchableOpacity key={e} onPress={() => reactToMessage(item.id, e)} style={cs.reactionOption}>
-                  <Text style={{ fontSize: 22 }}>{e}</Text>
+                  <AppText style={{ fontSize: 22 }}>{e}</AppText>
                 </TouchableOpacity>
               ))}
               <TouchableOpacity onPress={() => { setReplyTo(item); setShowReactions(null); }} style={cs.reactionOption}>
@@ -289,13 +290,13 @@ export default function ChatScreen({ route, navigation }) {
           style={cs.headerInfo}
           onPress={() => otherUserId && navigation.navigate("UserProfile", { userId: otherUserId, userName: title })}
         >
-          <Text style={cs.headerTitle}>{title}</Text>
-          <Text style={cs.headerSub}>
+          <AppText style={cs.headerTitle}>{title}</AppText>
+          <AppText style={cs.headerSub}>
             {type === "family" ? "Family Group" :
               otherStatus === "online" ? "🟢 Online" :
               otherStatus === "recently" ? "Recently active" :
               "Active recently"}
-          </Text>
+          </AppText>
         </TouchableOpacity>
 
         {type === "family" && (
@@ -332,7 +333,7 @@ export default function ChatScreen({ route, navigation }) {
           ListEmptyComponent={
             <View style={cs.emptyWrap}>
               <Ionicons name="chatbubble-outline" size={40} color={colors.dim} />
-              <Text style={cs.emptyText}>No messages yet. Say hello! 👋</Text>
+              <AppText style={cs.emptyText}>No messages yet. Say hello! 👋</AppText>
             </View>
           }
         />
@@ -341,14 +342,14 @@ export default function ChatScreen({ route, navigation }) {
       {disappearing && (
         <View style={cs.disappearBanner}>
           <Ionicons name="timer-outline" size={14} color="#f59e0b" />
-          <Text style={cs.disappearText}>Disappearing messages on · 24h</Text>
+          <AppText style={cs.disappearText}>Disappearing messages on · 24h</AppText>
         </View>
       )}
 
       {/* Typing indicator */}
       {typingNames.length > 0 && (
         <View style={cs.typingBanner}>
-          <Text style={cs.typingText}>{typingNames.join(", ")} {typingNames.length === 1 ? "is" : "are"} typing...</Text>
+          <AppText style={cs.typingText}>{typingNames.join(", ")} {typingNames.length === 1 ? "is" : "are"} typing...</AppText>
         </View>
       )}
 
@@ -357,7 +358,7 @@ export default function ChatScreen({ route, navigation }) {
         <View style={cs.smartRepliesRow}>
           {smartReplies.map((r, i) => (
             <TouchableOpacity key={i} style={cs.smartReplyChip} onPress={() => { setText(r); setSmartReplies([]); }}>
-              <Text style={cs.smartReplyText}>{r}</Text>
+              <AppText style={cs.smartReplyText}>{r}</AppText>
             </TouchableOpacity>
           ))}
         </View>
@@ -368,8 +369,8 @@ export default function ChatScreen({ route, navigation }) {
         <View style={cs.replyBar2}>
           <View style={cs.replyBarLine} />
           <View style={{ flex: 1 }}>
-            <Text style={cs.replyBarName}>{replyTo.sender_name}</Text>
-            <Text style={cs.replyBarText} numberOfLines={1}>{replyTo.text || "Media"}</Text>
+            <AppText style={cs.replyBarName}>{replyTo.sender_name}</AppText>
+            <AppText style={cs.replyBarText} numberOfLines={1}>{replyTo.text || "Media"}</AppText>
           </View>
           <TouchableOpacity onPress={() => setReplyTo(null)}>
             <Ionicons name="close" size={18} color={colors.muted} />

@@ -1,9 +1,10 @@
 import { useState, useCallback } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet,
+  View, TextInput, TouchableOpacity, StyleSheet,
   ScrollView, ActivityIndicator, Alert, KeyboardAvoidingView,
   Platform, Image, Dimensions,
 } from 'react-native';
+import AppText from '../components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -167,7 +168,7 @@ export default function CreateScreen({ navigation }) {
       <LinearGradient colors={isDark ? ['#0f172a', '#1e1040', '#0f172a'] : [theme.bg, theme.bgSecondary, theme.bg]} style={StyleSheet.absoluteFill} />
 
       <View style={[s.header, { borderBottomColor: theme.border }]}>
-        <Text style={[s.headerTitle, { color: theme.text }]}>Create</Text>
+        <AppText style={[s.headerTitle, { color: theme.text }]}>Create</AppText>
         <TouchableOpacity
           style={[s.postBtn, loading && { opacity: 0.5 }]}
           onPress={handlePost}
@@ -175,7 +176,7 @@ export default function CreateScreen({ navigation }) {
         >
           {loading
             ? <ActivityIndicator color="#fff" size="small" />
-            : <Text style={s.postBtnText}>Share</Text>}
+            : <AppText style={s.postBtnText}>Share</AppText>}
         </TouchableOpacity>
       </View>
 
@@ -188,7 +189,7 @@ export default function CreateScreen({ navigation }) {
             onPress={() => setMode(m.key)}
           >
             <Ionicons name={m.icon} size={18} color={mode === m.key ? '#fff' : theme.muted} />
-            <Text style={[s.modeBtnText, mode === m.key && { color: '#fff' }]}>{m.label}</Text>
+            <AppText style={[s.modeBtnText, mode === m.key && { color: '#fff' }]}>{m.label}</AppText>
           </TouchableOpacity>
         ))}
       </View>
@@ -226,13 +227,13 @@ export default function CreateScreen({ navigation }) {
                 <TouchableOpacity style={s.mediaBtn} onPress={takePhoto} activeOpacity={0.85}>
                   <LinearGradient colors={['#7c3aed', '#3b82f6']} style={s.mediaBtnGrad}>
                     <Ionicons name="camera" size={26} color="#fff" />
-                    <Text style={s.mediaBtnLabel}>Camera</Text>
+                    <AppText style={s.mediaBtnLabel}>Camera</AppText>
                   </LinearGradient>
                 </TouchableOpacity>
                 <TouchableOpacity style={s.mediaBtn} onPress={() => pickMedia(true)} activeOpacity={0.85}>
                   <LinearGradient colors={['#3b82f6', '#06b6d4']} style={s.mediaBtnGrad}>
                     <Ionicons name="images" size={26} color="#fff" />
-                    <Text style={s.mediaBtnLabel}>Gallery</Text>
+                    <AppText style={s.mediaBtnLabel}>Gallery</AppText>
                   </LinearGradient>
                 </TouchableOpacity>
               </View>
@@ -260,10 +261,10 @@ export default function CreateScreen({ navigation }) {
                   color={toneResult.score >= 7 ? '#10b981' : toneResult.score <= 3 ? '#f87171' : '#f59e0b'}
                 />
                 <View style={{ flex: 1 }}>
-                  <Text style={[s.toneLabel, { color: toneResult.score >= 7 ? '#10b981' : toneResult.score <= 3 ? '#f87171' : '#f59e0b' }]}>
+                  <AppText style={[s.toneLabel, { color: toneResult.score >= 7 ? '#10b981' : toneResult.score <= 3 ? '#f87171' : '#f59e0b' }]}>
                     Tone: {toneResult.tone} · {toneResult.score}/10
-                  </Text>
-                  {toneResult.suggestion ? <Text style={s.toneSuggestion}>{toneResult.suggestion}</Text> : null}
+                  </AppText>
+                  {toneResult.suggestion ? <AppText style={s.toneSuggestion}>{toneResult.suggestion}</AppText> : null}
                 </View>
                 {checkingTone && <ActivityIndicator size="small" color={theme.muted} />}
               </View>
@@ -294,7 +295,7 @@ export default function CreateScreen({ navigation }) {
               <TextInput style={[s.fieldInput, { color: theme.text }]} placeholder="Schedule: YYYY-MM-DD HH:MM (optional)" placeholderTextColor={theme.dim} value={scheduledFor} onChangeText={setScheduledFor} />
             </View>
 
-            <Text style={[s.label, { color: theme.muted }]}>Audience</Text>
+            <AppText style={[s.label, { color: theme.muted }]}>Audience</AppText>
             <View style={s.privacyRow}>
               {PRIVACY_OPTS.map(opt => (
                 <TouchableOpacity
@@ -303,7 +304,7 @@ export default function CreateScreen({ navigation }) {
                   onPress={() => setPrivacy(opt.key)}
                 >
                   <Ionicons name={opt.icon} size={14} color={privacy === opt.key ? opt.color : theme.muted} />
-                  <Text style={[s.privacyText, { color: theme.muted }, privacy === opt.key && { color: opt.color }]}>{opt.label}</Text>
+                  <AppText style={[s.privacyText, { color: theme.muted }, privacy === opt.key && { color: opt.color }]}>{opt.label}</AppText>
                 </TouchableOpacity>
               ))}
             </View>
@@ -337,17 +338,17 @@ export default function CreateScreen({ navigation }) {
             <View style={s.storyActions}>
               <TouchableOpacity style={[s.storyActionBtn, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]} onPress={takePhoto}>
                 <Ionicons name="camera-outline" size={22} color={theme.text} />
-                <Text style={[s.storyActionText, { color: theme.text }]}>Camera</Text>
+                <AppText style={[s.storyActionText, { color: theme.text }]}>Camera</AppText>
               </TouchableOpacity>
               <TouchableOpacity style={[s.storyActionBtn, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]} onPress={() => pickMedia(false)}>
                 <Ionicons name="images-outline" size={22} color={theme.text} />
-                <Text style={[s.storyActionText, { color: theme.text }]}>Gallery</Text>
+                <AppText style={[s.storyActionText, { color: theme.text }]}>Gallery</AppText>
               </TouchableOpacity>
             </View>
 
             {!mediaFiles[0] && (
               <>
-                <Text style={[s.label, { color: theme.muted }]}>Background Color</Text>
+                <AppText style={[s.label, { color: theme.muted }]}>Background Color</AppText>
                 <View style={s.bgColorRow}>
                   {BG_COLORS.map(c => (
                     <TouchableOpacity
@@ -360,7 +361,7 @@ export default function CreateScreen({ navigation }) {
               </>
             )}
 
-            <Text style={[s.label, { color: theme.muted }]}>Audience</Text>
+            <AppText style={[s.label, { color: theme.muted }]}>Audience</AppText>
             <View style={s.privacyRow}>
               {PRIVACY_OPTS.slice(0, 2).map(opt => (
                 <TouchableOpacity
@@ -369,7 +370,7 @@ export default function CreateScreen({ navigation }) {
                   onPress={() => setPrivacy(opt.key)}
                 >
                   <Ionicons name={opt.icon} size={14} color={privacy === opt.key ? opt.color : theme.muted} />
-                  <Text style={[s.privacyText, { color: theme.muted }, privacy === opt.key && { color: opt.color }]}>{opt.label}</Text>
+                  <AppText style={[s.privacyText, { color: theme.muted }, privacy === opt.key && { color: opt.color }]}>{opt.label}</AppText>
                 </TouchableOpacity>
               ))}
             </View>
@@ -392,28 +393,28 @@ export default function CreateScreen({ navigation }) {
                 <TouchableOpacity style={s.mediaBtn} onPress={takePhoto} activeOpacity={0.85}>
                   <LinearGradient colors={['#10b981', '#059669']} style={s.mediaBtnGrad}>
                     <Ionicons name="camera" size={26} color="#fff" />
-                    <Text style={s.mediaBtnLabel}>Camera</Text>
+                    <AppText style={s.mediaBtnLabel}>Camera</AppText>
                   </LinearGradient>
                 </TouchableOpacity>
                 <TouchableOpacity style={s.mediaBtn} onPress={() => pickMedia(false)} activeOpacity={0.85}>
                   <LinearGradient colors={['#7c3aed', '#3b82f6']} style={s.mediaBtnGrad}>
                     <Ionicons name="images" size={26} color="#fff" />
-                    <Text style={s.mediaBtnLabel}>Gallery</Text>
+                    <AppText style={s.mediaBtnLabel}>Gallery</AppText>
                   </LinearGradient>
                 </TouchableOpacity>
               </View>
             )}
 
-            <Text style={[s.label, { color: theme.muted }]}>Title *</Text>
+            <AppText style={[s.label, { color: theme.muted }]}>Title *</AppText>
             <TextInput style={[s.input, { backgroundColor: theme.bgCard, color: theme.text, borderColor: theme.border2 }]} placeholder="Give your story a title..." placeholderTextColor={theme.dim} value={familyTitle} onChangeText={setFamilyTitle} />
 
-            <Text style={[s.label, { color: theme.muted }]}>Story</Text>
+            <AppText style={[s.label, { color: theme.muted }]}>Story</AppText>
             <TextInput style={[s.input, s.textarea, { backgroundColor: theme.bgCard, color: theme.text, borderColor: theme.border2 }]} multiline placeholder="Tell your family story..." placeholderTextColor={theme.dim} value={familyContent} onChangeText={setFamilyContent} />
 
-            <Text style={[s.label, { color: theme.muted }]}>When did this happen?</Text>
+            <AppText style={[s.label, { color: theme.muted }]}>When did this happen?</AppText>
             <TextInput style={[s.input, { backgroundColor: theme.bgCard, color: theme.text, borderColor: theme.border2 }]} placeholder="YYYY-MM-DD" placeholderTextColor={theme.dim} value={storyDate} onChangeText={setStoryDate} keyboardType="numeric" />
 
-            <Text style={[s.label, { color: theme.muted }]}>Privacy</Text>
+            <AppText style={[s.label, { color: theme.muted }]}>Privacy</AppText>
             <View style={s.privacyRow}>
               {[
                 { key: 'family', label: '👨‍👩‍👧 Family', color: '#10b981' },
@@ -425,7 +426,7 @@ export default function CreateScreen({ navigation }) {
                   style={[s.privacyBtn, familyPrivacy === opt.key && { borderColor: opt.color, backgroundColor: `${opt.color}22` }]}
                   onPress={() => setFamilyPrivacy(opt.key)}
                 >
-                  <Text style={[s.privacyText, familyPrivacy === opt.key && { color: opt.color }]}>{opt.label}</Text>
+                  <AppText style={[s.privacyText, familyPrivacy === opt.key && { color: opt.color }]}>{opt.label}</AppText>
                 </TouchableOpacity>
               ))}
             </View>

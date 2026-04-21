@@ -1,8 +1,9 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, Image, TouchableOpacity,
+  View, StyleSheet, Image, TouchableOpacity,
   ActivityIndicator, ScrollView, Dimensions, Alert, Modal,
 } from 'react-native';
+import AppText from '../components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
@@ -137,7 +138,7 @@ export default function UserProfileScreen({ route, navigation }) {
         <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={s.topName}>{profile?.name || userName}</Text>
+        <AppText style={s.topName}>{profile?.name || userName}</AppText>
         <TouchableOpacity onPress={() => Alert.alert(
           profile?.name || userName,
           'Choose an action',
@@ -158,22 +159,22 @@ export default function UserProfileScreen({ route, navigation }) {
           <View style={s.avatarInner}>
             {(profile?.avatar_url || userAvatar)
               ? <Image source={{ uri: profile?.avatar_url || userAvatar }} style={s.avatarImg} />
-              : <Text style={s.avatarLetter}>{(profile?.name || userName)?.[0]?.toUpperCase() || '?'}</Text>}
+              : <AppText style={s.avatarLetter}>{(profile?.name || userName)?.[0]?.toUpperCase() || '?'}</AppText>}
           </View>
         </LinearGradient>
 
         <View style={s.statsRow}>
           <View style={s.stat}>
-            <Text style={s.statNum}>{locked ? '—' : posts.length}</Text>
-            <Text style={s.statLabel}>Posts</Text>
+            <AppText style={s.statNum}>{locked ? '—' : posts.length}</AppText>
+            <AppText style={s.statLabel}>Posts</AppText>
           </View>
           <View style={s.stat}>
-            <Text style={s.statNum}>{profile?.connection_count || 0}</Text>
-            <Text style={s.statLabel}>Followers</Text>
+            <AppText style={s.statNum}>{profile?.connection_count || 0}</AppText>
+            <AppText style={s.statLabel}>Followers</AppText>
           </View>
           <View style={s.stat}>
-            <Text style={s.statNum}>{profile?.interest_count || 0}</Text>
-            <Text style={s.statLabel}>Following</Text>
+            <AppText style={s.statNum}>{profile?.interest_count || 0}</AppText>
+            <AppText style={s.statLabel}>Following</AppText>
           </View>
         </View>
       </View>
@@ -181,20 +182,20 @@ export default function UserProfileScreen({ route, navigation }) {
       {/* Bio */}
       <View style={s.bioWrap}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <Text style={s.name}>{profile?.name || userName}</Text>
+          <AppText style={s.name}>{profile?.name || userName}</AppText>
           {profile?.verified_badge && (
             <Ionicons name="checkmark-circle" size={16} color="#3b82f6" />
           )}
           {isPrivate && (
             <View style={s.privateBadge}>
               <Ionicons name="lock-closed" size={10} color="#a78bfa" />
-              <Text style={s.privateBadgeText}>Private</Text>
+              <AppText style={s.privateBadgeText}>Private</AppText>
             </View>
           )}
         </View>
-        {profile?.username && <Text style={s.handle}>@{profile.username}</Text>}
-        {profile?.bio && <Text style={s.bio}>{profile.bio}</Text>}
-        {followsYou && <Text style={s.followsYouBadge}>Follows you</Text>}
+        {profile?.username && <AppText style={s.handle}>@{profile.username}</AppText>}
+        {profile?.bio && <AppText style={s.bio}>{profile.bio}</AppText>}
+        {followsYou && <AppText style={s.followsYouBadge}>Follows you</AppText>}
       </View>
 
       {/* Action buttons */}
@@ -212,23 +213,23 @@ export default function UserProfileScreen({ route, navigation }) {
           {connecting ? (
             <ActivityIndicator size="small" color={connStatus ? colors.muted : '#fff'} />
           ) : connStatus === 'accepted' ? (
-            <Text style={s.actionBtnOutlineText}>Following ✓</Text>
+            <AppText style={s.actionBtnOutlineText}>Following ✓</AppText>
           ) : connStatus === 'pending' ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <Ionicons name="time-outline" size={14} color={colors.muted} />
-              <Text style={s.actionBtnOutlineText}>Requested</Text>
+              <AppText style={s.actionBtnOutlineText}>Requested</AppText>
             </View>
           ) : (
             <LinearGradient colors={['#7c3aed', '#3b82f6']} style={s.actionBtnGrad}>
               <Ionicons name="person-add-outline" size={14} color="#fff" />
-              <Text style={s.actionBtnText}>Follow</Text>
+              <AppText style={s.actionBtnText}>Follow</AppText>
             </LinearGradient>
           )}
         </TouchableOpacity>
 
         <TouchableOpacity style={s.actionBtnOutline} onPress={openDM} activeOpacity={0.8}>
           <Ionicons name="chatbubble-outline" size={14} color={colors.text} />
-          <Text style={s.actionBtnOutlineText}>Message</Text>
+          <AppText style={s.actionBtnOutlineText}>Message</AppText>
         </TouchableOpacity>
 
         {/* Block button */}
@@ -276,12 +277,12 @@ export default function UserProfileScreen({ route, navigation }) {
                   <Ionicons name="lock-closed" size={28} color="#fff" />
                 </LinearGradient>
               </View>
-              <Text style={s.lockedTitle}>This account is private</Text>
-              <Text style={s.lockedSub}>
+              <AppText style={s.lockedTitle}>This account is private</AppText>
+              <AppText style={s.lockedSub}>
                 {connStatus === 'pending'
                   ? 'Your follow request is pending approval.'
                   : 'Follow this account to see their photos and videos.'}
-              </Text>
+              </AppText>
               {connStatus !== 'pending' && (
                 <TouchableOpacity
                   style={s.lockedFollowBtn}
@@ -294,7 +295,7 @@ export default function UserProfileScreen({ route, navigation }) {
                       ? <ActivityIndicator color="#fff" size="small" />
                       : <>
                           <Ionicons name="person-add-outline" size={16} color="#fff" />
-                          <Text style={s.lockedFollowBtnText}>Follow</Text>
+                          <AppText style={s.lockedFollowBtnText}>Follow</AppText>
                         </>}
                   </LinearGradient>
                 </TouchableOpacity>
@@ -311,7 +312,7 @@ export default function UserProfileScreen({ route, navigation }) {
         ) : posts.length === 0 ? (
           <View style={s.empty}>
             <Ionicons name="camera-outline" size={48} color={colors.dim} />
-            <Text style={s.emptyText}>No posts yet</Text>
+            <AppText style={s.emptyText}>No posts yet</AppText>
           </View>
         ) : tab === 'posts' ? (
           <View style={s.grid}>
@@ -320,12 +321,12 @@ export default function UserProfileScreen({ route, navigation }) {
                 {p.media_url
                   ? <Image source={{ uri: p.media_url }} style={s.gridImg} resizeMode="cover" />
                   : <View style={[s.gridImg, s.gridText]}>
-                      <Text style={s.gridCaption} numberOfLines={4}>{p.caption}</Text>
+                      <AppText style={s.gridCaption} numberOfLines={4}>{p.caption}</AppText>
                     </View>}
                 {p.like_count > 0 && (
                   <View style={s.gridLikes}>
                     <Ionicons name="heart" size={10} color="#fff" />
-                    <Text style={s.gridLikesText}>{p.like_count}</Text>
+                    <AppText style={s.gridLikesText}>{p.like_count}</AppText>
                   </View>
                 )}
               </TouchableOpacity>
@@ -336,12 +337,12 @@ export default function UserProfileScreen({ route, navigation }) {
             <View key={p.id} style={s.listItem}>
               {p.media_url && <Image source={{ uri: p.media_url }} style={s.listImg} resizeMode="cover" />}
               <View style={s.listInfo}>
-                <Text style={s.listCaption} numberOfLines={2}>{p.caption}</Text>
+                <AppText style={s.listCaption} numberOfLines={2}>{p.caption}</AppText>
                 <View style={s.listMeta}>
                   <Ionicons name="heart" size={13} color={colors.muted} />
-                  <Text style={s.listMetaText}>{p.like_count}</Text>
+                  <AppText style={s.listMetaText}>{p.like_count}</AppText>
                   <Ionicons name="chatbubble-outline" size={13} color={colors.muted} />
-                  <Text style={s.listMetaText}>{p.comment_count}</Text>
+                  <AppText style={s.listMetaText}>{p.comment_count}</AppText>
                 </View>
               </View>
             </View>
@@ -363,43 +364,43 @@ export default function UserProfileScreen({ route, navigation }) {
                 <View style={s.blockAvatarInner}>
                   {(profile?.avatar_url || userAvatar)
                     ? <Image source={{ uri: profile?.avatar_url || userAvatar }} style={{ width: '100%', height: '100%' }} />
-                    : <Text style={s.blockAvatarLetter}>{(profile?.name || userName)?.[0]?.toUpperCase()}</Text>}
+                    : <AppText style={s.blockAvatarLetter}>{(profile?.name || userName)?.[0]?.toUpperCase()}</AppText>}
                 </View>
               </LinearGradient>
             </View>
 
-            <Text style={s.blockTitle}>
+            <AppText style={s.blockTitle}>
               {isBlocked ? `Unblock ${profile?.name || userName}?` : `Block ${profile?.name || userName}?`}
-            </Text>
+            </AppText>
 
             {isBlocked ? (
               <View style={s.blockInfoBox}>
                 <View style={s.blockInfoRow}>
                   <Ionicons name="checkmark-circle" size={16} color="#34d399" />
-                  <Text style={s.blockInfoText}>They will be able to see your posts and follow you again</Text>
+                  <AppText style={s.blockInfoText}>They will be able to see your posts and follow you again</AppText>
                 </View>
                 <View style={s.blockInfoRow}>
                   <Ionicons name="checkmark-circle" size={16} color="#34d399" />
-                  <Text style={s.blockInfoText}>They can send you messages again</Text>
+                  <AppText style={s.blockInfoText}>They can send you messages again</AppText>
                 </View>
               </View>
             ) : (
               <View style={s.blockInfoBox}>
                 <View style={s.blockInfoRow}>
                   <Ionicons name="close-circle" size={16} color="#f87171" />
-                  <Text style={s.blockInfoText}>They won't be able to see your posts or stories</Text>
+                  <AppText style={s.blockInfoText}>They won't be able to see your posts or stories</AppText>
                 </View>
                 <View style={s.blockInfoRow}>
                   <Ionicons name="close-circle" size={16} color="#f87171" />
-                  <Text style={s.blockInfoText}>They won't be able to follow you or send messages</Text>
+                  <AppText style={s.blockInfoText}>They won't be able to follow you or send messages</AppText>
                 </View>
                 <View style={s.blockInfoRow}>
                   <Ionicons name="close-circle" size={16} color="#f87171" />
-                  <Text style={s.blockInfoText}>They won't be notified that you blocked them</Text>
+                  <AppText style={s.blockInfoText}>They won't be notified that you blocked them</AppText>
                 </View>
                 <View style={s.blockInfoRow}>
                   <Ionicons name="information-circle" size={16} color="#94a3b8" />
-                  <Text style={s.blockInfoText}>You can unblock them anytime from Settings → Privacy</Text>
+                  <AppText style={s.blockInfoText}>You can unblock them anytime from Settings → Privacy</AppText>
                 </View>
               </View>
             )}
@@ -410,7 +411,7 @@ export default function UserProfileScreen({ route, navigation }) {
                 onPress={() => setShowBlockModal(false)}
                 activeOpacity={0.8}
               >
-                <Text style={s.blockCancelText}>Cancel</Text>
+                <AppText style={s.blockCancelText}>Cancel</AppText>
               </TouchableOpacity>
               <TouchableOpacity
                 style={s.blockConfirmBtn}
@@ -424,7 +425,7 @@ export default function UserProfileScreen({ route, navigation }) {
                 >
                   {blocking
                     ? <ActivityIndicator color="#fff" size="small" />
-                    : <Text style={s.blockConfirmText}>{isBlocked ? 'Unblock' : 'Block'}</Text>}
+                    : <AppText style={s.blockConfirmText}>{isBlocked ? 'Unblock' : 'Block'}</AppText>}
                 </LinearGradient>
               </TouchableOpacity>
             </View>

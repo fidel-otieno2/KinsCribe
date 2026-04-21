@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from "react";
 import {
   View,
-  Text,
   FlatList,
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
 } from "react-native";
+import AppText from '../components/AppText';
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation } from "@react-navigation/native";
@@ -36,17 +36,17 @@ export default function StorybooksScreen() {
 
   const renderStorybook = ({ item }) => (
     <GlassCard style={s.item}>
-      <Text style={s.title}>{item.title}</Text>
-      <Text style={s.subtitle}>
+      <AppText style={s.title}>{item.title}</AppText>
+      <AppText style={s.subtitle}>
         {item.story_ids.length} stories •{" "}
         {new Date(item.created_at).toLocaleDateString()}
-      </Text>
+      </AppText>
     </GlassCard>
   );
 
   return (
     <View style={s.container}>
-      <Text style={s.header}>Family Storybooks</Text>
+      <AppText style={s.header}>Family Storybooks</AppText>
       <FlatList
         data={storybooks}
         renderItem={renderStorybook}
@@ -54,8 +54,8 @@ export default function StorybooksScreen() {
         ListEmptyComponent={
           <View style={s.empty}>
             <Ionicons name="book-outline" size={64} color={colors.muted} />
-            <Text style={s.emptyTitle}>No storybooks yet</Text>
-            <Text style={s.emptySub}>Create your first family memory book</Text>
+            <AppText style={s.emptyTitle}>No storybooks yet</AppText>
+            <AppText style={s.emptySub}>Create your first family memory book</AppText>
             <TouchableOpacity
               style={s.newBtn}
               onPress={() => navigation.navigate("StorybookGenerator")}
@@ -64,7 +64,7 @@ export default function StorybooksScreen() {
                 colors={["#7c3aed", "#3b82f6"]}
                 style={s.newBtnGrad}
               >
-                <Text style={s.newBtnText}>Create Storybook</Text>
+                <AppText style={s.newBtnText}>Create Storybook</AppText>
               </LinearGradient>
             </TouchableOpacity>
           </View>

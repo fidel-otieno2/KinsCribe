@@ -1,9 +1,10 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, ActivityIndicator,
+  View, TouchableOpacity, StyleSheet, ActivityIndicator,
   ScrollView, Image, RefreshControl, Alert, TextInput,
   Clipboard, Dimensions,
 } from 'react-native';
+import AppText from '../components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
@@ -36,7 +37,7 @@ function Avatar({ uri, name, size = 44 }) {
     <Image source={{ uri }} style={{ width: size, height: size, borderRadius: size / 2 }} />
   ) : (
     <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }}>
-      <Text style={{ color: '#fff', fontWeight: '700', fontSize: size * 0.38 }}>{name?.[0]?.toUpperCase() || '?'}</Text>
+      <AppText style={{ color: '#fff', fontWeight: '700', fontSize: size * 0.38 }}>{name?.[0]?.toUpperCase() || '?'}</AppText>
     </View>
   );
 }
@@ -64,16 +65,16 @@ function FamilyFeedTab({ navigation, userRole }) {
       {/* Admin Announcements */}
       {announcements.length > 0 && (
         <View style={{ marginBottom: 16 }}>
-          <Text style={ft.sectionLabel}>📢 Announcements</Text>
+          <AppText style={ft.sectionLabel}>📢 Announcements</AppText>
           {announcements.map(ann => (
             <View key={ann.id} style={ft.announcementCard}>
               <LinearGradient colors={['rgba(245,158,11,0.15)', 'rgba(30,41,59,0.9)']} style={StyleSheet.absoluteFill} />
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                 <Ionicons name="megaphone" size={16} color="#f59e0b" />
-                <Text style={ft.announcementTitle}>{ann.title}</Text>
+                <AppText style={ft.announcementTitle}>{ann.title}</AppText>
               </View>
-              {ann.content ? <Text style={ft.announcementContent}>{ann.content}</Text> : null}
-              <Text style={ft.time}>{timeAgo(ann.created_at)}</Text>
+              {ann.content ? <AppText style={ft.announcementContent}>{ann.content}</AppText> : null}
+              <AppText style={ft.time}>{timeAgo(ann.created_at)}</AppText>
             </View>
           ))}
         </View>
@@ -81,8 +82,8 @@ function FamilyFeedTab({ navigation, userRole }) {
       {stories.length === 0 ? (
         <View style={ft.empty}>
           <Ionicons name="library-outline" size={48} color={colors.dim} />
-          <Text style={ft.emptyTitle}>No family stories yet</Text>
-          <Text style={ft.emptySub}>Share your first family memory</Text>
+          <AppText style={ft.emptyTitle}>No family stories yet</AppText>
+          <AppText style={ft.emptySub}>Share your first family memory</AppText>
         </View>
       ) : stories.map(story => (
         <TouchableOpacity
@@ -94,29 +95,29 @@ function FamilyFeedTab({ navigation, userRole }) {
           <View style={ft.cardHeader}>
             <Avatar uri={story.author_avatar} name={story.author_name} size={38} />
             <View style={{ flex: 1, marginLeft: 10 }}>
-              <Text style={ft.authorName}>{story.author_name}</Text>
-              <Text style={ft.time}>{timeAgo(story.created_at)}</Text>
+              <AppText style={ft.authorName}>{story.author_name}</AppText>
+              <AppText style={ft.time}>{timeAgo(story.created_at)}</AppText>
             </View>
             {story.privacy === 'family' && (
               <View style={ft.privacyBadge}>
                 <Ionicons name="people" size={11} color="#10b981" />
-                <Text style={ft.privacyText}>Family</Text>
+                <AppText style={ft.privacyText}>Family</AppText>
               </View>
             )}
           </View>
-          <Text style={ft.title}>{story.title}</Text>
-          {story.content ? <Text style={ft.content} numberOfLines={3}>{story.content}</Text> : null}
+          <AppText style={ft.title}>{story.title}</AppText>
+          {story.content ? <AppText style={ft.content} numberOfLines={3}>{story.content}</AppText> : null}
           {story.media_url && story.media_type === 'image' && (
             <Image source={{ uri: story.media_url }} style={ft.media} resizeMode="cover" />
           )}
           <View style={ft.actions}>
             <View style={ft.actionItem}>
               <Ionicons name="heart-outline" size={16} color={colors.muted} />
-              <Text style={ft.actionText}>{story.like_count}</Text>
+              <AppText style={ft.actionText}>{story.like_count}</AppText>
             </View>
             <View style={ft.actionItem}>
               <Ionicons name="chatbubble-outline" size={16} color={colors.muted} />
-              <Text style={ft.actionText}>{story.comment_count}</Text>
+              <AppText style={ft.actionText}>{story.comment_count}</AppText>
             </View>
           </View>
         </TouchableOpacity>
@@ -176,11 +177,11 @@ function MembersTab({ members, user, family, navigation, success, error }) {
       {/* Invite code */}
       <BlurView intensity={20} tint="dark" style={mt.codeCard}>
         <LinearGradient colors={['rgba(124,58,237,0.2)', 'rgba(59,130,246,0.1)']} style={StyleSheet.absoluteFill} />
-        <Text style={mt.codeLabel}>Family Invite Code</Text>
-        <Text style={mt.code}>{family?.invite_code}</Text>
+        <AppText style={mt.codeLabel}>Family Invite Code</AppText>
+        <AppText style={mt.code}>{family?.invite_code}</AppText>
         <TouchableOpacity style={[mt.copyBtn, copied && mt.copyBtnDone]} onPress={copyCode}>
           <Ionicons name={copied ? 'checkmark' : 'copy-outline'} size={16} color="#fff" />
-          <Text style={mt.copyBtnText}>{copied ? 'Copied!' : 'Copy Code'}</Text>
+          <AppText style={mt.copyBtnText}>{copied ? 'Copied!' : 'Copy Code'}</AppText>
         </TouchableOpacity>
       </BlurView>
 
@@ -197,12 +198,12 @@ function MembersTab({ members, user, family, navigation, success, error }) {
             onChangeText={setInviteEmail}
           />
           <TouchableOpacity style={mt.sendBtn} onPress={sendInvite} disabled={sending}>
-            {sending ? <ActivityIndicator color="#fff" size="small" /> : <Text style={mt.sendBtnText}>Send</Text>}
+            {sending ? <ActivityIndicator color="#fff" size="small" /> : <AppText style={mt.sendBtnText}>Send</AppText>}
           </TouchableOpacity>
         </View>
       )}
 
-      <Text style={mt.sectionTitle}>Members ({members.length})</Text>
+      <AppText style={mt.sectionTitle}>Members ({members.length})</AppText>
       {members.map(m => (
         <TouchableOpacity
           key={m.id}
@@ -227,15 +228,15 @@ function MembersTab({ members, user, family, navigation, success, error }) {
           <Avatar uri={m.avatar_url} name={m.name} size={48} />
           <View style={{ flex: 1, marginLeft: 12 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Text style={mt.memberName}>{m.name}</Text>
-              {m.id === user?.id && <Text style={mt.youBadge}>You</Text>}
+              <AppText style={mt.memberName}>{m.name}</AppText>
+              {m.id === user?.id && <AppText style={mt.youBadge}>You</AppText>}
             </View>
-            <Text style={mt.memberEmail}>{m.email}</Text>
+            <AppText style={mt.memberEmail}>{m.email}</AppText>
           </View>
           <View style={[mt.roleBadge, m.role === 'admin' && mt.adminBadge, m.role === 'view-only' && mt.viewOnlyBadge]}>
-            <Text style={[mt.roleText, m.role === 'admin' && { color: '#f59e0b' }, m.role === 'view-only' && { color: '#94a3b8' }]}>
+            <AppText style={[mt.roleText, m.role === 'admin' && { color: '#f59e0b' }, m.role === 'view-only' && { color: '#94a3b8' }]}>
               {m.role === 'admin' ? '👑 Admin' : m.role === 'view-only' ? '👁 View Only' : m.role}
-            </Text>
+            </AppText>
           </View>
         </TouchableOpacity>
       ))}
@@ -287,20 +288,20 @@ function TimelineTab({ navigation }) {
             {idx < stories.length - 1 && <View style={tl.line} />}
           </View>
           <View style={tl.content}>
-            <Text style={tl.date}>
+            <AppText style={tl.date}>
               {story.story_date
                 ? new Date(story.story_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
                 : new Date(story.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}
-            </Text>
+            </AppText>
             <TouchableOpacity style={tl.card} activeOpacity={0.85}>
               {story.media_url && story.media_type === 'image' && (
                 <Image source={{ uri: story.media_url }} style={tl.media} resizeMode="cover" />
               )}
-              <Text style={tl.title}>{story.title}</Text>
-              {story.content ? <Text style={tl.body} numberOfLines={2}>{story.content}</Text> : null}
+              <AppText style={tl.title}>{story.title}</AppText>
+              {story.content ? <AppText style={tl.body} numberOfLines={2}>{story.content}</AppText> : null}
               <View style={tl.meta}>
                 <Avatar uri={story.author_avatar} name={story.author_name} size={20} />
-                <Text style={tl.author}>{story.author_name}</Text>
+                <AppText style={tl.author}>{story.author_name}</AppText>
               </View>
             </TouchableOpacity>
           </View>
@@ -309,7 +310,7 @@ function TimelineTab({ navigation }) {
       {stories.length === 0 && (
         <View style={{ alignItems: 'center', marginTop: 60, gap: 10 }}>
           <Ionicons name="git-branch-outline" size={48} color={colors.dim} />
-          <Text style={{ fontSize: 16, color: colors.muted }}>No timeline entries yet</Text>
+          <AppText style={{ fontSize: 16, color: colors.muted }}>No timeline entries yet</AppText>
         </View>
       )}
     </ScrollView>
@@ -375,8 +376,8 @@ export default function FamilyScreen({ navigation }) {
             <Ionicons name="people" size={20} color="#fff" />
           </LinearGradient>
           <View>
-            <Text style={s.familyName}>{family?.name || 'My Family'}</Text>
-            <Text style={s.memberCount}>{members.length} members</Text>
+            <AppText style={s.familyName}>{family?.name || 'My Family'}</AppText>
+            <AppText style={s.memberCount}>{members.length} members</AppText>
           </View>
         </View>
         <View style={s.headerRight}>
@@ -421,7 +422,7 @@ export default function FamilyScreen({ navigation }) {
             <View style={[s.quickIcon, { backgroundColor: `${item.color}22` }]}>
               <Ionicons name={item.icon} size={22} color={item.color} />
             </View>
-            <Text style={s.quickLabel}>{item.label}</Text>
+            <AppText style={s.quickLabel}>{item.label}</AppText>
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -431,7 +432,7 @@ export default function FamilyScreen({ navigation }) {
         {TABS.map(t => (
           <TouchableOpacity key={t.key} style={[s.tabBtn, tab === t.key && s.tabBtnActive]} onPress={() => setTab(t.key)}>
             <Ionicons name={tab === t.key ? t.iconActive : t.icon} size={18} color={tab === t.key ? colors.primary : colors.muted} />
-            <Text style={[s.tabLabel, tab === t.key && s.tabLabelActive]}>{t.label}</Text>
+            <AppText style={[s.tabLabel, tab === t.key && s.tabLabelActive]}>{t.label}</AppText>
           </TouchableOpacity>
         ))}
       </View>

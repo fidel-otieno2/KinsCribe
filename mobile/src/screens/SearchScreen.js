@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
 import {
-  View, Text, FlatList, TouchableOpacity, StyleSheet,
+  View, FlatList, TouchableOpacity, StyleSheet,
   Image, ActivityIndicator, StatusBar, TextInput, ScrollView,
 } from "react-native";
+import AppText from '../components/AppText';
 import { useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -16,7 +17,7 @@ function Avatar({ uri, name, size = 52 }) {
     <Image source={{ uri }} style={{ width: size, height: size, borderRadius: size / 2 }} />
   ) : (
     <View style={[s.avatarFallback, { width: size, height: size, borderRadius: size / 2 }]}>
-      <Text style={{ color: "#fff", fontWeight: "700", fontSize: size * 0.36 }}>{name?.[0]?.toUpperCase() || "?"}</Text>
+      <AppText style={{ color: "#fff", fontWeight: "700", fontSize: size * 0.36 }}>{name?.[0]?.toUpperCase() || "?"}</AppText>
     </View>
   );
 }
@@ -44,10 +45,10 @@ function ConnectButton({ userId, initialConnected, onToggle }) {
       {loading ? (
         <ActivityIndicator size="small" color={connected ? colors.muted : "#fff"} />
       ) : connected ? (
-        <Text style={s.connectedText}>Connected</Text>
+        <AppText style={s.connectedText}>Connected</AppText>
       ) : (
         <LinearGradient colors={["#7c3aed", "#3b82f6"]} style={s.connectGrad}>
-          <Text style={s.connectText}>Connect</Text>
+          <AppText style={s.connectText}>Connect</AppText>
         </LinearGradient>
       )}
     </TouchableOpacity>
@@ -114,9 +115,9 @@ export default function SearchScreen({ navigation }) {
     >
       <Avatar uri={item.avatar_url} name={item.name} size={48} />
       <View style={s.userInfo}>
-        <Text style={[s.userName, { color: theme.text }]}>{item.name}</Text>
-        <Text style={[s.userHandle, { color: theme.muted }]}>@{item.username || "user"}</Text>
-        {item.follows_you && <Text style={[s.followsYou, { color: theme.primary }]}>Connects with you</Text>}
+        <AppText style={[s.userName, { color: theme.text }]}>{item.name}</AppText>
+        <AppText style={[s.userHandle, { color: theme.muted }]}>@{item.username || "user"}</AppText>
+        {item.follows_you && <AppText style={[s.followsYou, { color: theme.primary }]}>Connects with you</AppText>}
       </View>
       {showConnect && (
         <ConnectButton userId={item.id} initialConnected={item.is_connected} />
@@ -130,7 +131,7 @@ export default function SearchScreen({ navigation }) {
 
       {/* Header */}
       <View style={s.header}>
-        <Text style={[s.title, { color: theme.text }]}>Discover</Text>
+        <AppText style={[s.title, { color: theme.text }]}>Discover</AppText>
       </View>
 
       {/* Search bar */}
@@ -160,7 +161,7 @@ export default function SearchScreen({ navigation }) {
             ) : results.length === 0 ? (
               <View style={s.emptyWrap}>
                 <Ionicons name="search-outline" size={40} color={theme.dim} />
-                <Text style={[s.emptyText, { color: theme.muted }]}>No users found for "{query}"</Text>
+                <AppText style={[s.emptyText, { color: theme.muted }]}>No users found for "{query}"</AppText>
               </View>
             ) : (
               results.map(u => renderUser(u))
@@ -170,11 +171,11 @@ export default function SearchScreen({ navigation }) {
           <>
             {/* People you may know */}
             <View style={s.section}>
-              <Text style={[s.sectionTitle, { color: theme.text }]}>People You May Know</Text>
+              <AppText style={[s.sectionTitle, { color: theme.text }]}>People You May Know</AppText>
               {loadingSuggestions ? (
                 <ActivityIndicator color={theme.primary} style={{ marginTop: 20 }} />
               ) : suggestions.length === 0 ? (
-                <Text style={[s.emptyText, { color: theme.muted }]}>No suggestions right now</Text>
+                <AppText style={[s.emptyText, { color: theme.muted }]}>No suggestions right now</AppText>
               ) : (
                 suggestions.map(u => renderUser(u))
               )}
@@ -184,7 +185,7 @@ export default function SearchScreen({ navigation }) {
             {posts.length > 0 && (
               <View style={s.section}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                  <Text style={[s.sectionTitle, { color: theme.text }]}>Explore Posts</Text>
+                  <AppText style={[s.sectionTitle, { color: theme.text }]}>Explore Posts</AppText>
                   <View style={{ flexDirection: 'row', gap: 6 }}>
                     {['recent', 'trending', 'popular'].map(f => (
                       <TouchableOpacity
@@ -192,9 +193,9 @@ export default function SearchScreen({ navigation }) {
                         style={[s.filterBtn, exploreFilter === f && { backgroundColor: 'rgba(124,58,237,0.25)', borderColor: 'rgba(124,58,237,0.5)' }, { borderColor: theme.border2, backgroundColor: theme.bgSecondary }]}
                         onPress={() => { setExploreFilter(f); fetchExplorePosts(); }}
                       >
-                        <Text style={[s.filterBtnText, { color: exploreFilter === f ? theme.primary : theme.muted }]}>
+                        <AppText style={[s.filterBtnText, { color: exploreFilter === f ? theme.primary : theme.muted }]}>
                           {f.charAt(0).toUpperCase() + f.slice(1)}
-                        </Text>
+                        </AppText>
                       </TouchableOpacity>
                     ))}
                   </View>
@@ -207,8 +208,8 @@ export default function SearchScreen({ navigation }) {
                         style={[s.hashtagChip, { backgroundColor: theme.bgSecondary, borderColor: theme.border2 }]}
                         onPress={() => { setQuery(`#${h.tag}`); handleSearch(`#${h.tag}`); }}
                       >
-                        <Text style={[s.hashtagText, { color: theme.primary }]}>#{h.tag}</Text>
-                        <Text style={[s.hashtagCount, { color: theme.dim }]}>{h.count}</Text>
+                        <AppText style={[s.hashtagText, { color: theme.primary }]}>#{h.tag}</AppText>
+                        <AppText style={[s.hashtagCount, { color: theme.dim }]}>{h.count}</AppText>
                       </TouchableOpacity>
                     ))}
                   </ScrollView>
@@ -220,7 +221,7 @@ export default function SearchScreen({ navigation }) {
                         <Image source={{ uri: p.media_url }} style={s.postThumbImg} resizeMode="cover" />
                       ) : (
                         <View style={[s.postThumbImg, { backgroundColor: theme.bgSecondary, padding: 8, justifyContent: 'center' }]}>
-                          <Text style={[s.postThumbCaption, { color: theme.muted }]} numberOfLines={4}>{p.caption}</Text>
+                          <AppText style={[s.postThumbCaption, { color: theme.muted }]} numberOfLines={4}>{p.caption}</AppText>
                         </View>
                       )}
                     </TouchableOpacity>

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { Animated, Text, View, StyleSheet, TouchableOpacity } from 'react-native';
+import { Animated, View, StyleSheet, TouchableOpacity } from 'react-native';
+import AppText from './AppText';
 import { Ionicons } from '@expo/vector-icons';
 
 const CONFIGS = {
@@ -36,7 +37,7 @@ export default function Toast({ visible, type = 'success', message, onHide }) {
   return (
     <Animated.View style={[s.wrap, { opacity, transform: [{ translateY }], backgroundColor: cfg.bg, borderColor: cfg.border }]}>
       <Ionicons name={cfg.icon} size={20} color={cfg.iconColor} />
-      <Text style={s.msg} numberOfLines={3}>{message}</Text>
+      <AppText style={s.msg} numberOfLines={3}>{message}</AppText>
       <TouchableOpacity onPress={hide} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
         <Ionicons name="close" size={16} color="rgba(255,255,255,0.6)" />
       </TouchableOpacity>

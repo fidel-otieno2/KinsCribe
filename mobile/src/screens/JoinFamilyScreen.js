@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, TextInput, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
+import AppText from '../components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
@@ -39,19 +40,19 @@ export default function JoinFamilyScreen({ navigation }) {
           <Ionicons name="key" size={32} color="#fff" />
         </LinearGradient>
 
-        <Text style={s.title}>Join a Family</Text>
-        <Text style={s.sub}>Enter the invite code sent by your family admin</Text>
+        <AppText style={s.title}>Join a Family</AppText>
+        <AppText style={s.sub}>Enter the invite code sent by your family admin</AppText>
 
         <BlurView intensity={20} tint="dark" style={s.card}>
           <View style={s.cardInner}>
             {error ? (
               <View style={s.errorBox}>
                 <Ionicons name="alert-circle" size={16} color="#f87171" />
-                <Text style={s.errorText}>{error}</Text>
+                <AppText style={s.errorText}>{error}</AppText>
               </View>
             ) : null}
 
-            <Text style={s.inputLabel}>Invite Code</Text>
+            <AppText style={s.inputLabel}>Invite Code</AppText>
             <TextInput
               style={s.codeInput}
               placeholder="AB12CD34"
@@ -61,13 +62,13 @@ export default function JoinFamilyScreen({ navigation }) {
               onChangeText={v => setCode(v.toUpperCase())}
               maxLength={8}
             />
-            <Text style={s.hint}>Code is 8 characters long</Text>
+            <AppText style={s.hint}>Code is 8 characters long</AppText>
             <GradientButton label="Join Family" onPress={handleJoin} loading={loading} style={{ marginTop: 8 }} />
           </View>
         </BlurView>
 
         <TouchableOpacity onPress={() => navigation.navigate('Login')} style={{ marginTop: 24, alignItems: 'center' }}>
-          <Text style={{ color: colors.muted, fontSize: 14 }}>Already have an account? <Text style={{ color: '#7c3aed', fontWeight: '700' }}>Sign in</Text></Text>
+          <AppText style={{ color: colors.muted, fontSize: 14 }}>Already have an account? <AppText style={{ color: '#7c3aed', fontWeight: '700' }}>Sign in</AppText></AppText>
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>

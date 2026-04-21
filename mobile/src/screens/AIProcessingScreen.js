@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
+import AppText from '../components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
@@ -44,7 +45,7 @@ export default function AIProcessingScreen({ route, navigation }) {
         <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={s.headerTitle}>AI Processing</Text>
+        <AppText style={s.headerTitle}>AI Processing</AppText>
       </View>
 
       <ScrollView contentContainerStyle={s.scroll}>
@@ -55,16 +56,16 @@ export default function AIProcessingScreen({ route, navigation }) {
             {polling ? (
               <>
                 <ActivityIndicator color="#7c3aed" size="large" />
-                <Text style={s.statusTitle}>AI is working its magic...</Text>
-                <Text style={s.statusSub}>Transcribing, enhancing and tagging your story</Text>
+                <AppText style={s.statusTitle}>AI is working its magic...</AppText>
+                <AppText style={s.statusSub}>Transcribing, enhancing and tagging your story</AppText>
               </>
             ) : (
               <>
                 <LinearGradient colors={['#7c3aed', '#3b82f6']} style={s.doneIcon}>
                   <Ionicons name="checkmark" size={28} color="#fff" />
                 </LinearGradient>
-                <Text style={s.statusTitle}>AI Processing Complete!</Text>
-                <Text style={s.statusSub}>Your story has been enhanced</Text>
+                <AppText style={s.statusTitle}>AI Processing Complete!</AppText>
+                <AppText style={s.statusSub}>Your story has been enhanced</AppText>
               </>
             )}
           </View>
@@ -83,7 +84,7 @@ export default function AIProcessingScreen({ route, navigation }) {
                 <View style={[s.stepIcon, done ? s.stepIconDone : s.stepIconPending]}>
                   <Ionicons name={icon} size={18} color={done ? '#fff' : colors.muted} />
                 </View>
-                <Text style={s.stepLabel}>{label}</Text>
+                <AppText style={s.stepLabel}>{label}</AppText>
                 {polling && !done
                   ? <ActivityIndicator size="small" color="#7c3aed" style={{ marginLeft: 'auto' }} />
                   : done
@@ -91,7 +92,7 @@ export default function AIProcessingScreen({ route, navigation }) {
                     : <Ionicons name="ellipse-outline" size={20} color={colors.dim} style={{ marginLeft: 'auto' }} />}
               </View>
               {done && value ? (
-                <Text style={s.stepValue} numberOfLines={3}>{value}</Text>
+                <AppText style={s.stepValue} numberOfLines={3}>{value}</AppText>
               ) : null}
             </View>
           </BlurView>
@@ -102,7 +103,7 @@ export default function AIProcessingScreen({ route, navigation }) {
           <View style={s.tagsWrap}>
             {story.tags.map((tag, i) => (
               <View key={i} style={s.tag}>
-                <Text style={s.tagText}>#{tag}</Text>
+                <AppText style={s.tagText}>#{tag}</AppText>
               </View>
             ))}
           </View>
@@ -111,7 +112,7 @@ export default function AIProcessingScreen({ route, navigation }) {
         {!polling && (
           <TouchableOpacity style={s.doneBtn} onPress={() => navigation.navigate('Main', { screen: 'Feed' })} activeOpacity={0.85}>
             <LinearGradient colors={['#7c3aed', '#3b82f6']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.doneBtnGrad}>
-              <Text style={s.doneBtnText}>View in Feed</Text>
+              <AppText style={s.doneBtnText}>View in Feed</AppText>
               <Ionicons name="arrow-forward" size={18} color="#fff" />
             </LinearGradient>
           </TouchableOpacity>

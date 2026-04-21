@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, Image, TouchableOpacity,
+  View, StyleSheet, Image, TouchableOpacity,
   TextInput, Alert, ActivityIndicator, ScrollView,
   Modal, FlatList, KeyboardAvoidingView, Platform,
   Animated,
 } from 'react-native';
+import AppText from '../components/AppText';
 import { Video, ResizeMode } from 'expo-av';
 import { Audio } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
@@ -69,7 +70,7 @@ function MusicPicker({ visible, onClose, onSelect, selected }) {
         <View style={mp.sheet}>
           <View style={mp.handle} />
           <View style={mp.header}>
-            <Text style={mp.title}>🎵 Choose Music</Text>
+            <AppText style={mp.title}>🎵 Choose Music</AppText>
             <TouchableOpacity onPress={() => { sound?.unloadAsync(); setPlaying(null); onClose(); }}>
               <Ionicons name="close" size={24} color={colors.text} />
             </TouchableOpacity>
@@ -78,7 +79,7 @@ function MusicPicker({ visible, onClose, onSelect, selected }) {
           {selected && (
             <TouchableOpacity style={mp.clearBtn} onPress={() => { onSelect(null); onClose(); }}>
               <Ionicons name="close-circle" size={16} color={colors.muted} />
-              <Text style={mp.clearText}>Remove music</Text>
+              <AppText style={mp.clearText}>Remove music</AppText>
             </TouchableOpacity>
           )}
 
@@ -105,8 +106,8 @@ function MusicPicker({ visible, onClose, onSelect, selected }) {
                     </LinearGradient>
                   </TouchableOpacity>
                   <View style={{ flex: 1 }}>
-                    <Text style={mp.trackName}>{item.name}</Text>
-                    <Text style={mp.trackMeta}>{item.genre} · {item.duration}</Text>
+                    <AppText style={mp.trackName}>{item.name}</AppText>
+                    <AppText style={mp.trackMeta}>{item.genre} · {item.duration}</AppText>
                   </View>
                   {isSelected && <Ionicons name="checkmark-circle" size={22} color="#7c3aed" />}
                 </TouchableOpacity>
@@ -176,7 +177,7 @@ function LocationPicker({ visible, onClose, onSelect }) {
           <View style={lp.sheet}>
             <View style={lp.handle} />
             <View style={lp.header}>
-              <Text style={lp.title}>📍 Add Location</Text>
+              <AppText style={lp.title}>📍 Add Location</AppText>
               <TouchableOpacity onPress={onClose}>
                 <Ionicons name="close" size={24} color={colors.text} />
               </TouchableOpacity>
@@ -202,11 +203,11 @@ function LocationPicker({ visible, onClose, onSelect }) {
 
             {results.length === 0 && !query && (
               <View style={lp.quickWrap}>
-                <Text style={lp.quickTitle}>Quick picks</Text>
+                <AppText style={lp.quickTitle}>Quick picks</AppText>
                 <View style={lp.quickGrid}>
                   {QUICK.map(q => (
                     <TouchableOpacity key={q} style={lp.quickBtn} onPress={() => { onSelect(q); onClose(); }}>
-                      <Text style={lp.quickText}>{q}</Text>
+                      <AppText style={lp.quickText}>{q}</AppText>
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -222,14 +223,14 @@ function LocationPicker({ visible, onClose, onSelect }) {
                 <TouchableOpacity style={lp.result} onPress={() => { onSelect(item.name); onClose(); }}>
                   <Ionicons name="location" size={18} color="#7c3aed" />
                   <View style={{ flex: 1 }}>
-                    <Text style={lp.resultName}>{item.name}</Text>
-                    <Text style={lp.resultFull} numberOfLines={1}>{item.full}</Text>
+                    <AppText style={lp.resultName}>{item.name}</AppText>
+                    <AppText style={lp.resultFull} numberOfLines={1}>{item.full}</AppText>
                   </View>
                 </TouchableOpacity>
               )}
               ListEmptyComponent={
                 query.length >= 3 && !loading
-                  ? <Text style={lp.noResults}>No places found</Text>
+                  ? <AppText style={lp.noResults}>No places found</AppText>
                   : null
               }
             />
@@ -340,13 +341,13 @@ export default function MediaEditorScreen({ route, navigation }) {
         <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={s.headerTitle}>New Story</Text>
+        <AppText style={s.headerTitle}>New Story</AppText>
         <TouchableOpacity
           style={[s.postHeaderBtn, loading && { opacity: 0.5 }]}
           onPress={handlePost}
           disabled={loading}
         >
-          <Text style={s.postHeaderBtnText}>{loading ? 'Posting...' : 'Share'}</Text>
+          <AppText style={s.postHeaderBtnText}>{loading ? 'Posting...' : 'Share'}</AppText>
         </TouchableOpacity>
       </View>
 
@@ -382,7 +383,7 @@ export default function MediaEditorScreen({ route, navigation }) {
             {music && (
               <View style={s.musicBadge}>
                 <Ionicons name="musical-notes" size={12} color="#fff" />
-                <Text style={s.musicBadgeText} numberOfLines={1}>{music.name}</Text>
+                <AppText style={s.musicBadgeText} numberOfLines={1}>{music.name}</AppText>
               </View>
             )}
 
@@ -390,7 +391,7 @@ export default function MediaEditorScreen({ route, navigation }) {
             {location ? (
               <View style={s.locationBadge}>
                 <Ionicons name="location" size={12} color="#fff" />
-                <Text style={s.locationBadgeText} numberOfLines={1}>{location}</Text>
+                <AppText style={s.locationBadgeText} numberOfLines={1}>{location}</AppText>
               </View>
             ) : null}
           </View>
@@ -399,23 +400,23 @@ export default function MediaEditorScreen({ route, navigation }) {
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.pillsRow}>
             <TouchableOpacity style={[s.pill, music && s.pillActive]} onPress={() => setShowMusic(true)}>
               <Ionicons name="musical-notes" size={16} color={music ? '#fff' : colors.muted} />
-              <Text style={[s.pillText, music && { color: '#fff' }]}>{music ? music.name : 'Add Music'}</Text>
+              <AppText style={[s.pillText, music && { color: '#fff' }]}>{music ? music.name : 'Add Music'}</AppText>
             </TouchableOpacity>
 
             <TouchableOpacity style={[s.pill, location && s.pillActive]} onPress={() => setShowLocation(true)}>
               <Ionicons name="location-outline" size={16} color={location ? '#fff' : colors.muted} />
-              <Text style={[s.pillText, location && { color: '#fff' }]}>{location || 'Add Location'}</Text>
+              <AppText style={[s.pillText, location && { color: '#fff' }]}>{location || 'Add Location'}</AppText>
             </TouchableOpacity>
 
             <TouchableOpacity style={s.pill} onPress={() => info('AI will auto-generate a caption after posting!')}>
               <Ionicons name="sparkles" size={16} color={colors.muted} />
-              <Text style={s.pillText}>AI Enhance</Text>
+              <AppText style={s.pillText}>AI Enhance</AppText>
             </TouchableOpacity>
           </ScrollView>
 
           {/* Form */}
           <View style={s.form}>
-            <Text style={s.label}>Title *</Text>
+            <AppText style={s.label}>Title *</AppText>
             <TextInput
               style={s.input}
               placeholder="Give your story a title..."
@@ -424,7 +425,7 @@ export default function MediaEditorScreen({ route, navigation }) {
               onChangeText={setTitle}
             />
 
-            <Text style={s.label}>Caption</Text>
+            <AppText style={s.label}>Caption</AppText>
             <TextInput
               style={[s.input, s.textarea]}
               placeholder="Write something about this memory..."
@@ -434,7 +435,7 @@ export default function MediaEditorScreen({ route, navigation }) {
               multiline
             />
 
-            <Text style={s.label}>Tags (comma separated)</Text>
+            <AppText style={s.label}>Tags (comma separated)</AppText>
             <TextInput
               style={s.input}
               placeholder="family, vacation, 1990s..."
@@ -443,7 +444,7 @@ export default function MediaEditorScreen({ route, navigation }) {
               onChangeText={setTags}
             />
 
-            <Text style={s.label}>When did this happen?</Text>
+            <AppText style={s.label}>When did this happen?</AppText>
             <TextInput
               style={s.input}
               placeholder="YYYY-MM-DD  e.g. 1995-06-15"
@@ -453,7 +454,7 @@ export default function MediaEditorScreen({ route, navigation }) {
               keyboardType="numeric"
             />
 
-            <Text style={s.label}>Privacy</Text>
+            <AppText style={s.label}>Privacy</AppText>
             <View style={s.privacyRow}>
               {privacyOptions.map(opt => (
                 <TouchableOpacity
@@ -461,7 +462,7 @@ export default function MediaEditorScreen({ route, navigation }) {
                   style={[s.privacyBtn, privacy === opt.key && { borderColor: opt.color, backgroundColor: `${opt.color}22` }]}
                   onPress={() => setPrivacy(opt.key)}
                 >
-                  <Text style={[s.privacyText, privacy === opt.key && { color: opt.color }]}>{opt.label}</Text>
+                  <AppText style={[s.privacyText, privacy === opt.key && { color: opt.color }]}>{opt.label}</AppText>
                 </TouchableOpacity>
               ))}
             </View>
@@ -471,7 +472,7 @@ export default function MediaEditorScreen({ route, navigation }) {
               <LinearGradient colors={['#7c3aed', '#3b82f6']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.postBtnGrad}>
                 {loading
                   ? <ActivityIndicator color="#fff" />
-                  : <><Ionicons name="cloud-upload-outline" size={20} color="#fff" /><Text style={s.postBtnText}>Share Story</Text></>}
+                  : <><Ionicons name="cloud-upload-outline" size={20} color="#fff" /><AppText style={s.postBtnText}>Share Story</AppText></>}
               </LinearGradient>
             </TouchableOpacity>
           </View>
