@@ -89,7 +89,7 @@ def upgrade():
                 {"".join(f'<p style="margin:6px 0;color:#f1f5f9">✅ {f}</p>' for f in PREMIUM_FEATURES)}
               </div>
               <p style="color:#94a3b8;font-size:13px">Your plan renews on <strong style="color:#f1f5f9">{expires_str}</strong>.</p>
-              <p style="color:#64748b;font-size:12px">Questions? Contact support@kinscribe.com</p>
+              <p style="color:#64748b;font-size:12px">Questions? Contact kinscribe3@gmail.com</p>
             </div>
             """
         )
@@ -137,7 +137,7 @@ def cancel():
               <p>Hi <strong>{user.name}</strong>,</p>
               <p>Your Premium subscription has been cancelled. You had access until <strong>{expires_str}</strong>.</p>
               <p style="color:#94a3b8;font-size:13px">You can re-subscribe anytime from Settings → Subscription.</p>
-              <p style="color:#64748b;font-size:12px">Questions? Contact support@kinscribe.com</p>
+              <p style="color:#64748b;font-size:12px">Questions? Contact kinscribe3@gmail.com</p>
             </div>
             """
         )

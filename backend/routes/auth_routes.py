@@ -92,12 +92,12 @@ from datetime import datetime
 def _send_email(subject, recipients, html):
     """Send email with proper sender configuration"""
     try:
-        sender = os.getenv('MAIL_FROM_NAME', 'KinsCribe')
-        sender_email = os.getenv('MAIL_FROM_EMAIL') or os.getenv('MAIL_USERNAME')
+        sender_email = os.getenv('MAIL_USERNAME')
+        sender_name  = os.getenv('MAIL_FROM_NAME', 'KinsCribe')
         msg = Message(
             subject,
             recipients=recipients,
-            sender=(sender, sender_email)
+            sender=(sender_name, sender_email)
         )
         msg.html = html
         mail.send(msg)
@@ -1071,7 +1071,7 @@ def export_data():
                 </table>
               </div>
               <p style="color:#94a3b8;font-size:13px">A full export including all media and messages will be available in a future update. This summary was generated on {datetime.utcnow().strftime('%B %d, %Y at %H:%M UTC')}.</p>
-              <p style="color:#64748b;font-size:12px">If you didn't request this export, please contact support@kinscribe.com</p>
+              <p style="color:#64748b;font-size:12px">If you didn't request this export, please contact kinscribe3@gmail.com</p>
             </div>
             """
         )

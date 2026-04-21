@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import {
   View, StyleSheet, ScrollView, TouchableOpacity,
   Switch, Alert, TextInput, Image, ActivityIndicator,
-  Modal, FlatList,
+  Modal, FlatList, Linking,
 } from 'react-native';
 import AppText from '../components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as Notifications from 'expo-notifications';
+import * as WebBrowser from 'expo-web-browser';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../context/AuthContext';
 import { useTheme, FONT_SIZES, FONT_TYPES, LANGUAGES } from '../context/ThemeContext';
@@ -110,6 +111,13 @@ export default function SettingsScreen({ navigation }) {
   const [upgradingPlan, setUpgradingPlan] = useState(false);
   const [cancellingPlan, setCancellingPlan] = useState(false);
   const [premiumStep, setPremiumStep] = useState('plans'); // plans | confirm | success | cancel_confirm
+
+  // About
+  const [showPolicyModal, setShowPolicyModal]   = useState(false);
+  const [showTermsModal, setShowTermsModal]     = useState(false);
+  const [showHelpModal, setShowHelpModal]       = useState(false);
+  const [openFaq, setOpenFaq]                   = useState(null);
+  const appVersion = '1.0.0';
 
   // Notification toggles — persisted in AsyncStorage
   const [notifLikes, setNotifLikes] = useState(true);
@@ -989,13 +997,59 @@ export default function SettingsScreen({ navigation }) {
 
         {/* About */}
         <Section title={t('about')}>
-          <Row icon="phone-portrait-outline" iconColor="#94a3b8" label={t('app_version')} value="1.0.0" chevron={false} />
+          <View style={s.row}>
+            <View style={[s.rowIcon, { backgroundColor: 'rgba(148,163,184,0.12)' }]}>
+              <Ionicons name="phone-portrait-outline" size={18} color="#94a3b8" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <AppText style={s.rowLabel}>{t('app_version')}</AppText>
+              <AppText style={s.rowSubLabel}>KinsCribe v{appVersion}</AppText>
+            </View>
+            <View style={s.versionBadge}>
+              <AppText style={s.versionBadgeText}>v{appVersion}</AppText>
+            </View>
+          </View>
           <Divider />
-          <Row icon="document-text-outline" iconColor="#94a3b8" label={t('privacy_policy')} onPress={() => Alert.alert(t('privacy_policy'), 'Your stories are private by default')} />
+          <Row
+            icon="document-text-outline"
+            iconColor="#06b6d4"
+            label={t('privacy_policy')}
+            onPress={() => setShowPolicyModal(true)}
+          />
           <Divider />
-          <Row icon="help-circle-outline" iconColor="#94a3b8" label={t('help_support')} onPress={() => Alert.alert(t('help_support'), 'Email: support@kinscribe.com')} />
+          <Row
+            icon="reader-outline"
+            iconColor="#a78bfa"
+            label={t('terms_of_service')}
+            onPress={() => setShowTermsModal(true)}
+          />
           <Divider />
-          <Row icon="star-outline" iconColor="#f59e0b" label={t('rate_app')} onPress={() => Alert.alert(t('rate_app'), 'Thank you for your support! ⭐')} />
+          <Row
+            icon="help-circle-outline"
+            iconColor="#10b981"
+            label={t('help_support')}
+            onPress={() => { setOpenFaq(null); setShowHelpModal(true); }}
+          />
+          <Divider />
+          <Row
+            icon="star-outline"
+            iconColor="#f59e0b"
+            label={t('rate_app')}
+            onPress={() => {
+              Linking.openURL(
+                'https://play.google.com/store/apps/details?id=com.kinscribe.app'
+              ).catch(() =>
+                Alert.alert('Rate KinsCribe', 'Search for KinsCribe on the App Store or Google Play to leave a review. Thank you! ⭐')
+              );
+            }}
+          />
+          <Divider />
+          <Row
+            icon="mail-outline"
+            iconColor="#3b82f6"
+            label="Contact Us"
+            onPress={() => Linking.openURL('mailto:kinscribe3@gmail.com?subject=KinsCribe Support').catch(() => Alert.alert('Contact', 'Email us at kinscribe3@gmail.com'))}
+          />
         </Section>
 
         {/* Danger zone */}
@@ -1742,6 +1796,190 @@ export default function SettingsScreen({ navigation }) {
         </View>
       </Modal>
 
+      {/* ── Privacy Policy Modal ─────────────────────── */}
+      <Modal visible={showPolicyModal} transparent animationType="slide" onRequestClose={() => setShowPolicyModal(false)}>
+        <View style={s.blockedOverlay}>
+          <BlurView intensity={20} tint="dark" style={[s.appearSheet, { maxHeight: '92%' }]}>
+            <LinearGradient colors={['rgba(6,182,212,0.1)', 'rgba(15,23,42,0.98)']} style={StyleSheet.absoluteFill} />
+            <View style={s.blockedHandle} />
+            <View style={s.appearHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                <View style={[s.rowIcon, { backgroundColor: 'rgba(6,182,212,0.15)' }]}>
+                  <Ionicons name="document-text-outline" size={18} color="#06b6d4" />
+                </View>
+                <AppText style={s.appearTitle}>Privacy Policy</AppText>
+              </View>
+              <TouchableOpacity onPress={() => setShowPolicyModal(false)} style={s.blockedCloseBtn}>
+                <Ionicons name="close" size={22} color={colors.muted} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={{ paddingHorizontal: 20 }} showsVerticalScrollIndicator={false}>
+              <AppText style={s.legalDate}>Last updated: January 1, 2025</AppText>
+              {[
+                { title: '1. Information We Collect', body: 'We collect information you provide directly to us, such as your name, email address, phone number, profile photo, and any content you create or share on KinsCribe. We also collect usage data, device information, and log data automatically when you use our services.' },
+                { title: '2. How We Use Your Information', body: 'We use your information to provide, maintain, and improve our services; send you notifications and updates; personalise your experience; respond to your comments and questions; and comply with legal obligations. We do not sell your personal data to third parties.' },
+                { title: '3. Information Sharing', body: 'We do not share your personal information with third parties except as necessary to provide our services (e.g. cloud storage providers), when required by law, or with your explicit consent. Family Space content is only visible to members of your family group.' },
+                { title: '4. Data Storage & Security', body: 'Your data is stored securely on encrypted servers. We use industry-standard security measures including HTTPS, JWT authentication, and bcrypt password hashing. However, no method of transmission over the internet is 100% secure.' },
+                { title: '5. Your Rights', body: 'You have the right to access, correct, or delete your personal data at any time. You can download your data from Settings → Data & Storage → Download My Data, or delete your account from Settings → Account Actions → Delete Account.' },
+                { title: '6. Cookies & Tracking', body: 'We use minimal tracking technologies to keep you signed in and improve app performance. We do not use third-party advertising trackers. You can opt out of analytics in your device settings.' },
+                { title: '7. Children\'s Privacy', body: 'KinsCribe is not directed to children under 13. We do not knowingly collect personal information from children under 13. If you believe a child has provided us with personal information, please contact us immediately.' },
+                { title: '8. Changes to This Policy', body: 'We may update this Privacy Policy from time to time. We will notify you of any significant changes by email or through the app. Your continued use of KinsCribe after changes constitutes acceptance of the updated policy.' },
+                { title: '9. Contact Us', body: 'If you have any questions about this Privacy Policy, please contact us at kinscribe3@gmail.com.' },
+              ].map(({ title, body }) => (
+                <View key={title} style={s.legalSection}>
+                  <AppText style={s.legalSectionTitle}>{title}</AppText>
+                  <AppText style={s.legalSectionBody}>{body}</AppText>
+                </View>
+              ))}
+              <TouchableOpacity
+                style={s.legalContactBtn}
+                onPress={() => Linking.openURL('mailto:kinscribe3@gmail.com?subject=Privacy Policy Enquiry').catch(() => {})}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="mail-outline" size={16} color="#06b6d4" />
+                <AppText style={s.legalContactText}>kinscribe3@gmail.com</AppText>
+              </TouchableOpacity>
+              <View style={{ height: 40 }} />
+            </ScrollView>
+          </BlurView>
+        </View>
+      </Modal>
+
+      {/* ── Terms of Service Modal ───────────────────────── */}
+      <Modal visible={showTermsModal} transparent animationType="slide" onRequestClose={() => setShowTermsModal(false)}>
+        <View style={s.blockedOverlay}>
+          <BlurView intensity={20} tint="dark" style={[s.appearSheet, { maxHeight: '92%' }]}>
+            <LinearGradient colors={['rgba(167,139,250,0.1)', 'rgba(15,23,42,0.98)']} style={StyleSheet.absoluteFill} />
+            <View style={s.blockedHandle} />
+            <View style={s.appearHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                <View style={[s.rowIcon, { backgroundColor: 'rgba(167,139,250,0.15)' }]}>
+                  <Ionicons name="reader-outline" size={18} color="#a78bfa" />
+                </View>
+                <AppText style={s.appearTitle}>Terms of Service</AppText>
+              </View>
+              <TouchableOpacity onPress={() => setShowTermsModal(false)} style={s.blockedCloseBtn}>
+                <Ionicons name="close" size={22} color={colors.muted} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={{ paddingHorizontal: 20 }} showsVerticalScrollIndicator={false}>
+              <AppText style={s.legalDate}>Last updated: January 1, 2025</AppText>
+              {[
+                { title: '1. Acceptance of Terms', body: 'By accessing or using KinsCribe, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our services.' },
+                { title: '2. Your Account', body: 'You are responsible for maintaining the confidentiality of your account credentials and for all activities that occur under your account. You must be at least 13 years old to use KinsCribe. You agree to provide accurate and complete information when creating your account.' },
+                { title: '3. Acceptable Use', body: 'You agree not to use KinsCribe to post illegal content, harass or bully other users, spread misinformation, infringe on intellectual property rights, attempt to hack or disrupt our services, or impersonate other people or entities.' },
+                { title: '4. Content Ownership', body: 'You retain ownership of all content you post on KinsCribe. By posting content, you grant KinsCribe a non-exclusive, royalty-free licence to display and distribute your content within the platform. You are solely responsible for the content you post.' },
+                { title: '5. Family Space', body: 'Family Space content is private and only visible to members of your family group. You are responsible for who you invite to your family group. KinsCribe is not responsible for disputes arising within family groups.' },
+                { title: '6. Premium Subscription', body: 'Premium subscriptions are billed in advance on a monthly or yearly basis. Cancellations take effect immediately. We do not offer refunds for partial subscription periods. Prices may change with 30 days notice.' },
+                { title: '7. Termination', body: 'We reserve the right to suspend or terminate your account if you violate these Terms of Service. You may delete your account at any time from Settings → Account Actions → Delete Account.' },
+                { title: '8. Disclaimers', body: 'KinsCribe is provided "as is" without warranties of any kind. We do not guarantee uninterrupted or error-free service. We are not liable for any indirect, incidental, or consequential damages arising from your use of our services.' },
+                { title: '9. Governing Law', body: 'These Terms are governed by applicable law. Any disputes shall be resolved through binding arbitration, except where prohibited by law.' },
+                { title: '10. Contact', body: 'For questions about these Terms, contact us at kinscribe3@gmail.com.' },
+              ].map(({ title, body }) => (
+                <View key={title} style={s.legalSection}>
+                  <AppText style={s.legalSectionTitle}>{title}</AppText>
+                  <AppText style={s.legalSectionBody}>{body}</AppText>
+                </View>
+              ))}
+              <TouchableOpacity
+                style={s.legalContactBtn}
+                onPress={() => Linking.openURL('mailto:kinscribe3@gmail.com?subject=Terms of Service Enquiry').catch(() => {})}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="mail-outline" size={16} color="#a78bfa" />
+                <AppText style={[s.legalContactText, { color: '#a78bfa' }]}>kinscribe3@gmail.com</AppText>
+              </TouchableOpacity>
+              <View style={{ height: 40 }} />
+            </ScrollView>
+          </BlurView>
+        </View>
+      </Modal>
+
+      {/* ── Help & Support Modal ─────────────────────────── */}
+      <Modal visible={showHelpModal} transparent animationType="slide" onRequestClose={() => setShowHelpModal(false)}>
+        <View style={s.blockedOverlay}>
+          <BlurView intensity={20} tint="dark" style={[s.appearSheet, { maxHeight: '92%' }]}>
+            <LinearGradient colors={['rgba(16,185,129,0.1)', 'rgba(15,23,42,0.98)']} style={StyleSheet.absoluteFill} />
+            <View style={s.blockedHandle} />
+            <View style={s.appearHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                <View style={[s.rowIcon, { backgroundColor: 'rgba(16,185,129,0.15)' }]}>
+                  <Ionicons name="help-circle-outline" size={18} color="#10b981" />
+                </View>
+                <AppText style={s.appearTitle}>Help & Support</AppText>
+              </View>
+              <TouchableOpacity onPress={() => setShowHelpModal(false)} style={s.blockedCloseBtn}>
+                <Ionicons name="close" size={22} color={colors.muted} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={{ paddingHorizontal: 20 }} showsVerticalScrollIndicator={false}>
+
+              {/* Contact options */}
+              <AppText style={s.helpSectionLabel}>Get in touch</AppText>
+              <View style={s.helpContactRow}>
+                <TouchableOpacity
+                  style={s.helpContactCard}
+                  onPress={() => Linking.openURL('mailto:kinscribe3@gmail.com?subject=KinsCribe Support').catch(() => {})}
+                  activeOpacity={0.8}
+                >
+                  <LinearGradient colors={['rgba(59,130,246,0.2)', 'rgba(59,130,246,0.05)']} style={s.helpContactCardGrad}>
+                    <Ionicons name="mail-outline" size={26} color="#3b82f6" />
+                    <AppText style={s.helpContactCardTitle}>Email</AppText>
+                    <AppText style={s.helpContactCardSub}>kinscribe3@gmail.com</AppText>
+                  </LinearGradient>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={s.helpContactCard}
+                  onPress={() => Linking.openURL('mailto:kinscribe3@gmail.com?subject=KinsCribe Help').catch(() => {})}
+                  activeOpacity={0.8}
+                >
+                  <LinearGradient colors={['rgba(16,185,129,0.2)', 'rgba(16,185,129,0.05)']} style={s.helpContactCardGrad}>
+                    <Ionicons name="mail-outline" size={26} color="#10b981" />
+                    <AppText style={s.helpContactCardTitle}>Help Centre</AppText>
+                    <AppText style={s.helpContactCardSub}>kinscribe3@gmail.com</AppText>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+
+              {/* FAQ */}
+              <AppText style={s.helpSectionLabel}>Frequently asked questions</AppText>
+              {[
+                { q: 'How do I create a Family Space?', a: 'Go to the Family tab at the bottom of the screen and tap "Create Family". You can then invite members by phone number, shareable link, or QR code.' },
+                { q: 'How do I reset my password?', a: 'On the login screen, tap "Forgot Password" and enter your email address. You will receive a 6-digit code to reset your password.' },
+                { q: 'Can I use KinsCribe on multiple devices?', a: 'Yes! You can sign in on as many devices as you like. Manage your active sessions from Settings → Active Sessions.' },
+                { q: 'How do I cancel my Premium subscription?', a: 'Go to Settings → Subscription → tap your plan → Cancel Subscription. Your access will end immediately.' },
+                { q: 'Is my Family Space content private?', a: 'Yes. All Family Space content is completely private and only visible to members of your family group. It never appears in public feeds.' },
+                { q: 'How do I download my data?', a: 'Go to Settings → Data & Storage → Download My Data. A summary will be emailed to your registered email address.' },
+                { q: 'How do I enable two-factor authentication?', a: 'Go to Settings → Account → Two-Factor Authentication and follow the setup steps. You will need an authenticator app like Google Authenticator.' },
+                { q: 'Why are my videos not playing?', a: 'Check that Auto-play Videos is enabled in Settings → Data & Storage. If Data Saver mode is on, videos are paused by default — tap to play them.' },
+                { q: 'How do I report a user?', a: 'Visit the user\'s profile, tap the three-dot menu in the top right, and select "Report". Our team reviews all reports within 24 hours.' },
+                { q: 'How do I delete my account?', a: 'Go to Settings → Account Actions → Delete Account. This is permanent and cannot be undone. All your data will be removed.' },
+              ].map(({ q, a }, i) => (
+                <TouchableOpacity
+                  key={i}
+                  style={[s.faqItem, openFaq === i && s.faqItemOpen]}
+                  onPress={() => setOpenFaq(openFaq === i ? null : i)}
+                  activeOpacity={0.8}
+                >
+                  <View style={s.faqHeader}>
+                    <AppText style={[s.faqQ, openFaq === i && s.faqQOpen]}>{q}</AppText>
+                    <Ionicons
+                      name={openFaq === i ? 'chevron-up' : 'chevron-down'}
+                      size={16}
+                      color={openFaq === i ? '#10b981' : colors.muted}
+                    />
+                  </View>
+                  {openFaq === i && (
+                    <AppText style={s.faqA}>{a}</AppText>
+                  )}
+                </TouchableOpacity>
+              ))}
+              <View style={{ height: 40 }} />
+            </ScrollView>
+          </BlurView>
+        </View>
+      </Modal>
+
       {/* Premium Subscription Modal */}
       <Modal visible={showPremiumModal} transparent animationType="slide" onRequestClose={() => setShowPremiumModal(false)}>
         <View style={s.blockedOverlay}>
@@ -2335,4 +2573,30 @@ const s = StyleSheet.create({
   cancelPlanBtn: { marginTop: 16, paddingVertical: 14, borderRadius: 14, borderWidth: 1.5, borderColor: 'rgba(248,113,113,0.4)', alignItems: 'center', backgroundColor: 'rgba(248,113,113,0.06)' },
   cancelPlanText: { color: '#f87171', fontWeight: '700', fontSize: 14 },
   cancelConfirmIcon: { width: 88, height: 88, borderRadius: 44, alignItems: 'center', justifyContent: 'center' },
+
+  // About — version badge
+  versionBadge: { backgroundColor: 'rgba(148,163,184,0.12)', borderWidth: 1, borderColor: 'rgba(148,163,184,0.2)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+  versionBadgeText: { color: colors.muted, fontSize: 12, fontWeight: '700' },
+
+  // Legal modals (Privacy Policy & Terms)
+  legalDate: { fontSize: 11, color: colors.dim, marginTop: 12, marginBottom: 4 },
+  legalSection: { marginTop: 20 },
+  legalSectionTitle: { fontSize: 14, fontWeight: '800', color: colors.text, marginBottom: 6 },
+  legalSectionBody: { fontSize: 13, color: colors.muted, lineHeight: 20 },
+  legalContactBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 24, paddingVertical: 14, borderRadius: 14, borderWidth: 1, borderColor: 'rgba(6,182,212,0.3)', backgroundColor: 'rgba(6,182,212,0.06)', justifyContent: 'center' },
+  legalContactText: { color: '#06b6d4', fontWeight: '700', fontSize: 14 },
+
+  // Help & Support modal
+  helpSectionLabel: { fontSize: 11, fontWeight: '700', color: colors.muted, textTransform: 'uppercase', letterSpacing: 1, marginTop: 20, marginBottom: 10 },
+  helpContactRow: { flexDirection: 'row', gap: 12 },
+  helpContactCard: { flex: 1, borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)' },
+  helpContactCardGrad: { padding: 16, alignItems: 'center', gap: 6 },
+  helpContactCardTitle: { fontSize: 14, fontWeight: '700', color: colors.text },
+  helpContactCardSub: { fontSize: 11, color: colors.muted, textAlign: 'center' },
+  faqItem: { borderRadius: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)', backgroundColor: 'rgba(255,255,255,0.02)', marginBottom: 8, padding: 14 },
+  faqItemOpen: { borderColor: 'rgba(16,185,129,0.35)', backgroundColor: 'rgba(16,185,129,0.05)' },
+  faqHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  faqQ: { flex: 1, fontSize: 14, fontWeight: '600', color: colors.text },
+  faqQOpen: { color: '#10b981' },
+  faqA: { fontSize: 13, color: colors.muted, lineHeight: 20, marginTop: 10 },
 });
