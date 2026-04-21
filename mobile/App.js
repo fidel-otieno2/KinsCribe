@@ -2,8 +2,11 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { StatusBar } from "expo-status-bar";
-import { ActivityIndicator, View } from "react-native";
+import { ActivityIndicator, View, Text } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useEffect, useState, useRef } from "react";
+import * as Notifications from "expo-notifications";
+import api from "./src/api/axios";
 
 import { AuthProvider, useAuth } from "./src/context/AuthContext";
 import { ThemeProvider, useTheme } from "./src/context/ThemeContext";
@@ -44,12 +47,46 @@ import FamilyRecipesScreen from "./src/screens/FamilyRecipesScreen";
 import FamilyBudgetScreen from "./src/screens/FamilyBudgetScreen";
 import PostInsightsScreen from "./src/screens/PostInsightsScreen";
 import AccountSwitcherScreen from "./src/screens/AccountSwitcherScreen";
+import OnThisDayScreen from "./src/screens/OnThisDayScreen";
+import ConnectionCRMScreen from "./src/screens/ConnectionCRMScreen";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
+// Configure how notifications are handled when app is foregrounded
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+  }),
+});
+
 function MainTabs() {
   const { theme } = useTheme();
+  const { user } = useAuth();
+  const [msgUnread, setMsgUnread] = useState(0);
+  const [notifUnread, setNotifUnread] = useState(0);
+  const pollRef = useRef(null);
+
+  useEffect(() => {
+    if (!user) return;
+    const poll = async () => {
+      try {
+        const [notifRes, msgRes] = await Promise.all([
+          api.get("/notifications/count").catch(() => ({ data: { unread_count: 0 } })),
+          api.get("/messages/conversations").catch(() => ({ data: { conversations: [] } })),
+        ]);
+        setNotifUnread(notifRes.data?.unread_count || 0);
+        const convs = msgRes.data?.conversations || [];
+        setMsgUnread(convs.reduce((sum, c) => sum + (c.unread_count || 0), 0));
+      } catch {}
+    };
+    poll();
+    pollRef.current = setInterval(poll, 8000);
+    return () => clearInterval(pollRef.current);
+  }, [user]);
+
   return (
     <Tab.Navigator
       screenOptions={{
@@ -77,7 +114,14 @@ function MainTabs() {
         options={{
           tabBarLabel: "Home",
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "home" : "home-outline"} size={24} color={color} />
+            <View>
+              <Ionicons name={focused ? "home" : "home-outline"} size={24} color={color} />
+              {notifUnread > 0 && (
+                <View style={tabBadge.dot}>
+                  <Text style={tabBadge.dotText}>{notifUnread > 9 ? "9+" : notifUnread}</Text>
+                </View>
+              )}
+            </View>
           ),
         }}
       />
@@ -107,7 +151,14 @@ function MainTabs() {
         options={{
           tabBarLabel: "Messages",
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "chatbubbles" : "chatbubbles-outline"} size={24} color={color} />
+            <View>
+              <Ionicons name={focused ? "chatbubbles" : "chatbubbles-outline"} size={24} color={color} />
+              {msgUnread > 0 && (
+                <View style={tabBadge.dot}>
+                  <Text style={tabBadge.dotText}>{msgUnread > 9 ? "9+" : msgUnread}</Text>
+                </View>
+              )}
+            </View>
           ),
         }}
       />
@@ -124,6 +175,11 @@ function MainTabs() {
     </Tab.Navigator>
   );
 }
+
+const tabBadge = {
+  dot: { position: "absolute", top: -4, right: -8, backgroundColor: "#e11d48", borderRadius: 8, minWidth: 16, height: 16, alignItems: "center", justifyContent: "center", paddingHorizontal: 3 },
+  dotText: { color: "#fff", fontSize: 9, fontWeight: "800" },
+};
 
 function RootNavigator() {
   const { user, loading } = useAuth();
@@ -182,10 +238,37 @@ function RootNavigator() {
           <Stack.Screen name="FamilyBudget" component={FamilyBudgetScreen} options={{ animation: "slide_from_right" }} />
           <Stack.Screen name="PostInsights" component={PostInsightsScreen} options={{ animation: "slide_from_right" }} />
           <Stack.Screen name="AccountSwitcher" component={AccountSwitcherScreen} options={{ animation: "slide_from_right" }} />
+          <Stack.Screen name="OnThisDay" component={OnThisDayScreen} options={{ animation: "slide_from_right" }} />
+          <Stack.Screen name="ConnectionCRM" component={ConnectionCRMScreen} options={{ animation: "slide_from_right" }} />
         </>
       )}
     </Stack.Navigator>
   );
+}
+
+function PushNotificationSetup() {
+  const { user } = useAuth();
+  const navigationRef = useRef(null);
+
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      try {
+        const { status: existing } = await Notifications.getPermissionsAsync();
+        let finalStatus = existing;
+        if (existing !== "granted") {
+          const { status } = await Notifications.requestPermissionsAsync();
+          finalStatus = status;
+        }
+        if (finalStatus !== "granted") return;
+        const token = (await Notifications.getExpoPushTokenAsync()).data;
+        // Send token to backend so server can push to this device
+        api.post("/auth/push-token", { token }).catch(() => {});
+      } catch {}
+    })();
+  }, [user]);
+
+  return null;
 }
 
 export default function App() {
@@ -194,6 +277,7 @@ export default function App() {
       <AuthProvider>
         <NavigationContainer>
           <StatusBar style="auto" />
+          <PushNotificationSetup />
           <RootNavigator />
         </NavigationContainer>
       </AuthProvider>

@@ -1,249 +1,245 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from extensions import db
-from models.notifications import Notification, NotificationSettings, DeviceToken
 from models.user import User
+from models.story import Story, Comment as StoryComment, Like as StoryLike
+from models.social import Post, PostLike, PostComment, Connection
+from models.family import Family
 import json
-from datetime import datetime, timedelta
+from datetime import datetime
 
 notification_bp = Blueprint("notifications", __name__)
+
+# In-memory store for read notification IDs per user
+# In production this should be a DB table, but works for now
+_read_store = {}
+
+
+def _get_all_notifications(user):
+    notifs = []
+
+    # ── 1. Story likes & comments ─────────────────────────────
+    my_stories = Story.query.filter_by(user_id=user.id).all()
+    for story in my_stories:
+        for like in StoryLike.query.filter(StoryLike.story_id == story.id, StoryLike.user_id != user.id).all():
+            actor = User.query.get(like.user_id)
+            if actor:
+                notifs.append({
+                    "id": f"story_like-{like.id}",
+                    "type": "story_like",
+                    "source": "family_story",
+                    "actor_name": actor.name,
+                    "actor_avatar": actor.avatar_url,
+                    "actor_id": actor.id,
+                    "title": f"{actor.name} liked your family story",
+                    "body": f'"{story.title}"' if story.title else "",
+                    "story_id": story.id,
+                    "story_title": story.title,
+                    "story_media": story.media_url,
+                    "story_media_type": story.media_type,
+                    "created_at": story.created_at.isoformat(),
+                })
+        for comment in StoryComment.query.filter(StoryComment.story_id == story.id, StoryComment.user_id != user.id).all():
+            actor = User.query.get(comment.user_id)
+            if actor:
+                notifs.append({
+                    "id": f"story_comment-{comment.id}",
+                    "type": "story_comment",
+                    "source": "family_story",
+                    "actor_name": actor.name,
+                    "actor_avatar": actor.avatar_url,
+                    "actor_id": actor.id,
+                    "title": f"{actor.name} commented on your family story",
+                    "body": comment.text,
+                    "story_id": story.id,
+                    "story_title": story.title,
+                    "story_media": story.media_url,
+                    "story_media_type": story.media_type,
+                    "comment_text": comment.text,
+                    "created_at": comment.created_at.isoformat(),
+                })
+
+    # ── 2. New family stories from others ────────────────────
+    if user.family_id:
+        for story in Story.query.filter(Story.family_id == user.family_id, Story.user_id != user.id).order_by(Story.created_at.desc()).limit(20).all():
+            actor = User.query.get(story.user_id)
+            if actor:
+                notifs.append({
+                    "id": f"new_family_story-{story.id}",
+                    "type": "new_family_story",
+                    "source": "family_story",
+                    "actor_name": actor.name,
+                    "actor_avatar": actor.avatar_url,
+                    "actor_id": actor.id,
+                    "title": f"{actor.name} shared a family story",
+                    "body": story.title or "",
+                    "story_id": story.id,
+                    "story_title": story.title,
+                    "story_media": story.media_url,
+                    "story_media_type": story.media_type,
+                    "created_at": story.created_at.isoformat(),
+                })
+
+    # ── 3. Post likes & comments ──────────────────────────────
+    my_posts = Post.query.filter_by(user_id=user.id).all()
+    for post in my_posts:
+        for like in PostLike.query.filter(PostLike.post_id == post.id, PostLike.user_id != user.id).all():
+            actor = User.query.get(like.user_id)
+            if actor:
+                notifs.append({
+                    "id": f"post_like-{like.id}",
+                    "type": "post_like",
+                    "source": "post",
+                    "actor_name": actor.name,
+                    "actor_avatar": actor.avatar_url,
+                    "actor_id": actor.id,
+                    "title": f"{actor.name} liked your post",
+                    "body": post.caption[:60] if post.caption else "",
+                    "post_id": post.id,
+                    "post_media": post.media_url,
+                    "created_at": post.created_at.isoformat(),
+                })
+        for comment in PostComment.query.filter(PostComment.post_id == post.id, PostComment.user_id != user.id).all():
+            actor = User.query.get(comment.user_id)
+            if actor:
+                notifs.append({
+                    "id": f"post_comment-{comment.id}",
+                    "type": "post_comment",
+                    "source": "post",
+                    "actor_name": actor.name,
+                    "actor_avatar": actor.avatar_url,
+                    "actor_id": actor.id,
+                    "title": f"{actor.name} commented on your post",
+                    "body": comment.text,
+                    "post_id": post.id,
+                    "post_media": post.media_url,
+                    "comment_text": comment.text,
+                    "created_at": comment.created_at.isoformat(),
+                })
+
+    # ── 4. New connections / follow requests ─────────────────
+    for conn in Connection.query.filter_by(following_id=user.id).order_by(Connection.id.desc()).limit(20).all():
+        actor = User.query.get(conn.follower_id)
+        if actor:
+            if conn.status == "pending":
+                notifs.append({
+                    "id": f"follow_request-{conn.id}",
+                    "type": "follow_request",
+                    "source": "connection",
+                    "actor_name": actor.name,
+                    "actor_avatar": actor.avatar_url,
+                    "actor_id": actor.id,
+                    "connection_id": conn.id,
+                    "title": f"{actor.name} wants to follow you",
+                    "body": f"@{actor.username}" if actor.username else "",
+                    "created_at": conn.created_at.isoformat(),
+                })
+            else:
+                notifs.append({
+                    "id": f"connection-{conn.id}",
+                    "type": "connection",
+                    "source": "connection",
+                    "actor_name": actor.name,
+                    "actor_avatar": actor.avatar_url,
+                    "actor_id": actor.id,
+                    "title": f"{actor.name} connected with you",
+                    "body": f"@{actor.username}" if actor.username else "",
+                    "created_at": conn.created_at.isoformat(),
+                })
+
+    # ── 5. Birthday reminders ─────────────────────────────────
+    if user.family_id:
+        from models.extras import FamilyEvent
+        from sqlalchemy import extract as sa_extract
+        today = datetime.utcnow()
+        upcoming = FamilyEvent.query.filter(
+            FamilyEvent.family_id == user.family_id,
+            FamilyEvent.event_type == "birthday",
+            sa_extract("month", FamilyEvent.event_date) == today.month,
+        ).all()
+        for ev in upcoming:
+            try:
+                ev_this_year = ev.event_date.replace(year=today.year)
+                days_away = (ev_this_year.date() - today.date()).days
+                if days_away < 0:
+                    days_away += 365
+                if days_away <= 7:
+                    notifs.append({
+                        "id": f"birthday-{ev.id}",
+                        "type": "birthday",
+                        "source": "family",
+                        "actor_name": "KinsCribe",
+                        "actor_avatar": None,
+                        "actor_id": None,
+                        "title": f"🎂 {ev.title}",
+                        "body": "Today!" if days_away == 0 else f"In {days_away} day{'s' if days_away != 1 else ''}",
+                        "created_at": today.isoformat(),
+                    })
+            except Exception:
+                pass
+
+    # ── 6. Post shared notifications ──────────────────────────
+    for post in my_posts:
+        if post.share_count and post.share_count > 0:
+            notifs.append({
+                "id": f"post_share-{post.id}",
+                "type": "post_share",
+                "source": "post",
+                "actor_name": "Someone",
+                "actor_avatar": None,
+                "actor_id": None,
+                "title": f"Your post was shared {post.share_count} time{'s' if post.share_count != 1 else ''}",
+                "body": post.caption[:60] if post.caption else "",
+                "post_id": post.id,
+                "post_media": post.media_url,
+                "created_at": post.created_at.isoformat(),
+            })
+
+    notifs.sort(key=lambda x: x["created_at"], reverse=True)
+    return notifs[:60]
 
 
 @notification_bp.route("/", methods=["GET"])
 @jwt_required()
 def get_notifications():
-    """Get user's notifications with pagination"""
-    user_id = int(get_jwt_identity())
-    page = int(request.args.get("page", 1))
-    limit = min(int(request.args.get("limit", 20)), 50)
-    unread_only = request.args.get("unread_only", "false").lower() == "true"
-    
-    query = Notification.query.filter_by(user_id=user_id)
-    
-    if unread_only:
-        query = query.filter_by(is_read=False)
-    
-    notifications = query.order_by(Notification.created_at.desc())\
-                         .offset((page - 1) * limit)\
-                         .limit(limit)\
-                         .all()
-    
-    # Get unread count
-    unread_count = Notification.query.filter_by(user_id=user_id, is_read=False).count()
-    
-    return jsonify({
-        "notifications": [n.to_dict() for n in notifications],
-        "unread_count": unread_count,
-        "page": page,
-        "has_more": len(notifications) == limit
-    })
+    user = User.query.get(int(get_jwt_identity()))
+    notifs = _get_all_notifications(user)
+    read_ids = set(_read_store.get(user.id, []))
+    for n in notifs:
+        n["is_read"] = n["id"] in read_ids
+    unread_count = sum(1 for n in notifs if not n["is_read"])
+    return jsonify({"notifications": notifs, "unread_count": unread_count})
+
+
+@notification_bp.route("/count", methods=["GET"])
+@jwt_required()
+def get_notification_count():
+    user = User.query.get(int(get_jwt_identity()))
+    notifs = _get_all_notifications(user)
+    read_ids = set(_read_store.get(user.id, []))
+    unread_count = sum(1 for n in notifs if n["id"] not in read_ids)
+    return jsonify({"unread_count": unread_count})
 
 
 @notification_bp.route("/mark-read", methods=["POST"])
 @jwt_required()
-def mark_notifications_read():
-    """Mark notifications as read"""
+def mark_read():
     user_id = int(get_jwt_identity())
     data = request.get_json() or {}
-    notification_ids = data.get("notification_ids", [])
     mark_all = data.get("mark_all", False)
-    
+    ids = data.get("notification_ids", [])
+
     if mark_all:
-        Notification.query.filter_by(user_id=user_id, is_read=False)\
-                         .update({"is_read": True})
-    elif notification_ids:
-        Notification.query.filter(
-            Notification.user_id == user_id,
-            Notification.id.in_(notification_ids)
-        ).update({"is_read": True}, synchronize_session=False)
-    
-    db.session.commit()
-    
-    # Return updated unread count
-    unread_count = Notification.query.filter_by(user_id=user_id, is_read=False).count()
-    
-    return jsonify({
-        "message": "Notifications marked as read",
-        "unread_count": unread_count
-    })
+        user = User.query.get(user_id)
+        notifs = _get_all_notifications(user)
+        _read_store[user_id] = [n["id"] for n in notifs]
+    elif ids:
+        existing = set(_read_store.get(user_id, []))
+        existing.update(ids)
+        _read_store[user_id] = list(existing)
 
-
-@notification_bp.route("/settings", methods=["GET"])
-@jwt_required()
-def get_notification_settings():
-    """Get user's notification settings"""
-    user_id = int(get_jwt_identity())
-    
-    settings = NotificationSettings.query.filter_by(user_id=user_id).first()
-    if not settings:
-        # Create default settings
-        settings = NotificationSettings(user_id=user_id)
-        db.session.add(settings)
-        db.session.commit()
-    
-    return jsonify(settings.to_dict())
-
-
-@notification_bp.route("/settings", methods=["PUT"])
-@jwt_required()
-def update_notification_settings():
-    """Update user's notification settings"""
-    user_id = int(get_jwt_identity())
-    data = request.get_json() or {}
-    
-    settings = NotificationSettings.query.filter_by(user_id=user_id).first()
-    if not settings:
-        settings = NotificationSettings(user_id=user_id)
-        db.session.add(settings)
-    
-    # Update settings
-    for key in ["likes", "comments", "mentions", "follows", "messages", 
-                "stories", "birthdays", "quiet_hours_enabled", "email_digest"]:
-        if key in data:
-            setattr(settings, key, data[key])
-    
-    if "quiet_start" in data:
-        settings.quiet_start = data["quiet_start"]
-    if "quiet_end" in data:
-        settings.quiet_end = data["quiet_end"]
-    
-    settings.updated_at = datetime.utcnow()
-    db.session.commit()
-    
-    return jsonify({
-        "message": "Notification settings updated",
-        "settings": settings.to_dict()
-    })
-
-
-@notification_bp.route("/device-token", methods=["POST"])
-@jwt_required()
-def register_device_token():
-    """Register device token for push notifications"""
-    user_id = int(get_jwt_identity())
-    data = request.get_json() or {}
-    
-    token = data.get("token")
-    platform = data.get("platform", "unknown")
-    device_name = data.get("device_name")
-    
-    if not token:
-        return jsonify({"error": "Token is required"}), 400
-    
-    # Check if token already exists
-    existing = DeviceToken.query.filter_by(user_id=user_id, token=token).first()
-    if existing:
-        existing.last_used = datetime.utcnow()
-        existing.is_active = True
-        if device_name:
-            existing.device_name = device_name
-    else:
-        device_token = DeviceToken(
-            user_id=user_id,
-            token=token,
-            platform=platform,
-            device_name=device_name
-        )
-        db.session.add(device_token)
-    
-    db.session.commit()
-    
-    return jsonify({"message": "Device token registered successfully"})
-
-
-@notification_bp.route("/device-tokens", methods=["GET"])
-@jwt_required()
-def get_device_tokens():
-    """Get user's registered device tokens"""
-    user_id = int(get_jwt_identity())
-    
-    tokens = DeviceToken.query.filter_by(user_id=user_id, is_active=True)\
-                             .order_by(DeviceToken.last_used.desc())\
-                             .all()
-    
-    return jsonify({
-        "tokens": [t.to_dict() for t in tokens]
-    })
-
-
-@notification_bp.route("/device-token/<int:token_id>", methods=["DELETE"])
-@jwt_required()
-def remove_device_token(token_id):
-    """Remove/deactivate a device token"""
-    user_id = int(get_jwt_identity())
-    
-    token = DeviceToken.query.filter_by(id=token_id, user_id=user_id).first()
-    if not token:
-        return jsonify({"error": "Token not found"}), 404
-    
-    token.is_active = False
-    db.session.commit()
-    
-    return jsonify({"message": "Device token removed"})
-
-
-@notification_bp.route("/test", methods=["POST"])
-@jwt_required()
-def send_test_notification():
-    """Send a test notification (for development)"""
-    user_id = int(get_jwt_identity())
-    
-    notification = Notification(
-        user_id=user_id,
-        type="test",
-        title="Test Notification",
-        message="This is a test notification from KinsCribe!",
-        data=json.dumps({"test": True})
-    )
-    
-    db.session.add(notification)
-    db.session.commit()
-    
-    return jsonify({
-        "message": "Test notification sent",
-        "notification": notification.to_dict()
-    })
-
-
-def create_notification(user_id, notification_type, title, message, from_user_id=None, data=None):
-    """Helper function to create notifications"""
-    try:
-        # Check if user has this notification type enabled
-        settings = NotificationSettings.query.filter_by(user_id=user_id).first()
-        if settings:
-            type_enabled = getattr(settings, notification_type, True)
-            if not type_enabled:
-                return None
-        
-        # Check quiet hours
-        if settings and settings.quiet_hours_enabled:
-            now = datetime.now().time()
-            quiet_start = datetime.strptime(settings.quiet_start, "%H:%M").time()
-            quiet_end = datetime.strptime(settings.quiet_end, "%H:%M").time()
-            
-            if quiet_start <= quiet_end:
-                # Same day quiet hours
-                if quiet_start <= now <= quiet_end:
-                    return None
-            else:
-                # Overnight quiet hours
-                if now >= quiet_start or now <= quiet_end:
-                    return None
-        
-        notification = Notification(
-            user_id=user_id,
-            from_user_id=from_user_id,
-            type=notification_type,
-            title=title,
-            message=message,
-            data=json.dumps(data) if data else None
-        )
-        
-        db.session.add(notification)
-        db.session.commit()
-        
-        return notification
-        
-    except Exception as e:
-        print(f"Error creating notification: {e}")
-        return None
+    user = User.query.get(user_id)
+    notifs = _get_all_notifications(user)
+    read_ids = set(_read_store.get(user_id, []))
+    unread_count = sum(1 for n in notifs if n["id"] not in read_ids)
+    return jsonify({"message": "Marked as read", "unread_count": unread_count})

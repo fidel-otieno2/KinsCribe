@@ -7,12 +7,15 @@ class Connection(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     follower_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     following_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    # 'pending' = follow request sent to private account, 'accepted' = approved/public follow
+    status = db.Column(db.String(20), default="accepted")
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     __table_args__ = (db.UniqueConstraint("follower_id", "following_id"),)
 
     def to_dict(self):
         return {"id": self.id, "follower_id": self.follower_id,
-                "following_id": self.following_id, "created_at": self.created_at.isoformat()}
+                "following_id": self.following_id, "status": self.status,
+                "created_at": self.created_at.isoformat()}
 
 
 class Post(db.Model):
@@ -34,6 +37,10 @@ class Post(db.Model):
     # Scheduling
     is_scheduled = db.Column(db.Boolean, default=False)
     scheduled_at = db.Column(db.DateTime, nullable=True)
+
+    # Sponsored / promoted
+    is_sponsored = db.Column(db.Boolean, default=False)
+    sponsor_label = db.Column(db.String(100), nullable=True)
     
     # Analytics
     view_count = db.Column(db.Integer, default=0)
@@ -75,6 +82,8 @@ class Post(db.Model):
             "is_collab": self.is_collab, "collab_users": collab_users_list,
             "is_scheduled": self.is_scheduled,
             "scheduled_at": self.scheduled_at.isoformat() if self.scheduled_at else None,
+            "is_sponsored": self.is_sponsored or False,
+            "sponsor_label": self.sponsor_label,
             "view_count": self.view_count, "share_count": self.share_count,
             "like_count": len(self.likes), "comment_count": len(self.comments),
             "liked_by_me": liked, "saved_by_me": saved,
@@ -82,6 +91,7 @@ class Post(db.Model):
             "author_name": self.author.name if self.author else None,
             "author_username": self.author.username if self.author else None,
             "author_avatar": self.author.avatar_url if self.author else None,
+            "author_verified_badge": self.author.to_dict().get("verified_badge") if self.author else None,
             "created_at": self.created_at.isoformat()
         }
 

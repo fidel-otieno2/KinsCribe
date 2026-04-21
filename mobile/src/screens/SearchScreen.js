@@ -63,11 +63,22 @@ export default function SearchScreen({ navigation }) {
   const [posts, setPosts] = useState([]);
   const [searching, setSearching] = useState(false);
   const [loadingSuggestions, setLoadingSuggestions] = useState(true);
+  const [exploreFilter, setExploreFilter] = useState('recent'); // recent|trending|popular
+  const [trendingHashtags, setTrendingHashtags] = useState([]);
+  const [hashtagQuery, setHashtagQuery] = useState('');
 
   useFocusEffect(useCallback(() => {
     fetchSuggestions();
     fetchExplorePosts();
-  }, []));
+    fetchTrending();
+  }, [exploreFilter]));
+
+  const fetchTrending = async () => {
+    try {
+      const { data } = await api.get('/search/trending');
+      setTrendingHashtags(data.hashtags || []);
+    } catch {}
+  };
 
   const fetchSuggestions = async () => {
     setLoadingSuggestions(true);
@@ -79,7 +90,7 @@ export default function SearchScreen({ navigation }) {
 
   const fetchExplorePosts = async () => {
     try {
-      const { data } = await api.get("/posts/explore");
+      const { data } = await api.get(`/posts/explore?category=${exploreFilter}`);
       setPosts(data.posts || []);
     } catch {}
   };
@@ -172,7 +183,36 @@ export default function SearchScreen({ navigation }) {
             {/* Explore posts */}
             {posts.length > 0 && (
               <View style={s.section}>
-                <Text style={[s.sectionTitle, { color: theme.text }]}>Explore Posts</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                  <Text style={[s.sectionTitle, { color: theme.text }]}>Explore Posts</Text>
+                  <View style={{ flexDirection: 'row', gap: 6 }}>
+                    {['recent', 'trending', 'popular'].map(f => (
+                      <TouchableOpacity
+                        key={f}
+                        style={[s.filterBtn, exploreFilter === f && { backgroundColor: 'rgba(124,58,237,0.25)', borderColor: 'rgba(124,58,237,0.5)' }, { borderColor: theme.border2, backgroundColor: theme.bgSecondary }]}
+                        onPress={() => { setExploreFilter(f); fetchExplorePosts(); }}
+                      >
+                        <Text style={[s.filterBtnText, { color: exploreFilter === f ? theme.primary : theme.muted }]}>
+                          {f.charAt(0).toUpperCase() + f.slice(1)}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+                {trendingHashtags.length > 0 && (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+                    {trendingHashtags.slice(0, 8).map(h => (
+                      <TouchableOpacity
+                        key={h.tag}
+                        style={[s.hashtagChip, { backgroundColor: theme.bgSecondary, borderColor: theme.border2 }]}
+                        onPress={() => { setQuery(`#${h.tag}`); handleSearch(`#${h.tag}`); }}
+                      >
+                        <Text style={[s.hashtagText, { color: theme.primary }]}>#{h.tag}</Text>
+                        <Text style={[s.hashtagCount, { color: theme.dim }]}>{h.count}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                )}
                 <View style={s.postsGrid}>
                   {posts.map(p => (
                     <TouchableOpacity key={p.id} style={s.postThumb} activeOpacity={0.85}>
@@ -222,4 +262,9 @@ const s = StyleSheet.create({
   postThumbCaption: { fontSize: 11, color: colors.muted },
   emptyWrap: { alignItems: "center", marginTop: 40, gap: 8 },
   emptyText: { color: colors.muted, fontSize: 14, textAlign: "center" },
+  filterBtn: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1 },
+  filterBtnText: { fontSize: 11, fontWeight: '600' },
+  hashtagChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, marginRight: 8 },
+  hashtagText: { fontSize: 13, fontWeight: '600' },
+  hashtagCount: { fontSize: 11 },
 });

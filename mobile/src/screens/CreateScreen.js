@@ -44,6 +44,8 @@ export default function CreateScreen({ navigation }) {
   const [altText, setAltText] = useState('');
   const [collabUser, setCollabUser] = useState('');
   const [scheduledFor, setScheduledFor] = useState('');
+  const [toneResult, setToneResult] = useState(null); // { tone, score, suggestion }
+  const [checkingTone, setCheckingTone] = useState(false);
 
   // Family story fields
   const [familyTitle, setFamilyTitle] = useState('');
@@ -52,6 +54,15 @@ export default function CreateScreen({ navigation }) {
   const [familyPrivacy, setFamilyPrivacy] = useState('family');
 
   const BG_COLORS = ['#7c3aed', '#3b82f6', '#ec4899', '#10b981', '#f59e0b', '#e11d48', '#0f172a'];
+
+  const checkTone = useCallback(async (text) => {
+    if (!text || text.length < 20) { setToneResult(null); return; }
+    setCheckingTone(true);
+    try {
+      const { data } = await api.post('/ai/tone-check', { text });
+      setToneResult(data);
+    } catch {} finally { setCheckingTone(false); }
+  }, []);
 
   const pickMedia = useCallback(async (allowMultiple = false) => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -233,9 +244,30 @@ export default function CreateScreen({ navigation }) {
               placeholderTextColor={theme.dim}
               multiline
               value={caption}
-              onChangeText={setCaption}
+              onChangeText={(v) => { setCaption(v); if (v.length > 20) checkTone(v); else setToneResult(null); }}
               maxLength={2200}
             />
+
+            {/* Tone checker result */}
+            {toneResult && (
+              <View style={[s.toneRow, {
+                backgroundColor: toneResult.score >= 7 ? 'rgba(16,185,129,0.1)' : toneResult.score <= 3 ? 'rgba(248,113,113,0.1)' : 'rgba(245,158,11,0.1)',
+                borderColor: toneResult.score >= 7 ? 'rgba(16,185,129,0.3)' : toneResult.score <= 3 ? 'rgba(248,113,113,0.3)' : 'rgba(245,158,11,0.3)',
+              }]}>
+                <Ionicons
+                  name={toneResult.score >= 7 ? 'happy-outline' : toneResult.score <= 3 ? 'sad-outline' : 'analytics-outline'}
+                  size={16}
+                  color={toneResult.score >= 7 ? '#10b981' : toneResult.score <= 3 ? '#f87171' : '#f59e0b'}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={[s.toneLabel, { color: toneResult.score >= 7 ? '#10b981' : toneResult.score <= 3 ? '#f87171' : '#f59e0b' }]}>
+                    Tone: {toneResult.tone} · {toneResult.score}/10
+                  </Text>
+                  {toneResult.suggestion ? <Text style={s.toneSuggestion}>{toneResult.suggestion}</Text> : null}
+                </View>
+                {checkingTone && <ActivityIndicator size="small" color={theme.muted} />}
+              </View>
+            )}
 
             <View style={[s.fieldRow, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]}>
               <Ionicons name="location-outline" size={18} color={theme.muted} />
@@ -427,6 +459,9 @@ const s = StyleSheet.create({
   mediaBtnGrad: { alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 28 },
   mediaBtnLabel: { color: '#fff', fontWeight: '700', fontSize: 14 },
   captionInput: { backgroundColor: 'rgba(30,41,59,0.6)', borderRadius: radius.md, padding: 14, color: colors.text, fontSize: 15, minHeight: 80, textAlignVertical: 'top', marginBottom: 12, borderWidth: 1, borderColor: colors.border2 },
+  toneRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, borderRadius: radius.md, borderWidth: 1, padding: 10, marginBottom: 12 },
+  toneLabel: { fontSize: 12, fontWeight: '700' },
+  toneSuggestion: { fontSize: 11, color: colors.muted, marginTop: 2, lineHeight: 16 },
   fieldRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(30,41,59,0.6)', borderRadius: radius.md, paddingHorizontal: 14, marginBottom: 10, borderWidth: 1, borderColor: colors.border2 },
   fieldInput: { flex: 1, paddingVertical: 12, color: colors.text, fontSize: 14 },
   label: { fontSize: 11, color: colors.muted, fontWeight: '600', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 8 },

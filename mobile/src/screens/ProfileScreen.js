@@ -195,6 +195,9 @@ export default function ProfileScreen({ navigation }) {
       <View style={s.bioWrap}>
         <View style={s.nameRow}>
           <Text style={[s.name, { color: theme.text }]}>{user?.name}</Text>
+          {user?.verified_badge && (
+            <Ionicons name="checkmark-circle" size={16} color="#3b82f6" />
+          )}
           <View style={s.roleBadge}>
             <Ionicons name="shield-checkmark" size={11} color="#7c3aed" />
             <Text style={s.roleText}>{user?.role}</Text>
@@ -219,6 +222,9 @@ export default function ProfileScreen({ navigation }) {
         </TouchableOpacity>
         <TouchableOpacity style={[s.shareBtn, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]} onPress={() => navigation.navigate('PostInsights')}>
           <Ionicons name="bar-chart-outline" size={18} color={theme.text} />
+        </TouchableOpacity>
+        <TouchableOpacity style={[s.shareBtn, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]} onPress={() => navigation.navigate('ConnectionCRM')}>
+          <Ionicons name="people-circle-outline" size={18} color={theme.text} />
         </TouchableOpacity>
       </View>
 

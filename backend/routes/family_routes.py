@@ -117,3 +117,41 @@ def remove_member(member_id):
     member.role = "member"
     db.session.commit()
     return jsonify({"message": "Member removed"})
+
+
+@family_bp.route("/announcements", methods=["GET"])
+@jwt_required()
+def get_announcements():
+    """Get admin-only announcement posts for the family."""
+    from models.story import Story
+    user = current_user()
+    if not user.family_id:
+        return jsonify({"announcements": []})
+    announcements = Story.query.filter_by(
+        family_id=user.family_id, is_announcement=True
+    ).order_by(Story.created_at.desc()).limit(20).all()
+    return jsonify({"announcements": [s.to_dict() for s in announcements]})
+
+
+@family_bp.route("/announcements", methods=["POST"])
+@jwt_required()
+def create_announcement():
+    """Admin-only: post a pinned announcement to the family."""
+    from models.story import Story
+    user = current_user()
+    if user.role != "admin":
+        return jsonify({"error": "Only admins can post announcements"}), 403
+    data = request.get_json() or {}
+    if not data.get("title") and not data.get("content"):
+        return jsonify({"error": "Title or content required"}), 400
+    story = Story(
+        title=data.get("title", "Announcement"),
+        content=data.get("content", ""),
+        privacy="family",
+        family_id=user.family_id,
+        user_id=user.id,
+        is_announcement=True
+    )
+    db.session.add(story)
+    db.session.commit()
+    return jsonify({"announcement": story.to_dict()}), 201

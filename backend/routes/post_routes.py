@@ -19,7 +19,23 @@ def me():
 
 
 def _is_connected(user_id, target_id):
-    return Connection.query.filter_by(follower_id=user_id, following_id=target_id).first() is not None
+    """Returns True only if there is an accepted connection from user_id → target_id"""
+    return Connection.query.filter_by(
+        follower_id=user_id, following_id=target_id, status="accepted"
+    ).first() is not None
+
+
+def _can_view_profile(current_id, target_user):
+    """Can current_id view target_user's posts?
+    - Always yes for own profile
+    - Always yes if target is public
+    - Yes if private AND current_id has an accepted connection
+    """
+    if current_id == target_user.id:
+        return True
+    if not target_user.is_private:
+        return True
+    return _is_connected(current_id, target_user.id)
 
 
 @post_bp.route("/", methods=["POST"])
@@ -76,11 +92,20 @@ def create_post():
 def post_feed():
     user = me()
     current_id = user.id
-    interests = {c.following_id for c in Connection.query.filter_by(follower_id=current_id).all()}
+    # Only include accepted connections in feed
+    interests = {c.following_id for c in Connection.query.filter_by(
+        follower_id=current_id, status="accepted"
+    ).all()}
     candidate_ids = interests | {current_id}
     all_posts = Post.query.filter(Post.user_id.in_(candidate_ids)).order_by(Post.created_at.desc()).limit(50).all()
     result = []
     for p in all_posts:
+        author = User.query.get(p.user_id)
+        if not author:
+            continue
+        # If author is private and we're not connected, skip (except own posts)
+        if p.user_id != current_id and author.is_private and not _is_connected(current_id, p.user_id):
+            continue
         if p.privacy == "public":
             result.append(p.to_dict(current_id))
         elif p.privacy == "connections" and (p.user_id == current_id or _is_connected(current_id, p.user_id)):
@@ -102,6 +127,15 @@ def explore():
 @jwt_required()
 def user_posts(user_id):
     current_id = int(get_jwt_identity())
+    target = User.query.get(user_id)
+    if not target:
+        return jsonify({"posts": [], "is_private": False})
+
+    can_view = _can_view_profile(current_id, target)
+    if not can_view:
+        # Private account — return empty posts with a flag
+        return jsonify({"posts": [], "is_private": True, "locked": True})
+
     is_connected = _is_connected(current_id, user_id)
     is_same = current_id == user_id
     posts = Post.query.filter_by(user_id=user_id).order_by(Post.created_at.desc()).all()
@@ -113,7 +147,7 @@ def user_posts(user_id):
             result.append(p.to_dict(current_id))
         elif is_same:
             result.append(p.to_dict(current_id))
-    return jsonify({"posts": result})
+    return jsonify({"posts": result, "is_private": target.is_private})
 
 
 @post_bp.route("/<int:post_id>/like", methods=["POST"])
@@ -211,3 +245,60 @@ def liked_posts(user_id):
     posts_map = {p.id: p for p in posts}
     result = [posts_map[pid].to_dict(current_id) for pid in post_ids if pid in posts_map]
     return jsonify({"posts": result})
+
+
+@post_bp.route("/<int:post_id>/share", methods=["POST"])
+@jwt_required()
+def share_post(post_id):
+    """Share a post into a DM conversation."""
+    from models.social import Conversation, ConversationParticipant, Message
+    user = me()
+    data = request.get_json() or {}
+    to_user_id = data.get("to_user_id")
+    if not to_user_id:
+        return jsonify({"error": "to_user_id required"}), 400
+    post = Post.query.get_or_404(post_id)
+    # Find or create DM
+    a_convs = {p.conversation_id for p in ConversationParticipant.query.filter_by(user_id=user.id).all()}
+    b_convs = {p.conversation_id for p in ConversationParticipant.query.filter_by(user_id=to_user_id).all()}
+    shared = a_convs & b_convs
+    conv = None
+    for cid in shared:
+        c = Conversation.query.get(cid)
+        if c and c.type == "private":
+            conv = c
+            break
+    if not conv:
+        conv = Conversation(type="private")
+        db.session.add(conv)
+        db.session.flush()
+        db.session.add(ConversationParticipant(conversation_id=conv.id, user_id=user.id))
+        db.session.add(ConversationParticipant(conversation_id=conv.id, user_id=to_user_id))
+    post_url = post.media_url or ""
+    caption_preview = (post.caption or "")[:100]
+    msg = Message(
+        text=f"Shared a post: {caption_preview}" if caption_preview else "Shared a post",
+        media_url=post_url,
+        media_type="shared_post",
+        conversation_id=conv.id,
+        sender_id=user.id
+    )
+    db.session.add(msg)
+    post.share_count = (post.share_count or 0) + 1
+    db.session.commit()
+    return jsonify({"message": "Post shared", "conversation_id": conv.id}), 201
+
+
+@post_bp.route("/<int:post_id>/sponsor", methods=["POST"])
+@jwt_required()
+def toggle_sponsor(post_id):
+    """Opt-in to mark your own post as sponsored/promoted."""
+    user = me()
+    post = Post.query.get_or_404(post_id)
+    if post.user_id != user.id:
+        return jsonify({"error": "Not authorized"}), 403
+    data = request.get_json() or {}
+    post.is_sponsored = data.get("is_sponsored", not post.is_sponsored)
+    post.sponsor_label = data.get("sponsor_label", post.sponsor_label)
+    db.session.commit()
+    return jsonify({"is_sponsored": post.is_sponsored})

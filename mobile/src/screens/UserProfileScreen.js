@@ -1,9 +1,10 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, Image, TouchableOpacity,
-  FlatList, ActivityIndicator, ScrollView, Dimensions,
+  ActivityIndicator, ScrollView, Dimensions, Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import api from '../api/axios';
@@ -18,8 +19,10 @@ export default function UserProfileScreen({ route, navigation }) {
   const { user: me } = useAuth();
   const [profile, setProfile] = useState(null);
   const [posts, setPosts] = useState([]);
-  const [connected, setConnected] = useState(false);
+  const [connStatus, setConnStatus] = useState(null); // null | 'pending' | 'accepted'
   const [followsYou, setFollowsYou] = useState(false);
+  const [isPrivate, setIsPrivate] = useState(false);
+  const [locked, setLocked] = useState(false);
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
   const [tab, setTab] = useState('posts');
@@ -32,17 +35,17 @@ export default function UserProfileScreen({ route, navigation }) {
 
   const fetchAll = useCallback(async () => {
     try {
-      const [userRes, postsRes, statusRes] = await Promise.all([
-        api.get(`/auth/me`).catch(() => null),
-        api.get(`/posts/user/${userId}`).catch(() => ({ data: { posts: [] } })),
-        api.get(`/connections/${userId}/status`).catch(() => ({ data: { connected: false, follows_you: false } })),
+      const [postsRes, statusRes] = await Promise.all([
+        api.get(`/posts/user/${userId}`).catch(() => ({ data: { posts: [], is_private: false, locked: false } })),
+        api.get(`/connections/${userId}/status`).catch(() => ({ data: { connected: false, status: null, follows_you: false } })),
       ]);
-      // Get target user info from search
       const searchRes = await api.get(`/connections/search?q=${userName || ''}`).catch(() => null);
       const found = searchRes?.data?.users?.find(u => u.id === userId);
       setProfile(found || { id: userId, name: userName, avatar_url: userAvatar });
       setPosts(postsRes.data.posts || []);
-      setConnected(statusRes.data.connected);
+      setIsPrivate(postsRes.data.is_private || false);
+      setLocked(postsRes.data.locked || false);
+      setConnStatus(statusRes.data.status);
       setFollowsYou(statusRes.data.follows_you);
     } catch {} finally { setLoading(false); }
   }, [userId]);
@@ -53,7 +56,13 @@ export default function UserProfileScreen({ route, navigation }) {
     setConnecting(true);
     try {
       const { data } = await api.post(`/connections/${userId}/toggle`);
-      setConnected(data.connected);
+      // data.status = 'accepted' | 'pending' | null
+      setConnStatus(data.status || null);
+      if (data.status === null) {
+        // unfollowed — re-check if profile is now locked
+        setLocked(isPrivate);
+        setPosts([]);
+      }
     } catch {} finally { setConnecting(false); }
   };
 
@@ -79,17 +88,6 @@ export default function UserProfileScreen({ route, navigation }) {
     ]
   );
 
-  const handleReport = () => Alert.alert(
-    'Report Account',
-    'Why are you reporting this account?',
-    [
-      { text: 'Spam', onPress: () => Alert.alert('Reported', 'Thank you for your report.') },
-      { text: 'Harassment', onPress: () => Alert.alert('Reported', 'Thank you for your report.') },
-      { text: 'Inappropriate content', onPress: () => Alert.alert('Reported', 'Thank you for your report.') },
-      { text: 'Cancel', style: 'cancel' },
-    ]
-  );
-
   const openDM = async () => {
     try {
       const { data } = await api.post(`/messages/dm/${userId}`);
@@ -103,8 +101,22 @@ export default function UserProfileScreen({ route, navigation }) {
     } catch {}
   };
 
+  // Button label + style based on connection status
+  const connectLabel = () => {
+    if (connStatus === 'accepted') return 'Following ✓';
+    if (connStatus === 'pending') return 'Requested';
+    return isPrivate ? 'Follow' : 'Follow';
+  };
+
+  const connectIcon = () => {
+    if (connStatus === 'accepted') return null;
+    if (connStatus === 'pending') return 'time-outline';
+    return 'person-add-outline';
+  };
+
   const Header = () => (
     <View>
+      {/* Top bar */}
       <View style={s.topBar}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
@@ -116,7 +128,7 @@ export default function UserProfileScreen({ route, navigation }) {
           [
             { text: 'Mute', onPress: handleMute },
             { text: 'Block', style: 'destructive', onPress: handleBlock },
-            { text: 'Report', onPress: handleReport },
+            { text: 'Report', onPress: () => Alert.alert('Reported', 'Thank you for your report.') },
             { text: 'Cancel', style: 'cancel' },
           ]
         )} style={s.backBtn}>
@@ -135,62 +147,86 @@ export default function UserProfileScreen({ route, navigation }) {
         </LinearGradient>
 
         <View style={s.statsRow}>
-          <TouchableOpacity style={s.stat} onPress={() => navigation.navigate('UserProfile', { userId, userName, tab: 'posts' })}>
-            <Text style={s.statNum}>{posts.length}</Text>
+          <View style={s.stat}>
+            <Text style={s.statNum}>{locked ? '—' : posts.length}</Text>
             <Text style={s.statLabel}>Posts</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={s.stat} onPress={() => {}}>
+          </View>
+          <View style={s.stat}>
             <Text style={s.statNum}>{profile?.connection_count || 0}</Text>
-            <Text style={s.statLabel}>Connections</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={s.stat} onPress={() => {}}>
+            <Text style={s.statLabel}>Followers</Text>
+          </View>
+          <View style={s.stat}>
             <Text style={s.statNum}>{profile?.interest_count || 0}</Text>
-            <Text style={s.statLabel}>Interests</Text>
-          </TouchableOpacity>
+            <Text style={s.statLabel}>Following</Text>
+          </View>
         </View>
       </View>
 
       {/* Bio */}
       <View style={s.bioWrap}>
-        <Text style={s.name}>{profile?.name || userName}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Text style={s.name}>{profile?.name || userName}</Text>
+          {profile?.verified_badge && (
+            <Ionicons name="checkmark-circle" size={16} color="#3b82f6" />
+          )}
+          {isPrivate && (
+            <View style={s.privateBadge}>
+              <Ionicons name="lock-closed" size={10} color="#a78bfa" />
+              <Text style={s.privateBadgeText}>Private</Text>
+            </View>
+          )}
+        </View>
         {profile?.username && <Text style={s.handle}>@{profile.username}</Text>}
         {profile?.bio && <Text style={s.bio}>{profile.bio}</Text>}
-        {followsYou && <Text style={s.followsYouBadge}>Connects with you</Text>}
+        {followsYou && <Text style={s.followsYouBadge}>Follows you</Text>}
       </View>
 
       {/* Action buttons */}
       <View style={s.actionRow}>
         <TouchableOpacity
-          style={[s.actionBtn, connected && s.actionBtnOutline]}
+          style={[
+            s.actionBtn,
+            connStatus === 'accepted' && s.actionBtnOutline,
+            connStatus === 'pending' && s.actionBtnPending,
+          ]}
           onPress={toggleConnect}
           disabled={connecting}
           activeOpacity={0.8}
         >
           {connecting ? (
-            <ActivityIndicator size="small" color={connected ? colors.muted : '#fff'} />
-          ) : connected ? (
-            <Text style={s.actionBtnOutlineText}>Connected ✓</Text>
+            <ActivityIndicator size="small" color={connStatus ? colors.muted : '#fff'} />
+          ) : connStatus === 'accepted' ? (
+            <Text style={s.actionBtnOutlineText}>Following ✓</Text>
+          ) : connStatus === 'pending' ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Ionicons name="time-outline" size={14} color={colors.muted} />
+              <Text style={s.actionBtnOutlineText}>Requested</Text>
+            </View>
           ) : (
             <LinearGradient colors={['#7c3aed', '#3b82f6']} style={s.actionBtnGrad}>
-              <Text style={s.actionBtnText}>Connect</Text>
+              <Ionicons name="person-add-outline" size={14} color="#fff" />
+              <Text style={s.actionBtnText}>Follow</Text>
             </LinearGradient>
           )}
         </TouchableOpacity>
 
         <TouchableOpacity style={s.actionBtnOutline} onPress={openDM} activeOpacity={0.8}>
+          <Ionicons name="chatbubble-outline" size={14} color={colors.text} />
           <Text style={s.actionBtnOutlineText}>Message</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Tab toggle */}
-      <View style={s.tabRow}>
-        <TouchableOpacity style={[s.tabBtn, tab === 'posts' && s.tabBtnActive]} onPress={() => setTab('posts')}>
-          <Ionicons name="grid-outline" size={20} color={tab === 'posts' ? colors.primary : colors.muted} />
-        </TouchableOpacity>
-        <TouchableOpacity style={[s.tabBtn, tab === 'list' && s.tabBtnActive]} onPress={() => setTab('list')}>
-          <Ionicons name="list-outline" size={22} color={tab === 'list' ? colors.primary : colors.muted} />
-        </TouchableOpacity>
-      </View>
+      {/* Tab toggle — only show if not locked */}
+      {!locked && (
+        <View style={s.tabRow}>
+          <TouchableOpacity style={[s.tabBtn, tab === 'posts' && s.tabBtnActive]} onPress={() => setTab('posts')}>
+            <Ionicons name="grid-outline" size={20} color={tab === 'posts' ? colors.primary : colors.muted} />
+          </TouchableOpacity>
+          <TouchableOpacity style={[s.tabBtn, tab === 'list' && s.tabBtnActive]} onPress={() => setTab('list')}>
+            <Ionicons name="list-outline" size={22} color={tab === 'list' ? colors.primary : colors.muted} />
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 
@@ -204,7 +240,50 @@ export default function UserProfileScreen({ route, navigation }) {
     <View style={s.container}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
         <Header />
-        {posts.length === 0 ? (
+
+        {/* Private / locked state */}
+        {locked ? (
+          <View style={s.lockedWrap}>
+            <BlurView intensity={10} tint="dark" style={s.lockedCard}>
+              <LinearGradient colors={['rgba(124,58,237,0.12)', 'rgba(15,23,42,0.9)']} style={StyleSheet.absoluteFill} />
+              <View style={s.lockedIconWrap}>
+                <LinearGradient colors={['#7c3aed', '#3b82f6']} style={s.lockedIcon}>
+                  <Ionicons name="lock-closed" size={28} color="#fff" />
+                </LinearGradient>
+              </View>
+              <Text style={s.lockedTitle}>This account is private</Text>
+              <Text style={s.lockedSub}>
+                {connStatus === 'pending'
+                  ? 'Your follow request is pending approval.'
+                  : 'Follow this account to see their photos and videos.'}
+              </Text>
+              {connStatus !== 'pending' && (
+                <TouchableOpacity
+                  style={s.lockedFollowBtn}
+                  onPress={toggleConnect}
+                  disabled={connecting}
+                  activeOpacity={0.85}
+                >
+                  <LinearGradient colors={['#7c3aed', '#3b82f6']} style={s.lockedFollowBtnGrad}>
+                    {connecting
+                      ? <ActivityIndicator color="#fff" size="small" />
+                      : <>
+                          <Ionicons name="person-add-outline" size={16} color="#fff" />
+                          <Text style={s.lockedFollowBtnText}>Follow</Text>
+                        </>}
+                  </LinearGradient>
+                </TouchableOpacity>
+              )}
+            </BlurView>
+
+            {/* Blurred placeholder grid */}
+            <View style={s.blurGrid}>
+              {Array.from({ length: 9 }).map((_, i) => (
+                <View key={i} style={[s.gridItem, { backgroundColor: 'rgba(255,255,255,0.04)' }]} />
+              ))}
+            </View>
+          </View>
+        ) : posts.length === 0 ? (
           <View style={s.empty}>
             <Ionicons name="camera-outline" size={48} color={colors.dim} />
             <Text style={s.emptyText}>No posts yet</Text>
@@ -266,12 +345,15 @@ const s = StyleSheet.create({
   name: { fontSize: 15, fontWeight: '700', color: colors.text },
   handle: { fontSize: 13, color: colors.muted, marginTop: 1 },
   bio: { fontSize: 13, color: colors.text, marginTop: 4, lineHeight: 18 },
-  followsYouBadge: { fontSize: 11, color: colors.primary, fontWeight: '600', marginTop: 4 },
+  followsYouBadge: { fontSize: 11, color: colors.muted, fontWeight: '600', marginTop: 4, backgroundColor: 'rgba(255,255,255,0.07)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20, alignSelf: 'flex-start' },
+  privateBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(124,58,237,0.15)', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(124,58,237,0.3)' },
+  privateBadgeText: { fontSize: 10, color: '#a78bfa', fontWeight: '700' },
   actionRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingBottom: 14 },
   actionBtn: { flex: 1, height: 36, borderRadius: radius.md, overflow: 'hidden' },
-  actionBtnGrad: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  actionBtnGrad: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   actionBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
-  actionBtnOutline: { flex: 1, height: 36, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border2, alignItems: 'center', justifyContent: 'center' },
+  actionBtnOutline: { flex: 1, height: 36, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border2, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6 },
+  actionBtnPending: { flex: 1, height: 36, borderRadius: radius.md, borderWidth: 1, borderColor: 'rgba(245,158,11,0.4)', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(245,158,11,0.08)' },
   actionBtnOutlineText: { color: colors.text, fontWeight: '600', fontSize: 14 },
   tabRow: { flexDirection: 'row', borderTopWidth: 0.5, borderTopColor: colors.border },
   tabBtn: { flex: 1, alignItems: 'center', paddingVertical: 10 },
@@ -291,4 +373,15 @@ const s = StyleSheet.create({
   listMetaText: { fontSize: 12, color: colors.muted },
   empty: { alignItems: 'center', marginTop: 60, gap: 12 },
   emptyText: { fontSize: 16, color: colors.muted },
+  // Locked / private state
+  lockedWrap: { position: 'relative' },
+  lockedCard: { margin: 20, borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(124,58,237,0.2)', paddingVertical: 32, paddingHorizontal: 24, alignItems: 'center', gap: 10 },
+  lockedIconWrap: { marginBottom: 4 },
+  lockedIcon: { width: 64, height: 64, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  lockedTitle: { fontSize: 18, fontWeight: '800', color: colors.text, textAlign: 'center' },
+  lockedSub: { fontSize: 13, color: colors.muted, textAlign: 'center', lineHeight: 19, paddingHorizontal: 10 },
+  lockedFollowBtn: { borderRadius: radius.md, overflow: 'hidden', marginTop: 8, width: '100%' },
+  lockedFollowBtnGrad: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 13 },
+  lockedFollowBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  blurGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 1.5, opacity: 0.3 },
 });

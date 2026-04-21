@@ -94,6 +94,7 @@ def _run_migrations():
         "ALTER TABLE stories ADD COLUMN IF NOT EXISTS story_date DATE",
         "ALTER TABLE stories ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW()",
         "ALTER TABLE stories ADD COLUMN IF NOT EXISTS repost_count INTEGER DEFAULT 0",
+        "ALTER TABLE stories ADD COLUMN IF NOT EXISTS is_announcement BOOLEAN DEFAULT FALSE",
         # Users table
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS website VARCHAR(200)",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS interests VARCHAR(500)",
@@ -123,12 +124,17 @@ def _run_migrations():
         "ALTER TABLE posts ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMP",
         "ALTER TABLE posts ADD COLUMN IF NOT EXISTS view_count INTEGER DEFAULT 0",
         "ALTER TABLE posts ADD COLUMN IF NOT EXISTS share_count INTEGER DEFAULT 0",
+        "ALTER TABLE posts ADD COLUMN IF NOT EXISTS is_sponsored BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE posts ADD COLUMN IF NOT EXISTS sponsor_label VARCHAR(100)",
         # Post comments table migrations
         "ALTER TABLE post_comments ADD COLUMN IF NOT EXISTS parent_id INTEGER",
         "ALTER TABLE post_comments ADD COLUMN IF NOT EXISTS likes INTEGER DEFAULT 0",
         # Post saves table migrations
         "ALTER TABLE post_saves ADD COLUMN IF NOT EXISTS collection VARCHAR(100) DEFAULT 'Saved'",
         "ALTER TABLE post_saves ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW()",
+        # Connections table migrations
+        "ALTER TABLE connections ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'accepted'",
+        "UPDATE connections SET status = 'accepted' WHERE status IS NULL",
         # Public stories table migrations
         "ALTER TABLE public_stories ADD COLUMN IF NOT EXISTS music_url VARCHAR(300)",
         "ALTER TABLE public_stories ADD COLUMN IF NOT EXISTS music_name VARCHAR(200)",

@@ -19,12 +19,14 @@ import { useAuth } from "../context/AuthContext";
 const { width } = Dimensions.get("window");
 
 function timeAgo(dateStr) {
-  const diff = (Date.now() - new Date(dateStr)) / 1000;
+  // Fix: Server returns UTC without 'Z', so append it to force UTC parsing
+  const utcDate = dateStr.endsWith('Z') ? dateStr : dateStr + 'Z';
+  const diff = (Date.now() - new Date(utcDate)) / 1000;
   if (diff < 60) return "just now";
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
   if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
-  return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return new Date(utcDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
 // ── Join Family Modal ──────────────────────────────────────────
@@ -110,18 +112,127 @@ const jf = StyleSheet.create({
   joinBtnText: { color: "#fff", fontWeight: "700", fontSize: 16 },
 });
 
+// ── Share Post Modal ──────────────────────────────────────────
+function SharePostModal({ visible, postId, onClose }) {
+  const { theme } = useTheme();
+  const [query, setQuery] = useState("");
+  const [users, setUsers] = useState([]);
+  const [sending, setSending] = useState(null);
+  const [sent, setSent] = useState(new Set());
+
+  useEffect(() => {
+    if (!visible) { setQuery(""); setUsers([]); setSent(new Set()); return; }
+    api.get("/connections/suggestions").then(({ data }) => setUsers(data.suggestions || [])).catch(() => {});
+  }, [visible]);
+
+  const handleSearch = async (q) => {
+    setQuery(q);
+    if (!q.trim()) {
+      api.get("/connections/suggestions").then(({ data }) => setUsers(data.suggestions || [])).catch(() => {});
+      return;
+    }
+    try {
+      const { data } = await api.get(`/connections/search?q=${q}`);
+      setUsers(data.users || []);
+    } catch {}
+  };
+
+  const shareToUser = async (userId) => {
+    setSending(userId);
+    try {
+      await api.post(`/posts/${postId}/share`, { to_user_id: userId });
+      setSent(prev => new Set([...prev, userId]));
+    } catch {} finally { setSending(null); }
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <BlurView intensity={20} tint="dark" style={{ flex: 1, justifyContent: "flex-end" }}>
+        <View style={[sp.sheet, { backgroundColor: theme.surface }]}>
+          <View style={[sp.handle, { backgroundColor: theme.border }]} />
+          <View style={[sp.header, { borderBottomColor: theme.border }]}>
+            <Text style={[sp.title, { color: theme.text }]}>Share Post</Text>
+            <TouchableOpacity onPress={onClose}><Ionicons name="close" size={22} color={theme.muted} /></TouchableOpacity>
+          </View>
+          <View style={[sp.searchWrap, { backgroundColor: theme.bgSecondary }]}>
+            <Ionicons name="search" size={15} color={theme.dim} />
+            <TextInput style={[sp.searchInput, { color: theme.text }]} placeholder="Search people..." placeholderTextColor={theme.dim} value={query} onChangeText={handleSearch} />
+          </View>
+          <ScrollView style={{ maxHeight: 320 }} contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 20 }}>
+            {users.map(u => (
+              <View key={u.id} style={sp.userRow}>
+                <View style={[sp.avatar, { backgroundColor: colors.primary }]}>
+                  {u.avatar_url ? <Image source={{ uri: u.avatar_url }} style={{ width: 40, height: 40, borderRadius: 20 }} /> : <Text style={sp.avatarLetter}>{u.name?.[0]?.toUpperCase()}</Text>}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[sp.userName, { color: theme.text }]}>{u.name}</Text>
+                  <Text style={[sp.userHandle, { color: theme.muted }]}>@{u.username || "user"}</Text>
+                </View>
+                <TouchableOpacity
+                  style={[sp.sendBtn, sent.has(u.id) && sp.sentBtn]}
+                  onPress={() => shareToUser(u.id)}
+                  disabled={sending === u.id || sent.has(u.id)}
+                >
+                  {sending === u.id ? <ActivityIndicator size="small" color="#fff" /> :
+                    sent.has(u.id) ? <Ionicons name="checkmark" size={16} color="#fff" /> :
+                    <Text style={sp.sendBtnText}>Send</Text>}
+                </TouchableOpacity>
+              </View>
+            ))}
+          </ScrollView>
+        </View>
+      </BlurView>
+    </Modal>
+  );
+}
+
+const sp = StyleSheet.create({
+  sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 40 },
+  handle: { width: 40, height: 4, borderRadius: 2, alignSelf: "center", marginTop: 10, marginBottom: 8 },
+  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 0.5 },
+  title: { fontSize: 16, fontWeight: "700" },
+  searchWrap: { flexDirection: "row", alignItems: "center", gap: 8, marginHorizontal: 16, marginVertical: 10, paddingHorizontal: 12, paddingVertical: 9, borderRadius: radius.md },
+  searchInput: { flex: 1, fontSize: 14 },
+  userRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 10 },
+  avatar: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
+  avatarLetter: { color: "#fff", fontWeight: "700", fontSize: 16 },
+  userName: { fontSize: 14, fontWeight: "600" },
+  userHandle: { fontSize: 12 },
+  sendBtn: { backgroundColor: colors.primary, paddingHorizontal: 16, paddingVertical: 7, borderRadius: radius.full, minWidth: 60, alignItems: "center" },
+  sentBtn: { backgroundColor: "#10b981" },
+  sendBtnText: { color: "#fff", fontWeight: "700", fontSize: 13 },
+});
+
 // ── Post Card ──────────────────────────────────────────────────
 const PostCard = memo(function PostCard({ post, onUpdate, navigation }) {
   const { user } = useAuth();
   const { theme } = useTheme();
   const [liked, setLiked] = useState(post.liked_by_me || false);
+  const [saved, setSaved] = useState(post.saved_by_me || false);
   const [likeCount, setLikeCount] = useState(post.like_count || 0);
   const [showComments, setShowComments] = useState(false);
+  const [showFullCaption, setShowFullCaption] = useState(false);
+  const [showMediaViewer, setShowMediaViewer] = useState(false);
+  const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
   const [comments, setComments] = useState([]);
   const [commentText, setCommentText] = useState("");
   const [posting, setPosting] = useState(false);
   const [loadingComments, setLoadingComments] = useState(false);
+  const [showShare, setShowShare] = useState(false);
   const lastTap = useRef(0);
+  const scrollViewRef = useRef(null);
+
+  // Fix: Re-sync liked state when post or user changes (account switch)
+  useEffect(() => {
+    setLiked(post.liked_by_me || false);
+    setSaved(post.saved_by_me || false);
+  }, [post.id, post.liked_by_me, post.saved_by_me, user?.id]);
+
+  const mediaList = post.media_type === 'carousel' && post.media_urls?.length > 0
+    ? post.media_urls
+    : post.media_url
+    ? [{ url: post.media_url, type: post.media_type }]
+    : [];
 
   const toggleLike = async () => {
     const next = !liked;
@@ -129,6 +240,13 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation }) {
     setLikeCount(c => next ? c + 1 : c - 1);
     try { await api.post(`/posts/${post.id}/like`); }
     catch { setLiked(!next); setLikeCount(c => next ? c - 1 : c + 1); }
+  };
+
+  const toggleSave = async () => {
+    const next = !saved;
+    setSaved(next);
+    try { await api.post(`/posts/${post.id}/save`); }
+    catch { setSaved(!next); }
   };
 
   const handleDoubleTap = () => {
@@ -164,6 +282,22 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation }) {
 
   const isOwner = post.user_id === user?.id;
 
+  const renderHashtags = (text) => {
+    if (!text) return null;
+    const parts = text.split(/(#\w+)/);
+    return parts.map((part, i) => 
+      part.startsWith('#') 
+        ? <Text key={i} style={{ color: '#3b82f6', fontWeight: '600' }}>{part}</Text>
+        : <Text key={i}>{part}</Text>
+    );
+  };
+
+  const handleScroll = (event) => {
+    const offsetX = event.nativeEvent.contentOffset.x;
+    const index = Math.round(offsetX / width);
+    setCurrentMediaIndex(index);
+  };
+
   return (
     <View style={pc.card}>
       {/* Header */}
@@ -180,7 +314,12 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation }) {
           </View>
         </LinearGradient>
         <View style={{ flex: 1 }}>
-          <Text style={[pc.authorName, { color: theme.text }]}>{post.author_name}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Text style={[pc.authorName, { color: theme.text }]}>{post.author_name}</Text>
+            {post.author_verified_badge && (
+              <Ionicons name="checkmark-circle" size={14} color="#3b82f6" />
+            )}
+          </View>
           <View style={pc.metaRow}>
             {post.location ? (
               <>
@@ -192,6 +331,9 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation }) {
             <Text style={[pc.metaText, { color: theme.muted }]}>{timeAgo(post.created_at)}</Text>
             {post.privacy === "connections" && (
               <><Text style={[pc.dot, { color: theme.dim }]}>·</Text><Ionicons name="people-outline" size={11} color={theme.muted} /></>
+            )}
+            {post.is_sponsored && (
+              <><Text style={[pc.dot, { color: theme.dim }]}>·</Text><Text style={pc.sponsoredLabel}>Sponsored</Text></>
             )}
           </View>
         </View>
@@ -207,12 +349,55 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation }) {
         )}
       </TouchableOpacity>
 
-      {/* Media */}
-      {post.media_url ? (
-        <TouchableOpacity activeOpacity={1} onPress={handleDoubleTap}>
-          <Image source={{ uri: post.media_url }} style={pc.media} resizeMode="cover" />
-        </TouchableOpacity>
-      ) : null}
+      {/* Media - Carousel or Single */}
+      {mediaList.length > 0 && (
+        <View>
+          <ScrollView
+            ref={scrollViewRef}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onScroll={handleScroll}
+            scrollEventThrottle={16}
+          >
+            {mediaList.map((media, idx) => (
+              <TouchableOpacity
+                key={idx}
+                activeOpacity={1}
+                onPress={() => {
+                  const now = Date.now();
+                  if (now - lastTap.current < 300 && !liked) {
+                    setLiked(true);
+                    setLikeCount(c => c + 1);
+                    api.post(`/posts/${post.id}/like`).catch(() => {
+                      setLiked(false); setLikeCount(c => c - 1);
+                    });
+                  } else {
+                    setShowMediaViewer(true);
+                    setCurrentMediaIndex(idx);
+                  }
+                  lastTap.current = now;
+                }}
+              >
+                <Image source={{ uri: media.url }} style={pc.media} resizeMode="cover" />
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          {mediaList.length > 1 && (
+            <View style={pc.carouselDots}>
+              {mediaList.map((_, idx) => (
+                <View
+                  key={idx}
+                  style={[
+                    pc.dot,
+                    { backgroundColor: idx === currentMediaIndex ? '#3b82f6' : 'rgba(255,255,255,0.4)' }
+                  ]}
+                />
+              ))}
+            </View>
+          )}
+        </View>
+      )}
 
       {/* Actions */}
       <View style={pc.actions}>
@@ -223,10 +408,13 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation }) {
           <TouchableOpacity onPress={openComments} style={pc.actionBtn}>
             <Ionicons name="chatbubble-outline" size={24} color={theme.text} />
           </TouchableOpacity>
-          <TouchableOpacity style={pc.actionBtn}>
+          <TouchableOpacity style={pc.actionBtn} onPress={() => setShowShare(true)}>
             <Ionicons name="paper-plane-outline" size={24} color={theme.text} />
           </TouchableOpacity>
         </View>
+        <TouchableOpacity onPress={toggleSave} style={pc.actionBtn}>
+          <Ionicons name={saved ? "bookmark" : "bookmark-outline"} size={24} color={saved ? theme.primary : theme.text} />
+        </TouchableOpacity>
       </View>
 
       {/* Likes */}
@@ -237,10 +425,15 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation }) {
       {/* Caption */}
       {post.caption ? (
         <View style={pc.captionWrap}>
-          <Text style={pc.caption}>
+          <Text style={pc.caption} numberOfLines={showFullCaption ? undefined : 2}>
             <Text style={pc.captionName}>{post.author_name} </Text>
-            {post.caption}
+            {renderHashtags(post.caption)}
           </Text>
+          {post.caption.length > 100 && (
+            <TouchableOpacity onPress={() => setShowFullCaption(!showFullCaption)}>
+              <Text style={pc.moreText}>{showFullCaption ? 'less' : 'more'}</Text>
+            </TouchableOpacity>
+          )}
         </View>
       ) : null}
 
@@ -252,6 +445,33 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation }) {
       )}
 
       <Text style={pc.timestamp}>{timeAgo(post.created_at).toUpperCase()}</Text>
+
+      {/* Full Screen Media Viewer */}
+      <Modal visible={showMediaViewer} transparent animationType="fade" onRequestClose={() => setShowMediaViewer(false)}>
+        <View style={pc.mediaViewerOverlay}>
+          <TouchableOpacity style={pc.mediaViewerClose} onPress={() => setShowMediaViewer(false)}>
+            <Ionicons name="close" size={28} color="#fff" />
+          </TouchableOpacity>
+          <ScrollView
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            contentOffset={{ x: currentMediaIndex * width, y: 0 }}
+          >
+            {mediaList.map((media, idx) => (
+              <View key={idx} style={{ width, height: '100%', justifyContent: 'center' }}>
+                <Image
+                  source={{ uri: media.url }}
+                  style={{ width, height: width }}
+                  resizeMode="contain"
+                />
+              </View>
+            ))}
+          </ScrollView>
+        </View>
+      </Modal>
+
+      <SharePostModal visible={showShare} postId={post.id} onClose={() => setShowShare(false)} />
 
       {/* Comments Modal */}
       <Modal visible={showComments} animationType="slide" transparent>
@@ -322,6 +542,7 @@ const pc = StyleSheet.create({
   authorName: { fontSize: 13, fontWeight: "700", color: colors.text },
   metaRow: { flexDirection: "row", alignItems: "center", gap: 3, marginTop: 1 },
   metaText: { fontSize: 11, color: colors.muted },
+  sponsoredLabel: { fontSize: 10, color: '#f59e0b', fontWeight: '700', backgroundColor: 'rgba(245,158,11,0.12)', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 },
   dot: { fontSize: 11, color: colors.dim },
   media: { width, height: width },
   actions: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 10, paddingVertical: 8 },
@@ -331,6 +552,11 @@ const pc = StyleSheet.create({
   captionWrap: { paddingHorizontal: 14, marginBottom: 4 },
   caption: { fontSize: 13, color: colors.text, lineHeight: 18 },
   captionName: { fontWeight: "700" },
+  moreText: { color: colors.muted, fontSize: 13, marginTop: 2 },
+  carouselDots: { position: 'absolute', bottom: 12, alignSelf: 'center', flexDirection: 'row', gap: 6 },
+  dot: { width: 6, height: 6, borderRadius: 3 },
+  mediaViewerOverlay: { flex: 1, backgroundColor: '#000', justifyContent: 'center' },
+  mediaViewerClose: { position: 'absolute', top: 52, right: 16, zIndex: 10, padding: 8, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 20 },
   viewComments: { paddingHorizontal: 14, color: colors.muted, fontSize: 13, marginBottom: 4 },
   timestamp: { paddingHorizontal: 14, paddingBottom: 10, fontSize: 10, color: colors.dim, letterSpacing: 0.5 },
   commentsOverlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.5)" },
@@ -397,8 +623,8 @@ export default function FeedScreen({ navigation }) {
 
   const fetchUnread = useCallback(async () => {
     try {
-      const { data } = await api.get("/stories/notifications/count");
-      setUnreadCount(data?.count || 0);
+      const { data } = await api.get("/notifications/count");
+      setUnreadCount(data?.unread_count || 0);
     } catch {}
   }, []);
 
@@ -408,6 +634,26 @@ export default function FeedScreen({ navigation }) {
     fetchFeed(true);
     fetchUnread();
   }, []));
+
+  // Reset badge immediately when Notifications screen is focused
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchUnread();
+    });
+    return unsubscribe;
+  }, [navigation, fetchUnread]);
+
+  // Also reset badge to 0 immediately when navigating TO Notifications
+  // by listening for state changes — when Notifications is in the stack, badge = 0
+  useEffect(() => {
+    const unsubscribeState = navigation.addListener('state', () => {
+      const routes = navigation.getState()?.routes || [];
+      const onNotifications = routes.some(r => r.name === 'Notifications');
+      if (onNotifications) setUnreadCount(0);
+      else fetchUnread();
+    });
+    return unsubscribeState;
+  }, [navigation, fetchUnread]);
 
   const ListHeader = () => (
     <View>

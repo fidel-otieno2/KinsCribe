@@ -47,6 +47,12 @@ class User(db.Model):
         except Exception:
             connection_count = 0
             interest_count = 0
+        try:
+            from models.extras import VerifiedBadge
+            badge = VerifiedBadge.query.filter_by(user_id=self.id).first()
+            verified_badge = badge.badge_type if badge else None
+        except Exception:
+            verified_badge = None
         return {
             "id": self.id,
             "name": self.name,
@@ -55,6 +61,7 @@ class User(db.Model):
             "phone": self.phone,
             "role": self.role,
             "is_verified": self.is_verified,
+            "verified_badge": verified_badge,
             "avatar_url": self.avatar_url,
             "bio": self.bio,
             "website": self.website,

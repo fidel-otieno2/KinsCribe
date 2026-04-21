@@ -110,9 +110,12 @@ export default function SettingsScreen({ navigation }) {
   const [showSessions, setShowSessions] = useState(false);
 
   // Privacy toggles
-  const [privateAccount, setPrivateAccount] = useState(false);
+  const [privateAccount, setPrivateAccount] = useState(user?.is_private || false);
   const [showActivity, setShowActivity] = useState(true);
   const [allowDMs, setAllowDMs] = useState(true);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+  const [pendingPrivate, setPendingPrivate] = useState(false);
+  const [savingPrivacy, setSavingPrivacy] = useState(false);
 
   useEffect(() => {
     checkBiometricStatus();
@@ -266,6 +269,26 @@ export default function SettingsScreen({ navigation }) {
 
   const handleDeleteAccount = () => setShowDeleteModal(true);
 
+  const handlePrivacyToggle = (newVal) => {
+    setPendingPrivate(newVal);
+    setShowPrivacyModal(true);
+  };
+
+  const confirmPrivacyChange = async () => {
+    setSavingPrivacy(true);
+    try {
+      await api.put('/auth/profile', { is_private: pendingPrivate });
+      await refreshUser();
+      setPrivateAccount(pendingPrivate);
+      setShowPrivacyModal(false);
+      success(pendingPrivate ? 'Account set to Private' : 'Account set to Public');
+    } catch {
+      error('Failed to update privacy setting');
+    } finally {
+      setSavingPrivacy(false);
+    }
+  };
+
   const confirmDeleteAccount = async () => {
     setDeletingAccount(true);
     try {
@@ -392,7 +415,25 @@ export default function SettingsScreen({ navigation }) {
 
         {/* Privacy */}
         <Section title="Privacy">
-          <Row icon="lock-closed-outline" label="Private Account" toggle toggled={privateAccount} onPress={() => setPrivateAccount(v => !v)} />
+          <View style={s.row}>
+            <View style={[s.rowIcon, { backgroundColor: 'rgba(124,58,237,0.15)' }]}>
+              <Ionicons name="lock-closed-outline" size={18} color="#7c3aed" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.rowLabel}>Private Account</Text>
+              <Text style={s.rowSubLabel}>
+                {privateAccount
+                  ? 'Only approved followers see your posts'
+                  : 'Anyone can see your posts and follow you'}
+              </Text>
+            </View>
+            <Switch
+              value={privateAccount}
+              onValueChange={handlePrivacyToggle}
+              trackColor={{ true: '#7c3aed', false: colors.border2 }}
+              thumbColor="#fff"
+            />
+          </View>
           <Divider />
           <Row icon="eye-outline" label="Show Activity Status" toggle toggled={showActivity} onPress={() => setShowActivity(v => !v)} />
           <Divider />
@@ -684,6 +725,97 @@ export default function SettingsScreen({ navigation }) {
         onSuccess={() => success('Password changed successfully!')}
       />
 
+      {/* Privacy Change Confirmation Modal */}
+      <Modal visible={showPrivacyModal} transparent animationType="fade" onRequestClose={() => setShowPrivacyModal(false)}>
+        <View style={s.modalOverlay}>
+          <BlurView intensity={20} tint="dark" style={s.confirmModal}>
+            <LinearGradient
+              colors={pendingPrivate ? ['rgba(124,58,237,0.1)', 'rgba(15,23,42,0.98)'] : ['rgba(16,185,129,0.1)', 'rgba(15,23,42,0.98)']}
+              style={StyleSheet.absoluteFill}
+            />
+            <View style={s.confirmIconWrap}>
+              <LinearGradient
+                colors={pendingPrivate ? ['#7c3aed', '#3b82f6'] : ['#10b981', '#059669']}
+                style={s.confirmIcon}
+              >
+                <Ionicons name={pendingPrivate ? 'lock-closed' : 'globe-outline'} size={26} color="#fff" />
+              </LinearGradient>
+            </View>
+
+            <Text style={s.confirmTitle}>
+              {pendingPrivate ? 'Switch to Private?' : 'Switch to Public?'}
+            </Text>
+
+            {pendingPrivate ? (
+              <View style={s.privacyInfoBox}>
+                <View style={s.privacyInfoRow}>
+                  <Ionicons name="checkmark-circle" size={16} color="#a78bfa" />
+                  <Text style={s.privacyInfoText}>Only approved followers can see your posts and stories</Text>
+                </View>
+                <View style={s.privacyInfoRow}>
+                  <Ionicons name="checkmark-circle" size={16} color="#a78bfa" />
+                  <Text style={s.privacyInfoText}>New followers must send a request — you approve or decline</Text>
+                </View>
+                <View style={s.privacyInfoRow}>
+                  <Ionicons name="checkmark-circle" size={16} color="#a78bfa" />
+                  <Text style={s.privacyInfoText}>Your profile won't appear in public search results</Text>
+                </View>
+                <View style={s.privacyInfoRow}>
+                  <Ionicons name="checkmark-circle" size={16} color="#a78bfa" />
+                  <Text style={s.privacyInfoText}>Existing followers keep access</Text>
+                </View>
+              </View>
+            ) : (
+              <View style={s.privacyInfoBox}>
+                <View style={s.privacyInfoRow}>
+                  <Ionicons name="checkmark-circle" size={16} color="#34d399" />
+                  <Text style={s.privacyInfoText}>Anyone can see your posts and stories</Text>
+                </View>
+                <View style={s.privacyInfoRow}>
+                  <Ionicons name="checkmark-circle" size={16} color="#34d399" />
+                  <Text style={s.privacyInfoText}>Anyone can follow you without approval</Text>
+                </View>
+                <View style={s.privacyInfoRow}>
+                  <Ionicons name="checkmark-circle" size={16} color="#34d399" />
+                  <Text style={s.privacyInfoText}>Your profile appears in search and explore</Text>
+                </View>
+                <View style={s.privacyInfoRow}>
+                  <Ionicons name="checkmark-circle" size={16} color="#34d399" />
+                  <Text style={s.privacyInfoText}>Pending follow requests will be auto-approved</Text>
+                </View>
+              </View>
+            )}
+
+            <View style={[s.confirmBtns, { marginTop: 8 }]}>
+              <TouchableOpacity
+                style={s.confirmCancelBtn}
+                onPress={() => setShowPrivacyModal(false)}
+                activeOpacity={0.8}
+              >
+                <Text style={s.confirmCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={s.confirmRemoveBtn}
+                onPress={confirmPrivacyChange}
+                disabled={savingPrivacy}
+                activeOpacity={0.8}
+              >
+                <LinearGradient
+                  colors={pendingPrivate ? ['#7c3aed', '#3b82f6'] : ['#10b981', '#059669']}
+                  style={s.confirmRemoveBtnGrad}
+                >
+                  {savingPrivacy
+                    ? <ActivityIndicator color="#fff" size="small" />
+                    : <Text style={s.confirmRemoveText}>
+                        {pendingPrivate ? 'Set Private' : 'Set Public'}
+                      </Text>}
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </BlurView>
+        </View>
+      </Modal>
+
     </View>
   );
 }
@@ -711,6 +843,7 @@ const s = StyleSheet.create({
   rowIcon: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   rowLabel: { flex: 1, fontSize: 14, color: colors.text, fontWeight: '500' },
   rowValue: { fontSize: 13, color: colors.muted },
+  rowSubLabel: { fontSize: 11, color: colors.muted, marginTop: 2, lineHeight: 15 },
   divider: { height: 0.5, backgroundColor: colors.border, marginLeft: 61 },
   editField: { padding: 14 },
   editLabel: { fontSize: 11, color: colors.muted, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
@@ -733,4 +866,7 @@ const s = StyleSheet.create({
   confirmRemoveBtn: { flex: 1, borderRadius: radius.md, overflow: 'hidden' },
   confirmRemoveBtnGrad: { paddingVertical: 13, alignItems: 'center', justifyContent: 'center' },
   confirmRemoveText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  privacyInfoBox: { marginHorizontal: 20, marginBottom: 20, gap: 10 },
+  privacyInfoRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  privacyInfoText: { flex: 1, fontSize: 13, color: colors.muted, lineHeight: 19 },
 });

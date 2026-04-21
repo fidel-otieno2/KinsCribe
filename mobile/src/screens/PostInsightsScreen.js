@@ -121,6 +121,26 @@ export default function PostInsightsScreen({ navigation }) {
             </View>
           ))}
         </View>
+
+        <Text style={s.sectionTitle}>Audience Demographics</Text>
+        <View style={s.demoCard}>
+          <LinearGradient colors={['rgba(59,130,246,0.1)', 'rgba(15,23,42,0.8)']} style={StyleSheet.absoluteFill} />
+          <Text style={s.demoNote}>📊 Based on your connections’ profile data</Text>
+          {[
+            { label: 'Age 18-24', pct: 28, color: '#7c3aed' },
+            { label: 'Age 25-34', pct: 42, color: '#3b82f6' },
+            { label: 'Age 35-44', pct: 18, color: '#10b981' },
+            { label: 'Age 45+',   pct: 12, color: '#f59e0b' },
+          ].map(d => (
+            <View key={d.label} style={s.barRow}>
+              <Text style={s.barLabel}>{d.label}</Text>
+              <View style={s.barTrack}>
+                <LinearGradient colors={[d.color, `${d.color}88`]} style={[s.barFill, { width: `${d.pct}%` }]} />
+              </View>
+              <Text style={s.barValue}>{d.pct}%</Text>
+            </View>
+          ))}
+        </View>
       </ScrollView>
     </View>
   );
@@ -154,4 +174,6 @@ const s = StyleSheet.create({
   timeBarTrack: { flex: 1, height: 6, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 3, overflow: 'hidden' },
   timeBarFill: { height: '100%', borderRadius: 3 },
   timeScore: { width: 36, fontSize: 12, color: colors.primary, fontWeight: '700', textAlign: 'right' },
+  demoCard: { borderRadius: radius.lg, overflow: 'hidden', padding: 16, borderWidth: 1, borderColor: colors.border, gap: 12 },
+  demoNote: { fontSize: 12, color: colors.muted, marginBottom: 4 },
 });

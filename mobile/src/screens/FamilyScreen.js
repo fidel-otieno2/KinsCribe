@@ -42,20 +42,42 @@ function Avatar({ uri, name, size = 44 }) {
 }
 
 // ── Family Feed Tab ───────────────────────────────────────────
-function FamilyFeedTab({ navigation }) {
+function FamilyFeedTab({ navigation, userRole }) {
   const [stories, setStories] = useState([]);
+  const [announcements, setAnnouncements] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.get('/stories/feed').then(({ data }) => {
-      setStories(data.stories || []);
-    }).catch(() => {}).finally(() => setLoading(false));
+    Promise.all([
+      api.get('/stories/feed').catch(() => ({ data: { stories: [] } })),
+      api.get('/family/announcements').catch(() => ({ data: { announcements: [] } })),
+    ]).then(([storiesRes, annRes]) => {
+      setStories(storiesRes.data.stories || []);
+      setAnnouncements(annRes.data.announcements || []);
+    }).finally(() => setLoading(false));
   }, []);
 
   if (loading) return <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />;
 
   return (
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
+      {/* Admin Announcements */}
+      {announcements.length > 0 && (
+        <View style={{ marginBottom: 16 }}>
+          <Text style={ft.sectionLabel}>📢 Announcements</Text>
+          {announcements.map(ann => (
+            <View key={ann.id} style={ft.announcementCard}>
+              <LinearGradient colors={['rgba(245,158,11,0.15)', 'rgba(30,41,59,0.9)']} style={StyleSheet.absoluteFill} />
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                <Ionicons name="megaphone" size={16} color="#f59e0b" />
+                <Text style={ft.announcementTitle}>{ann.title}</Text>
+              </View>
+              {ann.content ? <Text style={ft.announcementContent}>{ann.content}</Text> : null}
+              <Text style={ft.time}>{timeAgo(ann.created_at)}</Text>
+            </View>
+          ))}
+        </View>
+      )}
       {stories.length === 0 ? (
         <View style={ft.empty}>
           <Ionicons name="library-outline" size={48} color={colors.dim} />
@@ -107,6 +129,10 @@ const ft = StyleSheet.create({
   empty: { alignItems: 'center', marginTop: 60, gap: 10 },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: colors.text },
   emptySub: { fontSize: 14, color: colors.muted },
+  sectionLabel: { fontSize: 11, fontWeight: '700', color: colors.muted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 },
+  announcementCard: { borderRadius: radius.md, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(245,158,11,0.3)', padding: 14, marginBottom: 10 },
+  announcementTitle: { fontSize: 14, fontWeight: '700', color: '#f59e0b', flex: 1 },
+  announcementContent: { fontSize: 13, color: colors.text, lineHeight: 18, marginBottom: 6 },
   card: { backgroundColor: colors.bgSecondary, borderRadius: radius.lg, padding: 16, marginBottom: 12, borderWidth: 0.5, borderColor: colors.border },
   cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
   authorName: { fontSize: 14, fontWeight: '700', color: colors.text },
@@ -182,6 +208,20 @@ function MembersTab({ members, user, family, navigation, success, error }) {
           key={m.id}
           style={mt.memberRow}
           onPress={() => navigation.navigate('UserProfile', { userId: m.id, userName: m.name, userAvatar: m.avatar_url })}
+          onLongPress={() => {
+            if (user?.role !== 'admin' || m.id === user?.id) return;
+            Alert.alert(
+              `Manage ${m.name}`,
+              'Change role or remove member',
+              [
+                { text: 'Make Admin', onPress: async () => { try { await api.patch(`/family/members/${m.id}/role`, { role: 'admin' }); } catch {} } },
+                { text: 'Set View-Only', onPress: async () => { try { await api.patch(`/family/members/${m.id}/role`, { role: 'view-only' }); } catch {} } },
+                { text: 'Set Member', onPress: async () => { try { await api.patch(`/family/members/${m.id}/role`, { role: 'member' }); } catch {} } },
+                { text: 'Remove from Family', style: 'destructive', onPress: async () => { try { await api.delete(`/family/members/${m.id}`); } catch {} } },
+                { text: 'Cancel', style: 'cancel' },
+              ]
+            );
+          }}
           activeOpacity={0.8}
         >
           <Avatar uri={m.avatar_url} name={m.name} size={48} />
@@ -192,9 +232,9 @@ function MembersTab({ members, user, family, navigation, success, error }) {
             </View>
             <Text style={mt.memberEmail}>{m.email}</Text>
           </View>
-          <View style={[mt.roleBadge, m.role === 'admin' && mt.adminBadge]}>
-            <Text style={[mt.roleText, m.role === 'admin' && { color: '#f59e0b' }]}>
-              {m.role === 'admin' ? '👑 Admin' : m.role}
+          <View style={[mt.roleBadge, m.role === 'admin' && mt.adminBadge, m.role === 'view-only' && mt.viewOnlyBadge]}>
+            <Text style={[mt.roleText, m.role === 'admin' && { color: '#f59e0b' }, m.role === 'view-only' && { color: '#94a3b8' }]}>
+              {m.role === 'admin' ? '👑 Admin' : m.role === 'view-only' ? '👁 View Only' : m.role}
             </Text>
           </View>
         </TouchableOpacity>
@@ -221,6 +261,7 @@ const mt = StyleSheet.create({
   memberEmail: { fontSize: 12, color: colors.muted, marginTop: 2 },
   roleBadge: { backgroundColor: 'rgba(30,41,59,0.8)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
   adminBadge: { backgroundColor: 'rgba(245,158,11,0.15)' },
+  viewOnlyBadge: { backgroundColor: 'rgba(148,163,184,0.15)' },
   roleText: { color: colors.muted, fontSize: 11, fontWeight: '600' },
 });
 
@@ -364,6 +405,7 @@ export default function FamilyScreen({ navigation }) {
           { icon: 'wallet-outline', label: 'Budget', screen: 'FamilyBudget', color: '#10b981' },
           { icon: 'book-outline', label: 'Storybooks', screen: 'Storybooks', color: '#ec4899' },
           { icon: 'chatbubbles-outline', label: 'Chat', screen: null, color: colors.primary },
+          { icon: 'calendar-number-outline', label: 'On This Day', screen: 'OnThisDay', color: '#f59e0b' },
         ].map(item => (
           <TouchableOpacity
             key={item.label}
@@ -395,7 +437,7 @@ export default function FamilyScreen({ navigation }) {
       </View>
 
       {/* Tab content */}
-      {tab === 'feed' && <FamilyFeedTab navigation={navigation} />}
+      {tab === 'feed' && <FamilyFeedTab navigation={navigation} userRole={user?.role} />}
       {tab === 'chat' && (() => {
         // Auto-navigate to family chat
         navigation.navigate('Chat', {

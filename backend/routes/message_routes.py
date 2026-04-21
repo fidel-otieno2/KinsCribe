@@ -7,8 +7,15 @@ from models.family import Family
 import cloudinary
 import cloudinary.uploader
 import os
+from datetime import datetime, timedelta
 
 message_bp = Blueprint("messages", __name__)
+
+# In-memory stores for typing indicators and presence
+# { conversation_id: { user_id: expires_at } }
+_typing_store = {}
+# { user_id: last_seen_at (datetime) }
+_presence_store = {}
 
 cloudinary.config(
     cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
@@ -212,6 +219,64 @@ def delete_message(msg_id):
     db.session.delete(msg)
     db.session.commit()
     return jsonify({"message": "Deleted"})
+
+
+@message_bp.route("/presence/ping", methods=["POST"])
+@jwt_required()
+def presence_ping():
+    """Update user's last seen timestamp"""
+    user_id = int(get_jwt_identity())
+    _presence_store[user_id] = datetime.utcnow()
+    return jsonify({"ok": True})
+
+
+@message_bp.route("/presence/<int:user_id>", methods=["GET"])
+@jwt_required()
+def get_presence(user_id):
+    """Get a user's online status"""
+    last_seen = _presence_store.get(user_id)
+    if not last_seen:
+        return jsonify({"status": "offline", "last_seen": None})
+    diff = (datetime.utcnow() - last_seen).total_seconds()
+    if diff < 60:
+        status = "online"
+    elif diff < 300:
+        status = "recently"
+    else:
+        status = "offline"
+    return jsonify({"status": status, "last_seen": last_seen.isoformat(), "seconds_ago": int(diff)})
+
+
+@message_bp.route("/conversations/<int:conv_id>/typing", methods=["POST"])
+@jwt_required()
+def set_typing(conv_id):
+    """Signal that current user is typing in a conversation"""
+    user_id = int(get_jwt_identity())
+    is_typing = request.json.get("typing", True)
+    if conv_id not in _typing_store:
+        _typing_store[conv_id] = {}
+    if is_typing:
+        _typing_store[conv_id][user_id] = datetime.utcnow() + timedelta(seconds=5)
+    else:
+        _typing_store[conv_id].pop(user_id, None)
+    return jsonify({"ok": True})
+
+
+@message_bp.route("/conversations/<int:conv_id>/typing", methods=["GET"])
+@jwt_required()
+def get_typing(conv_id):
+    """Get who is currently typing in a conversation"""
+    current_user_id = int(get_jwt_identity())
+    now = datetime.utcnow()
+    typers = _typing_store.get(conv_id, {})
+    # Clean expired + exclude self
+    active = [uid for uid, exp in typers.items() if exp > now and uid != current_user_id]
+    names = []
+    for uid in active:
+        u = User.query.get(uid)
+        if u:
+            names.append(u.name.split()[0])
+    return jsonify({"typing": active, "names": names})
 
 
 @message_bp.route("/conversations/<int:conv_id>/members", methods=["POST"])

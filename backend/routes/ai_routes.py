@@ -81,3 +81,48 @@ def generate_summary():
     content = (request.json or {}).get("content", "")
     prompt = f"Summarize this family story in 2-3 emotional sentences:\n\n{content}"
     return jsonify({"summary": chat_completion(prompt)})
+
+
+@ai_bp.route("/smart-replies", methods=["POST"])
+@jwt_required()
+def smart_replies():
+    """Generate 3 smart reply suggestions for a message."""
+    message = (request.json or {}).get("message", "").strip()
+    if not message:
+        return jsonify({"replies": []})
+    prompt = f"""Generate exactly 3 short, natural reply suggestions for this message: "{message}"
+Return only the 3 replies as a JSON array of strings, nothing else. Example: ["Sure!", "Sounds good", "Let me check"]"""
+    try:
+        import json as _json
+        raw = chat_completion(prompt)
+        replies = _json.loads(raw)
+        if isinstance(replies, list):
+            return jsonify({"replies": replies[:3]})
+    except Exception:
+        pass
+    return jsonify({"replies": ["Sure!", "Sounds good!", "Let me think about it"]})
+
+
+@ai_bp.route("/tone-check", methods=["POST"])
+@jwt_required()
+def tone_check():
+    """Check the tone and sentiment of a post caption before publishing."""
+    text = (request.json or {}).get("text", "").strip()
+    if not text:
+        return jsonify({"tone": "neutral", "score": 5, "suggestion": ""})
+    prompt = f"""Analyse the tone and sentiment of this social media post caption:
+"{text}"
+
+Respond with a JSON object with these exact keys:
+- tone: one of positive/negative/neutral/aggressive/sad/inspiring/funny
+- score: integer 1-10 (10 = very positive)
+- suggestion: one short sentence improvement tip if needed, or empty string if it's fine
+
+Return only the JSON object."""
+    try:
+        import json as _json
+        raw = chat_completion(prompt)
+        result = _json.loads(raw)
+        return jsonify(result)
+    except Exception:
+        return jsonify({"tone": "neutral", "score": 5, "suggestion": ""})

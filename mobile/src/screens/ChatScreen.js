@@ -42,8 +42,12 @@ export default function ChatScreen({ route, navigation }) {
   const [replyTo, setReplyTo] = useState(null);
   const [showReactions, setShowReactions] = useState(null);
   const [disappearing, setDisappearing] = useState(false);
+  const [typingNames, setTypingNames] = useState([]);
+  const [otherStatus, setOtherStatus] = useState(null); // 'online'|'recently'|'offline'
+  const [smartReplies, setSmartReplies] = useState([]);
   const flatRef = useRef(null);
   const pollRef = useRef(null);
+  const typingRef = useRef(null);
 
   const fetchMessages = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -56,7 +60,19 @@ export default function ChatScreen({ route, navigation }) {
       }
       if (!cid) { setLoading(false); return; }
       const { data } = await api.get(`/messages/conversations/${cid}/messages`);
-      setMessages(data.messages || []);
+      const msgs = data.messages || [];
+      setMessages(msgs);
+      // Fetch smart replies for the last received message
+      if (!silent && msgs.length > 0) {
+        const last = msgs[msgs.length - 1];
+        if (last.sender_id !== user?.id && last.text) {
+          api.post('/ai/smart-replies', { message: last.text })
+            .then(({ data: d }) => setSmartReplies(d.replies || []))
+            .catch(() => {});
+        } else {
+          setSmartReplies([]);
+        }
+      }
     } catch {} finally { setLoading(false); }
   }, [convId, type]);
 
@@ -66,6 +82,35 @@ export default function ChatScreen({ route, navigation }) {
     pollRef.current = setInterval(() => fetchMessages(true), 3000);
     return () => clearInterval(pollRef.current);
   }, [fetchMessages]);
+
+  // Poll typing indicator and presence
+  useEffect(() => {
+    if (!convId) return;
+    const pollTyping = async () => {
+      try {
+        const { data } = await api.get(`/messages/conversations/${convId}/typing`);
+        setTypingNames(data.names || []);
+      } catch {}
+    };
+    const pollPresence = async () => {
+      if (!otherUserId) return;
+      try {
+        const { data } = await api.get(`/messages/presence/${otherUserId}`);
+        setOtherStatus(data.status);
+      } catch {}
+    };
+    pollTyping(); pollPresence();
+    typingRef.current = setInterval(() => { pollTyping(); pollPresence(); }, 4000);
+    return () => clearInterval(typingRef.current);
+  }, [convId, otherUserId]);
+
+  // Signal typing when user types
+  const handleTextChange = (val) => {
+    setText(val);
+    if (convId) {
+      api.post(`/messages/conversations/${convId}/typing`, { typing: val.length > 0 }).catch(() => {});
+    }
+  };
 
   useEffect(() => {
     if (messages.length > 0) {
@@ -245,7 +290,12 @@ export default function ChatScreen({ route, navigation }) {
           onPress={() => otherUserId && navigation.navigate("UserProfile", { userId: otherUserId, userName: title })}
         >
           <Text style={cs.headerTitle}>{title}</Text>
-          <Text style={cs.headerSub}>{type === "family" ? "Family Group" : "Active recently"}</Text>
+          <Text style={cs.headerSub}>
+            {type === "family" ? "Family Group" :
+              otherStatus === "online" ? "🟢 Online" :
+              otherStatus === "recently" ? "Recently active" :
+              "Active recently"}
+          </Text>
         </TouchableOpacity>
 
         {type === "family" && (
@@ -295,6 +345,24 @@ export default function ChatScreen({ route, navigation }) {
         </View>
       )}
 
+      {/* Typing indicator */}
+      {typingNames.length > 0 && (
+        <View style={cs.typingBanner}>
+          <Text style={cs.typingText}>{typingNames.join(", ")} {typingNames.length === 1 ? "is" : "are"} typing...</Text>
+        </View>
+      )}
+
+      {/* Smart reply suggestions */}
+      {smartReplies.length > 0 && !text && (
+        <View style={cs.smartRepliesRow}>
+          {smartReplies.map((r, i) => (
+            <TouchableOpacity key={i} style={cs.smartReplyChip} onPress={() => { setText(r); setSmartReplies([]); }}>
+              <Text style={cs.smartReplyText}>{r}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+
       {/* Reply preview bar */}
       {replyTo && (
         <View style={cs.replyBar2}>
@@ -321,7 +389,7 @@ export default function ChatScreen({ route, navigation }) {
             placeholder="Message..."
             placeholderTextColor={colors.dim}
             value={text}
-            onChangeText={setText}
+            onChangeText={handleTextChange}
             multiline
             maxLength={1000}
           />
@@ -393,4 +461,9 @@ const cs = StyleSheet.create({
   emptyText: { color: colors.muted, fontSize: 14 },
   disappearBanner: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(245,158,11,0.1)', paddingHorizontal: 16, paddingVertical: 8, borderTopWidth: 0.5, borderTopColor: 'rgba(245,158,11,0.3)' },
   disappearText: { fontSize: 12, color: '#f59e0b', fontWeight: '600' },
+  typingBanner: { paddingHorizontal: 16, paddingVertical: 6, backgroundColor: 'rgba(124,58,237,0.08)' },
+  typingText: { fontSize: 12, color: colors.muted, fontStyle: 'italic' },
+  smartRepliesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 12, paddingVertical: 8, borderTopWidth: 0.5, borderTopColor: colors.border },
+  smartReplyChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: 'rgba(124,58,237,0.15)', borderWidth: 1, borderColor: 'rgba(124,58,237,0.3)' },
+  smartReplyText: { fontSize: 13, color: colors.primary, fontWeight: '500' },
 });

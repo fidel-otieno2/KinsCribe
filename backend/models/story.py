@@ -26,6 +26,7 @@ class Story(db.Model):
     # Privacy: private | family | public
     privacy = db.Column(db.String(20), default="family")
     repost_count = db.Column(db.Integer, default=0)
+    is_announcement = db.Column(db.Boolean, default=False)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -58,6 +59,7 @@ class Story(db.Model):
             "like_count": len(self.likes),
             "comment_count": len(self.comments),
             "repost_count": self.repost_count or 0,
+            "is_announcement": self.is_announcement or False,
             "author_name": self.author.name if self.author else None,
             "author_avatar": self.author.avatar_url if self.author else None,
             "created_at": self.created_at.isoformat()
