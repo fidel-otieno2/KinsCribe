@@ -100,8 +100,16 @@ export default function SettingsScreen({ navigation }) {
 
   // Data & Storage
   const [showDownloadModal, setShowDownloadModal] = useState(false);
-  const [downloadStep, setDownloadStep] = useState('idle'); // idle | loading | done | error
+  const [downloadStep, setDownloadStep] = useState('idle');
   const [downloadError, setDownloadError] = useState('');
+
+  // Subscription
+  const [showPremiumModal, setShowPremiumModal] = useState(false);
+  const [premiumStatus, setPremiumStatus] = useState(null); // null = not loaded
+  const [selectedPlan, setSelectedPlan] = useState('yearly');
+  const [upgradingPlan, setUpgradingPlan] = useState(false);
+  const [cancellingPlan, setCancellingPlan] = useState(false);
+  const [premiumStep, setPremiumStep] = useState('plans'); // plans | confirm | success | cancel_confirm
 
   // Notification toggles — persisted in AsyncStorage
   const [notifLikes, setNotifLikes] = useState(true);
@@ -151,7 +159,47 @@ export default function SettingsScreen({ navigation }) {
   useEffect(() => {
     checkBiometricStatus();
     loadNotifSettings();
+    loadPremiumStatus();
   }, []);
+
+  const loadPremiumStatus = async () => {
+    try {
+      const { data } = await api.get('/subscription/status');
+      setPremiumStatus(data);
+    } catch {
+      setPremiumStatus({ is_premium: user?.is_premium || false, plan: user?.premium_plan || null });
+    }
+  };
+
+  const handleUpgrade = async () => {
+    setUpgradingPlan(true);
+    try {
+      const { data } = await api.post('/subscription/upgrade', { plan: selectedPlan });
+      setPremiumStatus(prev => ({ ...prev, is_premium: true, plan: selectedPlan, expires_at: data.expires_at }));
+      await refreshUser();
+      setPremiumStep('success');
+    } catch (e) {
+      error(e.response?.data?.error || 'Upgrade failed. Try again.');
+    } finally {
+      setUpgradingPlan(false);
+    }
+  };
+
+  const handleCancelPremium = async () => {
+    setCancellingPlan(true);
+    try {
+      await api.post('/subscription/cancel');
+      setPremiumStatus(prev => ({ ...prev, is_premium: false, plan: null, expires_at: null }));
+      await refreshUser();
+      setPremiumStep('plans');
+      setShowPremiumModal(false);
+      success('Premium subscription cancelled');
+    } catch (e) {
+      error(e.response?.data?.error || 'Cancellation failed. Try again.');
+    } finally {
+      setCancellingPlan(false);
+    }
+  };
 
   const loadNotifSettings = async () => {
     try {
@@ -906,24 +954,36 @@ export default function SettingsScreen({ navigation }) {
           </View>
         </Section>
 
-        {/* About */}
+        {/* Subscription */}
         <Section title={t('subscription')}>
-          <View style={s.row}>
-            <View style={[s.rowIcon, { backgroundColor: 'rgba(245,158,11,0.15)' }]}>
-              <Ionicons name="star" size={18} color="#f59e0b" />
-            </View>
+          <TouchableOpacity
+            style={s.row}
+            onPress={() => { setPremiumStep('plans'); setShowPremiumModal(true); }}
+            activeOpacity={0.7}
+          >
+            <LinearGradient
+              colors={premiumStatus?.is_premium ? ['#7c3aed', '#3b82f6'] : ['rgba(245,158,11,0.15)', 'rgba(245,158,11,0.15)']}
+              style={[s.rowIcon, { borderRadius: 10 }]}
+            >
+              <Ionicons
+                name={premiumStatus?.is_premium ? 'diamond' : 'diamond-outline'}
+                size={18}
+                color={premiumStatus?.is_premium ? '#fff' : '#f59e0b'}
+              />
+            </LinearGradient>
             <View style={{ flex: 1 }}>
-              <AppText style={s.rowLabel}>Current Plan</AppText>
-              <AppText style={[s.rowValue, { fontSize: 12, marginTop: 2 }]}>Free</AppText>
+              <AppText style={s.rowLabel}>
+                {premiumStatus?.is_premium ? 'KinsCribe Premium' : 'Upgrade to Premium'}
+              </AppText>
+              <AppText style={s.rowSubLabel}>
+                {premiumStatus?.is_premium
+                  ? `${premiumStatus.plan === 'yearly' ? 'Yearly' : 'Monthly'} plan · Active`
+                  : 'Unlock all features — from $4.99/mo'}
+              </AppText>
             </View>
-          </View>
-          <Divider />
-          <TouchableOpacity style={s.row} onPress={() => Alert.alert('KinsCribe Premium', 'Premium plan coming soon!\n\n✅ Unlimited storage\n✅ AI story generation\n✅ Priority support\n✅ Advanced analytics\n\nStay tuned!')} activeOpacity={0.7}>
-            <View style={[s.rowIcon, { backgroundColor: 'rgba(124,58,237,0.15)' }]}>
-              <Ionicons name="diamond-outline" size={18} color="#7c3aed" />
-            </View>
-            <AppText style={[s.rowLabel, { color: '#7c3aed' }]}>Upgrade to Premium</AppText>
-            <Ionicons name="chevron-forward" size={16} color="#7c3aed" />
+            {premiumStatus?.is_premium
+              ? <View style={s.premiumBadge}><AppText style={s.premiumBadgeText}>ACTIVE</AppText></View>
+              : <Ionicons name="chevron-forward" size={16} color="#7c3aed" />}
           </TouchableOpacity>
         </Section>
 
@@ -1682,6 +1742,220 @@ export default function SettingsScreen({ navigation }) {
         </View>
       </Modal>
 
+      {/* Premium Subscription Modal */}
+      <Modal visible={showPremiumModal} transparent animationType="slide" onRequestClose={() => setShowPremiumModal(false)}>
+        <View style={s.blockedOverlay}>
+          <BlurView intensity={20} tint="dark" style={[s.appearSheet, { maxHeight: '92%' }]}>
+            <LinearGradient colors={['rgba(124,58,237,0.18)', 'rgba(59,130,246,0.10)', 'rgba(15,23,42,0.99)']} style={StyleSheet.absoluteFill} />
+            <View style={s.blockedHandle} />
+
+            {/* Header */}
+            <View style={s.premiumHeader}>
+              <LinearGradient colors={['#7c3aed', '#3b82f6']} style={s.premiumHeaderIcon}>
+                <Ionicons name="diamond" size={22} color="#fff" />
+              </LinearGradient>
+              <View style={{ flex: 1 }}>
+                <AppText style={s.premiumHeaderTitle}>KinsCribe Premium</AppText>
+                <AppText style={s.premiumHeaderSub}>
+                  {premiumStatus?.is_premium
+                    ? `${premiumStatus.plan === 'yearly' ? 'Yearly' : 'Monthly'} plan · Active`
+                    : 'Unlock everything'}
+                </AppText>
+              </View>
+              <TouchableOpacity onPress={() => setShowPremiumModal(false)} style={s.blockedCloseBtn}>
+                <Ionicons name="close" size={22} color={colors.muted} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}>
+
+              {/* Plans step */}
+              {(premiumStep === 'plans' || premiumStep === 'confirm') && !premiumStatus?.is_premium && (
+                <>
+                  {/* Features list */}
+                  <View style={s.premiumFeaturesBox}>
+                    {[
+                      { icon: 'infinite-outline',        color: '#7c3aed', text: 'Unlimited post & media storage' },
+                      { icon: 'sparkles-outline',        color: '#a78bfa', text: 'AI story & caption generation' },
+                      { icon: 'bar-chart-outline',       color: '#3b82f6', text: 'Advanced analytics & insights' },
+                      { icon: 'headset-outline',         color: '#10b981', text: 'Priority customer support' },
+                      { icon: 'shield-checkmark-outline',color: '#f59e0b', text: 'Exclusive verified badge' },
+                      { icon: 'eye-off-outline',         color: '#ec4899', text: 'Ad-free experience' },
+                      { icon: 'rocket-outline',          color: '#06b6d4', text: 'Early access to new features' },
+                    ].map(({ icon, color, text }) => (
+                      <View key={text} style={s.premiumFeatureRow}>
+                        <View style={[s.premiumFeatureIcon, { backgroundColor: `${color}22` }]}>
+                          <Ionicons name={icon} size={16} color={color} />
+                        </View>
+                        <AppText style={s.premiumFeatureText}>{text}</AppText>
+                      </View>
+                    ))}
+                  </View>
+
+                  {/* Plan selector */}
+                  <AppText style={s.premiumSectionLabel}>Choose your plan</AppText>
+                  {[
+                    { key: 'yearly',  label: 'Yearly',  price: '$39.99', sub: '$3.33 / month · Save 33%', badge: 'BEST VALUE' },
+                    { key: 'monthly', label: 'Monthly', price: '$4.99',  sub: 'Billed monthly', badge: null },
+                  ].map(plan => (
+                    <TouchableOpacity
+                      key={plan.key}
+                      style={[s.planCard, selectedPlan === plan.key && s.planCardActive]}
+                      onPress={() => setSelectedPlan(plan.key)}
+                      activeOpacity={0.8}
+                    >
+                      <View style={[s.planRadio, selectedPlan === plan.key && s.planRadioActive]}>
+                        {selectedPlan === plan.key && <View style={s.planRadioDot} />}
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                          <AppText style={[s.planLabel, selectedPlan === plan.key && s.planLabelActive]}>{plan.label}</AppText>
+                          {plan.badge && (
+                            <View style={s.planBadge}>
+                              <AppText style={s.planBadgeText}>{plan.badge}</AppText>
+                            </View>
+                          )}
+                        </View>
+                        <AppText style={s.planSub}>{plan.sub}</AppText>
+                      </View>
+                      <AppText style={[s.planPrice, selectedPlan === plan.key && s.planPriceActive]}>{plan.price}</AppText>
+                    </TouchableOpacity>
+                  ))}
+
+                  {/* CTA */}
+                  <TouchableOpacity
+                    style={s.premiumCTA}
+                    onPress={handleUpgrade}
+                    disabled={upgradingPlan}
+                    activeOpacity={0.85}
+                  >
+                    <LinearGradient colors={['#7c3aed', '#3b82f6']} style={s.premiumCTAGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+                      {upgradingPlan
+                        ? <ActivityIndicator color="#fff" />
+                        : <>
+                            <Ionicons name="diamond" size={18} color="#fff" />
+                            <AppText style={s.premiumCTAText}>
+                              Get {selectedPlan === 'yearly' ? 'Yearly' : 'Monthly'} Premium
+                            </AppText>
+                          </>}
+                    </LinearGradient>
+                  </TouchableOpacity>
+                  <AppText style={s.premiumDisclaimer}>Cancel anytime · No hidden fees · Secure payment</AppText>
+                </>
+              )}
+
+              {/* Already premium — manage plan */}
+              {premiumStatus?.is_premium && premiumStep !== 'success' && premiumStep !== 'cancel_confirm' && (
+                <>
+                  {/* Active plan card */}
+                  <LinearGradient colors={['rgba(124,58,237,0.2)', 'rgba(59,130,246,0.12)']} style={s.activePlanCard}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                      <Ionicons name="diamond" size={28} color="#a78bfa" />
+                      <View>
+                        <AppText style={s.activePlanTitle}>
+                          {premiumStatus.plan === 'yearly' ? 'Yearly' : 'Monthly'} Premium
+                        </AppText>
+                        {premiumStatus.expires_at && (
+                          <AppText style={s.activePlanSub}>
+                            Renews {new Date(premiumStatus.expires_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                          </AppText>
+                        )}
+                      </View>
+                    </View>
+                  </LinearGradient>
+
+                  {/* Features */}
+                  <View style={s.premiumFeaturesBox}>
+                    {[
+                      { icon: 'infinite-outline',        color: '#7c3aed', text: 'Unlimited post & media storage' },
+                      { icon: 'sparkles-outline',        color: '#a78bfa', text: 'AI story & caption generation' },
+                      { icon: 'bar-chart-outline',       color: '#3b82f6', text: 'Advanced analytics & insights' },
+                      { icon: 'headset-outline',         color: '#10b981', text: 'Priority customer support' },
+                      { icon: 'shield-checkmark-outline',color: '#f59e0b', text: 'Exclusive verified badge' },
+                      { icon: 'eye-off-outline',         color: '#ec4899', text: 'Ad-free experience' },
+                      { icon: 'rocket-outline',          color: '#06b6d4', text: 'Early access to new features' },
+                    ].map(({ icon, color, text }) => (
+                      <View key={text} style={s.premiumFeatureRow}>
+                        <View style={[s.premiumFeatureIcon, { backgroundColor: `${color}22` }]}>
+                          <Ionicons name={icon} size={16} color={color} />
+                        </View>
+                        <AppText style={s.premiumFeatureText}>{text}</AppText>
+                        <Ionicons name="checkmark-circle" size={16} color="#10b981" />
+                      </View>
+                    ))}
+                  </View>
+
+                  <TouchableOpacity
+                    style={s.cancelPlanBtn}
+                    onPress={() => setPremiumStep('cancel_confirm')}
+                    activeOpacity={0.8}
+                  >
+                    <AppText style={s.cancelPlanText}>Cancel Subscription</AppText>
+                  </TouchableOpacity>
+                </>
+              )}
+
+              {/* Cancel confirmation */}
+              {premiumStep === 'cancel_confirm' && (
+                <View style={{ alignItems: 'center', paddingTop: 12, gap: 16 }}>
+                  <LinearGradient colors={['rgba(248,113,113,0.15)', 'rgba(248,113,113,0.05)']} style={s.cancelConfirmIcon}>
+                    <Ionicons name="warning-outline" size={40} color="#f87171" />
+                  </LinearGradient>
+                  <AppText style={[s.premiumHeaderTitle, { textAlign: 'center' }]}>Cancel Premium?</AppText>
+                  <AppText style={[s.premiumHeaderSub, { textAlign: 'center', lineHeight: 20 }]}>
+                    You'll lose access to all Premium features immediately.
+                  </AppText>
+                  <View style={{ flexDirection: 'row', gap: 12, width: '100%', marginTop: 8 }}>
+                    <TouchableOpacity
+                      style={[s.confirmCancelBtn, { flex: 1 }]}
+                      onPress={() => setPremiumStep('plans')}
+                      activeOpacity={0.8}
+                    >
+                      <AppText style={s.confirmCancelText}>Keep Premium</AppText>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[s.confirmRemoveBtn, { flex: 1 }]}
+                      onPress={handleCancelPremium}
+                      disabled={cancellingPlan}
+                      activeOpacity={0.8}
+                    >
+                      <LinearGradient colors={['#f87171', '#ef4444']} style={s.confirmRemoveBtnGrad}>
+                        {cancellingPlan
+                          ? <ActivityIndicator color="#fff" size="small" />
+                          : <AppText style={s.confirmRemoveText}>Yes, Cancel</AppText>}
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+
+              {/* Success */}
+              {premiumStep === 'success' && (
+                <View style={{ alignItems: 'center', paddingTop: 12, gap: 16 }}>
+                  <LinearGradient colors={['rgba(124,58,237,0.2)', 'rgba(59,130,246,0.1)']} style={s.cancelConfirmIcon}>
+                    <Ionicons name="diamond" size={40} color="#a78bfa" />
+                  </LinearGradient>
+                  <AppText style={[s.premiumHeaderTitle, { textAlign: 'center', fontSize: 22 }]}>Welcome to Premium! 🎉</AppText>
+                  <AppText style={[s.premiumHeaderSub, { textAlign: 'center', lineHeight: 20 }]}>
+                    Your {selectedPlan === 'yearly' ? 'Yearly' : 'Monthly'} plan is now active.{`\n`}A confirmation has been sent to your email.
+                  </AppText>
+                  <TouchableOpacity
+                    style={[s.premiumCTA, { width: '100%' }]}
+                    onPress={() => { setPremiumStep('plans'); setShowPremiumModal(false); }}
+                    activeOpacity={0.85}
+                  >
+                    <LinearGradient colors={['#7c3aed', '#3b82f6']} style={s.premiumCTAGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+                      <AppText style={s.premiumCTAText}>Start Exploring</AppText>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+            </ScrollView>
+          </BlurView>
+        </View>
+      </Modal>
+
       {/* Download My Data Modal */}
       <Modal visible={showDownloadModal} transparent animationType="fade" onRequestClose={() => setShowDownloadModal(false)}>
         <View style={s.modalOverlay}>
@@ -2026,4 +2300,39 @@ const s = StyleSheet.create({
   blockedUsername: { fontSize: 12, color: colors.muted, marginTop: 1 },
   unblockBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: radius.full, borderWidth: 1.5, borderColor: '#f87171', minWidth: 80, alignItems: 'center' },
   unblockBtnText: { color: '#f87171', fontWeight: '700', fontSize: 13 },
+
+  // Premium / Subscription
+  premiumBadge: { backgroundColor: 'rgba(124,58,237,0.2)', borderWidth: 1, borderColor: 'rgba(124,58,237,0.5)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
+  premiumBadgeText: { color: '#a78bfa', fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
+  premiumHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 0.5, borderBottomColor: 'rgba(124,58,237,0.2)' },
+  premiumHeaderIcon: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  premiumHeaderTitle: { fontSize: 18, fontWeight: '800', color: colors.text },
+  premiumHeaderSub: { fontSize: 12, color: colors.muted, marginTop: 2 },
+  premiumFeaturesBox: { gap: 10, marginVertical: 16 },
+  premiumFeatureRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 6 },
+  premiumFeatureIcon: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  premiumFeatureText: { flex: 1, fontSize: 14, color: colors.text, fontWeight: '500' },
+  premiumSectionLabel: { fontSize: 11, fontWeight: '700', color: colors.muted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10, marginTop: 4 },
+  planCard: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderRadius: 16, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.08)', backgroundColor: 'rgba(255,255,255,0.03)', marginBottom: 10 },
+  planCardActive: { borderColor: 'rgba(124,58,237,0.6)', backgroundColor: 'rgba(124,58,237,0.08)' },
+  planRadio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: colors.border2, alignItems: 'center', justifyContent: 'center' },
+  planRadioActive: { borderColor: '#7c3aed' },
+  planRadioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#7c3aed' },
+  planLabel: { fontSize: 15, fontWeight: '700', color: colors.text },
+  planLabelActive: { color: '#a78bfa' },
+  planSub: { fontSize: 12, color: colors.muted, marginTop: 2 },
+  planPrice: { fontSize: 16, fontWeight: '800', color: colors.muted },
+  planPriceActive: { color: '#a78bfa' },
+  planBadge: { backgroundColor: 'rgba(124,58,237,0.2)', borderWidth: 1, borderColor: 'rgba(124,58,237,0.4)', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 20 },
+  planBadgeText: { color: '#a78bfa', fontSize: 9, fontWeight: '800', letterSpacing: 0.5 },
+  premiumCTA: { borderRadius: 16, overflow: 'hidden', marginTop: 8 },
+  premiumCTAGrad: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 16 },
+  premiumCTAText: { color: '#fff', fontWeight: '800', fontSize: 16 },
+  premiumDisclaimer: { textAlign: 'center', fontSize: 11, color: colors.dim, marginTop: 12 },
+  activePlanCard: { borderRadius: 16, padding: 20, marginVertical: 16, borderWidth: 1, borderColor: 'rgba(124,58,237,0.3)' },
+  activePlanTitle: { fontSize: 16, fontWeight: '800', color: '#a78bfa' },
+  activePlanSub: { fontSize: 12, color: colors.muted, marginTop: 3 },
+  cancelPlanBtn: { marginTop: 16, paddingVertical: 14, borderRadius: 14, borderWidth: 1.5, borderColor: 'rgba(248,113,113,0.4)', alignItems: 'center', backgroundColor: 'rgba(248,113,113,0.06)' },
+  cancelPlanText: { color: '#f87171', fontWeight: '700', fontSize: 14 },
+  cancelConfirmIcon: { width: 88, height: 88, borderRadius: 44, alignItems: 'center', justifyContent: 'center' },
 });

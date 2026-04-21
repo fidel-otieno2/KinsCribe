@@ -30,7 +30,12 @@ class User(db.Model):
     
     # Account type
     account_type = db.Column(db.String(20), default="personal")  # personal|professional|creator
-    
+
+    # Subscription
+    is_premium = db.Column(db.Boolean, default=False)
+    premium_plan = db.Column(db.String(20), nullable=True)   # monthly | yearly
+    premium_expires_at = db.Column(db.DateTime, nullable=True)
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     family_id = db.Column(db.Integer, db.ForeignKey("families.id"), nullable=True)
@@ -77,5 +82,8 @@ class User(db.Model):
             "family_id": self.family_id,
             "connection_count": connection_count,
             "interest_count": interest_count,
+            "is_premium": self.is_premium or False,
+            "premium_plan": self.premium_plan,
+            "premium_expires_at": self.premium_expires_at.isoformat() if self.premium_expires_at else None,
             "created_at": self.created_at.isoformat()
         }

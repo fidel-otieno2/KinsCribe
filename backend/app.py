@@ -15,6 +15,7 @@ from routes.public_story_routes import public_story_bp
 from routes.extras_routes import extras_bp
 from routes.notification_routes import notification_bp
 from routes.search_routes import search_bp
+from routes.subscription_routes import subscription_bp
 
 
 def create_app():
@@ -45,6 +46,7 @@ def create_app():
     app.register_blueprint(extras_bp, url_prefix="/api/extras")
     app.register_blueprint(notification_bp, url_prefix="/api/notifications")
     app.register_blueprint(search_bp, url_prefix="/api/search")
+    app.register_blueprint(subscription_bp, url_prefix="/api/subscription")
 
     with app.app_context():
         _safe_migrate()
@@ -173,6 +175,10 @@ def _run_migrations():
         "ALTER TABLE public_stories ADD COLUMN IF NOT EXISTS text_content TEXT",
         # Indexes
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_apple_id ON users(apple_id)",
+        # Subscription fields
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_premium BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS premium_plan VARCHAR(20)",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS premium_expires_at TIMESTAMP",
     ]
 
     try:
