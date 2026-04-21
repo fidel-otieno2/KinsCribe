@@ -148,6 +148,21 @@ def _run_migrations():
             UNIQUE(blocker_id, blocked_id)
         )
         """,
+        # User sessions table
+        """
+        CREATE TABLE IF NOT EXISTS user_sessions (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            token_hash VARCHAR(64),
+            device_name VARCHAR(150),
+            platform VARCHAR(20),
+            ip_address VARCHAR(45),
+            location VARCHAR(200),
+            last_active TIMESTAMP DEFAULT NOW(),
+            created_at TIMESTAMP DEFAULT NOW(),
+            is_revoked BOOLEAN DEFAULT FALSE
+        )
+        """,
         # Public stories table migrations
         "ALTER TABLE public_stories ADD COLUMN IF NOT EXISTS music_url VARCHAR(300)",
         "ALTER TABLE public_stories ADD COLUMN IF NOT EXISTS music_name VARCHAR(200)",

@@ -1,14 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Switch, Alert, TextInput, Image, ActivityIndicator,
-  Modal,
+  Modal, FlatList,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as LocalAuthentication from 'expo-local-authentication';
+import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -90,24 +91,29 @@ export default function SettingsScreen({ navigation }) {
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
 
-  // Notification toggles
+  // Notification toggles — persisted in AsyncStorage
   const [notifLikes, setNotifLikes] = useState(true);
   const [notifComments, setNotifComments] = useState(true);
   const [notifMessages, setNotifMessages] = useState(true);
   const [notifStories, setNotifStories] = useState(true);
   const [notifFollows, setNotifFollows] = useState(true);
+  const [savingNotif, setSavingNotif] = useState(null); // which key is saving
 
   // Quiet hours / DND
   const [quietHours, setQuietHours] = useState(false);
-  const [quietFrom] = useState('22:00');
-  const [quietTo] = useState('08:00');
+  const [quietFrom, setQuietFrom] = useState({ h: 22, m: 0 });
+  const [quietTo, setQuietTo] = useState({ h: 8, m: 0 });
+  const [showQuietPicker, setShowQuietPicker] = useState(false);
+  const [editingQuiet, setEditingQuiet] = useState('from'); // 'from' | 'to'
+  const [pickerH, setPickerH] = useState(22);
+  const [pickerM, setPickerM] = useState(0);
 
-  // Active sessions (mock — real impl needs backend)
-  const [sessions] = useState([
-    { id: 1, device: 'This device', location: 'Current session', current: true, last: 'Now' },
-    { id: 2, device: 'Chrome on Windows', location: 'Other session', current: false, last: '2 days ago' },
-  ]);
-  const [showSessions, setShowSessions] = useState(false);
+  // Active sessions
+  const [showSessionsModal, setShowSessionsModal] = useState(false);
+  const [sessions, setSessions] = useState([]);
+  const [loadingSessions, setLoadingSessions] = useState(false);
+  const [revokingId, setRevokingId] = useState(null);
+  const [revokingAll, setRevokingAll] = useState(false);
 
   // Privacy toggles
   const [privateAccount, setPrivateAccount] = useState(user?.is_private || false);
@@ -132,7 +138,96 @@ export default function SettingsScreen({ navigation }) {
 
   useEffect(() => {
     checkBiometricStatus();
+    loadNotifSettings();
   }, []);
+
+  const loadNotifSettings = async () => {
+    try {
+      const keys = ['notif_likes','notif_comments','notif_messages','notif_stories','notif_follows','notif_quiet','notif_quiet_from_h','notif_quiet_from_m','notif_quiet_to_h','notif_quiet_to_m'];
+      const pairs = await AsyncStorage.multiGet(keys);
+      const map = Object.fromEntries(pairs.map(([k, v]) => [k, v]));
+      if (map.notif_likes !== null)     setNotifLikes(map.notif_likes !== 'false');
+      if (map.notif_comments !== null)  setNotifComments(map.notif_comments !== 'false');
+      if (map.notif_messages !== null)  setNotifMessages(map.notif_messages !== 'false');
+      if (map.notif_stories !== null)   setNotifStories(map.notif_stories !== 'false');
+      if (map.notif_follows !== null)   setNotifFollows(map.notif_follows !== 'false');
+      if (map.notif_quiet !== null)     setQuietHours(map.notif_quiet === 'true');
+      if (map.notif_quiet_from_h !== null) setQuietFrom(prev => ({ ...prev, h: parseInt(map.notif_quiet_from_h) }));
+      if (map.notif_quiet_from_m !== null) setQuietFrom(prev => ({ ...prev, m: parseInt(map.notif_quiet_from_m) }));
+      if (map.notif_quiet_to_h !== null)   setQuietTo(prev => ({ ...prev, h: parseInt(map.notif_quiet_to_h) }));
+      if (map.notif_quiet_to_m !== null)   setQuietTo(prev => ({ ...prev, m: parseInt(map.notif_quiet_to_m) }));
+    } catch {}
+  };
+
+  const toggleNotif = async (key, setter, currentVal) => {
+    const newVal = !currentVal;
+    setter(newVal);
+    setSavingNotif(key);
+    try {
+      await AsyncStorage.setItem(`notif_${key}`, String(newVal));
+      // Update the notification channel permission
+      if (newVal) {
+        await Notifications.requestPermissionsAsync();
+      }
+      success(newVal ? 'Notifications enabled' : 'Notifications disabled');
+    } catch {
+      setter(currentVal); // revert on failure
+      error('Failed to update notification setting');
+    } finally {
+      setSavingNotif(null);
+    }
+  };
+
+  const toggleQuietHours = async (newVal) => {
+    setQuietHours(newVal);
+    try {
+      await AsyncStorage.setItem('notif_quiet', String(newVal));
+      if (newVal) {
+        success(`DND enabled: ${fmtTime(quietFrom)} – ${fmtTime(quietTo)}`);
+      } else {
+        success('Quiet hours disabled');
+      }
+    } catch {
+      setQuietHours(!newVal);
+    }
+  };
+
+  const openQuietPicker = (which) => {
+    setEditingQuiet(which);
+    const t = which === 'from' ? quietFrom : quietTo;
+    setPickerH(t.h);
+    setPickerM(t.m);
+    setShowQuietPicker(true);
+  };
+
+  const saveQuietTime = async () => {
+    const updated = { h: pickerH, m: pickerM };
+    if (editingQuiet === 'from') {
+      setQuietFrom(updated);
+      await AsyncStorage.multiSet([['notif_quiet_from_h', String(pickerH)], ['notif_quiet_from_m', String(pickerM)]]);
+    } else {
+      setQuietTo(updated);
+      await AsyncStorage.multiSet([['notif_quiet_to_h', String(pickerH)], ['notif_quiet_to_m', String(pickerM)]]);
+    }
+    setShowQuietPicker(false);
+    success('Quiet hours updated');
+  };
+
+  const fmtTime = (t) => {
+    const h = t.h % 12 || 12;
+    const ampm = t.h < 12 ? 'AM' : 'PM';
+    return `${h}:${String(t.m).padStart(2,'0')} ${ampm}`;
+  };
+
+  const _sessionTimeAgo = (dateStr) => {
+    if (!dateStr) return 'Unknown';
+    const diff = (Date.now() - new Date(dateStr.endsWith('Z') ? dateStr : dateStr + 'Z')) / 1000;
+    if (diff < 60) return 'Just now';
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
+    return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
 
   const checkBiometricStatus = async () => {
     try {
@@ -271,14 +366,53 @@ export default function SettingsScreen({ navigation }) {
     ]
   );
 
-  const handleRevokeSession = (sessionId) => Alert.alert(
-    'Revoke Session',
-    'This will sign out that device.',
-    [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Revoke', style: 'destructive', onPress: () => success('Session revoked') },
-    ]
-  );
+  const openSessions = async () => {
+    setShowSessionsModal(true);
+    setLoadingSessions(true);
+    try {
+      const { data } = await api.get('/auth/sessions');
+      setSessions(data.sessions || []);
+    } catch {
+      setSessions([]);
+    } finally {
+      setLoadingSessions(false);
+    }
+  };
+
+  const revokeSession = async (sessionId) => {
+    setRevokingId(sessionId);
+    try {
+      await api.delete(`/auth/sessions/${sessionId}`);
+      setSessions(prev => prev.filter(s => s.id !== sessionId));
+      success('Device signed out');
+    } catch {
+      error('Failed to revoke session');
+    } finally {
+      setRevokingId(null);
+    }
+  };
+
+  const revokeAllOther = async () => {
+    Alert.alert(
+      'Sign Out All Other Devices?',
+      'This will sign out all devices except this one.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Sign Out All', style: 'destructive', onPress: async () => {
+          setRevokingAll(true);
+          try {
+            await api.delete('/auth/sessions/all');
+            setSessions(prev => prev.filter(s => s.is_current));
+            success('All other devices signed out');
+          } catch {
+            error('Failed to sign out other devices');
+          } finally {
+            setRevokingAll(false);
+          }
+        }},
+      ]
+    );
+  };
 
   const handleDeleteAccount = () => setShowDeleteModal(true);
 
@@ -581,23 +715,66 @@ export default function SettingsScreen({ navigation }) {
 
         {/* Notifications */}
         <Section title="Notifications">
-          <Row icon="heart-outline" iconColor="#e11d48" label="Likes" toggle toggled={notifLikes} onPress={() => setNotifLikes(v => !v)} />
+          {[
+            { key: 'likes',    setter: setNotifLikes,    val: notifLikes,    icon: 'heart-outline',       color: '#e11d48', label: 'Likes',           sub: 'When someone likes your post or story' },
+            { key: 'comments', setter: setNotifComments, val: notifComments, icon: 'chatbubble-outline',  color: '#3b82f6', label: 'Comments',         sub: 'When someone comments on your post' },
+            { key: 'messages', setter: setNotifMessages, val: notifMessages, icon: 'chatbubbles-outline', color: '#7c3aed', label: 'Messages',          sub: 'When you receive a new direct message' },
+            { key: 'stories',  setter: setNotifStories,  val: notifStories,  icon: 'time-outline',        color: '#f59e0b', label: 'Stories',           sub: 'When someone you follow posts a story' },
+            { key: 'follows',  setter: setNotifFollows,  val: notifFollows,  icon: 'person-add-outline',  color: '#10b981', label: 'New Connections',   sub: 'When someone follows or requests to follow you' },
+          ].map(({ key, setter, val, icon, color, label, sub }, i, arr) => (
+            <View key={key}>
+              <View style={s.row}>
+                <View style={[s.rowIcon, { backgroundColor: `${color}22` }]}>
+                  {savingNotif === key
+                    ? <ActivityIndicator size="small" color={color} />
+                    : <Ionicons name={icon} size={18} color={color} />}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.rowLabel}>{label}</Text>
+                  <Text style={s.rowSubLabel}>{sub}</Text>
+                </View>
+                <Switch
+                  value={val}
+                  onValueChange={() => toggleNotif(key, setter, val)}
+                  trackColor={{ true: color, false: colors.border2 }}
+                  thumbColor="#fff"
+                  disabled={savingNotif === key}
+                />
+              </View>
+              {i < arr.length - 1 && <Divider />}
+            </View>
+          ))}
           <Divider />
-          <Row icon="chatbubble-outline" iconColor="#3b82f6" label="Comments" toggle toggled={notifComments} onPress={() => setNotifComments(v => !v)} />
-          <Divider />
-          <Row icon="paper-plane-outline" iconColor="#7c3aed" label="Messages" toggle toggled={notifMessages} onPress={() => setNotifMessages(v => !v)} />
-          <Divider />
-          <Row icon="time-outline" iconColor="#f59e0b" label="Stories" toggle toggled={notifStories} onPress={() => setNotifStories(v => !v)} />
-          <Divider />
-          <Row icon="person-add-outline" iconColor="#10b981" label="New Connections" toggle toggled={notifFollows} onPress={() => setNotifFollows(v => !v)} />
-          <Divider />
-          <Row icon="moon-outline" iconColor="#6366f1" label="Quiet Hours (DND)" toggle toggled={quietHours} onPress={() => setQuietHours(v => !v)} />
+          {/* Quiet Hours DND */}
+          <View style={s.row}>
+            <View style={[s.rowIcon, { backgroundColor: 'rgba(99,102,241,0.15)' }]}>
+              <Ionicons name="moon-outline" size={18} color="#6366f1" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.rowLabel}>Quiet Hours (DND)</Text>
+              <Text style={s.rowSubLabel}>
+                {quietHours ? `Silent ${fmtTime(quietFrom)} – ${fmtTime(quietTo)}` : 'Silence notifications during set hours'}
+              </Text>
+            </View>
+            <Switch
+              value={quietHours}
+              onValueChange={toggleQuietHours}
+              trackColor={{ true: '#6366f1', false: colors.border2 }}
+              thumbColor="#fff"
+            />
+          </View>
           {quietHours && (
             <View style={s.quietRow}>
-              <Ionicons name="time-outline" size={15} color={colors.muted} />
-              <Text style={s.quietText}>Silent from <Text style={s.quietTime}>{quietFrom}</Text> to <Text style={s.quietTime}>{quietTo}</Text></Text>
-              <TouchableOpacity onPress={() => Alert.alert('Quiet Hours', 'Custom time picker coming soon')}>
-                <Text style={s.quietEdit}>Edit</Text>
+              <Ionicons name="time-outline" size={14} color={colors.muted} />
+              <Text style={s.quietText}>From</Text>
+              <TouchableOpacity style={s.quietTimeBtn} onPress={() => openQuietPicker('from')}>
+                <Text style={s.quietTimeBtnText}>{fmtTime(quietFrom)}</Text>
+                <Ionicons name="chevron-down" size={12} color="#6366f1" />
+              </TouchableOpacity>
+              <Text style={s.quietText}>to</Text>
+              <TouchableOpacity style={s.quietTimeBtn} onPress={() => openQuietPicker('to')}>
+                <Text style={s.quietTimeBtnText}>{fmtTime(quietTo)}</Text>
+                <Ionicons name="chevron-down" size={12} color="#6366f1" />
               </TouchableOpacity>
             </View>
           )}
@@ -605,26 +782,16 @@ export default function SettingsScreen({ navigation }) {
 
         {/* Active Sessions */}
         <Section title="Active Sessions">
-          <Row icon="phone-portrait-outline" iconColor="#06b6d4" label="Manage Sessions" onPress={() => setShowSessions(v => !v)} />
-          {showSessions && sessions.map((sess, i) => (
-            <View key={sess.id}>
-              <Divider />
-              <View style={s.sessionRow}>
-                <View style={[s.rowIcon, { backgroundColor: sess.current ? 'rgba(16,185,129,0.15)' : 'rgba(100,116,139,0.15)' }]}>
-                  <Ionicons name={sess.current ? 'checkmark-circle' : 'phone-portrait-outline'} size={18} color={sess.current ? '#10b981' : colors.muted} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[s.rowLabel, { fontSize: 13 }]}>{sess.device}</Text>
-                  <Text style={[s.rowValue, { fontSize: 11 }]}>{sess.location} · {sess.last}</Text>
-                </View>
-                {!sess.current && (
-                  <TouchableOpacity onPress={() => handleRevokeSession(sess.id)}>
-                    <Text style={s.revokeBtn}>Revoke</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
+          <TouchableOpacity style={s.row} onPress={openSessions} activeOpacity={0.7}>
+            <View style={[s.rowIcon, { backgroundColor: 'rgba(6,182,212,0.15)' }]}>
+              <Ionicons name="phone-portrait-outline" size={18} color="#06b6d4" />
             </View>
-          ))}
+            <View style={{ flex: 1 }}>
+              <Text style={s.rowLabel}>Manage Sessions</Text>
+              <Text style={s.rowSubLabel}>See and sign out devices logged into your account</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.dim} />
+          </TouchableOpacity>
         </Section>
 
         {/* Appearance */}
@@ -861,6 +1028,257 @@ export default function SettingsScreen({ navigation }) {
         hasPassword={user?.has_password}
         onSuccess={() => success('Password changed successfully!')}
       />
+
+      {/* Active Sessions Modal */}
+      <Modal visible={showSessionsModal} transparent animationType="slide" onRequestClose={() => setShowSessionsModal(false)}>
+        <View style={s.blockedOverlay}>
+          <BlurView intensity={20} tint="dark" style={s.sessionsSheet}>
+            <LinearGradient colors={['rgba(6,182,212,0.07)', 'rgba(15,23,42,0.98)']} style={StyleSheet.absoluteFill} />
+            <View style={s.blockedHandle} />
+
+            {/* Header */}
+            <View style={s.sessionsHeader}>
+              <View style={s.sessionsHeaderLeft}>
+                <View style={[s.rowIcon, { backgroundColor: 'rgba(6,182,212,0.15)' }]}>
+                  <Ionicons name="shield-checkmark-outline" size={18} color="#06b6d4" />
+                </View>
+                <View>
+                  <Text style={s.sessionsTitle}>Active Sessions</Text>
+                  <Text style={s.sessionsSubtitle}>{sessions.length} device{sessions.length !== 1 ? 's' : ''} logged in</Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={() => setShowSessionsModal(false)} style={s.blockedCloseBtn}>
+                <Ionicons name="close" size={22} color={colors.muted} />
+              </TouchableOpacity>
+            </View>
+
+            {loadingSessions ? (
+              <View style={s.blockedLoading}>
+                <ActivityIndicator color="#06b6d4" size="large" />
+                <Text style={s.blockedLoadingText}>Loading sessions...</Text>
+              </View>
+            ) : sessions.length === 0 ? (
+              <View style={s.blockedEmpty}>
+                <LinearGradient colors={['rgba(6,182,212,0.12)', 'rgba(6,182,212,0.04)']} style={s.blockedEmptyIcon}>
+                  <Ionicons name="phone-portrait-outline" size={40} color="#06b6d4" />
+                </LinearGradient>
+                <Text style={s.blockedEmptyTitle}>No sessions found</Text>
+                <Text style={s.blockedEmptyText}>Your active login sessions will appear here.</Text>
+              </View>
+            ) : (
+              <ScrollView style={s.blockedList} showsVerticalScrollIndicator={false}>
+                {sessions.map((sess, i) => (
+                  <View key={sess.id}>
+                    {i > 0 && <View style={{ height: 0.5, backgroundColor: 'rgba(255,255,255,0.05)', marginHorizontal: 0 }} />}
+                    <View style={s.sessionCard}>
+                      {/* Device icon */}
+                      <View style={[s.sessionIconWrap, sess.is_current && s.sessionIconWrapCurrent]}>
+                        <Ionicons
+                          name={
+                            sess.platform === 'ios' ? 'logo-apple' :
+                            sess.platform === 'android' ? 'logo-android' :
+                            sess.platform === 'web' ? 'globe-outline' :
+                            'phone-portrait-outline'
+                          }
+                          size={22}
+                          color={sess.is_current ? '#10b981' : '#06b6d4'}
+                        />
+                      </View>
+
+                      {/* Info */}
+                      <View style={{ flex: 1 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Text style={s.sessionDevice}>{sess.device_name}</Text>
+                          {sess.is_current && (
+                            <View style={s.currentBadge}>
+                              <View style={s.currentDot} />
+                              <Text style={s.currentBadgeText}>This device</Text>
+                            </View>
+                          )}
+                        </View>
+                        <View style={s.sessionMeta}>
+                          {sess.ip_address && (
+                            <View style={s.sessionMetaItem}>
+                              <Ionicons name="location-outline" size={11} color={colors.dim} />
+                              <Text style={s.sessionMetaText}>{sess.ip_address}</Text>
+                            </View>
+                          )}
+                          <View style={s.sessionMetaItem}>
+                            <Ionicons name="time-outline" size={11} color={colors.dim} />
+                            <Text style={s.sessionMetaText}>{_sessionTimeAgo(sess.last_active)}</Text>
+                          </View>
+                          <View style={s.sessionMetaItem}>
+                            <Ionicons name="calendar-outline" size={11} color={colors.dim} />
+                            <Text style={s.sessionMetaText}>Signed in {_sessionTimeAgo(sess.created_at)}</Text>
+                          </View>
+                        </View>
+                      </View>
+
+                      {/* Revoke button */}
+                      {!sess.is_current && (
+                        <TouchableOpacity
+                          style={s.revokeBtn2}
+                          onPress={() => revokeSession(sess.id)}
+                          disabled={revokingId === sess.id}
+                          activeOpacity={0.8}
+                        >
+                          {revokingId === sess.id
+                            ? <ActivityIndicator size="small" color="#f87171" />
+                            : <Text style={s.revokeBtnText}>Sign out</Text>}
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  </View>
+                ))}
+
+                {/* Sign out all other devices */}
+                {sessions.filter(s => !s.is_current).length > 0 && (
+                  <TouchableOpacity
+                    style={s.revokeAllBtn}
+                    onPress={revokeAllOther}
+                    disabled={revokingAll}
+                    activeOpacity={0.8}
+                  >
+                    {revokingAll
+                      ? <ActivityIndicator color="#f87171" size="small" />
+                      : <>
+                          <Ionicons name="log-out-outline" size={16} color="#f87171" />
+                          <Text style={s.revokeAllBtnText}>Sign out all other devices</Text>
+                        </>}
+                  </TouchableOpacity>
+                )}
+                <View style={{ height: 40 }} />
+              </ScrollView>
+            )}
+          </BlurView>
+        </View>
+      </Modal>
+
+      {/* Quiet Hours Time Picker Modal */}
+      <Modal visible={showQuietPicker} transparent animationType="slide" onRequestClose={() => setShowQuietPicker(false)}>
+        <View style={s.blockedOverlay}>
+          <BlurView intensity={20} tint="dark" style={s.quietPickerSheet}>
+            <LinearGradient colors={['rgba(99,102,241,0.1)', 'rgba(15,23,42,0.98)']} style={StyleSheet.absoluteFill} />
+            <View style={s.blockedHandle} />
+            <View style={s.quietPickerHeader}>
+              <TouchableOpacity onPress={() => setShowQuietPicker(false)}>
+                <Text style={s.quietPickerCancel}>Cancel</Text>
+              </TouchableOpacity>
+              <Text style={s.quietPickerTitle}>
+                {editingQuiet === 'from' ? 'Start Time' : 'End Time'}
+              </Text>
+              <TouchableOpacity onPress={saveQuietTime}>
+                <Text style={s.quietPickerDone}>Done</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Current selection display */}
+            <View style={s.quietPickerDisplay}>
+              <LinearGradient colors={['rgba(99,102,241,0.2)', 'rgba(99,102,241,0.05)']} style={s.quietPickerDisplayGrad}>
+                <Text style={s.quietPickerDisplayTime}>
+                  {(() => { const h = pickerH % 12 || 12; const ampm = pickerH < 12 ? 'AM' : 'PM'; return `${h}:${String(pickerM).padStart(2,'0')} ${ampm}`; })()}
+                </Text>
+                <Text style={s.quietPickerDisplayLabel}>
+                  {editingQuiet === 'from' ? 'Notifications silent from this time' : 'Notifications resume at this time'}
+                </Text>
+              </LinearGradient>
+            </View>
+
+            {/* Scroll wheels */}
+            <View style={s.quietWheelsRow}>
+              {/* Hour wheel */}
+              <View style={s.quietWheelWrap}>
+                <Text style={s.quietWheelLabel}>Hour</Text>
+                <FlatList
+                  data={Array.from({ length: 12 }, (_, i) => i + 1)}
+                  keyExtractor={i => String(i)}
+                  showsVerticalScrollIndicator={false}
+                  style={s.quietWheel}
+                  contentContainerStyle={{ paddingVertical: 48 }}
+                  snapToInterval={48}
+                  decelerationRate="fast"
+                  initialScrollIndex={Math.max(0, (pickerH % 12 || 12) - 1)}
+                  getItemLayout={(_, index) => ({ length: 48, offset: 48 * index, index })}
+                  onMomentumScrollEnd={(e) => {
+                    const idx = Math.round(e.nativeEvent.contentOffset.y / 48);
+                    const h12 = (idx % 12) + 1;
+                    const isAM = pickerH < 12;
+                    setPickerH(isAM ? (h12 === 12 ? 0 : h12) : (h12 === 12 ? 12 : h12 + 12));
+                  }}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      style={[s.quietWheelItem, (pickerH % 12 || 12) === item && s.quietWheelItemActive]}
+                      onPress={() => {
+                        const isAM = pickerH < 12;
+                        setPickerH(isAM ? (item === 12 ? 0 : item) : (item === 12 ? 12 : item + 12));
+                      }}
+                    >
+                      <Text style={[(pickerH % 12 || 12) === item ? s.quietWheelTextActive : s.quietWheelText]}>
+                        {String(item).padStart(2, '0')}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                />
+              </View>
+
+              <Text style={s.quietWheelColon}>:</Text>
+
+              {/* Minute wheel */}
+              <View style={s.quietWheelWrap}>
+                <Text style={s.quietWheelLabel}>Min</Text>
+                <FlatList
+                  data={[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55]}
+                  keyExtractor={i => String(i)}
+                  showsVerticalScrollIndicator={false}
+                  style={s.quietWheel}
+                  contentContainerStyle={{ paddingVertical: 48 }}
+                  snapToInterval={48}
+                  decelerationRate="fast"
+                  initialScrollIndex={Math.max(0, [0,5,10,15,20,25,30,35,40,45,50,55].indexOf(Math.round(pickerM / 5) * 5))}
+                  getItemLayout={(_, index) => ({ length: 48, offset: 48 * index, index })}
+                  onMomentumScrollEnd={(e) => {
+                    const idx = Math.round(e.nativeEvent.contentOffset.y / 48);
+                    setPickerM([0,5,10,15,20,25,30,35,40,45,50,55][idx % 12]);
+                  }}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      style={[s.quietWheelItem, pickerM === item && s.quietWheelItemActive]}
+                      onPress={() => setPickerM(item)}
+                    >
+                      <Text style={[pickerM === item ? s.quietWheelTextActive : s.quietWheelText]}>
+                        {String(item).padStart(2, '0')}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                />
+              </View>
+
+              {/* AM/PM wheel */}
+              <View style={s.quietWheelWrap}>
+                <Text style={s.quietWheelLabel}>AM/PM</Text>
+                <View style={s.quietAmPmWrap}>
+                  {['AM', 'PM'].map(period => (
+                    <TouchableOpacity
+                      key={period}
+                      style={[s.quietAmPmBtn, ((period === 'AM') === (pickerH < 12)) && s.quietAmPmBtnActive]}
+                      onPress={() => {
+                        if (period === 'AM' && pickerH >= 12) setPickerH(pickerH - 12);
+                        if (period === 'PM' && pickerH < 12) setPickerH(pickerH + 12);
+                      }}
+                    >
+                      <Text style={[s.quietAmPmText, ((period === 'AM') === (pickerH < 12)) && s.quietAmPmTextActive]}>
+                        {period}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            </View>
+
+            <View style={{ height: 24 }} />
+          </BlurView>
+        </View>
+      </Modal>
 
       {/* Activity Status Modal */}
       <Modal visible={showActivityModal} transparent animationType="fade" onRequestClose={() => setShowActivityModal(false)}>
@@ -1191,12 +1609,58 @@ const s = StyleSheet.create({
   editField: { padding: 14 },
   editLabel: { fontSize: 11, color: colors.muted, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
   editInput: { color: colors.text, fontSize: 15, borderBottomWidth: 1, borderBottomColor: colors.border2, paddingBottom: 6 },
-  quietRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 15, paddingBottom: 12, paddingTop: 4 },
-  quietText: { flex: 1, fontSize: 12, color: colors.muted },
+  quietRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 15, paddingBottom: 14, paddingTop: 4 },
+  quietText: { fontSize: 12, color: colors.muted },
   quietTime: { color: colors.primary, fontWeight: '700' },
   quietEdit: { color: colors.primary, fontSize: 12, fontWeight: '700' },
+  quietTimeBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(99,102,241,0.15)', borderWidth: 1, borderColor: 'rgba(99,102,241,0.35)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.full },
+  quietTimeBtnText: { color: '#818cf8', fontWeight: '700', fontSize: 13 },
+  // Quiet hours time picker modal
+  quietPickerSheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, overflow: 'hidden', paddingBottom: 32 },
+  quietPickerHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 16 },
+  quietPickerTitle: { fontSize: 16, fontWeight: '700', color: colors.text },
+  quietPickerCancel: { fontSize: 15, color: colors.muted, fontWeight: '500' },
+  quietPickerDone: { fontSize: 15, color: '#818cf8', fontWeight: '700' },
+  quietPickerDisplay: { marginHorizontal: 20, marginBottom: 20, borderRadius: 16, overflow: 'hidden' },
+  quietPickerDisplayGrad: { paddingVertical: 16, paddingHorizontal: 20, alignItems: 'center', gap: 4 },
+  quietPickerDisplayTime: { fontSize: 36, fontWeight: '800', color: '#818cf8', letterSpacing: 2 },
+  quietPickerDisplayLabel: { fontSize: 12, color: colors.muted, textAlign: 'center' },
+  quietWheelsRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'center', paddingHorizontal: 20, gap: 8 },
+  quietWheelWrap: { alignItems: 'center', flex: 1 },
+  quietWheelLabel: { fontSize: 11, color: colors.dim, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
+  quietWheel: { height: 144, width: '100%' },
+  quietWheelItem: { height: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
+  quietWheelItemActive: { backgroundColor: 'rgba(99,102,241,0.2)', borderWidth: 1, borderColor: 'rgba(99,102,241,0.4)' },
+  quietWheelText: { fontSize: 22, color: colors.dim, fontWeight: '500' },
+  quietWheelTextActive: { fontSize: 24, color: '#818cf8', fontWeight: '800' },
+  quietWheelColon: { fontSize: 28, color: colors.muted, fontWeight: '700', marginTop: 44, alignSelf: 'center' },
+  quietAmPmWrap: { gap: 8, marginTop: 0 },
+  quietAmPmBtn: { paddingHorizontal: 14, paddingVertical: 12, borderRadius: 10, borderWidth: 1, borderColor: colors.border2, alignItems: 'center' },
+  quietAmPmBtnActive: { backgroundColor: 'rgba(99,102,241,0.2)', borderColor: 'rgba(99,102,241,0.5)' },
+  quietAmPmText: { fontSize: 14, color: colors.muted, fontWeight: '600' },
+  quietAmPmTextActive: { color: '#818cf8', fontWeight: '800' },
   sessionRow: { flexDirection: 'row', alignItems: 'center', padding: 15, gap: 12 },
   revokeBtn: { color: '#f87171', fontSize: 12, fontWeight: '700' },
+  // Sessions modal
+  sessionsSheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, overflow: 'hidden', maxHeight: '85%', minHeight: 300 },
+  sessionsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 0.5, borderBottomColor: 'rgba(6,182,212,0.15)' },
+  sessionsHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  sessionsTitle: { fontSize: 17, fontWeight: '800', color: colors.text },
+  sessionsSubtitle: { fontSize: 12, color: colors.muted, marginTop: 1 },
+  sessionCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingVertical: 14, paddingHorizontal: 20 },
+  sessionIconWrap: { width: 44, height: 44, borderRadius: 14, backgroundColor: 'rgba(6,182,212,0.12)', borderWidth: 1, borderColor: 'rgba(6,182,212,0.25)', alignItems: 'center', justifyContent: 'center' },
+  sessionIconWrapCurrent: { backgroundColor: 'rgba(16,185,129,0.12)', borderColor: 'rgba(16,185,129,0.3)' },
+  sessionDevice: { fontSize: 14, fontWeight: '700', color: colors.text },
+  currentBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(16,185,129,0.15)', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(16,185,129,0.3)' },
+  currentDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#10b981' },
+  currentBadgeText: { fontSize: 10, color: '#34d399', fontWeight: '700' },
+  sessionMeta: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 5 },
+  sessionMetaItem: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  sessionMetaText: { fontSize: 11, color: colors.dim },
+  revokeBtn2: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: radius.full, borderWidth: 1.5, borderColor: 'rgba(248,113,113,0.5)', alignSelf: 'flex-start', marginTop: 2 },
+  revokeBtnText: { color: '#f87171', fontWeight: '700', fontSize: 12 },
+  revokeAllBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginHorizontal: 20, marginTop: 8, paddingVertical: 14, borderRadius: 14, borderWidth: 1.5, borderColor: 'rgba(248,113,113,0.3)', backgroundColor: 'rgba(248,113,113,0.06)' },
+  revokeAllBtnText: { color: '#f87171', fontWeight: '700', fontSize: 14 },
   modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.7)', paddingHorizontal: 32 },
   confirmModal: { width: '100%', borderRadius: 24, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(248,113,113,0.2)', paddingBottom: 24 },
   confirmIconWrap: { alignItems: 'center', marginTop: 28, marginBottom: 16 },

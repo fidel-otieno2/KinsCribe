@@ -1,10 +1,12 @@
 from flask import Blueprint, request, jsonify
 from extensions import db, bcrypt, mail
 from models.user import User
+from models.notifications import UserSession
 from services.sms_service import sms_service
-from flask_jwt_extended import create_access_token, create_refresh_token, jwt_required, get_jwt_identity
+from flask_jwt_extended import create_access_token, create_refresh_token, jwt_required, get_jwt_identity, get_jwt
 from flask_mail import Message
 import secrets
+import hashlib
 import cloudinary
 import cloudinary.uploader
 import os
@@ -21,6 +23,70 @@ cloudinary.config(
     api_key=os.getenv("CLOUDINARY_API_KEY"),
     api_secret=os.getenv("CLOUDINARY_API_SECRET")
 )
+
+
+def _record_session(user_id, access_token):
+    """Record a login session with device/IP info."""
+    try:
+        token_hash = hashlib.sha256(access_token.encode()).hexdigest()
+        ua = request.headers.get('User-Agent', '')
+        ip = request.headers.get('X-Forwarded-For', request.remote_addr or '').split(',')[0].strip()
+
+        # Detect platform from User-Agent
+        ua_lower = ua.lower()
+        if 'iphone' in ua_lower or 'ipad' in ua_lower:
+            platform = 'ios'
+            device_name = 'iPhone' if 'iphone' in ua_lower else 'iPad'
+        elif 'android' in ua_lower:
+            platform = 'android'
+            device_name = 'Android Device'
+        elif 'expo' in ua_lower or 'okhttp' in ua_lower:
+            platform = 'android'
+            device_name = 'Mobile App'
+        elif 'chrome' in ua_lower:
+            platform = 'web'
+            device_name = 'Chrome Browser'
+        elif 'safari' in ua_lower:
+            platform = 'web'
+            device_name = 'Safari Browser'
+        elif 'firefox' in ua_lower:
+            platform = 'web'
+            device_name = 'Firefox Browser'
+        else:
+            platform = 'unknown'
+            device_name = ua[:60] if ua else 'Unknown Device'
+
+        # Check if session with same token_hash already exists
+        existing = UserSession.query.filter_by(token_hash=token_hash).first()
+        if existing:
+            existing.last_active = datetime.utcnow()
+            db.session.commit()
+            return
+
+        session = UserSession(
+            user_id=user_id,
+            token_hash=token_hash,
+            device_name=device_name,
+            platform=platform,
+            ip_address=ip,
+        )
+        db.session.add(session)
+        # Keep only last 10 sessions per user
+        old_sessions = UserSession.query.filter_by(
+            user_id=user_id, is_revoked=False
+        ).order_by(UserSession.created_at.desc()).offset(10).all()
+        for s in old_sessions:
+            db.session.delete(s)
+        db.session.commit()
+    except Exception as e:
+        print(f'Session record error: {e}')
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+
+
+from datetime import datetime
 
 
 def _send_email(subject, recipients, html):
@@ -44,8 +110,10 @@ def _send_email(subject, recipients, html):
 
 
 def _tokens(user):
+    access = create_access_token(identity=str(user.id))
+    _record_session(user.id, access)
     return {
-        "access_token": create_access_token(identity=str(user.id)),
+        "access_token": access,
         "refresh_token": create_refresh_token(identity=str(user.id)),
         "user": user.to_dict()
     }
@@ -979,3 +1047,65 @@ def me():
     if not user:
         return jsonify({"error": "User not found"}), 404
     return jsonify(user.to_dict())
+
+
+@auth_bp.route("/sessions", methods=["GET"])
+@jwt_required()
+def get_sessions():
+    """Return all active sessions for the current user."""
+    user_id = int(get_jwt_identity())
+    # Get current token hash from Authorization header
+    auth_header = request.headers.get('Authorization', '')
+    current_token = auth_header.replace('Bearer ', '').strip()
+    current_hash = hashlib.sha256(current_token.encode()).hexdigest() if current_token else None
+
+    try:
+        sessions = UserSession.query.filter_by(
+            user_id=user_id, is_revoked=False
+        ).order_by(UserSession.last_active.desc()).all()
+        return jsonify({
+            "sessions": [s.to_dict(current_hash) for s in sessions],
+            "count": len(sessions)
+        })
+    except Exception:
+        # Table may not exist yet
+        try:
+            db.create_all()
+        except Exception:
+            pass
+        return jsonify({"sessions": [], "count": 0})
+
+
+@auth_bp.route("/sessions/<int:session_id>", methods=["DELETE"])
+@jwt_required()
+def revoke_session(session_id):
+    """Revoke a specific session (sign out that device)."""
+    user_id = int(get_jwt_identity())
+    session = UserSession.query.filter_by(id=session_id, user_id=user_id).first()
+    if not session:
+        return jsonify({"error": "Session not found"}), 404
+    session.is_revoked = True
+    db.session.commit()
+    return jsonify({"message": "Session revoked"})
+
+
+@auth_bp.route("/sessions/all", methods=["DELETE"])
+@jwt_required()
+def revoke_all_other_sessions():
+    """Revoke all sessions except the current one."""
+    user_id = int(get_jwt_identity())
+    auth_header = request.headers.get('Authorization', '')
+    current_token = auth_header.replace('Bearer ', '').strip()
+    current_hash = hashlib.sha256(current_token.encode()).hexdigest() if current_token else None
+
+    try:
+        query = UserSession.query.filter_by(user_id=user_id, is_revoked=False)
+        if current_hash:
+            query = query.filter(UserSession.token_hash != current_hash)
+        count = query.count()
+        query.update({"is_revoked": True})
+        db.session.commit()
+        return jsonify({"message": f"Revoked {count} session(s)"})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500

@@ -1,6 +1,37 @@
 from extensions import db
 from datetime import datetime
 
+
+class UserSession(db.Model):
+    """Tracks active login sessions per user device."""
+    __tablename__ = "user_sessions"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    token_hash = db.Column(db.String(64), nullable=True)   # SHA256 of JWT for revocation
+    device_name = db.Column(db.String(150), nullable=True)  # e.g. "iPhone 14", "Chrome on Windows"
+    platform = db.Column(db.String(20), nullable=True)      # ios | android | web
+    ip_address = db.Column(db.String(45), nullable=True)
+    location = db.Column(db.String(200), nullable=True)     # city/country from IP (optional)
+    last_active = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    is_revoked = db.Column(db.Boolean, default=False)
+
+    user = db.relationship("User", foreign_keys=[user_id])
+
+    def to_dict(self, current_token_hash=None):
+        return {
+            "id": self.id,
+            "device_name": self.device_name or "Unknown device",
+            "platform": self.platform or "unknown",
+            "ip_address": self.ip_address,
+            "location": self.location,
+            "last_active": self.last_active.isoformat(),
+            "created_at": self.created_at.isoformat(),
+            "is_current": (current_token_hash is not None and self.token_hash == current_token_hash),
+        }
+
+
 class Notification(db.Model):
     __tablename__ = "notifications"
     

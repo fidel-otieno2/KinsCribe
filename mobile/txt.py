@@ -28,7 +28,7 @@ Login Options
 # Feed• Photo posts — single image and carousel (multiple images)
 # • Video posts — reels-style short video
 # • Text-only posts
-• Like, comment, share, and save posts
+# • Like, comment, share, and save posts
 • Bookmark posts and organise into collections
 • Suggested posts from accounts you do not follow
 • Sponsored / promoted posts (opt-in)
