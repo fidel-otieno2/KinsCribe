@@ -1082,65 +1082,142 @@ def export_data():
 
 @auth_bp.route("/u/<username>", methods=["GET"])
 def public_profile(username):
-    """Public web profile page — shareable HTTPS link like Instagram."""
+    """Smart app link — opens app if installed, otherwise sends to store."""
+    from flask import Response
+    import urllib.parse
+
     user = User.query.filter_by(username=username).first()
     if not user:
-        return f"<html><body style='font-family:sans-serif;background:#1C1A14;color:#F5F0E8;display:flex;align-items:center;justify-content:center;height:100vh;margin:0'><div style='text-align:center'><h2>Profile not found</h2><p style='color:#A89070'>@{username} doesn't exist on KinsCribe.</p></div></body></html>", 404
+        html_404 = f"""<!DOCTYPE html><html><head><meta charset="utf-8"><title>Not Found · KinsCribe</title>
+        <style>body{{font-family:-apple-system,sans-serif;background:#1C1A14;color:#F5F0E8;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center}}
+        h2{{font-size:22px;margin-bottom:8px}}p{{color:#A89070}}</style></head>
+        <body><div><h2>Profile not found</h2><p>@{username} doesn't exist on KinsCribe.</p></div></body></html>"""
+        return Response(html_404, status=404, mimetype='text/html')
 
-    ref = request.args.get('ref', '')
-    avatar = user.avatar_url or ''
-    bio = user.bio or 'KinsCribe member'
-    name = user.name or username
-    app_link = f"kinscribe://profile/{user.id}"
-    store_link = "https://kinscribe-1.onrender.com"
+    ref          = request.args.get('ref', '')
+    avatar       = user.avatar_url or ''
+    bio          = (user.bio or 'KinsCribe member').replace('"', '&quot;').replace('<', '&lt;')
+    name         = (user.name or username).replace('"', '&quot;').replace('<', '&lt;')
+    page_url     = f"https://kinscribe-1.onrender.com/api/auth/u/{username}"
+    deep_link    = f"kinscribe://profile/{user.id}"
+    # Universal fallback store links
+    ios_store    = "https://apps.apple.com/app/kinscribe/id6746818074"  # update with real ID when live
+    android_store = f"https://play.google.com/store/apps/details?id=com.kinscribe.app"
+    # Android intent URL — opens app if installed, falls back to Play Store
+    android_intent = (
+        f"intent://profile/{user.id}#Intent;"
+        f"scheme=kinscribe;"
+        f"package=com.kinscribe.app;"
+        f"S.browser_fallback_url={urllib.parse.quote(android_store, safe='')};end"
+    )
+    avatar_tag = f'<img class="avatar" src="{avatar}" alt="{name}">' if avatar else f'<div class="avatar-placeholder">{name[0].upper()}</div>'
 
-    html = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="utf-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1">
-      <title>{name} (@{username}) · KinsCribe</title>
-      <meta name="description" content="{bio}">
-      <meta property="og:title" content="{name} (@{username}) · KinsCribe">
-      <meta property="og:description" content="{bio}">
-      <meta property="og:image" content="{avatar}">
-      <meta property="og:url" content="https://kinscribe-1.onrender.com/api/auth/u/{username}">
-      <meta name="twitter:card" content="summary">
-      <style>
-        *{{box-sizing:border-box;margin:0;padding:0}}
-        body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#1C1A14;color:#F5F0E8;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}}
-        .card{{background:#2A2720;border-radius:24px;padding:36px 28px;max-width:380px;width:100%;text-align:center;border:1px solid rgba(196,163,90,0.15)}}
-        .avatar{{width:96px;height:96px;border-radius:50%;object-fit:cover;border:3px solid #4A7C3F;margin-bottom:16px}}
-        .avatar-placeholder{{width:96px;height:96px;border-radius:50%;background:#4A7C3F;display:flex;align-items:center;justify-content:center;font-size:36px;font-weight:800;color:#fff;margin:0 auto 16px}}
-        h1{{font-size:22px;font-weight:800;margin-bottom:4px}}
-        .handle{{color:#A89070;font-size:14px;margin-bottom:12px}}
-        .bio{{color:#E8E0CC;font-size:14px;line-height:1.5;margin-bottom:24px}}
-        .btn{{display:block;background:#4A7C3F;color:#fff;text-decoration:none;padding:14px 24px;border-radius:50px;font-weight:700;font-size:15px;margin-bottom:12px}}
-        .btn-outline{{background:transparent;border:1px solid rgba(196,163,90,0.3);color:#C4A35A}}
-        .logo{{color:#A89070;font-size:12px;margin-top:20px}}
-        .logo span{{color:#4A7C3F;font-weight:700}}
-      </style>
-      <script>
-        // Try to open the app immediately
-        window.location.href = "{app_link}";
-        setTimeout(function(){{ }}, 2000);
-      </script>
-    </head>
-    <body>
-      <div class="card">
-        {'<img class="avatar" src="' + avatar + '" alt="' + name + '">' if avatar else '<div class="avatar-placeholder">' + name[0].upper() + '</div>'}
-        <h1>{name}</h1>
-        <p class="handle">@{username}</p>
-        <p class="bio">{bio}</p>
-        <a href="{app_link}" class="btn">Open in KinsCribe</a>
-        <a href="{store_link}" class="btn btn-outline">Download KinsCribe</a>
-        <p class="logo">Shared via <span>KinsCribe</span></p>
-      </div>
-    </body>
-    </html>
-    """
-    from flask import Response
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{name} (@{username}) · KinsCribe</title>
+  <!-- Open Graph (WhatsApp, iMessage, Twitter previews) -->
+  <meta property="og:type" content="profile">
+  <meta property="og:title" content="{name} (@{username}) · KinsCribe">
+  <meta property="og:description" content="{bio}">
+  <meta property="og:image" content="{avatar}">
+  <meta property="og:url" content="{page_url}">
+  <meta property="og:site_name" content="KinsCribe">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="{name} (@{username}) · KinsCribe">
+  <meta name="twitter:description" content="{bio}">
+  <meta name="twitter:image" content="{avatar}">
+  <!-- iOS Smart App Banner (shows native "Open" banner on Safari) -->
+  <meta name="apple-itunes-app" content="app-id=6746818074, app-argument={deep_link}">
+  <style>
+    *{{box-sizing:border-box;margin:0;padding:0}}
+    body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+          background:#1C1A14;color:#F5F0E8;min-height:100vh;
+          display:flex;align-items:center;justify-content:center;padding:24px}}
+    .card{{background:#2A2720;border-radius:24px;padding:36px 28px;
+           max-width:400px;width:100%;text-align:center;
+           border:1px solid rgba(196,163,90,0.15);
+           box-shadow:0 20px 60px rgba(0,0,0,0.5)}}
+    .avatar{{width:96px;height:96px;border-radius:50%;object-fit:cover;
+             border:3px solid #4A7C3F;margin-bottom:16px}}
+    .avatar-placeholder{{width:96px;height:96px;border-radius:50%;background:#4A7C3F;
+                         display:flex;align-items:center;justify-content:center;
+                         font-size:36px;font-weight:800;color:#fff;margin:0 auto 16px}}
+    h1{{font-size:22px;font-weight:800;margin-bottom:4px}}
+    .handle{{color:#A89070;font-size:14px;margin-bottom:12px}}
+    .bio{{color:#E8E0CC;font-size:14px;line-height:1.6;margin-bottom:28px}}
+    .btn{{display:block;text-decoration:none;padding:15px 24px;
+          border-radius:50px;font-weight:700;font-size:15px;margin-bottom:12px;
+          transition:opacity .15s}}
+    .btn:active{{opacity:.8}}
+    .btn-primary{{background:linear-gradient(135deg,#2D5A27,#4A7C3F);color:#fff}}
+    .btn-ios{{background:linear-gradient(135deg,#1a1a2e,#16213e);color:#fff;
+              border:1px solid rgba(255,255,255,0.1)}}
+    .btn-android{{background:linear-gradient(135deg,#1a3a1a,#2d5a27);color:#fff;
+                  border:1px solid rgba(74,124,63,0.3)}}
+    .divider{{color:#A89070;font-size:12px;margin:4px 0 16px}}
+    .logo{{color:#6B5D4A;font-size:12px;margin-top:20px}}
+    .logo span{{color:#4A7C3F;font-weight:700}}
+    .store-row{{display:flex;gap:10px;margin-bottom:12px}}
+    .store-row .btn{{flex:1;margin-bottom:0;font-size:13px;padding:12px 8px}}
+  </style>
+</head>
+<body>
+  <div class="card">
+    {avatar_tag}
+    <h1>{name}</h1>
+    <p class="handle">@{username}</p>
+    <p class="bio">{bio}</p>
+    <a href="{deep_link}" class="btn btn-primary" id="openBtn">Open in KinsCribe</a>
+    <p class="divider">Don't have the app?</p>
+    <div class="store-row">
+      <a href="{ios_store}" class="btn btn-ios">&#xf8ff; App Store</a>
+      <a href="{android_intent}" class="btn btn-android">&#9654; Google Play</a>
+    </div>
+    <p class="logo">Shared via <span>KinsCribe</span></p>
+  </div>
+  <script>
+    (function() {{
+      var ua = navigator.userAgent || '';
+      var isIOS = /iPhone|iPad|iPod/i.test(ua);
+      var isAndroid = /Android/i.test(ua);
+      var appOpened = false;
+
+      function onVisibilityChange() {{
+        if (document.hidden) appOpened = true;
+      }}
+      document.addEventListener('visibilitychange', onVisibilityChange);
+      window.addEventListener('pagehide', function() {{ appOpened = true; }});
+
+      // Try to open the app
+      var deepLink = "{deep_link}";
+      var iosStore = "{ios_store}";
+      var androidStore = "{android_store}";
+
+      if (isIOS) {{
+        // iOS: try deep link, after 2.5s if page still visible → App Store
+        window.location.href = deepLink;
+        setTimeout(function() {{
+          if (!appOpened && !document.hidden) {{
+            window.location.href = iosStore;
+          }}
+        }}, 2500);
+      }} else if (isAndroid) {{
+        // Android intent handles fallback to Play Store automatically
+        window.location.href = "{android_intent}";
+        setTimeout(function() {{
+          if (!appOpened && !document.hidden) {{
+            window.location.href = androidStore;
+          }}
+        }}, 2500);
+      }}
+      // Desktop: just show the page, no redirect
+    }})();
+  </script>
+</body>
+</html>"""
     return Response(html, status=200, mimetype='text/html')
 
 
