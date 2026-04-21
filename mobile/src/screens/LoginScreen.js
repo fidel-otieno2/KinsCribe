@@ -736,10 +736,9 @@ export default function LoginScreen({ navigation }) {
     const enabled = await AsyncStorage.getItem('biometric_enabled');
     const savedCredentials = await AsyncStorage.getItem('biometric_credentials');
     const type = await getBiometricType();
+    console.log('🔐 checkBiometric - available:', available, 'enabled:', enabled, 'hasCredentials:', !!savedCredentials, 'type:', type);
     setBiometricAvailable(available);
     setBiometricType(type);
-    // Show as enabled if device has biometrics AND user has previously enabled it
-    // Don't require savedCredentials - they may have been cleared
     setBiometricEnabled(available && enabled === 'true');
   };
 
@@ -747,28 +746,48 @@ export default function LoginScreen({ navigation }) {
     setBiometricLoading(true);
     setError('');
     try {
+      console.log('🔐 Biometric: checking saved credentials...');
+      const savedCredentials = await AsyncStorage.getItem('biometric_credentials');
+      const biometricEnabledFlag = await AsyncStorage.getItem('biometric_enabled');
+      console.log('🔐 biometric_enabled:', biometricEnabledFlag);
+      console.log('🔐 credentials exist:', !!savedCredentials);
+      if (savedCredentials) {
+        const parsed = JSON.parse(savedCredentials);
+        console.log('🔐 credentials email:', parsed.email);
+        console.log('🔐 credentials password length:', parsed.password?.length);
+      }
+
+      if (!savedCredentials) {
+        console.log('🔐 No credentials found - disabling biometric');
+        await AsyncStorage.removeItem('biometric_enabled');
+        setBiometricEnabled(false);
+        setError('Biometric session expired. Please sign in with password once to re-link.');
+        return;
+      }
+
+      console.log('🔐 Showing biometric prompt...');
       const result = await authenticateAsync({
         promptMessage: 'Sign in to KinsCribe',
         fallbackLabel: 'Use password',
         cancelLabel: 'Cancel',
       });
+      console.log('🔐 Biometric result:', JSON.stringify(result));
+
       if (result.success) {
-        const savedCredentials = await AsyncStorage.getItem('biometric_credentials');
-        if (savedCredentials) {
-          const { email, password } = JSON.parse(savedCredentials);
-          const loginResult = await login(email, password);
-          if (loginResult?.requires_2fa) {
-            setTwoFAUserId(loginResult.user_id);
-            setShow2FA(true);
-          }
-        } else {
-          await AsyncStorage.removeItem('biometric_enabled');
-          setBiometricEnabled(false);
-          setError('Please sign in with your password once to re-link biometric login.');
+        const { email, password } = JSON.parse(savedCredentials);
+        console.log('🔐 Attempting login with saved credentials for:', email);
+        const loginResult = await login(email, password);
+        console.log('🔐 Login result:', JSON.stringify(loginResult));
+        if (loginResult?.requires_2fa) {
+          setTwoFAUserId(loginResult.user_id);
+          setShow2FA(true);
         }
+      } else {
+        console.log('🔐 Biometric failed/cancelled:', result.error);
       }
-    } catch {
-      setError('Biometric authentication failed.');
+    } catch (err) {
+      console.log('🔐 Biometric error:', err?.message, err?.response?.data);
+      setError('Biometric authentication failed: ' + (err?.message || 'Unknown error'));
     } finally {
       setBiometricLoading(false);
     }
@@ -778,29 +797,30 @@ export default function LoginScreen({ navigation }) {
     setError('');
     setLoading(true);
     try {
+      // Set biometric flag BEFORE login so FeedScreen sees it on mount
+      if (await isBiometricAvailable()) {
+        const biometricEnabled = await AsyncStorage.getItem('biometric_enabled');
+        await AsyncStorage.setItem('biometric_credentials', JSON.stringify({
+          email: form.email,
+          password: form.password
+        }));
+        if (biometricEnabled !== 'true') {
+          await AsyncStorage.setItem('show_biometric_prompt', 'true');
+        }
+      }
+
       const result = await login(form.email, form.password);
 
       if (result?.requires_2fa) {
         setTwoFAUserId(result.user_id);
         setShow2FA(true);
+        setLoading(false);
         return;
       }
-
-      if (await isBiometricAvailable()) {
-        const biometricEnabled = await AsyncStorage.getItem('biometric_enabled');
-        if (biometricEnabled !== 'true') {
-          setTimeout(() => {
-            setPendingBiometricCredentials({ email: form.email, password: form.password });
-            setShowBiometricPrompt(true);
-          }, 800);
-        } else {
-          await AsyncStorage.setItem('biometric_credentials', JSON.stringify({
-            email: form.email,
-            password: form.password
-          }));
-        }
-      }
     } catch (err) {
+      // Clear the flag if login failed
+      await AsyncStorage.removeItem('show_biometric_prompt');
+      await AsyncStorage.removeItem('biometric_credentials');
       setError(err.response?.data?.error || 'Login failed. Check your credentials.');
     } finally {
       setLoading(false);

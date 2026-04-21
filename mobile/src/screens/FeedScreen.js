@@ -9,6 +9,8 @@ import { useFocusEffect } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as LocalAuthentication from "expo-local-authentication";
 import api from "../api/axios";
 import { colors, radius } from "../theme";
 import { useTheme } from "../context/ThemeContext";
@@ -356,6 +358,25 @@ export default function FeedScreen({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showJoinFamily, setShowJoinFamily] = useState(false);
+  const [showBiometricPrompt, setShowBiometricPrompt] = useState(false);
+  const [biometricType, setBiometricType] = useState('fingerprint');
+
+  // Check if we should show biometric prompt after login
+  useEffect(() => {
+    const checkBiometricPrompt = async () => {
+      try {
+        const shouldShow = await AsyncStorage.getItem('show_biometric_prompt');
+        if (shouldShow === 'true') {
+          await AsyncStorage.removeItem('show_biometric_prompt');
+          const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
+          const hasFace = types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION);
+          setBiometricType(hasFace ? 'face' : 'fingerprint');
+          setTimeout(() => setShowBiometricPrompt(true), 1500);
+        }
+      } catch {}
+    };
+    checkBiometricPrompt();
+  }, []);
 
   const fetchFeed = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -546,6 +567,51 @@ export default function FeedScreen({ navigation }) {
         onClose={() => setShowJoinFamily(false)}
         onJoined={() => fetchFeed(true)}
       />
+
+      {/* Biometric Enable Prompt */}
+      <Modal visible={showBiometricPrompt} transparent animationType="fade">
+        <View style={bm.overlay}>
+          <BlurView intensity={20} tint="dark" style={bm.card}>
+            <LinearGradient colors={['rgba(124,58,237,0.12)', 'rgba(15,23,42,0.98)']} style={StyleSheet.absoluteFill} />
+            <LinearGradient colors={['#7c3aed', '#3b82f6']} style={bm.iconWrap}>
+              <Ionicons name={biometricType === 'face' ? 'scan-outline' : 'finger-print'} size={36} color="#fff" />
+            </LinearGradient>
+            <Text style={bm.title}>Enable {biometricType === 'face' ? 'Face ID' : 'Fingerprint'} Login</Text>
+            <Text style={bm.sub}>Sign in faster next time using{`\n`}{biometricType === 'face' ? 'Face ID' : 'your fingerprint'}.</Text>
+            <View style={bm.features}>
+              {[
+                { icon: 'flash-outline', text: 'One tap sign in' },
+                { icon: 'shield-checkmark-outline', text: 'Secure & encrypted' },
+                { icon: 'eye-off-outline', text: 'No password needed' },
+              ].map((f, i) => (
+                <View key={i} style={bm.featureRow}>
+                  <View style={bm.featureIcon}>
+                    <Ionicons name={f.icon} size={16} color="#7c3aed" />
+                  </View>
+                  <Text style={bm.featureText}>{f.text}</Text>
+                </View>
+              ))}
+            </View>
+            <TouchableOpacity
+              style={bm.enableBtn}
+              activeOpacity={0.85}
+              onPress={async () => {
+                await AsyncStorage.setItem('biometric_enabled', 'true');
+                setShowBiometricPrompt(false);
+              }}
+            >
+              <LinearGradient colors={['#7c3aed', '#3b82f6']} style={bm.enableBtnGrad}>
+                <Ionicons name={biometricType === 'face' ? 'scan-outline' : 'finger-print'} size={18} color="#fff" />
+                <Text style={bm.enableBtnText}>Enable {biometricType === 'face' ? 'Face ID' : 'Fingerprint'} Login</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+            <TouchableOpacity style={bm.skipBtn} onPress={() => setShowBiometricPrompt(false)}>
+              <Text style={bm.skipText}>Not Now</Text>
+            </TouchableOpacity>
+          </BlurView>
+        </View>
+      </Modal>
+
     </View>
   );
 }
@@ -597,4 +663,21 @@ const s = StyleSheet.create({
   discoverBtn: { borderRadius: radius.full, overflow: "hidden", marginTop: 8 },
   discoverBtnGrad: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 24, paddingVertical: 12 },
   discoverBtnText: { color: "#fff", fontWeight: "700", fontSize: 15 },
+});
+
+const bm = StyleSheet.create({
+  overlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.75)', paddingHorizontal: 28 },
+  card: { width: '100%', borderRadius: 28, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(124,58,237,0.25)', paddingBottom: 28, alignItems: 'center' },
+  iconWrap: { width: 80, height: 80, borderRadius: 26, alignItems: 'center', justifyContent: 'center', marginTop: 32, marginBottom: 20 },
+  title: { fontSize: 22, fontWeight: '800', color: colors.text, textAlign: 'center', marginBottom: 8 },
+  sub: { fontSize: 14, color: colors.muted, textAlign: 'center', lineHeight: 21, marginBottom: 24, paddingHorizontal: 16 },
+  features: { width: '100%', paddingHorizontal: 24, gap: 12, marginBottom: 28 },
+  featureRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  featureIcon: { width: 34, height: 34, borderRadius: 10, backgroundColor: 'rgba(124,58,237,0.15)', alignItems: 'center', justifyContent: 'center' },
+  featureText: { fontSize: 14, color: colors.text, fontWeight: '500' },
+  enableBtn: { width: '85%', borderRadius: 12, overflow: 'hidden', marginBottom: 12 },
+  enableBtnGrad: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14 },
+  enableBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  skipBtn: { paddingVertical: 10, paddingHorizontal: 24 },
+  skipText: { color: colors.muted, fontSize: 14, fontWeight: '500' },
 });

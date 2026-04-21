@@ -14,7 +14,7 @@ Login Options
 # • Google SSO (Sign in with Google)
 # • Apple SSO (Sign in with Apple)
 # • Biometric login — Face ID / fingerprint
-• Forgot password / reset via email or phone
+# • Forgot password / reset via email or phone
 # • Two-factor authentication (2FA)
 # Account Creation
 # # • Username selection with availability check

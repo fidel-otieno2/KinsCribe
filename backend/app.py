@@ -111,6 +111,18 @@ def _run_migrations():
         "ALTER TABLE messages ADD COLUMN IF NOT EXISTS disappears_at TIMESTAMP",
         "ALTER TABLE messages ADD COLUMN IF NOT EXISTS reply_to_id INTEGER",
         "ALTER TABLE messages ADD COLUMN IF NOT EXISTS media_type VARCHAR(20)",
+        # Posts table migrations
+        "ALTER TABLE posts ADD COLUMN IF NOT EXISTS media_urls TEXT",
+        "ALTER TABLE posts ADD COLUMN IF NOT EXISTS location VARCHAR(200)",
+        "ALTER TABLE posts ADD COLUMN IF NOT EXISTS hashtags VARCHAR(500)",
+        "ALTER TABLE posts ADD COLUMN IF NOT EXISTS privacy VARCHAR(20) DEFAULT 'public'",
+        "ALTER TABLE posts ADD COLUMN IF NOT EXISTS alt_text TEXT",
+        "ALTER TABLE posts ADD COLUMN IF NOT EXISTS is_collab BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE posts ADD COLUMN IF NOT EXISTS collab_users TEXT",
+        "ALTER TABLE posts ADD COLUMN IF NOT EXISTS is_scheduled BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE posts ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMP",
+        "ALTER TABLE posts ADD COLUMN IF NOT EXISTS view_count INTEGER DEFAULT 0",
+        "ALTER TABLE posts ADD COLUMN IF NOT EXISTS share_count INTEGER DEFAULT 0",
         # Indexes
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_apple_id ON users(apple_id)",
     ]
