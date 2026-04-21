@@ -13,6 +13,7 @@ const clearStoragePreserveBiometrics = async () => {
 };
 
  // [{id, name, username, avatar, email, access_token, refresh_token}]
+const ACCOUNTS_KEY = 'saved_accounts';
 const ACTIVE_ACCOUNT_KEY = 'active_account_id';
 
 export function AuthProvider({ children }) {

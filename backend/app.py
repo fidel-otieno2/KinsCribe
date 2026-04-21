@@ -61,15 +61,13 @@ def create_app():
 def _safe_migrate():
     """Run db.create_all + migrations synchronously before app starts."""
     try:
-        with app.app_context():
-            db.create_all()
-            print("db.create_all completed")
+        db.create_all()
+        print("db.create_all completed")
     except Exception as e:
         print(f"db.create_all error: {e}")
     try:
-        with app.app_context():
-            _run_migrations()
-            print("Migrations completed")
+        _run_migrations()
+        print("Migrations completed")
     except Exception as e:
         print(f"Migration error: {e}")
 
@@ -106,8 +104,13 @@ def _run_migrations():
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS two_factor_secret VARCHAR(32)",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS backup_codes TEXT",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS account_type VARCHAR(20) DEFAULT 'personal'",
-        # Conversations table
+        # Conversations table migrations
         "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS name VARCHAR(100)",
+        "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS family_id INTEGER",
+        # Messages table migrations
+        "ALTER TABLE messages ADD COLUMN IF NOT EXISTS disappears_at TIMESTAMP",
+        "ALTER TABLE messages ADD COLUMN IF NOT EXISTS reply_to_id INTEGER",
+        "ALTER TABLE messages ADD COLUMN IF NOT EXISTS media_type VARCHAR(20)",
         # Indexes
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_apple_id ON users(apple_id)",
     ]
