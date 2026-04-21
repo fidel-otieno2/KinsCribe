@@ -1080,6 +1080,69 @@ def export_data():
         return jsonify({"error": f"Failed to send export email: {str(e)}"}), 500
 
 
+@auth_bp.route("/u/<username>", methods=["GET"])
+def public_profile(username):
+    """Public web profile page — shareable HTTPS link like Instagram."""
+    user = User.query.filter_by(username=username).first()
+    if not user:
+        return f"<html><body style='font-family:sans-serif;background:#1C1A14;color:#F5F0E8;display:flex;align-items:center;justify-content:center;height:100vh;margin:0'><div style='text-align:center'><h2>Profile not found</h2><p style='color:#A89070'>@{username} doesn't exist on KinsCribe.</p></div></body></html>", 404
+
+    ref = request.args.get('ref', '')
+    avatar = user.avatar_url or ''
+    bio = user.bio or 'KinsCribe member'
+    name = user.name or username
+    app_link = f"kinscribe://profile/{user.id}"
+    store_link = "https://kinscribe-1.onrender.com"
+
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <title>{name} (@{username}) · KinsCribe</title>
+      <meta name="description" content="{bio}">
+      <meta property="og:title" content="{name} (@{username}) · KinsCribe">
+      <meta property="og:description" content="{bio}">
+      <meta property="og:image" content="{avatar}">
+      <meta property="og:url" content="https://kinscribe-1.onrender.com/api/auth/u/{username}">
+      <meta name="twitter:card" content="summary">
+      <style>
+        *{{box-sizing:border-box;margin:0;padding:0}}
+        body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#1C1A14;color:#F5F0E8;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}}
+        .card{{background:#2A2720;border-radius:24px;padding:36px 28px;max-width:380px;width:100%;text-align:center;border:1px solid rgba(196,163,90,0.15)}}
+        .avatar{{width:96px;height:96px;border-radius:50%;object-fit:cover;border:3px solid #4A7C3F;margin-bottom:16px}}
+        .avatar-placeholder{{width:96px;height:96px;border-radius:50%;background:#4A7C3F;display:flex;align-items:center;justify-content:center;font-size:36px;font-weight:800;color:#fff;margin:0 auto 16px}}
+        h1{{font-size:22px;font-weight:800;margin-bottom:4px}}
+        .handle{{color:#A89070;font-size:14px;margin-bottom:12px}}
+        .bio{{color:#E8E0CC;font-size:14px;line-height:1.5;margin-bottom:24px}}
+        .btn{{display:block;background:#4A7C3F;color:#fff;text-decoration:none;padding:14px 24px;border-radius:50px;font-weight:700;font-size:15px;margin-bottom:12px}}
+        .btn-outline{{background:transparent;border:1px solid rgba(196,163,90,0.3);color:#C4A35A}}
+        .logo{{color:#A89070;font-size:12px;margin-top:20px}}
+        .logo span{{color:#4A7C3F;font-weight:700}}
+      </style>
+      <script>
+        // Try to open the app immediately
+        window.location.href = "{app_link}";
+        setTimeout(function(){{ }}, 2000);
+      </script>
+    </head>
+    <body>
+      <div class="card">
+        {'<img class="avatar" src="' + avatar + '" alt="' + name + '">' if avatar else '<div class="avatar-placeholder">' + name[0].upper() + '</div>'}
+        <h1>{name}</h1>
+        <p class="handle">@{username}</p>
+        <p class="bio">{bio}</p>
+        <a href="{app_link}" class="btn">Open in KinsCribe</a>
+        <a href="{store_link}" class="btn btn-outline">Download KinsCribe</a>
+        <p class="logo">Shared via <span>KinsCribe</span></p>
+      </div>
+    </body>
+    </html>
+    """
+    return html, 200, {{'Content-Type': 'text/html'}}
+
+
 @auth_bp.route("/refresh", methods=["POST"])
 @jwt_required(refresh=True)
 def refresh():

@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, FlatList, TouchableOpacity, StyleSheet,
   Image, ActivityIndicator, Alert, RefreshControl,
-  ScrollView, Dimensions, Share, Modal,
+  ScrollView, Dimensions, Share, Modal, Linking, Text,
 } from 'react-native';
 import AppText from '../components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -47,6 +47,7 @@ export default function ProfileScreen({ navigation }) {
   const [showQR, setShowQR] = useState(false);
   const [feedLayout, setFeedLayout] = useState('grid'); // 'grid' | 'list'
   const [stats, setStats] = useState({ posts: 0, connections: 0, interests: 0 });
+  const [listModal, setListModal] = useState({ visible: false, type: null, data: [], loading: false });
 
   const fetchAll = useCallback(async () => {
     if (!user) return;
@@ -108,9 +109,29 @@ export default function ProfileScreen({ navigation }) {
     { text: 'Log Out', style: 'destructive', onPress: logout },
   ]);
 
+  const openList = async (type) => {
+    setListModal({ visible: true, type, data: [], loading: true });
+    try {
+      const endpoint = type === 'connections'
+        ? `/connections/${user.id}/connections`
+        : `/connections/${user.id}/interests`;
+      const res = await api.get(endpoint);
+      const key = type === 'connections' ? 'connections' : 'interests';
+      setListModal(prev => ({ ...prev, data: res.data[key] || [], loading: false }));
+    } catch {
+      setListModal(prev => ({ ...prev, loading: false }));
+    }
+  };
+
   const handleShare = async () => {
     try {
-      await Share.share({ message: `Check out ${user?.name}'s profile on KinsCribe!` });
+      const ref = Math.random().toString(36).slice(2, 12);
+      const profileUrl = `https://kinscribe-1.onrender.com/api/auth/u/${user?.username}?ref=${ref}`;
+      await Share.share({
+        title: `${user?.name} (@${user?.username}) · KinsCribe`,
+        message: `${user?.name} is on KinsCribe\n${profileUrl}`,
+        url: profileUrl,
+      });
     } catch {}
   };
 
@@ -152,13 +173,29 @@ export default function ProfileScreen({ navigation }) {
     <View>
       {/* Top bar */}
       <View style={s.topBar}>
-        <AppText style={[s.username, { color: theme.text }]}>@{user?.username || user?.name}</AppText>
+        <View style={s.topBarLeft}>
+          <AppText style={[s.username, { color: theme.text }]}>@{user?.username || user?.name}</AppText>
+          {user?.is_premium && (
+            <View style={s.premiumBadge}>
+              <Ionicons name="star" size={9} color="#C4A35A" />
+              <AppText style={s.premiumText}>PRO</AppText>
+            </View>
+          )}
+        </View>
         <View style={s.topBarRight}>
-          <TouchableOpacity onPress={() => navigation.navigate('Settings')} style={s.iconBtn}>
-            <Ionicons name="settings-outline" size={22} color={theme.text} />
+          <TouchableOpacity
+            onPress={() => navigation.navigate('Settings')}
+            style={[s.iconBtn, { backgroundColor: theme.bgCard }]}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="settings-outline" size={20} color={theme.text} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={handleLogout} style={s.iconBtn}>
-            <Ionicons name="log-out-outline" size={22} color={theme.muted} />
+          <TouchableOpacity
+            onPress={handleLogout}
+            style={[s.iconBtn, { backgroundColor: theme.bgCard }]}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="log-out-outline" size={20} color={theme.red} />
           </TouchableOpacity>
         </View>
       </View>
@@ -183,13 +220,13 @@ export default function ProfileScreen({ navigation }) {
             <AppText style={[s.statNum, { color: theme.text }]}>{stats.posts}</AppText>
             <AppText style={[s.statLabel, { color: theme.muted }]}>{t('posts')}</AppText>
           </View>
-          <TouchableOpacity style={s.stat} onPress={() => {}}>
+          <TouchableOpacity style={s.stat} onPress={() => openList('connections')}>
             <AppText style={[s.statNum, { color: theme.text }]}>{stats.connections}</AppText>
             <AppText style={[s.statLabel, { color: theme.muted }]}>{t('connections')}</AppText>
           </TouchableOpacity>
-          <TouchableOpacity style={s.stat} onPress={() => {}}>
+          <TouchableOpacity style={s.stat} onPress={() => openList('interests')}>
             <AppText style={[s.statNum, { color: theme.text }]}>{stats.interests}</AppText>
-            <AppText style={[s.statLabel, { color: theme.muted }]}>Interests</AppText>
+            <AppText style={[s.statLabel, { color: theme.muted }]}>{t('interests')}</AppText>
           </TouchableOpacity>
         </View>
       </View>
@@ -201,17 +238,30 @@ export default function ProfileScreen({ navigation }) {
           {user?.verified_badge && (
             <Ionicons name="checkmark-circle" size={16} color="#3b82f6" />
           )}
-          <View style={s.roleBadge}>
-            <Ionicons name="shield-checkmark" size={11} color="#7c3aed" />
-            <AppText style={s.roleText}>{user?.role}</AppText>
-          </View>
+          {user?.role ? (
+            <View style={s.roleBadge}>
+              <Ionicons name="shield-checkmark" size={11} color="#7c3aed" />
+              <AppText style={s.roleText}>{user.role}</AppText>
+            </View>
+          ) : null}
         </View>
         {user?.bio ? <AppText style={[s.bio, { color: theme.muted }]}>{user.bio}</AppText> : null}
+        {user?.website ? (
+          <TouchableOpacity
+            onPress={() => Linking.openURL(user.website.startsWith('http') ? user.website : `https://${user.website}`)}
+            style={s.websiteRow}
+          >
+            <Ionicons name="link-outline" size={13} color={theme.primary} />
+            <AppText style={[s.websiteText, { color: theme.primary }]} numberOfLines={1}>
+              {user.website.replace(/^https?:\/\//, '')}
+            </AppText>
+          </TouchableOpacity>
+        ) : null}
       </View>
 
       {/* Action buttons */}
       <View style={s.actionRow}>
-        <TouchableOpacity style={[s.editBtn, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]} onPress={() => navigation.navigate('Settings')}>
+        <TouchableOpacity style={[s.editBtn, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]} onPress={() => navigation.navigate('EditProfile')}>
           <AppText style={[s.editBtnText, { color: theme.text }]}>{t('edit_profile')}</AppText>
         </TouchableOpacity>
         <TouchableOpacity style={[s.shareBtn, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]} onPress={handleShare}>
@@ -281,6 +331,65 @@ export default function ProfileScreen({ navigation }) {
     <View style={[s.container, { backgroundColor: theme.bg }]}>
       <Toast visible={toast.visible} type={toast.type} message={toast.message} onHide={hide} />
 
+      {/* Connections / Interests List Modal */}
+      <Modal
+        visible={listModal.visible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setListModal(prev => ({ ...prev, visible: false }))}
+      >
+        <View style={s.modalOverlay}>
+          <View style={[s.modalSheet, { backgroundColor: theme.bgCard }]}>
+            <View style={[s.modalHeader, { borderBottomColor: theme.border }]}>
+              <AppText style={[s.modalTitle, { color: theme.text }]}>
+                {listModal.type === 'connections' ? t('connections') : t('interests')}
+              </AppText>
+              <TouchableOpacity onPress={() => setListModal(prev => ({ ...prev, visible: false }))} style={s.modalClose}>
+                <Ionicons name="close" size={22} color={theme.muted} />
+              </TouchableOpacity>
+            </View>
+            {listModal.loading ? (
+              <ActivityIndicator color={theme.primary} style={{ marginTop: 40 }} />
+            ) : listModal.data.length === 0 ? (
+              <View style={s.modalEmpty}>
+                <Ionicons name="people-outline" size={40} color={theme.dim} />
+                <AppText style={[s.modalEmptyText, { color: theme.muted }]}>No {listModal.type} yet</AppText>
+              </View>
+            ) : (
+              <FlatList
+                data={listModal.data}
+                keyExtractor={item => String(item.id)}
+                contentContainerStyle={{ paddingVertical: 8 }}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={s.modalUserRow}
+                    activeOpacity={0.8}
+                    onPress={() => {
+                      setListModal(prev => ({ ...prev, visible: false }));
+                      navigation.navigate('UserProfile', { userId: item.id });
+                    }}
+                  >
+                    <View style={[s.modalAvatar, { backgroundColor: theme.primary }]}>
+                      {item.avatar_url
+                        ? <Image source={{ uri: item.avatar_url }} style={s.modalAvatarImg} />
+                        : <AppText style={s.modalAvatarLetter}>{item.name?.[0]?.toUpperCase()}</AppText>}
+                    </View>
+                    <View style={s.modalUserInfo}>
+                      <View style={s.modalNameRow}>
+                        <AppText style={[s.modalUserName, { color: theme.text }]}>{item.name}</AppText>
+                        {item.verified_badge && <Ionicons name="checkmark-circle" size={13} color="#3b82f6" />}
+                      </View>
+                      <AppText style={[s.modalUserHandle, { color: theme.muted }]}>@{item.username || item.name}</AppText>
+                    </View>
+                    <Ionicons name="chevron-forward" size={16} color={theme.dim} />
+                  </TouchableOpacity>
+                )}
+              />
+            )}
+          </View>
+        </View>
+      </Modal>
+
       {/* QR Modal */}
       <Modal visible={showQR} transparent animationType="fade" onRequestClose={() => setShowQR(false)}>
         <TouchableOpacity style={s.qrOverlay} activeOpacity={1} onPress={() => setShowQR(false)}>
@@ -347,10 +456,13 @@ export default function ProfileScreen({ navigation }) {
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 52, paddingHorizontal: 16, paddingBottom: 10 },
-  username: { fontSize: 20, fontWeight: '800', color: colors.text },
-  topBarRight: { flexDirection: 'row', gap: 4 },
-  iconBtn: { padding: 8 },
+  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 52, paddingHorizontal: 16, paddingBottom: 12 },
+  topBarLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  username: { fontSize: 22, fontWeight: '900', letterSpacing: -0.5, color: colors.text },
+  premiumBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(196,163,90,0.18)', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(196,163,90,0.35)' },
+  premiumText: { color: '#C4A35A', fontSize: 9, fontWeight: '800', letterSpacing: 0.5 },
+  topBarRight: { flexDirection: 'row', gap: 8 },
+  iconBtn: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(196,163,90,0.15)' },
   profileRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 14, gap: 20 },
   avatarWrap: { position: 'relative' },
   avatarRing: { width: 86, height: 86, borderRadius: 43, padding: 3, alignItems: 'center', justifyContent: 'center' },
@@ -367,11 +479,13 @@ const s = StyleSheet.create({
   name: { fontSize: 15, fontWeight: '700', color: colors.text },
   roleBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(124,58,237,0.15)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 20 },
   roleText: { color: '#a78bfa', fontSize: 10, fontWeight: '600' },
-  bio: { fontSize: 13, color: colors.muted, lineHeight: 18 },
+  bio: { fontSize: 13, color: colors.muted, lineHeight: 18, marginBottom: 4 },
+  websiteRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
+  websiteText: { fontSize: 13, fontWeight: '600', textDecorationLine: 'underline', flex: 1 },
   actionRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingBottom: 14 },
-  editBtn: { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: radius.md, backgroundColor: 'rgba(30,41,59,0.8)', borderWidth: 1, borderColor: colors.border2 },
-  editBtnText: { color: colors.text, fontWeight: '600', fontSize: 14 },
-  shareBtn: { width: 40, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, backgroundColor: 'rgba(30,41,59,0.8)', borderWidth: 1, borderColor: colors.border2 },
+  editBtn: { flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: radius.md, borderWidth: 1 },
+  editBtnText: { fontWeight: '700', fontSize: 14 },
+  shareBtn: { width: 40, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, borderWidth: 1 },
   highlightsRow: { paddingHorizontal: 16, paddingBottom: 14, gap: 16 },
   highlightItem: { alignItems: 'center', gap: 4, width: 64 },
   highlightRing: { width: 64, height: 64, borderRadius: 32, padding: 2.5, alignItems: 'center', justifyContent: 'center' },
@@ -391,6 +505,21 @@ const s = StyleSheet.create({
   videoBadge: { position: 'absolute', top: 6, right: 6, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 4, padding: 3 },
   gridLikes: { position: 'absolute', bottom: 4, left: 4, flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 10 },
   gridLikesText: { color: '#fff', fontSize: 10, fontWeight: '600' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  modalSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '75%', minHeight: 300 },
+  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 0.5 },
+  modalTitle: { fontSize: 17, fontWeight: '800' },
+  modalClose: { padding: 4 },
+  modalEmpty: { alignItems: 'center', paddingTop: 50, gap: 12 },
+  modalEmptyText: { fontSize: 15 },
+  modalUserRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, gap: 12 },
+  modalAvatar: { width: 46, height: 46, borderRadius: 23, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  modalAvatarImg: { width: '100%', height: '100%' },
+  modalAvatarLetter: { color: '#fff', fontWeight: '800', fontSize: 18 },
+  modalUserInfo: { flex: 1 },
+  modalNameRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  modalUserName: { fontSize: 15, fontWeight: '700' },
+  modalUserHandle: { fontSize: 13, marginTop: 1 },
   qrOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', alignItems: 'center', justifyContent: 'center' },
   qrCard: { borderRadius: 24, padding: 28, alignItems: 'center', gap: 8, width: 280 },
   qrTitle: { fontSize: 18, fontWeight: '800' },

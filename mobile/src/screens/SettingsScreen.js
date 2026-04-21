@@ -1914,46 +1914,83 @@ export default function SettingsScreen({ navigation }) {
             </View>
             <ScrollView style={{ paddingHorizontal: 20 }} showsVerticalScrollIndicator={false}>
 
-              {/* Contact options */}
+              {/* ── Contact cards ── */}
               <AppText style={s.helpSectionLabel}>Get in touch</AppText>
               <View style={s.helpContactRow}>
                 <TouchableOpacity
                   style={s.helpContactCard}
-                  onPress={() => Linking.openURL('mailto:kinscribe3@gmail.com?subject=KinsCribe Support').catch(() => {})}
+                  onPress={() =>
+                    Linking.openURL('mailto:kinscribe3@gmail.com?subject=KinsCribe%20Support').catch(() =>
+                      Alert.alert('Email Support', 'Send us an email at kinscribe3@gmail.com')
+                    )
+                  }
                   activeOpacity={0.8}
                 >
                   <LinearGradient colors={['rgba(59,130,246,0.2)', 'rgba(59,130,246,0.05)']} style={s.helpContactCardGrad}>
                     <Ionicons name="mail-outline" size={26} color="#3b82f6" />
-                    <AppText style={s.helpContactCardTitle}>Email</AppText>
+                    <AppText style={s.helpContactCardTitle}>Email Support</AppText>
                     <AppText style={s.helpContactCardSub}>kinscribe3@gmail.com</AppText>
                   </LinearGradient>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={s.helpContactCard}
-                  onPress={() => Linking.openURL('mailto:kinscribe3@gmail.com?subject=KinsCribe Help').catch(() => {})}
+                  onPress={() =>
+                    Linking.openURL('mailto:kinscribe3@gmail.com?subject=Bug%20Report%20-%20KinsCribe&body=Describe%20the%20bug%3A%0A%0ADevice%3A%0AApp%20version%3A%201.0.0').catch(() =>
+                      Alert.alert('Report a Bug', 'Send your bug report to kinscribe3@gmail.com')
+                    )
+                  }
                   activeOpacity={0.8}
                 >
-                  <LinearGradient colors={['rgba(16,185,129,0.2)', 'rgba(16,185,129,0.05)']} style={s.helpContactCardGrad}>
-                    <Ionicons name="mail-outline" size={26} color="#10b981" />
-                    <AppText style={s.helpContactCardTitle}>Help Centre</AppText>
+                  <LinearGradient colors={['rgba(239,68,68,0.2)', 'rgba(239,68,68,0.05)']} style={s.helpContactCardGrad}>
+                    <Ionicons name="bug-outline" size={26} color="#f87171" />
+                    <AppText style={s.helpContactCardTitle}>Report a Bug</AppText>
                     <AppText style={s.helpContactCardSub}>kinscribe3@gmail.com</AppText>
                   </LinearGradient>
                 </TouchableOpacity>
               </View>
 
-              {/* FAQ */}
+              {/* ── Contact topics ── */}
+              <AppText style={s.helpSectionLabel}>Contact us about</AppText>
+              {[
+                { icon: 'lock-closed-outline',    color: '#7c3aed', label: 'Account & Security',  subject: 'Account%20%26%20Security%20-%20KinsCribe' },
+                { icon: 'diamond-outline',         color: '#f59e0b', label: 'Premium & Billing',   subject: 'Premium%20%26%20Billing%20-%20KinsCribe' },
+                { icon: 'people-outline',          color: '#10b981', label: 'Family Space',        subject: 'Family%20Space%20-%20KinsCribe' },
+                { icon: 'shield-outline',          color: '#e11d48', label: 'Safety & Abuse',      subject: 'Safety%20%26%20Abuse%20Report%20-%20KinsCribe' },
+                { icon: 'chatbubble-outline',      color: '#3b82f6', label: 'General Feedback',    subject: 'General%20Feedback%20-%20KinsCribe' },
+              ].map(({ icon, color, label, subject }) => (
+                <TouchableOpacity
+                  key={label}
+                  style={s.helpTopicRow}
+                  onPress={() =>
+                    Linking.openURL(`mailto:kinscribe3@gmail.com?subject=${subject}`).catch(() =>
+                      Alert.alert(label, 'Email us at kinscribe3@gmail.com')
+                    )
+                  }
+                  activeOpacity={0.8}
+                >
+                  <View style={[s.helpTopicIcon, { backgroundColor: `${color}22` }]}>
+                    <Ionicons name={icon} size={18} color={color} />
+                  </View>
+                  <AppText style={s.helpTopicLabel}>{label}</AppText>
+                  <Ionicons name="chevron-forward" size={16} color={colors.dim} />
+                </TouchableOpacity>
+              ))}
+
+              {/* ── FAQ ── */}
               <AppText style={s.helpSectionLabel}>Frequently asked questions</AppText>
               {[
-                { q: 'How do I create a Family Space?', a: 'Go to the Family tab at the bottom of the screen and tap "Create Family". You can then invite members by phone number, shareable link, or QR code.' },
-                { q: 'How do I reset my password?', a: 'On the login screen, tap "Forgot Password" and enter your email address. You will receive a 6-digit code to reset your password.' },
-                { q: 'Can I use KinsCribe on multiple devices?', a: 'Yes! You can sign in on as many devices as you like. Manage your active sessions from Settings → Active Sessions.' },
-                { q: 'How do I cancel my Premium subscription?', a: 'Go to Settings → Subscription → tap your plan → Cancel Subscription. Your access will end immediately.' },
-                { q: 'Is my Family Space content private?', a: 'Yes. All Family Space content is completely private and only visible to members of your family group. It never appears in public feeds.' },
-                { q: 'How do I download my data?', a: 'Go to Settings → Data & Storage → Download My Data. A summary will be emailed to your registered email address.' },
-                { q: 'How do I enable two-factor authentication?', a: 'Go to Settings → Account → Two-Factor Authentication and follow the setup steps. You will need an authenticator app like Google Authenticator.' },
-                { q: 'Why are my videos not playing?', a: 'Check that Auto-play Videos is enabled in Settings → Data & Storage. If Data Saver mode is on, videos are paused by default — tap to play them.' },
-                { q: 'How do I report a user?', a: 'Visit the user\'s profile, tap the three-dot menu in the top right, and select "Report". Our team reviews all reports within 24 hours.' },
-                { q: 'How do I delete my account?', a: 'Go to Settings → Account Actions → Delete Account. This is permanent and cannot be undone. All your data will be removed.' },
+                { q: 'How do I create a Family Space?', a: 'Tap the Family tab at the bottom of the screen, then tap "Create Family". You can invite members by phone number, shareable link, or QR code.' },
+                { q: 'How do I reset my password?', a: 'On the login screen tap "Forgot Password" and enter your email address. You will receive a 6-digit code to reset your password.' },
+                { q: 'Can I use KinsCribe on multiple devices?', a: 'Yes! Sign in on as many devices as you like. To see and manage all active sessions go to Settings → Active Sessions → Manage Sessions.' },
+                { q: 'How do I cancel my Premium subscription?', a: 'Go to Settings → Subscription → tap the plan row → Cancel Subscription. Your Premium access ends immediately after cancellation.' },
+                { q: 'Is my Family Space content private?', a: 'Yes. All Family Space content is completely private and only visible to members of your family group. It never appears in public feeds or search.' },
+                { q: 'How do I download my data?', a: 'Go to Settings → Data & Storage → Download My Data → tap "Request Export". A summary will be emailed to your registered email address within 24 hours.' },
+                { q: 'How do I enable two-factor authentication?', a: 'Go to Settings → Account → Two-Factor Authentication and follow the setup steps. You will need an authenticator app such as Google Authenticator or Authy.' },
+                { q: 'Why are my videos not playing?', a: 'Check that Auto-play Videos is turned on in Settings → Data & Storage. If Data Saver mode is on, videos are paused by default — tap the video to play it manually.' },
+                { q: 'How do I block or report a user?', a: "Visit the user's profile, tap the three-dot menu in the top-right corner, then choose 'Block' or 'Report'. Blocked users cannot see your posts or message you." },
+                { q: 'How do I delete my account?', a: 'Go to Settings → Account Actions → Delete Account. This is permanent and cannot be undone. All your posts, messages, and data will be removed immediately.' },
+                { q: 'How do I change my profile photo?', a: 'Go to Settings and tap your profile photo at the top. Choose a photo from your gallery. It will be updated immediately across the app.' },
+                { q: 'How do I turn off notifications?', a: "Go to Settings → Notifications and toggle off any notification type you don't want. You can also set Quiet Hours to silence all notifications during specific times." },
               ].map(({ q, a }, i) => (
                 <TouchableOpacity
                   key={i}
@@ -1974,6 +2011,28 @@ export default function SettingsScreen({ navigation }) {
                   )}
                 </TouchableOpacity>
               ))}
+
+              {/* ── Still need help? ── */}
+              <AppText style={s.helpSectionLabel}>Still need help?</AppText>
+              <TouchableOpacity
+                style={s.helpStillBtn}
+                onPress={() =>
+                  Linking.openURL('mailto:kinscribe3@gmail.com?subject=KinsCribe%20Support%20Request').catch(() =>
+                    Alert.alert('Contact Support', 'Email us at kinscribe3@gmail.com')
+                  )
+                }
+                activeOpacity={0.8}
+              >
+                <LinearGradient colors={['rgba(16,185,129,0.15)', 'rgba(16,185,129,0.05)']} style={s.helpStillBtnGrad}>
+                  <Ionicons name="mail-outline" size={20} color="#10b981" />
+                  <View style={{ flex: 1 }}>
+                    <AppText style={s.helpStillBtnTitle}>Email our support team</AppText>
+                    <AppText style={s.helpStillBtnSub}>We usually respond within 24 hours</AppText>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color="#10b981" />
+                </LinearGradient>
+              </TouchableOpacity>
+
               <View style={{ height: 40 }} />
             </ScrollView>
           </BlurView>
@@ -2598,5 +2657,13 @@ const s = StyleSheet.create({
   faqHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   faqQ: { flex: 1, fontSize: 14, fontWeight: '600', color: colors.text },
   faqQOpen: { color: '#10b981' },
+  faqA: { fontSize: 13, color: colors.muted, lineHeight: 20, marginTop: 10 },
+  helpTopicRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13, paddingHorizontal: 14, borderRadius: 12, marginBottom: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', backgroundColor: 'rgba(255,255,255,0.02)' },
+  helpTopicIcon: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  helpTopicLabel: { flex: 1, fontSize: 14, fontWeight: '500', color: colors.text },
+  helpStillBtn: { borderRadius: 16, overflow: 'hidden', marginTop: 4 },
+  helpStillBtnGrad: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderWidth: 1, borderColor: 'rgba(16,185,129,0.25)', borderRadius: 16 },
+  helpStillBtnTitle: { fontSize: 14, fontWeight: '700', color: colors.text },
+  helpStillBtnSub: { fontSize: 12, color: colors.muted, marginTop: 2 },
   faqA: { fontSize: 13, color: colors.muted, lineHeight: 20, marginTop: 10 },
 });

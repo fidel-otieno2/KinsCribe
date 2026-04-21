@@ -51,6 +51,7 @@ import PostInsightsScreen from "./src/screens/PostInsightsScreen";
 import AccountSwitcherScreen from "./src/screens/AccountSwitcherScreen";
 import OnThisDayScreen from "./src/screens/OnThisDayScreen";
 import ConnectionCRMScreen from "./src/screens/ConnectionCRMScreen";
+import EditProfileScreen from "./src/screens/EditProfileScreen";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -243,6 +244,7 @@ function RootNavigator() {
           <Stack.Screen name="AccountSwitcher" component={AccountSwitcherScreen} options={{ animation: "slide_from_right" }} />
           <Stack.Screen name="OnThisDay" component={OnThisDayScreen} options={{ animation: "slide_from_right" }} />
           <Stack.Screen name="ConnectionCRM" component={ConnectionCRMScreen} options={{ animation: "slide_from_right" }} />
+          <Stack.Screen name="EditProfile" component={EditProfileScreen} options={{ animation: "slide_from_right" }} />
         </>
       )}
     </Stack.Navigator>
