@@ -19,6 +19,7 @@ import { colors, radius } from '../theme';
 import Toast from '../components/Toast';
 import useToast from '../hooks/useToast';
 import { PhoneModal, TwoFactorModal, ChangePasswordModal } from '../components/SecurityModals';
+import { useTranslation } from '../i18n';
 
 const th = StyleSheet.create({
   themeRow: { flexDirection: 'row', gap: 6 },
@@ -72,7 +73,8 @@ function Divider() {
 
 export default function SettingsScreen({ navigation }) {
   const { user, refreshUser, logout } = useAuth();
-  const { theme, mode, setThemeMode, isDark, fontSize, fontSizeObj, saveFontSize, fontType, fontTypeObj, saveFontType, language, languageObj, saveLanguage } = useTheme();
+  const { theme, mode, setThemeMode, isDark, fontSize, fontSizeObj, saveFontSize, fontType, fontTypeObj, saveFontType, language, languageObj, saveLanguage, dataSaver, saveDataSaver, autoplayVideo, saveAutoplayVideo } = useTheme();
+  const { t } = useTranslation();
   const [showFontSizeModal, setShowFontSizeModal]   = useState(false);
   const [showFontTypeModal, setShowFontTypeModal]   = useState(false);
   const [showLanguageModal, setShowLanguageModal]   = useState(false);
@@ -95,6 +97,11 @@ export default function SettingsScreen({ navigation }) {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+
+  // Data & Storage
+  const [showDownloadModal, setShowDownloadModal] = useState(false);
+  const [downloadStep, setDownloadStep] = useState('idle'); // idle | loading | done | error
+  const [downloadError, setDownloadError] = useState('');
 
   // Notification toggles — persisted in AsyncStorage
   const [notifLikes, setNotifLikes] = useState(true);
@@ -549,10 +556,10 @@ export default function SettingsScreen({ navigation }) {
         <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <AppText style={s.headerTitle}>Settings</AppText>
+        <AppText style={s.headerTitle}>{t('settings')}</AppText>
         {editMode && (
           <TouchableOpacity onPress={saveProfile} disabled={saving}>
-            {saving ? <ActivityIndicator color={colors.primary} size="small" /> : <AppText style={s.saveBtn}>Save</AppText>}
+            {saving ? <ActivityIndicator color={colors.primary} size="small" /> : <AppText style={s.saveBtn}>{t('save')}</AppText>}
           </TouchableOpacity>
         )}
       </View>
@@ -599,13 +606,13 @@ export default function SettingsScreen({ navigation }) {
         )}
 
         {/* Account */}
-        <Section title="Account">
-          <Row icon="mail-outline" label="Email" value={user?.email} chevron={false} />
+        <Section title={t('account')}>
+          <Row icon="mail-outline" label={t('email')} value={user?.email} chevron={false} />
           <Divider />
           <Row 
             icon="phone-portrait-outline" 
             iconColor="#10b981"
-            label="Phone Number" 
+            label={t('phone_number')}
             value={user?.phone ? `••••${user.phone.slice(-4)}` : 'Not added'}
             onPress={() => setShowPhoneModal(true)} 
           />
@@ -615,15 +622,15 @@ export default function SettingsScreen({ navigation }) {
               <Row
                 icon="trash-outline"
                 iconColor="#f87171"
-                label="Remove Phone Number"
+                label={t('remove_phone')}
                 onPress={() => setShowRemovePhoneModal(true)}
               />
             </>
           )}
           <Divider />
-          <Row icon="key-outline" label="Change Password" onPress={() => setShowChangePasswordModal(true)} />
+          <Row icon="key-outline" label={t('change_password')} onPress={() => setShowChangePasswordModal(true)} />
           <Divider />
-          <Row icon="shield-checkmark-outline" iconColor={user?.two_factor_enabled ? '#10b981' : '#94a3b8'} label="Two-Factor Authentication" value={user?.two_factor_enabled ? 'Enabled' : 'Disabled'} onPress={() => setShow2FAModal(true)} />
+          <Row icon="shield-checkmark-outline" iconColor={user?.two_factor_enabled ? '#10b981' : '#94a3b8'} label={t('two_fa')} value={user?.two_factor_enabled ? 'Enabled' : 'Disabled'} onPress={() => setShow2FAModal(true)} />
           <Divider />
           <Row
             icon={biometricType === 'face' ? 'scan-outline' : 'finger-print'}
@@ -639,23 +646,23 @@ export default function SettingsScreen({ navigation }) {
             onPress={toggleBiometric}
           />
           <Divider />
-          <Row icon="people-outline" iconColor="#3b82f6" label="My Family" onPress={() => { navigation.goBack(); navigation.navigate('Family'); }} />
+          <Row icon="people-outline" iconColor="#3b82f6" label={t('my_family')} onPress={() => { navigation.goBack(); navigation.navigate('Family'); }} />
           <Divider />
-          <Row icon="swap-horizontal-outline" iconColor="#7c3aed" label="Switch Account" onPress={() => navigation.navigate('AccountSwitcher')} />
+          <Row icon="swap-horizontal-outline" iconColor="#7c3aed" label={t('switch_account')} onPress={() => navigation.navigate('AccountSwitcher')} />
         </Section>
 
         {/* Privacy */}
-        <Section title="Privacy">
+        <Section title={t('privacy')}>
           <View style={s.row}>
             <View style={[s.rowIcon, { backgroundColor: 'rgba(124,58,237,0.15)' }]}>
               <Ionicons name="lock-closed-outline" size={18} color="#7c3aed" />
             </View>
             <View style={{ flex: 1 }}>
-              <AppText style={s.rowLabel}>Private Account</AppText>
+              <AppText style={s.rowLabel}>{t('private_account')}</AppText>
               <AppText style={s.rowSubLabel}>
                 {privateAccount
-                  ? 'Only approved followers see your posts'
-                  : 'Anyone can see your posts and follow you'}
+                  ? t('private_account_on')
+                  : t('private_account_off')}
               </AppText>
             </View>
             <Switch
@@ -671,11 +678,11 @@ export default function SettingsScreen({ navigation }) {
               <Ionicons name="eye-outline" size={18} color="#10b981" />
             </View>
             <View style={{ flex: 1 }}>
-              <AppText style={s.rowLabel}>Show Activity Status</AppText>
+              <AppText style={s.rowLabel}>{t('show_activity')}</AppText>
               <AppText style={s.rowSubLabel}>
                 {showActivity
-                  ? 'Others can see when you were last active'
-                  : 'Your activity status is hidden from everyone'}
+                  ? t('show_activity_on')
+                  : t('show_activity_off')}
               </AppText>
             </View>
             <Switch
@@ -691,10 +698,10 @@ export default function SettingsScreen({ navigation }) {
               <Ionicons name="chatbubble-outline" size={18} color="#3b82f6" />
             </View>
             <View style={{ flex: 1 }}>
-              <AppText style={s.rowLabel}>Allow Direct Messages</AppText>
+              <AppText style={s.rowLabel}>{t('allow_dms')}</AppText>
               <AppText style={s.rowSubLabel}>
                 {allowDMs
-                  ? 'Anyone can send you a message'
+                  ? t('allow_dms_on')
                   : 'Only people you follow can message you'}
               </AppText>
             </View>
@@ -711,22 +718,22 @@ export default function SettingsScreen({ navigation }) {
               <Ionicons name="ban-outline" size={18} color="#f87171" />
             </View>
             <View style={{ flex: 1 }}>
-              <AppText style={[s.rowLabel, { color: '#f87171' }]}>Blocked Accounts</AppText>
-              <AppText style={s.rowSubLabel}>Manage people you have blocked</AppText>
+              <AppText style={[s.rowLabel, { color: '#f87171' }]}>{t('blocked_accounts')}</AppText>
+              <AppText style={s.rowSubLabel}>{t('blocked_accounts_sub')}</AppText>
             </View>
             <Ionicons name="chevron-forward" size={16} color={colors.dim} />
           </TouchableOpacity>
         </Section>
 
         {/* Notifications */}
-        <Section title="Notifications">
+        <Section title={t('notifications')}>
           {[
-            { key: 'likes',    setter: setNotifLikes,    val: notifLikes,    icon: 'heart-outline',       color: '#e11d48', label: 'Likes',           sub: 'When someone likes your post or story' },
-            { key: 'comments', setter: setNotifComments, val: notifComments, icon: 'chatbubble-outline',  color: '#3b82f6', label: 'Comments',         sub: 'When someone comments on your post' },
-            { key: 'messages', setter: setNotifMessages, val: notifMessages, icon: 'chatbubbles-outline', color: '#7c3aed', label: 'Messages',          sub: 'When you receive a new direct message' },
-            { key: 'stories',  setter: setNotifStories,  val: notifStories,  icon: 'time-outline',        color: '#f59e0b', label: 'Stories',           sub: 'When someone you follow posts a story' },
-            { key: 'follows',  setter: setNotifFollows,  val: notifFollows,  icon: 'person-add-outline',  color: '#10b981', label: 'New Connections',   sub: 'When someone follows or requests to follow you' },
-          ].map(({ key, setter, val, icon, color, label, sub }, i, arr) => (
+            { key: 'likes',    setter: setNotifLikes,    val: notifLikes,    icon: 'heart-outline',       color: '#e11d48', labelKey: 'notif_likes',    subKey: 'notif_likes_sub' },
+            { key: 'comments', setter: setNotifComments, val: notifComments, icon: 'chatbubble-outline',  color: '#3b82f6', labelKey: 'notif_comments', subKey: 'notif_comments_sub' },
+            { key: 'messages', setter: setNotifMessages, val: notifMessages, icon: 'chatbubbles-outline', color: '#7c3aed', labelKey: 'notif_messages', subKey: 'notif_messages_sub' },
+            { key: 'stories',  setter: setNotifStories,  val: notifStories,  icon: 'time-outline',        color: '#f59e0b', labelKey: 'notif_stories',  subKey: 'notif_stories_sub' },
+            { key: 'follows',  setter: setNotifFollows,  val: notifFollows,  icon: 'person-add-outline',  color: '#10b981', labelKey: 'notif_follows',  subKey: 'notif_follows_sub' },
+          ].map(({ key, setter, val, icon, color, labelKey, subKey }, i, arr) => (
             <View key={key}>
               <View style={s.row}>
                 <View style={[s.rowIcon, { backgroundColor: `${color}22` }]}>
@@ -735,8 +742,8 @@ export default function SettingsScreen({ navigation }) {
                     : <Ionicons name={icon} size={18} color={color} />}
                 </View>
                 <View style={{ flex: 1 }}>
-                  <AppText style={s.rowLabel}>{label}</AppText>
-                  <AppText style={s.rowSubLabel}>{sub}</AppText>
+                  <AppText style={s.rowLabel}>{t(labelKey)}</AppText>
+                  <AppText style={s.rowSubLabel}>{t(subKey)}</AppText>
                 </View>
                 <Switch
                   value={val}
@@ -756,9 +763,9 @@ export default function SettingsScreen({ navigation }) {
               <Ionicons name="moon-outline" size={18} color="#6366f1" />
             </View>
             <View style={{ flex: 1 }}>
-              <AppText style={s.rowLabel}>Quiet Hours (DND)</AppText>
+              <AppText style={s.rowLabel}>{t('quiet_hours')}</AppText>
               <AppText style={s.rowSubLabel}>
-                {quietHours ? `Silent ${fmtTime(quietFrom)} – ${fmtTime(quietTo)}` : 'Silence notifications during set hours'}
+                {quietHours ? t('quiet_hours_active', { from: fmtTime(quietFrom), to: fmtTime(quietTo) }) : t('quiet_hours_sub')}
               </AppText>
             </View>
             <Switch
@@ -786,21 +793,21 @@ export default function SettingsScreen({ navigation }) {
         </Section>
 
         {/* Active Sessions */}
-        <Section title="Active Sessions">
+        <Section title={t('active_sessions')}>
           <TouchableOpacity style={s.row} onPress={openSessions} activeOpacity={0.7}>
             <View style={[s.rowIcon, { backgroundColor: 'rgba(6,182,212,0.15)' }]}>
               <Ionicons name="phone-portrait-outline" size={18} color="#06b6d4" />
             </View>
             <View style={{ flex: 1 }}>
-              <AppText style={s.rowLabel}>Manage Sessions</AppText>
-              <AppText style={s.rowSubLabel}>See and sign out devices logged into your account</AppText>
+              <AppText style={s.rowLabel}>{t('manage_sessions')}</AppText>
+              <AppText style={s.rowSubLabel}>{t('active_sessions_sub')}</AppText>
             </View>
             <Ionicons name="chevron-forward" size={16} color={colors.dim} />
           </TouchableOpacity>
         </Section>
 
         {/* Appearance */}
-        <Section title="Appearance">
+        <Section title={t('appearance')}>
           {/* Theme */}
           <View style={s.row}>
             <View style={[s.rowIcon, { backgroundColor: 'rgba(196,163,90,0.15)' }]}>
@@ -829,7 +836,7 @@ export default function SettingsScreen({ navigation }) {
           <Row
             icon="text-outline"
             iconColor="#a78bfa"
-            label="Font Size"
+            label={t('font_size')}
             value={fontSizeObj.label}
             onPress={() => setShowFontSizeModal(true)}
           />
@@ -838,7 +845,7 @@ export default function SettingsScreen({ navigation }) {
           <Row
             icon="brush-outline"
             iconColor="#f59e0b"
-            label="Font Style"
+            label={t('font_style')}
             value={fontTypeObj.label}
             onPress={() => setShowFontTypeModal(true)}
           />
@@ -847,23 +854,60 @@ export default function SettingsScreen({ navigation }) {
           <Row
             icon="language-outline"
             iconColor="#06b6d4"
-            label="Language"
+            label={t('language')}
             value={`${languageObj.flag} ${languageObj.native}`}
             onPress={() => { setLangSearch(''); setShowLanguageModal(true); }}
           />
         </Section>
 
         {/* Data & Storage */}
-        <Section title="Data & Storage">
-          <Row icon="cloud-download-outline" iconColor="#3b82f6" label="Download My Data" onPress={() => Alert.alert('Download Data', 'Your data export will be emailed to you within 24 hours')} />
+        <Section title={t('data_storage')}>
+          <Row
+            icon="cloud-download-outline"
+            iconColor="#3b82f6"
+            label={t('download_data')}
+            onPress={() => { setDownloadStep('idle'); setShowDownloadModal(true); }}
+          />
           <Divider />
-          <Row icon="cellular-outline" iconColor="#10b981" label="Data Saver Mode" toggle toggled={false} onPress={() => {}} />
+          <View style={s.row}>
+            <View style={[s.rowIcon, { backgroundColor: 'rgba(16,185,129,0.15)' }]}>
+              <Ionicons name="cellular-outline" size={18} color="#10b981" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <AppText style={s.rowLabel}>{t('data_saver')}</AppText>
+              <AppText style={s.rowSubLabel}>
+                {dataSaver ? 'Reduces video quality & disables autoplay on mobile data' : 'Full quality video and images'}
+              </AppText>
+            </View>
+            <Switch
+              value={dataSaver}
+              onValueChange={async (v) => { await saveDataSaver(v); success(v ? 'Data Saver enabled' : 'Data Saver disabled'); }}
+              trackColor={{ true: '#10b981', false: colors.border2 }}
+              thumbColor="#fff"
+            />
+          </View>
           <Divider />
-          <Row icon="videocam-outline" iconColor="#7c3aed" label="Auto-play Videos" toggle toggled={true} onPress={() => {}} />
+          <View style={s.row}>
+            <View style={[s.rowIcon, { backgroundColor: 'rgba(124,58,237,0.15)' }]}>
+              <Ionicons name="videocam-outline" size={18} color="#7c3aed" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <AppText style={s.rowLabel}>{t('autoplay_video')}</AppText>
+              <AppText style={s.rowSubLabel}>
+                {autoplayVideo ? 'Videos play automatically in feed' : 'Tap to play videos'}
+              </AppText>
+            </View>
+            <Switch
+              value={autoplayVideo}
+              onValueChange={async (v) => { await saveAutoplayVideo(v); success(v ? 'Autoplay enabled' : 'Autoplay disabled'); }}
+              trackColor={{ true: '#7c3aed', false: colors.border2 }}
+              thumbColor="#fff"
+            />
+          </View>
         </Section>
 
         {/* About */}
-        <Section title="Subscription">
+        <Section title={t('subscription')}>
           <View style={s.row}>
             <View style={[s.rowIcon, { backgroundColor: 'rgba(245,158,11,0.15)' }]}>
               <Ionicons name="star" size={18} color="#f59e0b" />
@@ -884,23 +928,23 @@ export default function SettingsScreen({ navigation }) {
         </Section>
 
         {/* About */}
-        <Section title="About">
-          <Row icon="phone-portrait-outline" iconColor="#94a3b8" label="App Version" value="1.0.0" chevron={false} />
+        <Section title={t('about')}>
+          <Row icon="phone-portrait-outline" iconColor="#94a3b8" label={t('app_version')} value="1.0.0" chevron={false} />
           <Divider />
-          <Row icon="document-text-outline" iconColor="#94a3b8" label="Privacy Policy" onPress={() => Alert.alert('Privacy Policy', 'Your stories are private by default')} />
+          <Row icon="document-text-outline" iconColor="#94a3b8" label={t('privacy_policy')} onPress={() => Alert.alert(t('privacy_policy'), 'Your stories are private by default')} />
           <Divider />
-          <Row icon="help-circle-outline" iconColor="#94a3b8" label="Help & Support" onPress={() => Alert.alert('Support', 'Email: support@kinscribe.com')} />
+          <Row icon="help-circle-outline" iconColor="#94a3b8" label={t('help_support')} onPress={() => Alert.alert(t('help_support'), 'Email: support@kinscribe.com')} />
           <Divider />
-          <Row icon="star-outline" iconColor="#f59e0b" label="Rate the App" onPress={() => Alert.alert('Rate KinsCribe', 'Thank you for your support! ⭐')} />
+          <Row icon="star-outline" iconColor="#f59e0b" label={t('rate_app')} onPress={() => Alert.alert(t('rate_app'), 'Thank you for your support! ⭐')} />
         </Section>
 
         {/* Danger zone */}
-        <Section title="Account Actions">
-          <Row icon="pause-circle-outline" iconColor="#f59e0b" label="Deactivate Account" onPress={handleDeactivate} />
+        <Section title={t('account_actions')}>
+          <Row icon="pause-circle-outline" iconColor="#f59e0b" label={t('deactivate')} onPress={handleDeactivate} />
           <Divider />
-          <Row icon="log-out-outline" iconColor="#f87171" label="Log Out" onPress={handleLogout} danger />
+          <Row icon="log-out-outline" iconColor="#f87171" label={t('log_out')} onPress={handleLogout} danger />
           <Divider />
-          <Row icon="trash-outline" iconColor="#f87171" label="Delete Account" onPress={handleDeleteAccount} danger />
+          <Row icon="trash-outline" iconColor="#f87171" label={t('delete_account')} onPress={handleDeleteAccount} danger />
         </Section>
 
         <View style={{ height: 40 }} />
@@ -941,7 +985,7 @@ export default function SettingsScreen({ navigation }) {
                 onPress={() => setShowRemovePhoneModal(false)}
                 activeOpacity={0.8}
               >
-                <AppText style={s.confirmCancelText}>Cancel</AppText>
+                <AppText style={s.confirmCancelText}>{t('cancel')}</AppText>
               </TouchableOpacity>
               <TouchableOpacity
                 style={s.confirmRemoveBtn}
@@ -970,15 +1014,15 @@ export default function SettingsScreen({ navigation }) {
                 <Ionicons name="log-out-outline" size={26} color="#fff" />
               </LinearGradient>
             </View>
-            <AppText style={s.confirmTitle}>Log Out</AppText>
+            <AppText style={s.confirmTitle}>{t('log_out')}</AppText>
             <AppText style={s.confirmSub}>Are you sure you want to log out of your account?</AppText>
             <View style={s.confirmBtns}>
               <TouchableOpacity style={s.confirmCancelBtn} onPress={() => setShowLogoutModal(false)} activeOpacity={0.8}>
-                <AppText style={s.confirmCancelText}>Cancel</AppText>
+                <AppText style={s.confirmCancelText}>{t('cancel')}</AppText>
               </TouchableOpacity>
               <TouchableOpacity style={s.confirmRemoveBtn} onPress={logout} activeOpacity={0.8}>
                 <LinearGradient colors={['#f87171', '#ef4444']} style={s.confirmRemoveBtnGrad}>
-                  <AppText style={s.confirmRemoveText}>Log Out</AppText>
+                  <AppText style={s.confirmRemoveText}>{t('log_out')}</AppText>
                 </LinearGradient>
               </TouchableOpacity>
             </View>
@@ -996,15 +1040,15 @@ export default function SettingsScreen({ navigation }) {
                 <Ionicons name="log-out-outline" size={26} color="#fff" />
               </LinearGradient>
             </View>
-            <AppText style={s.confirmTitle}>Log Out</AppText>
+            <AppText style={s.confirmTitle}>{t('log_out')}</AppText>
             <AppText style={s.confirmSub}>Are you sure you want to log out of your account?</AppText>
             <View style={s.confirmBtns}>
               <TouchableOpacity style={s.confirmCancelBtn} onPress={() => setShowLogoutModal(false)} activeOpacity={0.8}>
-                <AppText style={s.confirmCancelText}>Cancel</AppText>
+                <AppText style={s.confirmCancelText}>{t('cancel')}</AppText>
               </TouchableOpacity>
               <TouchableOpacity style={s.confirmRemoveBtn} onPress={logout} activeOpacity={0.8}>
                 <LinearGradient colors={['#f87171', '#ef4444']} style={s.confirmRemoveBtnGrad}>
-                  <AppText style={s.confirmRemoveText}>Log Out</AppText>
+                  <AppText style={s.confirmRemoveText}>{t('log_out')}</AppText>
                 </LinearGradient>
               </TouchableOpacity>
             </View>
@@ -1029,13 +1073,13 @@ export default function SettingsScreen({ navigation }) {
             </AppText>
             <View style={s.confirmBtns}>
               <TouchableOpacity style={s.confirmCancelBtn} onPress={() => setShowDeleteModal(false)} activeOpacity={0.8}>
-                <AppText style={s.confirmCancelText}>Cancel</AppText>
+                <AppText style={s.confirmCancelText}>{t('cancel')}</AppText>
               </TouchableOpacity>
               <TouchableOpacity style={s.confirmRemoveBtn} onPress={confirmDeleteAccount} disabled={deletingAccount} activeOpacity={0.8}>
                 <LinearGradient colors={['#f87171', '#ef4444']} style={s.confirmRemoveBtnGrad}>
                   {deletingAccount
                     ? <ActivityIndicator color="#fff" size="small" />
-                    : <AppText style={s.confirmRemoveText}>Delete</AppText>}
+                    : <AppText style={s.confirmRemoveText}>{t('delete')}</AppText>}
                 </LinearGradient>
               </TouchableOpacity>
             </View>
@@ -1185,13 +1229,13 @@ export default function SettingsScreen({ navigation }) {
             <View style={s.blockedHandle} />
             <View style={s.quietPickerHeader}>
               <TouchableOpacity onPress={() => setShowQuietPicker(false)}>
-                <AppText style={s.quietPickerCancel}>Cancel</AppText>
+                <AppText style={s.quietPickerCancel}>{t('cancel')}</AppText>
               </TouchableOpacity>
               <AppText style={s.quietPickerTitle}>
                 {editingQuiet === 'from' ? 'Start Time' : 'End Time'}
               </AppText>
               <TouchableOpacity onPress={saveQuietTime}>
-                <AppText style={s.quietPickerDone}>Done</AppText>
+                <AppText style={s.quietPickerDone}>{t('done')}</AppText>
               </TouchableOpacity>
             </View>
 
@@ -1320,7 +1364,7 @@ export default function SettingsScreen({ navigation }) {
               </LinearGradient>
             </View>
             <AppText style={s.confirmTitle}>
-              {pendingActivity ? 'Show Activity Status?' : 'Hide Activity Status?'}
+              {pendingActivity ? t('show_activity') + '?' : t('show_activity') + '?'}
             </AppText>
             <View style={s.privacyInfoBox}>
               {pendingActivity ? (
@@ -1357,7 +1401,7 @@ export default function SettingsScreen({ navigation }) {
             </View>
             <View style={[s.confirmBtns, { marginTop: 8 }]}>
               <TouchableOpacity style={s.confirmCancelBtn} onPress={() => setShowActivityModal(false)} activeOpacity={0.8}>
-                <AppText style={s.confirmCancelText}>Cancel</AppText>
+                <AppText style={s.confirmCancelText}>{t('cancel')}</AppText>
               </TouchableOpacity>
               <TouchableOpacity style={s.confirmRemoveBtn} onPress={confirmActivityChange} disabled={savingActivity} activeOpacity={0.8}>
                 <LinearGradient
@@ -1391,7 +1435,7 @@ export default function SettingsScreen({ navigation }) {
               </LinearGradient>
             </View>
             <AppText style={s.confirmTitle}>
-              {pendingDMs ? 'Allow Direct Messages?' : 'Restrict Direct Messages?'}
+              {pendingDMs ? t('allow_dms') + '?' : t('allow_dms') + '?'}
             </AppText>
             <View style={s.privacyInfoBox}>
               {pendingDMs ? (
@@ -1424,7 +1468,7 @@ export default function SettingsScreen({ navigation }) {
             </View>
             <View style={[s.confirmBtns, { marginTop: 8 }]}>
               <TouchableOpacity style={s.confirmCancelBtn} onPress={() => setShowDMsModal(false)} activeOpacity={0.8}>
-                <AppText style={s.confirmCancelText}>Cancel</AppText>
+                <AppText style={s.confirmCancelText}>{t('cancel')}</AppText>
               </TouchableOpacity>
               <TouchableOpacity style={s.confirmRemoveBtn} onPress={confirmDMsChange} disabled={savingDMs} activeOpacity={0.8}>
                 <LinearGradient
@@ -1582,7 +1626,7 @@ export default function SettingsScreen({ navigation }) {
                   <Ionicons name="ban" size={18} color="#f87171" />
                 </View>
                 <View>
-                  <AppText style={s.blockedTitle}>Blocked Accounts</AppText>
+                  <AppText style={s.blockedTitle}>{t('blocked_accounts')}</AppText>
                   <AppText style={s.blockedSubtitle}>{blockedUsers.length} {blockedUsers.length === 1 ? 'account' : 'accounts'} blocked</AppText>
                 </View>
               </View>
@@ -1627,12 +1671,123 @@ export default function SettingsScreen({ navigation }) {
                     >
                       {unblocking === b.blocked_id
                         ? <ActivityIndicator size="small" color="#f87171" />
-                        : <AppText style={s.unblockBtnText}>Unblock</AppText>}
+                        : <AppText style={s.unblockBtnText}>{t('unblock')}</AppText>}
                     </TouchableOpacity>
                   </View>
                 ))}
                 <View style={{ height: 40 }} />
               </ScrollView>
+            )}
+          </BlurView>
+        </View>
+      </Modal>
+
+      {/* Download My Data Modal */}
+      <Modal visible={showDownloadModal} transparent animationType="fade" onRequestClose={() => setShowDownloadModal(false)}>
+        <View style={s.modalOverlay}>
+          <BlurView intensity={20} tint="dark" style={[s.confirmModal, { borderColor: 'rgba(59,130,246,0.25)' }]}>
+            <LinearGradient colors={['rgba(59,130,246,0.1)', 'rgba(15,23,42,0.98)']} style={StyleSheet.absoluteFill} />
+            <View style={s.confirmIconWrap}>
+              <LinearGradient colors={['#3b82f6', '#2563eb']} style={s.confirmIcon}>
+                <Ionicons
+                  name={downloadStep === 'done' ? 'checkmark-circle' : downloadStep === 'error' ? 'alert-circle' : 'cloud-download-outline'}
+                  size={26} color="#fff"
+                />
+              </LinearGradient>
+            </View>
+
+            {downloadStep === 'idle' && (
+              <>
+                <AppText style={s.confirmTitle}>Download My Data</AppText>
+                <View style={[s.privacyInfoBox, { marginBottom: 8 }]}>
+                  <View style={s.privacyInfoRow}>
+                    <Ionicons name="person-outline" size={15} color="#60a5fa" />
+                    <AppText style={s.privacyInfoText}>Profile info, bio, and account details</AppText>
+                  </View>
+                  <View style={s.privacyInfoRow}>
+                    <Ionicons name="images-outline" size={15} color="#60a5fa" />
+                    <AppText style={s.privacyInfoText}>Your posts, reels, and media</AppText>
+                  </View>
+                  <View style={s.privacyInfoRow}>
+                    <Ionicons name="chatbubbles-outline" size={15} color="#60a5fa" />
+                    <AppText style={s.privacyInfoText}>Messages and comments</AppText>
+                  </View>
+                  <View style={s.privacyInfoRow}>
+                    <Ionicons name="mail-outline" size={15} color="#94a3b8" />
+                    <AppText style={s.privacyInfoText}>Export will be emailed to <AppText style={{ color: colors.text, fontWeight: '700' }}>{user?.email}</AppText></AppText>
+                  </View>
+                </View>
+                <View style={s.confirmBtns}>
+                  <TouchableOpacity style={s.confirmCancelBtn} onPress={() => setShowDownloadModal(false)} activeOpacity={0.8}>
+                    <AppText style={s.confirmCancelText}>{t('cancel')}</AppText>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={s.confirmRemoveBtn}
+                    activeOpacity={0.8}
+                    onPress={async () => {
+                      setDownloadStep('loading');
+                      try {
+                        await api.post('/auth/export-data');
+                        setDownloadStep('done');
+                      } catch (e) {
+                        setDownloadError(e.response?.data?.error || 'Request failed. Try again.');
+                        setDownloadStep('error');
+                      }
+                    }}
+                  >
+                    <LinearGradient colors={['#3b82f6', '#2563eb']} style={s.confirmRemoveBtnGrad}>
+                      <AppText style={s.confirmRemoveText}>Request Export</AppText>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+
+            {downloadStep === 'loading' && (
+              <View style={{ alignItems: 'center', paddingVertical: 24, paddingHorizontal: 24, gap: 14 }}>
+                <ActivityIndicator color="#3b82f6" size="large" />
+                <AppText style={[s.confirmTitle, { fontSize: 16 }]}>Preparing your export...</AppText>
+                <AppText style={[s.confirmSub, { marginBottom: 0 }]}>This may take a moment</AppText>
+              </View>
+            )}
+
+            {downloadStep === 'done' && (
+              <>
+                <AppText style={s.confirmTitle}>Export Requested!</AppText>
+                <AppText style={s.confirmSub}>
+                  Your data export has been queued.{`\n`}We'll email it to{`\n`}
+                  <AppText style={{ color: '#60a5fa', fontWeight: '700' }}>{user?.email}</AppText>
+                  {`\n`}within 24 hours.
+                </AppText>
+                <View style={[s.confirmBtns, { paddingHorizontal: 20 }]}>
+                  <TouchableOpacity
+                    style={[s.confirmRemoveBtn, { flex: 1 }]}
+                    onPress={() => setShowDownloadModal(false)}
+                    activeOpacity={0.8}
+                  >
+                    <LinearGradient colors={['#3b82f6', '#2563eb']} style={s.confirmRemoveBtnGrad}>
+                      <AppText style={s.confirmRemoveText}>Done</AppText>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+
+            {downloadStep === 'error' && (
+              <>
+                <AppText style={s.confirmTitle}>Request Failed</AppText>
+                <AppText style={s.confirmSub}>{downloadError}</AppText>
+                <View style={s.confirmBtns}>
+                  <TouchableOpacity style={s.confirmCancelBtn} onPress={() => setShowDownloadModal(false)} activeOpacity={0.8}>
+                    <AppText style={s.confirmCancelText}>Close</AppText>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={s.confirmRemoveBtn} onPress={() => setDownloadStep('idle')} activeOpacity={0.8}>
+                    <LinearGradient colors={['#3b82f6', '#2563eb']} style={s.confirmRemoveBtnGrad}>
+                      <AppText style={s.confirmRemoveText}>Try Again</AppText>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </View>
+              </>
             )}
           </BlurView>
         </View>
@@ -1705,7 +1860,7 @@ export default function SettingsScreen({ navigation }) {
                 onPress={() => setShowPrivacyModal(false)}
                 activeOpacity={0.8}
               >
-                <AppText style={s.confirmCancelText}>Cancel</AppText>
+                <AppText style={s.confirmCancelText}>{t('cancel')}</AppText>
               </TouchableOpacity>
               <TouchableOpacity
                 style={s.confirmRemoveBtn}

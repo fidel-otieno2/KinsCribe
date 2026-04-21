@@ -10,6 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useTranslation } from '../i18n';
 import api from '../api/axios';
 import { colors, radius } from '../theme';
 import Toast from '../components/Toast';
@@ -32,6 +33,7 @@ const PRIVACY_OPTS = [
 export default function CreateScreen({ navigation }) {
   const { user } = useAuth();
   const { theme, isDark } = useTheme();
+  const { t } = useTranslation();
   const { toast, hide, success, error, info } = useToast();
   const [mode, setMode] = useState('post');
   const [mediaFiles, setMediaFiles] = useState([]); // [{uri, type}]
@@ -176,7 +178,7 @@ export default function CreateScreen({ navigation }) {
         >
           {loading
             ? <ActivityIndicator color="#fff" size="small" />
-            : <AppText style={s.postBtnText}>Share</AppText>}
+            : <AppText style={s.postBtnText}>{t('share')}</AppText>}
         </TouchableOpacity>
       </View>
 
@@ -227,13 +229,13 @@ export default function CreateScreen({ navigation }) {
                 <TouchableOpacity style={s.mediaBtn} onPress={takePhoto} activeOpacity={0.85}>
                   <LinearGradient colors={['#7c3aed', '#3b82f6']} style={s.mediaBtnGrad}>
                     <Ionicons name="camera" size={26} color="#fff" />
-                    <AppText style={s.mediaBtnLabel}>Camera</AppText>
+                    <AppText style={s.mediaBtnLabel}>{t('camera')}</AppText>
                   </LinearGradient>
                 </TouchableOpacity>
                 <TouchableOpacity style={s.mediaBtn} onPress={() => pickMedia(true)} activeOpacity={0.85}>
                   <LinearGradient colors={['#3b82f6', '#06b6d4']} style={s.mediaBtnGrad}>
                     <Ionicons name="images" size={26} color="#fff" />
-                    <AppText style={s.mediaBtnLabel}>Gallery</AppText>
+                    <AppText style={s.mediaBtnLabel}>{t('gallery')}</AppText>
                   </LinearGradient>
                 </TouchableOpacity>
               </View>
@@ -295,7 +297,7 @@ export default function CreateScreen({ navigation }) {
               <TextInput style={[s.fieldInput, { color: theme.text }]} placeholder="Schedule: YYYY-MM-DD HH:MM (optional)" placeholderTextColor={theme.dim} value={scheduledFor} onChangeText={setScheduledFor} />
             </View>
 
-            <AppText style={[s.label, { color: theme.muted }]}>Audience</AppText>
+            <AppText style={[s.label, { color: theme.muted }]}>{t('audience')}</AppText>
             <View style={s.privacyRow}>
               {PRIVACY_OPTS.map(opt => (
                 <TouchableOpacity
@@ -338,11 +340,11 @@ export default function CreateScreen({ navigation }) {
             <View style={s.storyActions}>
               <TouchableOpacity style={[s.storyActionBtn, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]} onPress={takePhoto}>
                 <Ionicons name="camera-outline" size={22} color={theme.text} />
-                <AppText style={[s.storyActionText, { color: theme.text }]}>Camera</AppText>
+                <AppText style={[s.storyActionText, { color: theme.text }]}>{t('camera')}</AppText>
               </TouchableOpacity>
               <TouchableOpacity style={[s.storyActionBtn, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]} onPress={() => pickMedia(false)}>
                 <Ionicons name="images-outline" size={22} color={theme.text} />
-                <AppText style={[s.storyActionText, { color: theme.text }]}>Gallery</AppText>
+                <AppText style={[s.storyActionText, { color: theme.text }]}>{t('gallery')}</AppText>
               </TouchableOpacity>
             </View>
 
@@ -361,7 +363,7 @@ export default function CreateScreen({ navigation }) {
               </>
             )}
 
-            <AppText style={[s.label, { color: theme.muted }]}>Audience</AppText>
+            <AppText style={[s.label, { color: theme.muted }]}>{t('audience')}</AppText>
             <View style={s.privacyRow}>
               {PRIVACY_OPTS.slice(0, 2).map(opt => (
                 <TouchableOpacity
@@ -393,13 +395,13 @@ export default function CreateScreen({ navigation }) {
                 <TouchableOpacity style={s.mediaBtn} onPress={takePhoto} activeOpacity={0.85}>
                   <LinearGradient colors={['#10b981', '#059669']} style={s.mediaBtnGrad}>
                     <Ionicons name="camera" size={26} color="#fff" />
-                    <AppText style={s.mediaBtnLabel}>Camera</AppText>
+                    <AppText style={s.mediaBtnLabel}>{t('camera')}</AppText>
                   </LinearGradient>
                 </TouchableOpacity>
                 <TouchableOpacity style={s.mediaBtn} onPress={() => pickMedia(false)} activeOpacity={0.85}>
                   <LinearGradient colors={['#7c3aed', '#3b82f6']} style={s.mediaBtnGrad}>
                     <Ionicons name="images" size={26} color="#fff" />
-                    <AppText style={s.mediaBtnLabel}>Gallery</AppText>
+                    <AppText style={s.mediaBtnLabel}>{t('gallery')}</AppText>
                   </LinearGradient>
                 </TouchableOpacity>
               </View>

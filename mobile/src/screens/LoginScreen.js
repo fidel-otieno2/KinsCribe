@@ -15,6 +15,7 @@ import * as Google from 'expo-auth-session/providers/google';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useTranslation } from '../i18n';
 import { colors, radius, shadows } from '../theme';
 import GradientButton from '../components/GradientButton';
 import PhoneInput from '../components/PhoneInput';
@@ -58,6 +59,7 @@ const HERO_HEIGHT = height * 0.32;
 // ── Phone Login Modal ─────────────────────────────────────────
 function PhoneLoginModal({ visible, onClose }) {
   const { theme } = useTheme();
+  const { t } = useTranslation();
   const { loginWithGoogle } = useAuth();
   const [step, setStep] = useState('phone'); // phone | otp
   const [phone, setPhone] = useState('');
@@ -245,7 +247,7 @@ function PhoneLoginModal({ visible, onClose }) {
 
             {step === 'phone' ? (
               <>
-                <AppText style={pl.label}>Phone Number</AppText>
+                <AppText style={pl.label}>{t('phone_number')}</AppText>
                 <PhoneInput
                   value={phone}
                   onChangeText={setPhone}
@@ -253,7 +255,7 @@ function PhoneLoginModal({ visible, onClose }) {
                   style={{ marginBottom: 16 }}
                 />
                 
-                <AppText style={pl.label}>Email Address</AppText>
+                <AppText style={pl.label}>{t('email_address')}</AppText>
                 <View style={pl.inputWrap}>
                   <Ionicons name="mail-outline" size={17} color={theme.muted} />
                   <TextInput
@@ -283,7 +285,7 @@ function PhoneLoginModal({ visible, onClose }) {
                   <LinearGradient colors={['#7c3aed', '#3b82f6']} style={pl.btnGrad}>
                     {loading
                       ? <ActivityIndicator color="#fff" size="small" />
-                      : <AppText style={pl.btnText}>Send Code</AppText>}
+                      : <AppText style={pl.btnText}>{t('send_code')}</AppText>}
                   </LinearGradient>
                 </TouchableOpacity>
               </>
@@ -365,6 +367,7 @@ const pl = StyleSheet.create({
 // ── Forgot Password Modal ─────────────────────────────────────
 function ForgotPasswordModal({ visible, onClose }) {
   const { theme } = useTheme();
+  const { t } = useTranslation();
   const [step, setStep] = useState('email');
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
@@ -438,11 +441,11 @@ function ForgotPasswordModal({ visible, onClose }) {
                 <LinearGradient colors={['#10b981', '#059669']} style={fp.doneIconWrap}>
                   <Ionicons name="checkmark" size={36} color="#fff" />
                 </LinearGradient>
-                <AppText style={fp.title}>Password Updated!</AppText>
+                <AppText style={fp.title}>{t('password_updated')}</AppText>
                 <AppText style={fp.sub}>You can now sign in with your new password.</AppText>
                 <TouchableOpacity style={fp.doneBtn} onPress={handleClose}>
                   <LinearGradient colors={['#7c3aed', '#3b82f6']} style={fp.doneBtnGrad}>
-                    <AppText style={fp.doneBtnText}>Back to Sign In</AppText>
+                    <AppText style={fp.doneBtnText}>{t('back_to_sign_in')}</AppText>
                   </LinearGradient>
                 </TouchableOpacity>
               </View>
@@ -472,7 +475,7 @@ function ForgotPasswordModal({ visible, onClose }) {
 
                 {step === 'email' ? (
                   <>
-                    <AppText style={fp.label}>Email Address</AppText>
+                    <AppText style={fp.label}>{t('email_address')}</AppText>
                     <View style={fp.inputWrap}>
                       <Ionicons name="mail-outline" size={17} color={theme.muted} />
                       <TextInput
@@ -489,7 +492,7 @@ function ForgotPasswordModal({ visible, onClose }) {
                       <LinearGradient colors={['#7c3aed', '#3b82f6']} style={fp.btnGrad}>
                         {loading
                           ? <ActivityIndicator color="#fff" size="small" />
-                          : <AppText style={fp.btnText}>Send Reset Code</AppText>}
+                          : <AppText style={fp.btnText}>{t('send_reset_code')}</AppText>}
                       </LinearGradient>
                     </TouchableOpacity>
                   </>
@@ -512,7 +515,7 @@ function ForgotPasswordModal({ visible, onClose }) {
                       ))}
                     </View>
 
-                    <AppText style={fp.label}>New Password</AppText>
+                    <AppText style={fp.label}>{t('new_password')}</AppText>
                     <View style={fp.inputWrap}>
                       <Ionicons name="lock-closed-outline" size={17} color={theme.muted} />
                       <TextInput
@@ -532,7 +535,7 @@ function ForgotPasswordModal({ visible, onClose }) {
                       <LinearGradient colors={['#7c3aed', '#3b82f6']} style={fp.btnGrad}>
                         {loading
                           ? <ActivityIndicator color="#fff" size="small" />
-                          : <AppText style={fp.btnText}>Reset Password</AppText>}
+                          : <AppText style={fp.btnText}>{t('reset_password')}</AppText>}
                       </LinearGradient>
                     </TouchableOpacity>
 
@@ -583,6 +586,7 @@ const fp = StyleSheet.create({
 // ── 2FA Login Modal ──────────────────────────────────────────
 function TwoFALoginModal({ visible, userId, onClose, onSuccess }) {
   const { theme } = useTheme();
+  const { t } = useTranslation();
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -648,7 +652,7 @@ function TwoFALoginModal({ visible, userId, onClose, onSuccess }) {
               <LinearGradient colors={['#7c3aed', '#3b82f6']} style={pl.btnGrad}>
                 {loading
                   ? <ActivityIndicator color="#fff" size="small" />
-                  : <AppText style={pl.btnText}>Verify</AppText>}
+                  : <AppText style={pl.btnText}>{t('verify')}</AppText>}
               </LinearGradient>
             </TouchableOpacity>
             <TouchableOpacity style={pl.resendBtn} onPress={() => { setUseBackup(p => !p); setCode(''); setError(''); }}>
@@ -666,6 +670,7 @@ function TwoFALoginModal({ visible, userId, onClose, onSuccess }) {
 export default function LoginScreen({ navigation }) {
   const { login, loginWithGoogle } = useAuth();
   const { theme, isDark } = useTheme();
+  const { t } = useTranslation();
   const [form, setForm] = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -845,7 +850,7 @@ export default function LoginScreen({ navigation }) {
         </TouchableOpacity>
         <View style={s.heroText}>
           <AppText style={s.appName}>KinsCribe</AppText>
-          <AppText style={s.heroSub}>Welcome back 👋</AppText>
+          <AppText style={s.heroSub}>{t('welcome_back')}</AppText>
         </View>
       </View>
 
@@ -854,8 +859,8 @@ export default function LoginScreen({ navigation }) {
         <BlurView intensity={20} tint="dark" style={s.card}>
           <LinearGradient colors={['rgba(124,58,237,0.08)', 'rgba(15,23,42,0.7)']} style={StyleSheet.absoluteFill} />
           <View style={s.cardInner}>
-            <AppText style={[s.cardTitle, { color: theme.text }]}>Sign In</AppText>
-            <AppText style={[s.cardSub, { color: theme.muted }]}>Enter your details to continue</AppText>
+            <AppText style={[s.cardTitle, { color: theme.text }]}>{t('sign_in')}</AppText>
+            <AppText style={[s.cardSub, { color: theme.muted }]}>{t('enter_details')}</AppText>
 
             {error ? (
               <View style={s.errorBox}>
@@ -864,7 +869,7 @@ export default function LoginScreen({ navigation }) {
               </View>
             ) : null}
 
-            <AppText style={[s.label, { color: theme.muted }]}>Email</AppText>
+            <AppText style={[s.label, { color: theme.muted }]}>{t('email')}</AppText>
             <View style={[s.inputWrap, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]}>
               <Ionicons name="mail-outline" size={18} color={theme.muted} />
               <TextInput
@@ -878,7 +883,7 @@ export default function LoginScreen({ navigation }) {
               />
             </View>
 
-            <AppText style={[s.label, { color: theme.muted }]}>Password</AppText>
+            <AppText style={[s.label, { color: theme.muted }]}>{t('password')}</AppText>
             <View style={[s.inputWrap, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]}>
               <Ionicons name="lock-closed-outline" size={18} color={theme.muted} />
               <TextInput
@@ -895,10 +900,10 @@ export default function LoginScreen({ navigation }) {
             </View>
 
             <TouchableOpacity style={s.forgotBtn} onPress={() => setShowForgot(true)}>
-              <AppText style={s.forgotText}>Forgot password?</AppText>
+              <AppText style={s.forgotText}>{t('forgot_password')}</AppText>
             </TouchableOpacity>
 
-            <GradientButton label="Sign In" onPress={handleLogin} loading={loading} style={{ marginTop: 4 }} />
+            <GradientButton label={t('sign_in')} onPress={handleLogin} loading={loading} style={{ marginTop: 4 }} />
 
             {/* Biometric */}
             {biometricAvailable && (
@@ -956,7 +961,7 @@ export default function LoginScreen({ navigation }) {
                     <Path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
                     <Path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
                   </Svg>
-                  <AppText style={s.googleText}>Continue with Google</AppText>
+                  <AppText style={s.googleText}>{t('continue_google')}</AppText>
                 </>
               )}
             </TouchableOpacity>
@@ -968,7 +973,7 @@ export default function LoginScreen({ navigation }) {
               activeOpacity={0.8}
             >
               <Ionicons name="phone-portrait-outline" size={20} color={theme.primary} />
-              <AppText style={[s.phoneBtnText, { color: theme.text }]}>Continue with Phone</AppText>
+              <AppText style={[s.phoneBtnText, { color: theme.text }]}>{t('continue_phone')}</AppText>
             </TouchableOpacity>
 
 
@@ -976,15 +981,15 @@ export default function LoginScreen({ navigation }) {
         </BlurView>
 
         <View style={s.footer}>
-          <AppText style={[s.footerText, { color: theme.muted }]}>Don't have an account? </AppText>
+          <AppText style={[s.footerText, { color: theme.muted }]}>{t('dont_have_account')} </AppText>
           <TouchableOpacity onPress={() => navigation.navigate('Register')}>
-            <AppText style={s.footerLink}>Sign up free</AppText>
+            <AppText style={s.footerLink}>{t('sign_up_free')}</AppText>
           </TouchableOpacity>
         </View>
 
         <TouchableOpacity style={s.inviteRow} onPress={() => navigation.navigate('JoinFamily')}>
           <Ionicons name="key-outline" size={14} color={theme.dim} />
-          <AppText style={[s.inviteText, { color: theme.dim }]}>Have an invite code? Join family</AppText>
+          <AppText style={[s.inviteText, { color: theme.dim }]}>{t('have_invite')}</AppText>
         </TouchableOpacity>
       </ScrollView>
 
@@ -1055,7 +1060,7 @@ export default function LoginScreen({ navigation }) {
                 setPendingBiometricCredentials(null);
               }}
             >
-              <AppText style={bm.skipText}>Not Now</AppText>
+              <AppText style={bm.skipText}>{t('not_now')}</AppText>
             </TouchableOpacity>
           </BlurView>
         </View>

@@ -9,6 +9,7 @@ import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../api/axios';
 import { useTheme } from '../context/ThemeContext';
+import { useTranslation } from '../i18n';
 import { colors, radius } from '../theme';
 import Toast from '../components/Toast';
 import useToast from '../hooks/useToast';
@@ -28,6 +29,7 @@ const EVENT_TYPES = [
 
 function AddEventModal({ visible, onClose, onSave, selectedDate }) {
   const { theme } = useTheme();
+  const { t } = useTranslation();
   const { toast, hide, info } = useToast();
   const [form, setForm] = useState({ title: '', description: '', event_type: 'event', color: '#7c3aed', is_recurring: false, recurrence: 'yearly' });
   const [loading, setLoading] = useState(false);
@@ -80,7 +82,7 @@ function AddEventModal({ visible, onClose, onSave, selectedDate }) {
             </LinearGradient>
           </TouchableOpacity>
           <TouchableOpacity style={m.cancelBtn} onPress={onClose}>
-            <AppText style={m.cancelText}>Cancel</AppText>
+            <AppText style={m.cancelText}>{t('cancel')}</AppText>
           </TouchableOpacity>
         </View>
       </BlurView>
@@ -112,6 +114,7 @@ const m = StyleSheet.create({
 
 export default function FamilyCalendarScreen({ navigation }) {
   const { theme, isDark } = useTheme();
+  const { t } = useTranslation();
   const { toast, hide, success, error } = useToast();
   const today = new Date();
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());

@@ -6,11 +6,13 @@ import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
+import { useTranslation } from '../i18n';
 import { colors, radius, shadows } from '../theme';
 import GradientButton from '../components/GradientButton';
 
 export default function JoinFamilyScreen({ navigation }) {
   const { refreshUser } = useAuth();
+  const { t } = useTranslation();
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -40,7 +42,7 @@ export default function JoinFamilyScreen({ navigation }) {
           <Ionicons name="key" size={32} color="#fff" />
         </LinearGradient>
 
-        <AppText style={s.title}>Join a Family</AppText>
+        <AppText style={s.title}>{t('join_family')}</AppText>
         <AppText style={s.sub}>Enter the invite code sent by your family admin</AppText>
 
         <BlurView intensity={20} tint="dark" style={s.card}>
@@ -63,7 +65,7 @@ export default function JoinFamilyScreen({ navigation }) {
               maxLength={8}
             />
             <AppText style={s.hint}>Code is 8 characters long</AppText>
-            <GradientButton label="Join Family" onPress={handleJoin} loading={loading} style={{ marginTop: 8 }} />
+            <GradientButton label={t('join_family')} onPress={handleJoin} loading={loading} style={{ marginTop: 8 }} />
           </View>
         </BlurView>
 

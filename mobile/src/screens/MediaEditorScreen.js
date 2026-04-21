@@ -11,6 +11,7 @@ import { Audio } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, radius } from '../theme';
+import { useTranslation } from '../i18n';
 import Toast from '../components/Toast';
 import useToast from '../hooks/useToast';
 import { multipartPost, buildFileEntry } from '../api/upload';
@@ -262,6 +263,7 @@ const lp = StyleSheet.create({
 
 // ── Main MediaEditorScreen ────────────────────────────────────────────────────
 export default function MediaEditorScreen({ route, navigation }) {
+  const { t } = useTranslation();
   const { mediaFile, mediaType } = route.params;
   const { toast, hide, success, error, info } = useToast();
 

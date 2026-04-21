@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import AppText from '../components/AppText';
+import { useTranslation } from '../i18n';
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation } from "@react-navigation/native";
@@ -15,6 +16,7 @@ import api from "../api/axios";
 import { colors } from "../theme";
 
 export default function StorybooksScreen() {
+  const { t } = useTranslation();
   const [storybooks, setStorybooks] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigation = useNavigation();

@@ -7,12 +7,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, gradients, radius, shadows } from '../theme';
+import { useTranslation } from '../i18n';
 import GradientButton from '../components/GradientButton';
 
 const { width, height } = Dimensions.get('window');
 const HERO_HEIGHT = height * 0.55;
 
 export default function WelcomeScreen({ navigation }) {
+  const { t } = useTranslation();
   return (
     <View style={s.container}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
@@ -36,7 +38,7 @@ export default function WelcomeScreen({ navigation }) {
         <View style={s.heroTextWrap}>
           <BlurView intensity={30} tint="dark" style={s.badge}>
             <Ionicons name="leaf" size={12} color={colors.primaryLight} />
-            <AppText style={s.badgeText}>AI-Powered Family Stories</AppText>
+            <AppText style={s.badgeText}>{t('ai_powered')}</AppText>
           </BlurView>
 
           <AppText style={s.appName}>KinsCribe</AppText>
@@ -71,7 +73,7 @@ export default function WelcomeScreen({ navigation }) {
         {/* Buttons */}
         <View style={s.buttons}>
           <GradientButton
-            label="Get Started — It's Free"
+            label={t('sign_up_free')}
             onPress={() => navigation.navigate('Register')}
             style={{ marginBottom: 12 }}
           />
@@ -81,8 +83,8 @@ export default function WelcomeScreen({ navigation }) {
             onPress={() => navigation.navigate('Login')}
             activeOpacity={0.8}
           >
-            <AppText style={s.signInBtnText}>Already have an account? </AppText>
-            <AppText style={s.signInBtnHighlight}>Sign In</AppText>
+            <AppText style={s.signInBtnText}>{t('already_have_account')} </AppText>
+            <AppText style={s.signInBtnHighlight}>{t('sign_in')}</AppText>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -92,12 +94,12 @@ export default function WelcomeScreen({ navigation }) {
           >
             <View style={s.inviteBtnInner}>
               <Ionicons name="key-outline" size={16} color={colors.gold} />
-              <AppText style={s.inviteBtnText}>Join with Invite Code</AppText>
+              <AppText style={s.inviteBtnText}>{t('join_with_code')}</AppText>
             </View>
           </TouchableOpacity>
         </View>
 
-        <AppText style={s.footer}>Your stories. Your family. Forever. 🌿</AppText>
+        <AppText style={s.footer}>{t('app_tagline')}</AppText>
       </View>
     </View>
   );

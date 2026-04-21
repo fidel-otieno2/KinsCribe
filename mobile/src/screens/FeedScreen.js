@@ -17,6 +17,7 @@ import { colors, radius } from "../theme";
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
 import VideoPlayer from "../components/VideoPlayer";
+import { useTranslation } from "../i18n";
 
 const { width } = Dimensions.get("window");
 
@@ -35,6 +36,7 @@ function timeAgo(dateStr) {
 function JoinFamilyModal({ visible, onClose, onJoined }) {
   const { refreshUser } = useAuth();
   const { theme } = useTheme();
+  const { t } = useTranslation();
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -117,6 +119,7 @@ const jf = StyleSheet.create({
 // ── Share Post Modal ──────────────────────────────────────────
 function SharePostModal({ visible, postId, onClose }) {
   const { theme } = useTheme();
+  const { t } = useTranslation();
   const [query, setQuery] = useState("");
   const [users, setUsers] = useState([]);
   const [sending, setSending] = useState(null);
@@ -158,7 +161,7 @@ function SharePostModal({ visible, postId, onClose }) {
           </View>
           <View style={[sp.searchWrap, { backgroundColor: theme.bgSecondary }]}>
             <Ionicons name="search" size={15} color={theme.dim} />
-            <TextInput style={[sp.searchInput, { color: theme.text }]} placeholder="Search people..." placeholderTextColor={theme.dim} value={query} onChangeText={handleSearch} />
+            <TextInput style={[sp.searchInput, { color: theme.text }]} placeholder={t('search_people')} placeholderTextColor={theme.dim} value={query} onChangeText={handleSearch} />
           </View>
           <ScrollView style={{ maxHeight: 320 }} contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 20 }}>
             {users.map(u => (
@@ -177,7 +180,7 @@ function SharePostModal({ visible, postId, onClose }) {
                 >
                   {sending === u.id ? <ActivityIndicator size="small" color="#fff" /> :
                     sent.has(u.id) ? <Ionicons name="checkmark" size={16} color="#fff" /> :
-                    <AppText style={sp.sendBtnText}>Send</AppText>}
+                    <AppText style={sp.sendBtnText}>{t('send')}</AppText>}
                 </TouchableOpacity>
               </View>
             ))}
@@ -209,6 +212,7 @@ const sp = StyleSheet.create({
 const PostCard = memo(function PostCard({ post, onUpdate, navigation, isVisible }) {
   const { user } = useAuth();
   const { theme } = useTheme();
+  const { t } = useTranslation();
   const [liked, setLiked] = useState(post.liked_by_me || false);
   const [saved, setSaved] = useState(post.saved_by_me || false);
   const [likeCount, setLikeCount] = useState(post.like_count || 0);
@@ -343,8 +347,8 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation, isVisible 
         </View>
         {isOwner && (
           <TouchableOpacity onPress={() => Alert.alert("Delete Post", "Remove this post?", [
-            { text: "Cancel", style: "cancel" },
-            { text: "Delete", style: "destructive", onPress: async () => {
+            { text: t('cancel'), style: "cancel" },
+            { text: t('delete'), style: "destructive", onPress: async () => {
               try { await api.delete(`/posts/${post.id}`); onUpdate?.(); } catch {}
             }},
           ])}>
@@ -551,7 +555,7 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation, isVisible 
               </View>
               <TextInput
                 style={[pc.commentInput, { color: theme.text }]}
-                placeholder="Add a comment..."
+                placeholder={t('add_comment')}
                 placeholderTextColor={theme.dim}
                 value={commentText}
                 onChangeText={setCommentText}
@@ -559,7 +563,7 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation, isVisible 
               <TouchableOpacity onPress={postComment} disabled={posting || !commentText.trim()}>
                 {posting
                   ? <ActivityIndicator size="small" color={theme.primary} />
-                  : <AppText style={[pc.postBtn, !commentText.trim() && { opacity: 0.4 }]}>Post</AppText>}
+                  : <AppText style={[pc.postBtn, !commentText.trim() && { opacity: 0.4 }]}>{t('post')}</AppText>}
               </TouchableOpacity>
             </View>
           </View>
@@ -616,6 +620,7 @@ const pc = StyleSheet.create({
 export default function FeedScreen({ navigation }) {
   const { user } = useAuth();
   const { theme, isDark } = useTheme();
+  const { t } = useTranslation();
   const [posts, setPosts] = useState([]);
   const [storyGroups, setStoryGroups] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -738,7 +743,7 @@ export default function FeedScreen({ navigation }) {
                   <Ionicons name="add" size={22} color={theme.text} />
                 </View>
               </View>
-              <AppText style={[s.storyLabel, { color: theme.text }]}>Your Story</AppText>
+              <AppText style={[s.storyLabel, { color: theme.text }]}>{t('your_story')}</AppText>
             </TouchableOpacity>
             {storyGroups.map((group, idx) => (
               <TouchableOpacity
@@ -781,10 +786,10 @@ export default function FeedScreen({ navigation }) {
             </View>
             <View>
               <AppText style={s.familyBannerTitle}>
-                {user?.family_id ? "Your Family" : "Join a Family"}
+                {user?.family_id ? t('your_family') : t('join_family')}
               </AppText>
               <AppText style={s.familyBannerSub}>
-                {user?.family_id ? "View family stories & chat" : "Enter invite code to join"}
+                {user?.family_id ? t('your_family_sub') : t('join_family_sub')}}
               </AppText>
             </View>
           </View>
@@ -794,7 +799,7 @@ export default function FeedScreen({ navigation }) {
 
       {posts.length > 0 && (
         <View style={s.feedLabel}>
-          <AppText style={s.feedLabelText}>Your Feed</AppText>
+          <AppText style={s.feedLabelText}>{t('your_feed')}</AppText>
         </View>
       )}
     </View>
@@ -861,9 +866,9 @@ export default function FeedScreen({ navigation }) {
             <View style={s.emptyWrap}>
               <LinearGradient colors={["rgba(124,58,237,0.15)", "rgba(59,130,246,0.1)"]} style={s.emptyCard}>
                 <Ionicons name="people-outline" size={52} color={theme.primary} />
-                <AppText style={[s.emptyTitle, { color: theme.text }]}>Your feed is empty</AppText>
+                <AppText style={[s.emptyTitle, { color: theme.text }]}>{t('feed_empty')}</AppText>
                 <AppText style={[s.emptySub, { color: theme.muted }]}>
-                  Connect with people on the Discover tab to see their posts here
+                  {t('feed_empty_sub')}
                 </AppText>
                 <TouchableOpacity
                   style={s.discoverBtn}
@@ -872,7 +877,7 @@ export default function FeedScreen({ navigation }) {
                 >
                   <LinearGradient colors={["#7c3aed", "#3b82f6"]} style={s.discoverBtnGrad}>
                     <Ionicons name="compass-outline" size={18} color="#fff" />
-                    <AppText style={s.discoverBtnText}>Discover People</AppText>
+                    <AppText style={s.discoverBtnText}>{t('discover')}</AppText>
                   </LinearGradient>
                 </TouchableOpacity>
               </LinearGradient>
@@ -925,7 +930,7 @@ export default function FeedScreen({ navigation }) {
               </LinearGradient>
             </TouchableOpacity>
             <TouchableOpacity style={bm.skipBtn} onPress={() => setShowBiometricPrompt(false)}>
-              <AppText style={bm.skipText}>Not Now</AppText>
+              <AppText style={bm.skipText}>{t('not_now')}</AppText>
             </TouchableOpacity>
           </BlurView>
         </View>

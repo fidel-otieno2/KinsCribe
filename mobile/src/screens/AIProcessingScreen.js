@@ -5,9 +5,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../api/axios';
+import { useTranslation } from '../i18n';
 import { colors, radius, shadows } from '../theme';
 
 export default function AIProcessingScreen({ route, navigation }) {
+  const { t } = useTranslation();
   const { storyId } = route.params || {};
   const [story, setStory] = useState(null);
   const [loading, setLoading] = useState(true);

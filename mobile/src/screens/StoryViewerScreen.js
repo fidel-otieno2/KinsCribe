@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
+import { useTranslation } from '../i18n';
 import { colors } from '../theme';
 
 const { width, height } = Dimensions.get('window');
@@ -19,6 +20,7 @@ const STORY_DURATION = 5000;
 export default function StoryViewerScreen({ route, navigation }) {
   const { storyGroups, initialGroupIndex = 0 } = route.params;
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [groupIndex, setGroupIndex] = useState(initialGroupIndex);
   const [storyIndex, setStoryIndex] = useState(0);
   const [paused, setPaused] = useState(false);

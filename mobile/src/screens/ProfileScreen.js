@@ -10,6 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useTranslation } from '../i18n';
 import api from '../api/axios';
 import { colors, radius } from '../theme';
 import * as ImagePicker from 'expo-image-picker';
@@ -32,6 +33,7 @@ const TABS = [
 export default function ProfileScreen({ navigation }) {
   const { user, refreshUser, logout } = useAuth();
   const { theme } = useTheme();
+  const { t } = useTranslation();
   const { toast, hide, success, error, info } = useToast();
   const [posts, setPosts] = useState([]);
   const [savedPosts, setSavedPosts] = useState([]);
@@ -179,11 +181,11 @@ export default function ProfileScreen({ navigation }) {
         <View style={s.statsRow}>
           <View style={s.stat}>
             <AppText style={[s.statNum, { color: theme.text }]}>{stats.posts}</AppText>
-            <AppText style={[s.statLabel, { color: theme.muted }]}>Posts</AppText>
+            <AppText style={[s.statLabel, { color: theme.muted }]}>{t('posts')}</AppText>
           </View>
           <TouchableOpacity style={s.stat} onPress={() => {}}>
             <AppText style={[s.statNum, { color: theme.text }]}>{stats.connections}</AppText>
-            <AppText style={[s.statLabel, { color: theme.muted }]}>Connections</AppText>
+            <AppText style={[s.statLabel, { color: theme.muted }]}>{t('connections')}</AppText>
           </TouchableOpacity>
           <TouchableOpacity style={s.stat} onPress={() => {}}>
             <AppText style={[s.statNum, { color: theme.text }]}>{stats.interests}</AppText>
@@ -210,7 +212,7 @@ export default function ProfileScreen({ navigation }) {
       {/* Action buttons */}
       <View style={s.actionRow}>
         <TouchableOpacity style={[s.editBtn, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]} onPress={() => navigation.navigate('Settings')}>
-          <AppText style={[s.editBtnText, { color: theme.text }]}>Edit Profile</AppText>
+          <AppText style={[s.editBtnText, { color: theme.text }]}>{t('edit_profile')}</AppText>
         </TouchableOpacity>
         <TouchableOpacity style={[s.shareBtn, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]} onPress={handleShare}>
           <Ionicons name="share-outline" size={18} color={theme.text} />
@@ -283,7 +285,7 @@ export default function ProfileScreen({ navigation }) {
       <Modal visible={showQR} transparent animationType="fade" onRequestClose={() => setShowQR(false)}>
         <TouchableOpacity style={s.qrOverlay} activeOpacity={1} onPress={() => setShowQR(false)}>
           <View style={[s.qrCard, { backgroundColor: theme.bgCard }]}>
-            <AppText style={[s.qrTitle, { color: theme.text }]}>Scan to visit profile</AppText>
+            <AppText style={[s.qrTitle, { color: theme.text }]}>{t('scan_profile')}</AppText>
             <AppText style={[s.qrSub, { color: theme.muted }]}>@{user?.username || user?.name}</AppText>
             <View style={s.qrBox}>
               <QRCode value={qrValue} size={200} color="#7c3aed" backgroundColor="#fff" />
@@ -307,7 +309,7 @@ export default function ProfileScreen({ navigation }) {
               size={48} color={theme.dim}
             />
             <AppText style={[s.emptyTitle, { color: theme.muted }]}>
-              {tab === 'saved' ? 'No saved posts' : tab === 'reels' ? 'No reels yet' : tab === 'tagged' ? 'No tagged posts yet' : tab === 'liked' ? 'No liked posts yet' : 'No posts yet'}
+              {tab === 'saved' ? 'No saved posts' : tab === 'reels' ? 'No reels yet' : tab === 'tagged' ? 'No tagged posts yet' : tab === 'liked' ? 'No liked posts yet' : t('no_posts')}
             </AppText>
             {tab === 'posts' && (
               <TouchableOpacity style={s.createBtn} onPress={() => navigation.navigate('Create')}>

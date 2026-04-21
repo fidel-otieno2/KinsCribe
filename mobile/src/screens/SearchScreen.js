@@ -4,6 +4,7 @@ import {
   Image, ActivityIndicator, StatusBar, TextInput, ScrollView,
 } from "react-native";
 import AppText from '../components/AppText';
+import { useTranslation } from '../i18n';
 import { useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -56,6 +57,7 @@ function ConnectButton({ userId, initialConnected, onToggle }) {
 }
 
 export default function SearchScreen({ navigation }) {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { theme } = useTheme();
   const [query, setQuery] = useState("");
@@ -131,7 +133,7 @@ export default function SearchScreen({ navigation }) {
 
       {/* Header */}
       <View style={s.header}>
-        <AppText style={[s.title, { color: theme.text }]}>Discover</AppText>
+        <AppText style={[s.title, { color: theme.text }]}>{t('discover')}</AppText>
       </View>
 
       {/* Search bar */}
@@ -171,11 +173,11 @@ export default function SearchScreen({ navigation }) {
           <>
             {/* People you may know */}
             <View style={s.section}>
-              <AppText style={[s.sectionTitle, { color: theme.text }]}>People You May Know</AppText>
+              <AppText style={[s.sectionTitle, { color: theme.text }]}>{t('people_you_may_know')}</AppText>
               {loadingSuggestions ? (
                 <ActivityIndicator color={theme.primary} style={{ marginTop: 20 }} />
               ) : suggestions.length === 0 ? (
-                <AppText style={[s.emptyText, { color: theme.muted }]}>No suggestions right now</AppText>
+                <AppText style={[s.emptyText, { color: theme.muted }]}>{t('no_suggestions')}</AppText>
               ) : (
                 suggestions.map(u => renderUser(u))
               )}
@@ -185,7 +187,7 @@ export default function SearchScreen({ navigation }) {
             {posts.length > 0 && (
               <View style={s.section}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                  <AppText style={[s.sectionTitle, { color: theme.text }]}>Explore Posts</AppText>
+                  <AppText style={[s.sectionTitle, { color: theme.text }]}>{t('explore_posts')}</AppText>
                   <View style={{ flexDirection: 'row', gap: 6 }}>
                     {['recent', 'trending', 'popular'].map(f => (
                       <TouchableOpacity

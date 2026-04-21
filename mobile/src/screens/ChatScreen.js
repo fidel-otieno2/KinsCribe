@@ -5,6 +5,7 @@ import {
   ActivityIndicator, StatusBar, Alert,
 } from "react-native";
 import AppText from '../components/AppText';
+import { useTranslation } from '../i18n';
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
@@ -33,6 +34,7 @@ function Avatar({ uri, name, size = 32 }) {
 const REACTIONS = ["❤️", "😂", "😮", "😢", "👏", "🔥"];
 
 export default function ChatScreen({ route, navigation }) {
+  const { t } = useTranslation();
   const { conversationId: initialConvId, title, avatar, type, otherUserId } = route.params;
   const { user } = useAuth();
   const [convId, setConvId] = useState(initialConvId);
@@ -165,8 +167,8 @@ export default function ChatScreen({ route, navigation }) {
 
   const deleteMessage = (msgId) => {
     Alert.alert("Delete Message", "Delete this message?", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Delete", style: "destructive", onPress: async () => {
+      { text: t('cancel'), style: "cancel" },
+      { text: t('delete'), style: "destructive", onPress: async () => {
         try {
           await api.delete(`/messages/messages/${msgId}`);
           setMessages(prev => prev.filter(m => m.id !== msgId));
@@ -292,7 +294,7 @@ export default function ChatScreen({ route, navigation }) {
         >
           <AppText style={cs.headerTitle}>{title}</AppText>
           <AppText style={cs.headerSub}>
-            {type === "family" ? "Family Group" :
+            {type === "family" ? t('family_group') :
               otherStatus === "online" ? "🟢 Online" :
               otherStatus === "recently" ? "Recently active" :
               "Active recently"}
@@ -300,7 +302,7 @@ export default function ChatScreen({ route, navigation }) {
         </TouchableOpacity>
 
         {type === "family" && (
-          <TouchableOpacity onPress={() => navigation.navigate("Family")}>
+          <TouchableOpacity onPress={() => navigation.navigate('Family')}>
             <Ionicons name="information-circle-outline" size={24} color={colors.muted} />
           </TouchableOpacity>
         )}
@@ -333,7 +335,7 @@ export default function ChatScreen({ route, navigation }) {
           ListEmptyComponent={
             <View style={cs.emptyWrap}>
               <Ionicons name="chatbubble-outline" size={40} color={colors.dim} />
-              <AppText style={cs.emptyText}>No messages yet. Say hello! 👋</AppText>
+              <AppText style={cs.emptyText}>{t('say_hello')}</AppText>
             </View>
           }
         />
@@ -342,7 +344,7 @@ export default function ChatScreen({ route, navigation }) {
       {disappearing && (
         <View style={cs.disappearBanner}>
           <Ionicons name="timer-outline" size={14} color="#f59e0b" />
-          <AppText style={cs.disappearText}>Disappearing messages on · 24h</AppText>
+          <AppText style={cs.disappearText}>{t('disappearing_on')}</AppText>
         </View>
       )}
 
@@ -387,7 +389,7 @@ export default function ChatScreen({ route, navigation }) {
         <View style={cs.inputWrap}>
           <TextInput
             style={cs.input}
-            placeholder="Message..."
+            placeholder={t('message_placeholder')}
             placeholderTextColor={colors.dim}
             value={text}
             onChangeText={handleTextChange}

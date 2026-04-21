@@ -6,11 +6,13 @@ import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
+import { useTranslation } from '../i18n';
 import { colors, radius, shadows } from '../theme';
 import GradientButton from '../components/GradientButton';
 
 export default function FamilyGateScreen() {
   const { user, refreshUser } = useAuth();
+  const { t } = useTranslation();
   const [view, setView] = useState(null);
   const [loading, setLoading] = useState(false);
   const [createForm, setCreateForm] = useState({ name: '', description: '' });

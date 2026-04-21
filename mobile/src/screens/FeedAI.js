@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, radius } from '../theme';
 import api from '../api/axios';
+import { useTranslation } from '../i18n';
 
 const QUICK_PROMPTS = [
   { label: '💡 Story Idea', message: 'Give me a family story idea I can record today' },
@@ -17,6 +18,7 @@ const QUICK_PROMPTS = [
 ];
 
 export default function FeedAI({ navigation }) {
+  const { t } = useTranslation();
   const [messages, setMessages] = useState([
     {
       id: '1', role: 'ai',

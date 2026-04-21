@@ -10,6 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../context/AuthContext';
+import { useTranslation } from '../i18n';
 import api from '../api/axios';
 import { colors, radius, shadows } from '../theme';
 import GradientButton from '../components/GradientButton';
@@ -53,6 +54,7 @@ function StepIndicator({ current, total }) {
 // ── Step 1: Photo ─────────────────────────────────────────────
 function PhotoStep({ onNext }) {
   const { refreshUser } = useAuth();
+  const { t } = useTranslation();
   const [image, setImage] = useState(null);
   const [uploading, setUploading] = useState(false);
 
@@ -122,6 +124,7 @@ function PhotoStep({ onNext }) {
 // ── Step 2: Profile Info ──────────────────────────────────────
 function ProfileStep({ onNext, required }) {
   const { user, refreshUser } = useAuth();
+  const { t } = useTranslation();
   const [bio, setBio] = useState(user?.bio || '');
   const [website, setWebsite] = useState(user?.website || '');
   const [saving, setSaving] = useState(false);
@@ -171,7 +174,7 @@ function ProfileStep({ onNext, required }) {
         />
       </View>
 
-      <GradientButton label="Continue" onPress={handleNext} loading={saving} style={{ width: '100%', marginTop: 20 }} />
+      <GradientButton label={t('continue')} onPress={handleNext} loading={saving} style={{ width: '100%', marginTop: 20 }} />
       {!required && (
         <TouchableOpacity onPress={onNext} style={{ marginTop: 14 }}>
           <AppText style={s.skip}>Skip for now</AppText>
@@ -183,6 +186,7 @@ function ProfileStep({ onNext, required }) {
 
 // ── Step 3: Interests ─────────────────────────────────────────
 function InterestsStep({ onNext, required }) {
+  const { t } = useTranslation();
   const [selected, setSelected] = useState(new Set(['family']));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -236,7 +240,7 @@ function InterestsStep({ onNext, required }) {
       <AppText style={s.selectedCount}>{selected.size} selected {required && <AppText style={{ color: selected.size >= 3 ? '#10b981' : '#f59e0b' }}>({selected.size < 3 ? `${3 - selected.size} more needed` : '✓'})</AppText>}</AppText>
 
       <GradientButton
-        label="Continue"
+        label={t('continue')}
         onPress={handleNext}
         loading={saving}
         style={{ width: '100%', marginTop: 16 }}
@@ -247,6 +251,7 @@ function InterestsStep({ onNext, required }) {
 
 // ── Step 4: Privacy ───────────────────────────────────────────
 function PrivacyStep({ onNext }) {
+  const { t } = useTranslation();
   const [isPrivate, setIsPrivate] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -297,7 +302,7 @@ function PrivacyStep({ onNext }) {
         </View>
       </TouchableOpacity>
 
-      <GradientButton label="Continue" onPress={handleNext} loading={saving} style={{ width: '100%', marginTop: 24 }} />
+      <GradientButton label={t('continue')} onPress={handleNext} loading={saving} style={{ width: '100%', marginTop: 24 }} />
     </View>
   );
 }
@@ -379,6 +384,7 @@ function DiscoverStep({ onDone }) {
 export default function SetupProfileScreen({ navigation }) {
   const [step, setStep] = useState(1);
   const { user, refreshUser } = useAuth();
+  const { t } = useTranslation();
 
   // Determine which steps are already done so we can skip ahead
   useEffect(() => {

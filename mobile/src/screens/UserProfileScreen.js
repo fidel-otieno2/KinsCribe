@@ -10,6 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
+import { useTranslation } from '../i18n';
 import { colors, radius } from '../theme';
 
 const { width } = Dimensions.get('window');
@@ -18,6 +19,7 @@ const GRID = (width - 3) / 3;
 export default function UserProfileScreen({ route, navigation }) {
   const { userId, userName, userAvatar } = route.params;
   const { user: me } = useAuth();
+  const { t } = useTranslation();
   const [profile, setProfile] = useState(null);
   const [posts, setPosts] = useState([]);
   const [connStatus, setConnStatus] = useState(null); // null | 'pending' | 'accepted'
@@ -120,9 +122,9 @@ export default function UserProfileScreen({ route, navigation }) {
 
   // Button label + style based on connection status
   const connectLabel = () => {
-    if (connStatus === 'accepted') return 'Following ✓';
-    if (connStatus === 'pending') return 'Requested';
-    return isPrivate ? 'Follow' : 'Follow';
+    if (connStatus === 'accepted') return t('following_check');
+    if (connStatus === 'pending') return t('requested');
+    return t('follow');
   };
 
   const connectIcon = () => {
@@ -166,15 +168,15 @@ export default function UserProfileScreen({ route, navigation }) {
         <View style={s.statsRow}>
           <View style={s.stat}>
             <AppText style={s.statNum}>{locked ? '—' : posts.length}</AppText>
-            <AppText style={s.statLabel}>Posts</AppText>
+            <AppText style={s.statLabel}>{t('posts')}</AppText>
           </View>
           <View style={s.stat}>
             <AppText style={s.statNum}>{profile?.connection_count || 0}</AppText>
-            <AppText style={s.statLabel}>Followers</AppText>
+            <AppText style={s.statLabel}>{t('followers')}</AppText>
           </View>
           <View style={s.stat}>
             <AppText style={s.statNum}>{profile?.interest_count || 0}</AppText>
-            <AppText style={s.statLabel}>Following</AppText>
+            <AppText style={s.statLabel}>{t('following')}</AppText>
           </View>
         </View>
       </View>
@@ -195,7 +197,7 @@ export default function UserProfileScreen({ route, navigation }) {
         </View>
         {profile?.username && <AppText style={s.handle}>@{profile.username}</AppText>}
         {profile?.bio && <AppText style={s.bio}>{profile.bio}</AppText>}
-        {followsYou && <AppText style={s.followsYouBadge}>Follows you</AppText>}
+        {followsYou && <AppText style={s.followsYouBadge}>{t('follows_you')}</AppText>}
       </View>
 
       {/* Action buttons */}
@@ -213,23 +215,23 @@ export default function UserProfileScreen({ route, navigation }) {
           {connecting ? (
             <ActivityIndicator size="small" color={connStatus ? colors.muted : '#fff'} />
           ) : connStatus === 'accepted' ? (
-            <AppText style={s.actionBtnOutlineText}>Following ✓</AppText>
+            <AppText style={s.actionBtnOutlineText}>{t('following_check')}</AppText>
           ) : connStatus === 'pending' ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <Ionicons name="time-outline" size={14} color={colors.muted} />
-              <AppText style={s.actionBtnOutlineText}>Requested</AppText>
+              <AppText style={s.actionBtnOutlineText}>{t('requested')}</AppText>
             </View>
           ) : (
             <LinearGradient colors={['#7c3aed', '#3b82f6']} style={s.actionBtnGrad}>
               <Ionicons name="person-add-outline" size={14} color="#fff" />
-              <AppText style={s.actionBtnText}>Follow</AppText>
+              <AppText style={s.actionBtnText}>{t('follow')}</AppText>
             </LinearGradient>
           )}
         </TouchableOpacity>
 
         <TouchableOpacity style={s.actionBtnOutline} onPress={openDM} activeOpacity={0.8}>
           <Ionicons name="chatbubble-outline" size={14} color={colors.text} />
-          <AppText style={s.actionBtnOutlineText}>Message</AppText>
+          <AppText style={s.actionBtnOutlineText}>{t('message_action')}</AppText>
         </TouchableOpacity>
 
         {/* Block button */}
@@ -277,11 +279,11 @@ export default function UserProfileScreen({ route, navigation }) {
                   <Ionicons name="lock-closed" size={28} color="#fff" />
                 </LinearGradient>
               </View>
-              <AppText style={s.lockedTitle}>This account is private</AppText>
+              <AppText style={s.lockedTitle}>{t('this_account_private')}</AppText>
               <AppText style={s.lockedSub}>
                 {connStatus === 'pending'
-                  ? 'Your follow request is pending approval.'
-                  : 'Follow this account to see their photos and videos.'}
+                  ? t('request_pending')
+                  : t('follow_to_see')}
               </AppText>
               {connStatus !== 'pending' && (
                 <TouchableOpacity
@@ -295,7 +297,7 @@ export default function UserProfileScreen({ route, navigation }) {
                       ? <ActivityIndicator color="#fff" size="small" />
                       : <>
                           <Ionicons name="person-add-outline" size={16} color="#fff" />
-                          <AppText style={s.lockedFollowBtnText}>Follow</AppText>
+                          <AppText style={s.lockedFollowBtnText}>{t('follow')}</AppText>
                         </>}
                   </LinearGradient>
                 </TouchableOpacity>
@@ -312,7 +314,7 @@ export default function UserProfileScreen({ route, navigation }) {
         ) : posts.length === 0 ? (
           <View style={s.empty}>
             <Ionicons name="camera-outline" size={48} color={colors.dim} />
-            <AppText style={s.emptyText}>No posts yet</AppText>
+            <AppText style={s.emptyText}>{t('no_posts')}</AppText>
           </View>
         ) : tab === 'posts' ? (
           <View style={s.grid}>
@@ -411,7 +413,7 @@ export default function UserProfileScreen({ route, navigation }) {
                 onPress={() => setShowBlockModal(false)}
                 activeOpacity={0.8}
               >
-                <AppText style={s.blockCancelText}>Cancel</AppText>
+                <AppText style={s.blockCancelText}>{t('cancel')}</AppText>
               </TouchableOpacity>
               <TouchableOpacity
                 style={s.blockConfirmBtn}

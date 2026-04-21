@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
+import { useTranslation } from '../i18n';
 import { colors, radius } from '../theme';
 
 function Avatar({ uri, name, size = 48 }) {
@@ -23,6 +24,7 @@ function Avatar({ uri, name, size = 48 }) {
 
 export default function ConnectionCRMScreen({ navigation }) {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [connections, setConnections] = useState([]);
   const [interests, setInterests] = useState([]);
   const [loading, setLoading] = useState(true);

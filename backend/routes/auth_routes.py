@@ -1033,6 +1033,53 @@ def test_email():
         return jsonify({"success": False, "error": str(e), "traceback": traceback.format_exc(), "config": config_info}), 500
 
 
+@auth_bp.route("/export-data", methods=["POST"])
+@jwt_required()
+def export_data():
+    """Queue a data export and email the user when ready."""
+    from models.social import Post
+    user = User.query.get(int(get_jwt_identity()))
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    try:
+        posts = Post.query.filter_by(user_id=user.id).all()
+        post_count = len(posts)
+    except Exception:
+        post_count = 0
+
+    try:
+        _send_email(
+            "Your KinsCribe Data Export",
+            [user.email],
+            f"""
+            <div style="font-family:sans-serif;max-width:520px;margin:auto;background:#0f172a;color:#f1f5f9;padding:32px;border-radius:16px">
+              <h2 style="color:#3b82f6;margin-bottom:4px">KinsCribe</h2>
+              <p style="color:#94a3b8;margin-top:0">Data Export</p>
+              <hr style="border-color:#1e293b;margin:20px 0">
+              <p>Hi <strong>{user.name}</strong>,</p>
+              <p>Here is a summary of your KinsCribe account data:</p>
+              <div style="background:#1e293b;border-radius:12px;padding:20px;margin:20px 0">
+                <table style="width:100%;border-collapse:collapse;color:#f1f5f9;font-size:14px">
+                  <tr><td style="padding:8px 0;color:#94a3b8">Name</td><td style="padding:8px 0;font-weight:700">{user.name}</td></tr>
+                  <tr><td style="padding:8px 0;color:#94a3b8">Username</td><td style="padding:8px 0">@{user.username or 'not set'}</td></tr>
+                  <tr><td style="padding:8px 0;color:#94a3b8">Email</td><td style="padding:8px 0">{user.email}</td></tr>
+                  <tr><td style="padding:8px 0;color:#94a3b8">Phone</td><td style="padding:8px 0">{user.phone or 'not added'}</td></tr>
+                  <tr><td style="padding:8px 0;color:#94a3b8">Account type</td><td style="padding:8px 0">{'Private' if user.is_private else 'Public'}</td></tr>
+                  <tr><td style="padding:8px 0;color:#94a3b8">Posts</td><td style="padding:8px 0">{post_count}</td></tr>
+                  <tr><td style="padding:8px 0;color:#94a3b8">Member since</td><td style="padding:8px 0">{user.created_at.strftime('%B %d, %Y') if hasattr(user, 'created_at') and user.created_at else 'N/A'}</td></tr>
+                </table>
+              </div>
+              <p style="color:#94a3b8;font-size:13px">A full export including all media and messages will be available in a future update. This summary was generated on {datetime.utcnow().strftime('%B %d, %Y at %H:%M UTC')}.</p>
+              <p style="color:#64748b;font-size:12px">If you didn't request this export, please contact support@kinscribe.com</p>
+            </div>
+            """
+        )
+        return jsonify({"message": "Data export emailed successfully"})
+    except Exception as e:
+        return jsonify({"error": f"Failed to send export email: {str(e)}"}), 500
+
+
 @auth_bp.route("/refresh", methods=["POST"])
 @jwt_required(refresh=True)
 def refresh():

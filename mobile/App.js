@@ -8,6 +8,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useState, useRef } from "react";
 import * as Notifications from "expo-notifications";
 import api from "./src/api/axios";
+import { useTranslation } from "./src/i18n";
 
 import { AuthProvider, useAuth } from "./src/context/AuthContext";
 import { ThemeProvider, useTheme } from "./src/context/ThemeContext";
@@ -66,6 +67,7 @@ Notifications.setNotificationHandler({
 function MainTabs() {
   const { theme } = useTheme();
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [msgUnread, setMsgUnread] = useState(0);
   const [notifUnread, setNotifUnread] = useState(0);
   const pollRef = useRef(null);
@@ -113,7 +115,7 @@ function MainTabs() {
         name="Feed"
         component={FeedScreen}
         options={{
-          tabBarLabel: "Home",
+          tabBarLabel: t('home'),
           tabBarIcon: ({ color, focused }) => (
             <View>
               <Ionicons name={focused ? "home" : "home-outline"} size={24} color={color} />
@@ -130,7 +132,7 @@ function MainTabs() {
         name="Search"
         component={SearchScreen}
         options={{
-          tabBarLabel: "Discover",
+          tabBarLabel: t('discover'),
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? "compass" : "compass-outline"} size={24} color={color} />
           ),
@@ -140,7 +142,7 @@ function MainTabs() {
         name="Create"
         component={CreateScreen}
         options={{
-          tabBarLabel: "Create",
+          tabBarLabel: t('create'),
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? "add-circle" : "add-circle-outline"} size={28} color={color} />
           ),
@@ -150,7 +152,7 @@ function MainTabs() {
         name="Messages"
         component={MessagesScreen}
         options={{
-          tabBarLabel: "Messages",
+          tabBarLabel: t('messages'),
           tabBarIcon: ({ color, focused }) => (
             <View>
               <Ionicons name={focused ? "chatbubbles" : "chatbubbles-outline"} size={24} color={color} />
@@ -167,7 +169,7 @@ function MainTabs() {
         name="Profile"
         component={ProfileScreen}
         options={{
-          tabBarLabel: "Profile",
+          tabBarLabel: t('profile'),
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? "person-circle" : "person-circle-outline"} size={24} color={color} />
           ),

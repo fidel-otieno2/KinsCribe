@@ -8,6 +8,7 @@ import {
   Alert,
 } from "react-native";
 import AppText from '../components/AppText';
+import { useTranslation } from '../i18n';
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import GlassCard from "../components/GlassCard";
@@ -19,6 +20,7 @@ import Toast from '../components/Toast';
 import useToast from '../hooks/useToast';
 
 export default function StorybookGeneratorScreen({ navigation }) {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { toast, hide, success, error, info } = useToast();
   const [stories, setStories] = useState([]);

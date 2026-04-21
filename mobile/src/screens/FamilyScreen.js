@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
+import { useTranslation } from '../i18n';
 import { colors, radius } from '../theme';
 import Toast from '../components/Toast';
 import useToast from '../hooks/useToast';
@@ -44,6 +45,7 @@ function Avatar({ uri, name, size = 44 }) {
 
 // ── Family Feed Tab ───────────────────────────────────────────
 function FamilyFeedTab({ navigation, userRole }) {
+  const { t } = useTranslation();
   const [stories, setStories] = useState([]);
   const [announcements, setAnnouncements] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -82,8 +84,8 @@ function FamilyFeedTab({ navigation, userRole }) {
       {stories.length === 0 ? (
         <View style={ft.empty}>
           <Ionicons name="library-outline" size={48} color={colors.dim} />
-          <AppText style={ft.emptyTitle}>No family stories yet</AppText>
-          <AppText style={ft.emptySub}>Share your first family memory</AppText>
+          <AppText style={ft.emptyTitle}>{t('no_family_stories')}</AppText>
+          <AppText style={ft.emptySub}>{t('share_first_memory')}</AppText>
         </View>
       ) : stories.map(story => (
         <TouchableOpacity
@@ -101,7 +103,7 @@ function FamilyFeedTab({ navigation, userRole }) {
             {story.privacy === 'family' && (
               <View style={ft.privacyBadge}>
                 <Ionicons name="people" size={11} color="#10b981" />
-                <AppText style={ft.privacyText}>Family</AppText>
+                <AppText style={ft.privacyText}>{t('family')}</AppText>
               </View>
             )}
           </View>
@@ -150,6 +152,7 @@ const ft = StyleSheet.create({
 
 // ── Members Tab ───────────────────────────────────────────────
 function MembersTab({ members, user, family, navigation, success, error }) {
+  const { t } = useTranslation();
   const [inviteEmail, setInviteEmail] = useState('');
   const [sending, setSending] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -198,7 +201,7 @@ function MembersTab({ members, user, family, navigation, success, error }) {
             onChangeText={setInviteEmail}
           />
           <TouchableOpacity style={mt.sendBtn} onPress={sendInvite} disabled={sending}>
-            {sending ? <ActivityIndicator color="#fff" size="small" /> : <AppText style={mt.sendBtnText}>Send</AppText>}
+            {sending ? <ActivityIndicator color="#fff" size="small" /> : <AppText style={mt.sendBtnText}>{t('send')}</AppText>}
           </TouchableOpacity>
         </View>
       )}
@@ -335,6 +338,7 @@ const tl = StyleSheet.create({
 // ── Main FamilyScreen ─────────────────────────────────────────
 export default function FamilyScreen({ navigation }) {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const { toast, hide, success, error } = useToast();
   const [family, setFamily] = useState(null);
   const [members, setMembers] = useState([]);

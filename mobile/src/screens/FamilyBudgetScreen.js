@@ -9,6 +9,7 @@ import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../api/axios';
 import { useTheme } from '../context/ThemeContext';
+import { useTranslation } from '../i18n';
 import { colors, radius } from '../theme';
 import Toast from '../components/Toast';
 import useToast from '../hooks/useToast';
@@ -27,6 +28,7 @@ const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
 
 export default function FamilyBudgetScreen({ navigation }) {
   const { theme, isDark } = useTheme();
+  const { t } = useTranslation();
   const { toast, hide, success, error, info } = useToast();
   const today = new Date();
   const [month, setMonth] = useState(today.getMonth() + 1);
@@ -194,7 +196,7 @@ export default function FamilyBudgetScreen({ navigation }) {
               </LinearGradient>
             </TouchableOpacity>
             <TouchableOpacity style={{ alignItems: 'center', paddingVertical: 12 }} onPress={() => setShowAdd(false)}>
-              <AppText style={{ color: theme.muted }}>Cancel</AppText>
+              <AppText style={{ color: theme.muted }}>{t('cancel')}</AppText>
             </TouchableOpacity>
           </View>
         </BlurView>

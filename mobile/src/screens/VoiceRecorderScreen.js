@@ -8,6 +8,7 @@ import { Audio } from 'expo-av';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radius } from '../theme';
+import { useTranslation } from '../i18n';
 import { multipartPost, buildFileEntry } from '../api/upload';
 import Toast from '../components/Toast';
 import useToast from '../hooks/useToast';
@@ -15,6 +16,7 @@ import useToast from '../hooks/useToast';
 const BAR_COUNT = 32;
 
 export default function VoiceRecorderScreen({ navigation }) {
+  const { t } = useTranslation();
   const { toast, hide, success, error, info } = useToast();
   const [recording, setRecording] = useState(null);
   const [recordedUri, setRecordedUri] = useState(null);
@@ -161,7 +163,7 @@ export default function VoiceRecorderScreen({ navigation }) {
         <AppText style={s.headerTitle}>Voice Story</AppText>
         {step === 'record' && recordedUri && (
           <TouchableOpacity style={s.nextBtn} onPress={() => setStep('details')}>
-            <AppText style={s.nextBtnText}>Next</AppText>
+            <AppText style={s.nextBtnText}>{t('next')}</AppText>
             <Ionicons name="arrow-forward" size={16} color="#fff" />
           </TouchableOpacity>
         )}

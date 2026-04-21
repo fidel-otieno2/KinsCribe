@@ -14,6 +14,7 @@ import * as Google from 'expo-auth-session/providers/google';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useTranslation } from '../i18n';
 import api from '../api/axios';
 import { colors, radius, shadows } from '../theme';
 import GradientButton from '../components/GradientButton';
@@ -26,6 +27,7 @@ const HERO_HEIGHT = height * 0.28;
 export default function RegisterScreen({ navigation }) {
   const { login, loginWithGoogle } = useAuth();
   const { theme, isDark } = useTheme();
+  const { t } = useTranslation();
   const [form, setForm] = useState({ name: '', username: '', email: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -215,7 +217,7 @@ export default function RegisterScreen({ navigation }) {
                   <Ionicons name="mail-open-outline" size={28} color="#fff" />
                 </LinearGradient>
               </View>
-              <AppText style={[s.cardTitle, { color: theme.text, textAlign: 'center' }]}>Check your email</AppText>
+              <AppText style={[s.cardTitle, { color: theme.text, textAlign: 'center' }]}>{t('check_your_email')}</AppText>
               <AppText style={[s.cardSub, { color: theme.muted, textAlign: 'center' }]}>
                 We sent a 6-digit code to{' '}
                 <AppText style={{ color: theme.text, fontWeight: '700' }}>{form.email}</AppText>
@@ -268,8 +270,8 @@ export default function RegisterScreen({ navigation }) {
           <BlurView intensity={20} tint="dark" style={s.card}>
             <LinearGradient colors={['rgba(59,130,246,0.08)', 'rgba(15,23,42,0.7)']} style={StyleSheet.absoluteFill} />
             <View style={s.cardInner}>
-              <AppText style={[s.cardTitle, { color: theme.text }]}>Create Account</AppText>
-              <AppText style={[s.cardSub, { color: theme.muted }]}>Start preserving your family memories</AppText>
+              <AppText style={[s.cardTitle, { color: theme.text }]}>{t('create_account')}</AppText>
+              <AppText style={[s.cardSub, { color: theme.muted }]}>{t('app_sub')}</AppText>
 
               {error ? (
                 <View style={s.errorBox}>
@@ -278,7 +280,7 @@ export default function RegisterScreen({ navigation }) {
                 </View>
               ) : null}
 
-              <AppText style={[s.label, { color: theme.muted }]}>Full Name</AppText>
+              <AppText style={[s.label, { color: theme.muted }]}>{t('full_name')}</AppText>
               <View style={[s.inputWrap, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]}>
                 <Ionicons name="person-outline" size={18} color={theme.muted} />
                 <TextInput style={[s.input, { color: theme.text }]} placeholder="e.g. Fidel Otieno" placeholderTextColor={theme.dim} autoCapitalize="words" value={form.name} onChangeText={set('name')} />
@@ -292,8 +294,8 @@ export default function RegisterScreen({ navigation }) {
                 {usernameStatus === 'available' && <Ionicons name="checkmark-circle" size={18} color="#10b981" />}
                 {usernameStatus === 'taken' && <Ionicons name="close-circle" size={18} color="#f87171" />}
               </View>
-              {usernameStatus === 'taken' && <AppText style={s.usernameErr}>Username already taken</AppText>}
-              {usernameStatus === 'available' && <AppText style={s.usernameOk}>Username available!</AppText>}
+              {usernameStatus === 'taken' && <AppText style={s.usernameErr}>{t('username_taken')}</AppText>}
+              {usernameStatus === 'available' && <AppText style={s.usernameOk}>{t('username_available')}</AppText>}
 
               <AppText style={[s.label, { color: theme.muted }]}>Email</AppText>
               <View style={[s.inputWrap, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]}>
@@ -344,16 +346,16 @@ export default function RegisterScreen({ navigation }) {
               </TouchableOpacity>
 
               <AppText style={s.terms}>
-                By signing up you agree to our <AppText style={s.termsLink}>Terms of Service</AppText> and <AppText style={s.termsLink}>Privacy Policy</AppText>
+                By signing up you agree to our <AppText style={s.termsLink}>{t('terms_of_service')}</AppText> and <AppText style={s.termsLink}>{t('privacy_policy')}</AppText>
               </AppText>
             </View>
           </BlurView>
         )}
 
         <View style={s.footer}>
-          <AppText style={[s.footerText, { color: theme.muted }]}>Already have an account? </AppText>
+          <AppText style={[s.footerText, { color: theme.muted }]}>{t('already_have_account')} </AppText>
           <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-            <AppText style={s.footerLink}>Sign in</AppText>
+            <AppText style={s.footerLink}>{t('sign_in')}</AppText>
           </TouchableOpacity>
         </View>
       </ScrollView>

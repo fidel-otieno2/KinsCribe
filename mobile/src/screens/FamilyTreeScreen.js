@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useTranslation } from '../i18n';
 import { colors, radius } from '../theme';
 import Toast from '../components/Toast';
 import useToast from '../hooks/useToast';
@@ -63,6 +64,7 @@ function TreeNode({ node, onPress, onLongPress }) {
 
 function AddNodeModal({ visible, onClose, onSave, parentNode }) {
   const { theme } = useTheme();
+  const { t } = useTranslation();
   const { toast, hide, info } = useToast();
   const [form, setForm] = useState({
     display_name: '', relationship_label: '', birth_date: '',
@@ -132,7 +134,7 @@ function AddNodeModal({ visible, onClose, onSave, parentNode }) {
           </TouchableOpacity>
 
           <TouchableOpacity style={s.cancelBtn} onPress={onClose}>
-            <AppText style={s.cancelBtnText}>Cancel</AppText>
+            <AppText style={s.cancelBtnText}>{t('cancel')}</AppText>
           </TouchableOpacity>
         </View>
       </BlurView>
@@ -143,6 +145,7 @@ function AddNodeModal({ visible, onClose, onSave, parentNode }) {
 export default function FamilyTreeScreen({ navigation }) {
   const { user } = useAuth();
   const { theme, isDark } = useTheme();
+  const { t } = useTranslation();
   const { toast, hide, success, error } = useToast();
   const [nodes, setNodes] = useState([]);
   const [loading, setLoading] = useState(true);

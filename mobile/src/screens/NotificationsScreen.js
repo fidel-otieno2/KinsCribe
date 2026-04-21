@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
+import { useTranslation } from '../i18n';
 import { colors, radius } from '../theme';
 
 function timeAgo(dateStr) {
@@ -71,6 +72,7 @@ function TypingDots() {
 }
 
 function NotifRow({ item, onPress, index, onAccept, onDecline }) {
+  const { t } = useTranslation();
   const cfg = TYPE_CONFIG[item.type] || TYPE_CONFIG.post_like;
   const anim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -107,13 +109,13 @@ function NotifRow({ item, onPress, index, onAccept, onDecline }) {
                 style={s.acceptBtn}
                 onPress={() => onAccept(item)}
               >
-                <AppText style={s.acceptBtnText}>Confirm</AppText>
+              <AppText style={s.acceptBtnText}>{t('confirm')}</AppText>
               </TouchableOpacity>
               <TouchableOpacity
                 style={s.declineBtn}
                 onPress={() => onDecline(item)}
               >
-                <AppText style={s.declineBtnText}>Delete</AppText>
+              <AppText style={s.declineBtnText}>{t('delete')}</AppText>
               </TouchableOpacity>
             </View>
           ) : (
@@ -136,16 +138,17 @@ function NotifRow({ item, onPress, index, onAccept, onDecline }) {
 }
 
 const TABS = [
-  { key: 'all',         label: 'All',        icon: 'notifications' },
-  { key: 'requests',    label: 'Requests',   icon: 'person-add' },
-  { key: 'family',      label: 'Family',     icon: 'people' },
-  { key: 'posts',       label: 'Posts',      icon: 'grid' },
-  { key: 'connections', label: 'People',     icon: 'person' },
-  { key: 'messages',    label: 'Messages',   icon: 'chatbubbles' },
+  { key: 'all',         labelKey: 'all',          icon: 'notifications' },
+  { key: 'requests',    labelKey: 'requests',      icon: 'person-add' },
+  { key: 'family',      labelKey: 'family',        icon: 'people' },
+  { key: 'posts',       labelKey: 'posts',         icon: 'grid' },
+  { key: 'connections', labelKey: 'people',        icon: 'person' },
+  { key: 'messages',    labelKey: 'messages',      icon: 'chatbubbles' },
 ];
 
 export default function NotificationsScreen({ navigation }) {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -244,8 +247,8 @@ export default function NotificationsScreen({ navigation }) {
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
-          <AppText style={s.headerTitle}>Notifications</AppText>
-          {unreadCount > 0 && <AppText style={s.headerSub}>{unreadCount} unread</AppText>}
+          <AppText style={s.headerTitle}>{t('notifications')}</AppText>
+          {unreadCount > 0 && <AppText style={s.headerSub}>{t('unread', { count: unreadCount })}</AppText>}
         </View>
         <TouchableOpacity
           style={s.markAllBtn}
@@ -261,20 +264,20 @@ export default function NotificationsScreen({ navigation }) {
 
       {/* Tabs */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.tabsRow}>
-        {TABS.map(t => {
-          const count = tabCounts[t.key];
+        {TABS.map(tb => {
+          const count = tabCounts[tb.key];
           return (
             <TouchableOpacity
-              key={t.key}
-              style={[s.tab, tab === t.key && s.tabActive]}
-              onPress={() => setTab(t.key)}
+              key={tb.key}
+              style={[s.tab, tab === tb.key && s.tabActive]}
+              onPress={() => setTab(tb.key)}
             >
               <Ionicons
-                name={tab === t.key ? t.icon : `${t.icon}-outline`}
+                name={tab === tb.key ? tb.icon : `${tb.icon}-outline`}
                 size={14}
-                color={tab === t.key ? '#fff' : colors.muted}
+                color={tab === tb.key ? '#fff' : colors.muted}
               />
-              <AppText style={[s.tabText, tab === t.key && s.tabTextActive]}>{t.label}</AppText>
+              <AppText style={[s.tabText, tab === tb.key && s.tabTextActive]}>{t(tb.labelKey)}</AppText>
               {count > 0 && (
                 <View style={s.tabBadge}>
                   <AppText style={s.tabBadgeText}>{count > 9 ? '9+' : count}</AppText>
@@ -288,15 +291,15 @@ export default function NotificationsScreen({ navigation }) {
       {loading ? (
         <View style={s.loadingWrap}>
           <ActivityIndicator color={colors.primary} size="large" />
-          <AppText style={s.loadingText}>Loading notifications...</AppText>
+          <AppText style={s.loadingText}>{t('loading_notifications')}</AppText>
         </View>
       ) : filtered.length === 0 ? (
         <View style={s.empty}>
           <LinearGradient colors={['rgba(124,58,237,0.2)', 'rgba(59,130,246,0.08)']} style={s.emptyIconWrap}>
             <Ionicons name="notifications-off-outline" size={44} color={colors.dim} />
           </LinearGradient>
-          <AppText style={s.emptyTitle}>All caught up!</AppText>
-          <AppText style={s.emptyBody}>Activity from your family, posts and connections will appear here.</AppText>
+          <AppText style={s.emptyTitle}>{t('all_caught_up')}</AppText>
+          <AppText style={s.emptyBody}>{t('notif_empty_sub')}</AppText>
         </View>
       ) : (
         <FlatList
@@ -378,7 +381,7 @@ export default function NotificationsScreen({ navigation }) {
                   >
                     <LinearGradient colors={['#7c3aed', '#3b82f6']} style={s.detailViewBtnGrad}>
                       <Ionicons name="arrow-forward" size={16} color="#fff" />
-                      <AppText style={s.detailViewBtnText}>View</AppText>
+                      <AppText style={s.detailViewBtnText}>{t('view')}</AppText>
                     </LinearGradient>
                   </TouchableOpacity>
                   {showDetail.actor_id && (
@@ -390,7 +393,7 @@ export default function NotificationsScreen({ navigation }) {
                       }}
                     >
                       <Ionicons name="person-outline" size={16} color={colors.text} />
-                      <AppText style={s.detailProfileBtnText}>Profile</AppText>
+                      <AppText style={s.detailProfileBtnText}>{t('profile')}</AppText>
                     </TouchableOpacity>
                   )}
                 </View>

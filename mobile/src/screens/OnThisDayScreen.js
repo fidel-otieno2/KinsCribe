@@ -7,9 +7,11 @@ import AppText from '../components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../api/axios';
+import { useTranslation } from '../i18n';
 import { colors, radius } from '../theme';
 
 export default function OnThisDayScreen({ navigation }) {
+  const { t } = useTranslation();
   const [stories, setStories] = useState([]);
   const [date, setDate] = useState('');
   const [loading, setLoading] = useState(true);

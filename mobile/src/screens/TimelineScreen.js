@@ -8,6 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../api/axios';
+import { useTranslation } from '../i18n';
 import { colors, radius, shadows } from '../theme';
 
 function TimelineStoryCard({ story }) {
@@ -100,6 +101,7 @@ function TimelineStoryCard({ story }) {
 }
 
 export default function TimelineScreen() {
+  const { t } = useTranslation();
   const [grouped, setGrouped] = useState([]);
   const [stats, setStats] = useState({ total: 0, earliest: null, latest: null });
   const [loading, setLoading] = useState(true);

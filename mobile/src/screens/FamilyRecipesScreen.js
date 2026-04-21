@@ -10,6 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import api from '../api/axios';
 import { useTheme } from '../context/ThemeContext';
+import { useTranslation } from '../i18n';
 import { colors, radius } from '../theme';
 import Toast from '../components/Toast';
 import useToast from '../hooks/useToast';
@@ -25,6 +26,7 @@ const CATEGORIES = [
 
 function RecipeCard({ recipe, onPress, onDelete }) {
   const { theme } = useTheme();
+  const { t } = useTranslation();
   return (
     <TouchableOpacity style={[rc.card, { backgroundColor: theme.bgSecondary, borderColor: theme.border }]} onPress={onPress} onLongPress={onDelete} activeOpacity={0.85}>
       {recipe.image_url
@@ -61,6 +63,7 @@ const rc = StyleSheet.create({
 
 export default function FamilyRecipesScreen({ navigation }) {
   const { theme, isDark } = useTheme();
+  const { t } = useTranslation();
   const { toast, hide, success, error, info } = useToast();
   const [recipes, setRecipes] = useState([]);
   const [category, setCategory] = useState('all');
@@ -233,7 +236,7 @@ export default function FamilyRecipesScreen({ navigation }) {
                 </LinearGradient>
               </TouchableOpacity>
               <TouchableOpacity style={{ alignItems: 'center', paddingVertical: 12 }} onPress={() => setShowAdd(false)}>
-                <AppText style={{ color: theme.muted }}>Cancel</AppText>
+                <AppText style={{ color: theme.muted }}>{t('cancel')}</AppText>
               </TouchableOpacity>
             </ScrollView>
           </View>

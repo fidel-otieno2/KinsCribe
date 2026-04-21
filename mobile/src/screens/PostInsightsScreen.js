@@ -7,6 +7,7 @@ import AppText from '../components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../api/axios';
+import { useTranslation } from '../i18n';
 import { colors, radius } from '../theme';
 
 const { width } = Dimensions.get('window');
@@ -39,6 +40,7 @@ function Bar({ label, value, max, color }) {
 }
 
 export default function PostInsightsScreen({ navigation }) {
+  const { t } = useTranslation();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 

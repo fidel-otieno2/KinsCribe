@@ -1,14 +1,19 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { useColorScheme } from 'react-native';
+import { useColorScheme, I18nManager } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { darkTheme, lightTheme } from '../theme';
 
+// Defined here to avoid circular dependency with i18n/index.js
+const RTL_LANGUAGES = new Set(['ar', 'he', 'fa', 'ur', 'ps', 'ku']);
+
 const ThemeContext = createContext();
 
-const THEME_KEY    = 'ks_theme_mode';
-const FONTSIZE_KEY = 'ks_font_size';
-const FONTTYPE_KEY = 'ks_font_type';
-const LANG_KEY     = 'ks_language';
+const THEME_KEY      = 'ks_theme_mode';
+const FONTSIZE_KEY   = 'ks_font_size';
+const FONTTYPE_KEY   = 'ks_font_type';
+const LANG_KEY       = 'ks_language';
+const DATASAVER_KEY  = 'ks_data_saver';
+const AUTOPLAY_KEY   = 'ks_autoplay_video';
 
 // ── Font sizes ────────────────────────────────────────────────
 export const FONT_SIZES = [
@@ -151,19 +156,29 @@ export const LANGUAGES = [
 
 export function ThemeProvider({ children }) {
   const systemScheme = useColorScheme();
-  const [mode, setMode]           = useState('dark');
-  const [fontSize, setFontSize]   = useState('md');
-  const [fontType, setFontType]   = useState('default');
-  const [language, setLanguage]   = useState('en');
-  const [loaded, setLoaded]       = useState(false);
+  const [mode, setMode]               = useState('dark');
+  const [fontSize, setFontSize]       = useState('md');
+  const [fontType, setFontType]       = useState('default');
+  const [language, setLanguage]       = useState('en');
+  const [dataSaver, setDataSaver]     = useState(false);
+  const [autoplayVideo, setAutoplayVideo] = useState(true);
+  const [loaded, setLoaded]           = useState(false);
 
   useEffect(() => {
-    AsyncStorage.multiGet([THEME_KEY, FONTSIZE_KEY, FONTTYPE_KEY, LANG_KEY]).then(pairs => {
+    AsyncStorage.multiGet([THEME_KEY, FONTSIZE_KEY, FONTTYPE_KEY, LANG_KEY, DATASAVER_KEY, AUTOPLAY_KEY]).then(pairs => {
       const map = Object.fromEntries(pairs.map(([k, v]) => [k, v]));
       if (map[THEME_KEY])    setMode(map[THEME_KEY]);
       if (map[FONTSIZE_KEY]) setFontSize(map[FONTSIZE_KEY]);
       if (map[FONTTYPE_KEY]) setFontType(map[FONTTYPE_KEY]);
-      if (map[LANG_KEY])     setLanguage(map[LANG_KEY]);
+      if (map[LANG_KEY]) {
+        setLanguage(map[LANG_KEY]);
+        const shouldBeRTL = RTL_LANGUAGES.has(map[LANG_KEY]);
+        if (I18nManager.isRTL !== shouldBeRTL) {
+          I18nManager.forceRTL(shouldBeRTL);
+        }
+      }
+      if (map[DATASAVER_KEY] !== null) setDataSaver(map[DATASAVER_KEY] === 'true');
+      if (map[AUTOPLAY_KEY] !== null)  setAutoplayVideo(map[AUTOPLAY_KEY] !== 'false');
       setLoaded(true);
     });
   }, []);
@@ -189,9 +204,24 @@ export function ThemeProvider({ children }) {
     await AsyncStorage.setItem(FONTTYPE_KEY, key);
   };
 
+  const saveDataSaver = async (val) => {
+    setDataSaver(val);
+    await AsyncStorage.setItem(DATASAVER_KEY, String(val));
+  };
+
+  const saveAutoplayVideo = async (val) => {
+    setAutoplayVideo(val);
+    await AsyncStorage.setItem(AUTOPLAY_KEY, String(val));
+  };
+
   const saveLanguage = async (code) => {
     setLanguage(code);
     await AsyncStorage.setItem(LANG_KEY, code);
+    // Apply RTL layout direction immediately
+    const shouldBeRTL = RTL_LANGUAGES.has(code);
+    if (I18nManager.isRTL !== shouldBeRTL) {
+      I18nManager.forceRTL(shouldBeRTL);
+    }
   };
 
   const resolvedMode = mode === 'system'
@@ -215,6 +245,8 @@ export function ThemeProvider({ children }) {
       fontSize, fontSizeObj, saveFontSize, fs,
       fontType, fontTypeObj, saveFontType,
       language, languageObj, saveLanguage,
+      dataSaver, saveDataSaver,
+      autoplayVideo, saveAutoplayVideo,
       loaded,
     }}>
       {children}

@@ -8,12 +8,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useTranslation } from '../i18n';
 import { colors, radius } from '../theme';
 import GradientButton from '../components/GradientButton';
 
 export default function AccountSwitcherScreen({ navigation }) {
   const { user, savedAccounts, switchAccount, addAccount, removeAccount } = useAuth();
   const { theme } = useTheme();
+  const { t } = useTranslation();
   const [switching, setSwitching] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [addForm, setAddForm] = useState({ email: '', password: '' });

@@ -7,6 +7,7 @@ import AppText from './AppText';
 import { Video, ResizeMode, Audio } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useTheme } from '../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 const VIDEO_HEIGHT = width * (16 / 9); // portrait 9:16
@@ -29,9 +30,10 @@ export default function VideoPlayer({
   authorName, authorAvatar,
   caption,
 }) {
+  const { dataSaver, autoplayVideo } = useTheme();
   const videoRef = useRef(null);
   const [muted, setMuted] = useState(false);
-  const [paused, setPaused] = useState(false);
+  const [paused, setPaused] = useState(!autoplayVideo || dataSaver);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
   const [loaded, setLoaded] = useState(false);
@@ -45,7 +47,7 @@ export default function VideoPlayer({
 
   useEffect(() => {
     if (!videoRef.current || !loaded) return;
-    if (!isVisible) {
+    if (!isVisible || !autoplayVideo || dataSaver) {
       videoRef.current.pauseAsync().catch(() => {});
       videoRef.current.setStatusAsync({ shouldPlay: false }).catch(() => {});
       setPaused(true);
@@ -53,7 +55,7 @@ export default function VideoPlayer({
       videoRef.current.playAsync().catch(() => {});
       setPaused(false);
     }
-  }, [isVisible, loaded]);
+  }, [isVisible, loaded, autoplayVideo, dataSaver]);
 
   // Stop and release audio when component unmounts
   useEffect(() => {
@@ -132,13 +134,21 @@ export default function VideoPlayer({
         source={{ uri }}
         style={s.video}
         resizeMode={ResizeMode.COVER}
-        shouldPlay={isVisible && !paused}
+        shouldPlay={isVisible && !paused && autoplayVideo && !dataSaver}
         isLooping
-        isMuted={muted}
+        isMuted={muted || dataSaver}
         volume={1.0}
         onPlaybackStatusUpdate={onPlaybackUpdate}
         useNativeControls={false}
       />
+
+      {/* Data saver banner */}
+      {dataSaver && (
+        <View style={s.dataSaverBanner} pointerEvents="none">
+          <Ionicons name="cellular-outline" size={12} color="rgba(255,255,255,0.7)" />
+          <AppText style={s.dataSaverText}>Data Saver · Tap to play</AppText>
+        </View>
+      )}
 
       {/* Bottom gradient overlay */}
       <LinearGradient
@@ -381,5 +391,23 @@ const s = StyleSheet.create({
     fontWeight: '600',
     minWidth: 36,
     textAlign: 'center',
+  },
+  dataSaverBanner: {
+    position: 'absolute',
+    top: 14, left: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  dataSaverText: {
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 11,
+    fontWeight: '600',
   },
 });

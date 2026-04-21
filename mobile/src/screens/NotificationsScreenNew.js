@@ -8,6 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
+import { useTranslation } from '../i18n';
 import api from '../api/axios';
 import { colors, radius } from '../theme';
 
@@ -34,6 +35,7 @@ function formatTimeAgo(dateString) {
 }
 
 export default function NotificationsScreen({ navigation }) {
+  const { t } = useTranslation();
   const { theme } = useTheme();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -221,7 +223,7 @@ export default function NotificationsScreen({ navigation }) {
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         
-        <AppText style={s.headerTitle}>Notifications</AppText>
+        <AppText style={s.headerTitle}>{t('notifications')}</AppText>
         
         {unreadCount > 0 && (
           <TouchableOpacity onPress={handleMarkAllRead} style={s.markAllBtn}>
