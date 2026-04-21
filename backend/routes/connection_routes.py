@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from extensions import db
 from models.user import User
-from models.social import Connection
+from models.social import Connection, Block
 
 connection_bp = Blueprint("connections", __name__)
 
@@ -192,16 +192,73 @@ def search_users():
     return jsonify({"users": result})
 
 
+@connection_bp.route("/blocked", methods=["GET"])
+@jwt_required()
+def get_blocked_users():
+    """Get all users blocked by the current user"""
+    current_id = int(get_jwt_identity())
+    try:
+        blocks = Block.query.filter_by(blocker_id=current_id).order_by(Block.created_at.desc()).all()
+        return jsonify({"blocked": [b.to_dict() for b in blocks], "count": len(blocks)})
+    except Exception as e:
+        # Table may not exist yet — run create_all and return empty list
+        try:
+            from extensions import db
+            db.create_all()
+        except Exception:
+            pass
+        return jsonify({"blocked": [], "count": 0})
+
+
 @connection_bp.route("/<int:user_id>/block", methods=["POST"])
 @jwt_required()
 def block_user(user_id):
     current_id = int(get_jwt_identity())
+    if current_id == user_id:
+        return jsonify({"error": "Cannot block yourself"}), 400
+    try:
+        # Ensure table exists
+        from extensions import db as _db
+        _db.create_all()
+    except Exception:
+        pass
+    # Remove any existing connections both ways
     Connection.query.filter(
         ((Connection.follower_id == current_id) & (Connection.following_id == user_id)) |
         ((Connection.follower_id == user_id) & (Connection.following_id == current_id))
     ).delete(synchronize_session=False)
+    # Add block record (ignore if already blocked)
+    existing = Block.query.filter_by(blocker_id=current_id, blocked_id=user_id).first()
+    if not existing:
+        from extensions import db
+        db.session.add(Block(blocker_id=current_id, blocked_id=user_id))
+    from extensions import db
     db.session.commit()
     return jsonify({"blocked": True})
+
+
+@connection_bp.route("/<int:user_id>/unblock", methods=["POST"])
+@jwt_required()
+def unblock_user(user_id):
+    current_id = int(get_jwt_identity())
+    try:
+        Block.query.filter_by(blocker_id=current_id, blocked_id=user_id).delete()
+        from extensions import db
+        db.session.commit()
+    except Exception:
+        pass
+    return jsonify({"blocked": False})
+
+
+@connection_bp.route("/<int:user_id>/block-status", methods=["GET"])
+@jwt_required()
+def block_status(user_id):
+    current_id = int(get_jwt_identity())
+    try:
+        is_blocked = Block.query.filter_by(blocker_id=current_id, blocked_id=user_id).first() is not None
+    except Exception:
+        is_blocked = False
+    return jsonify({"blocked": is_blocked})
 
 
 @connection_bp.route("/<int:user_id>/mute", methods=["POST"])

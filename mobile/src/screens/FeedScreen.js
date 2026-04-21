@@ -15,6 +15,7 @@ import api from "../api/axios";
 import { colors, radius } from "../theme";
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
+import VideoPlayer from "../components/VideoPlayer";
 
 const { width } = Dimensions.get("window");
 
@@ -204,7 +205,7 @@ const sp = StyleSheet.create({
 });
 
 // ── Post Card ──────────────────────────────────────────────────
-const PostCard = memo(function PostCard({ post, onUpdate, navigation }) {
+const PostCard = memo(function PostCard({ post, onUpdate, navigation, isVisible }) {
   const { user } = useAuth();
   const { theme } = useTheme();
   const [liked, setLiked] = useState(post.liked_by_me || false);
@@ -212,6 +213,7 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation }) {
   const [likeCount, setLikeCount] = useState(post.like_count || 0);
   const [showComments, setShowComments] = useState(false);
   const [showFullCaption, setShowFullCaption] = useState(false);
+  const isVideoPost = post.media_type === 'video' && !!post.media_url;
   const [showMediaViewer, setShowMediaViewer] = useState(false);
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
   const [comments, setComments] = useState([]);
@@ -300,7 +302,8 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation }) {
 
   return (
     <View style={pc.card}>
-      {/* Header */}
+      {/* Header — hidden for video posts (overlaid inside VideoPlayer) */}
+      {!isVideoPost && (
       <TouchableOpacity
         style={pc.header}
         onPress={() => navigation.navigate("UserProfile", { userId: post.user_id, userName: post.author_name, userAvatar: post.author_avatar })}
@@ -348,103 +351,136 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation }) {
           </TouchableOpacity>
         )}
       </TouchableOpacity>
+      )}{/* end !isVideoPost header */}
 
-      {/* Media - Carousel or Single */}
-      {mediaList.length > 0 && (
-        <View>
-          <ScrollView
-            ref={scrollViewRef}
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            onScroll={handleScroll}
-            scrollEventThrottle={16}
-          >
-            {mediaList.map((media, idx) => (
-              <TouchableOpacity
-                key={idx}
-                activeOpacity={1}
-                onPress={() => {
-                  const now = Date.now();
-                  if (now - lastTap.current < 300 && !liked) {
-                    setLiked(true);
-                    setLikeCount(c => c + 1);
-                    api.post(`/posts/${post.id}/like`).catch(() => {
-                      setLiked(false); setLikeCount(c => c - 1);
-                    });
-                  } else {
-                    setShowMediaViewer(true);
-                    setCurrentMediaIndex(idx);
-                  }
-                  lastTap.current = now;
-                }}
-              >
-                <Image source={{ uri: media.url }} style={pc.media} resizeMode="cover" />
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-          {mediaList.length > 1 && (
-            <View style={pc.carouselDots}>
-              {mediaList.map((_, idx) => (
-                <View
-                  key={idx}
-                  style={[
-                    pc.dot,
-                    { backgroundColor: idx === currentMediaIndex ? '#3b82f6' : 'rgba(255,255,255,0.4)' }
-                  ]}
-                />
-              ))}
+      {/* Media - Video gets its own full card layout, images use carousel */}
+      {mediaList.length > 0 && (() => {
+        const isVideoPost = mediaList.length === 1 &&
+          (mediaList[0].type === 'video' || mediaList[0].media_type === 'video');
+
+        if (isVideoPost) {
+          return (
+            <View style={pc.videoCard}>
+              <VideoPlayer
+                uri={mediaList[0].url}
+                isVisible={isVisible}
+                liked={liked}
+                likeCount={likeCount}
+                onLike={toggleLike}
+                onComment={openComments}
+                onShare={() => setShowShare(true)}
+                saved={saved}
+                onSave={toggleSave}
+                authorName={post.author_name}
+                authorAvatar={post.author_avatar}
+                caption={post.caption}
+                commentCount={post.comment_count}
+              />
             </View>
+          );
+        }
+
+        return (
+          <View>
+            <ScrollView
+              ref={scrollViewRef}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              onScroll={handleScroll}
+              scrollEventThrottle={16}
+            >
+              {mediaList.map((media, idx) => (
+                <TouchableOpacity
+                  key={idx}
+                  activeOpacity={1}
+                  onPress={() => {
+                    const now = Date.now();
+                    if (now - lastTap.current < 300 && !liked) {
+                      setLiked(true);
+                      setLikeCount(c => c + 1);
+                      api.post(`/posts/${post.id}/like`).catch(() => {
+                        setLiked(false); setLikeCount(c => c - 1);
+                      });
+                    } else {
+                      setShowMediaViewer(true);
+                      setCurrentMediaIndex(idx);
+                    }
+                    lastTap.current = now;
+                  }}
+                >
+                  <Image source={{ uri: media.url }} style={pc.media} resizeMode="cover" />
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            {mediaList.length > 1 && (
+              <View style={pc.carouselDots}>
+                {mediaList.map((_, idx) => (
+                  <View
+                    key={idx}
+                    style={[
+                      pc.dot,
+                      { backgroundColor: idx === currentMediaIndex ? '#3b82f6' : 'rgba(255,255,255,0.4)' }
+                    ]}
+                  />
+                ))}
+              </View>
+            )}
+          </View>
+        );
+      })()}
+
+      {/* Actions / Likes / Caption / Timestamp — hidden for video (overlaid inside VideoPlayer) */}
+      {!isVideoPost && (
+        <>
+          {/* Actions */}
+          <View style={pc.actions}>
+            <View style={pc.actionsLeft}>
+              <TouchableOpacity onPress={toggleLike} style={pc.actionBtn}>
+                <Ionicons name={liked ? "heart" : "heart-outline"} size={26} color={liked ? "#e11d48" : theme.text} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={openComments} style={pc.actionBtn}>
+                <Ionicons name="chatbubble-outline" size={24} color={theme.text} />
+              </TouchableOpacity>
+              <TouchableOpacity style={pc.actionBtn} onPress={() => setShowShare(true)}>
+                <Ionicons name="paper-plane-outline" size={24} color={theme.text} />
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity onPress={toggleSave} style={pc.actionBtn}>
+              <Ionicons name={saved ? "bookmark" : "bookmark-outline"} size={24} color={saved ? theme.primary : theme.text} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Likes */}
+          {likeCount > 0 && (
+            <Text style={pc.likeCount}>{likeCount.toLocaleString()} {likeCount === 1 ? "like" : "likes"}</Text>
           )}
-        </View>
-      )}
 
-      {/* Actions */}
-      <View style={pc.actions}>
-        <View style={pc.actionsLeft}>
-          <TouchableOpacity onPress={toggleLike} style={pc.actionBtn}>
-            <Ionicons name={liked ? "heart" : "heart-outline"} size={26} color={liked ? "#e11d48" : theme.text} />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={openComments} style={pc.actionBtn}>
-            <Ionicons name="chatbubble-outline" size={24} color={theme.text} />
-          </TouchableOpacity>
-          <TouchableOpacity style={pc.actionBtn} onPress={() => setShowShare(true)}>
-            <Ionicons name="paper-plane-outline" size={24} color={theme.text} />
-          </TouchableOpacity>
-        </View>
-        <TouchableOpacity onPress={toggleSave} style={pc.actionBtn}>
-          <Ionicons name={saved ? "bookmark" : "bookmark-outline"} size={24} color={saved ? theme.primary : theme.text} />
-        </TouchableOpacity>
-      </View>
+          {/* Caption */}
+          {post.caption ? (
+            <View style={pc.captionWrap}>
+              <Text style={pc.caption} numberOfLines={showFullCaption ? undefined : 2}>
+                <Text style={pc.captionName}>{post.author_name} </Text>
+                {renderHashtags(post.caption)}
+              </Text>
+              {post.caption.length > 100 && (
+                <TouchableOpacity onPress={() => setShowFullCaption(!showFullCaption)}>
+                  <Text style={pc.moreText}>{showFullCaption ? 'less' : 'more'}</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : null}
 
-      {/* Likes */}
-      {likeCount > 0 && (
-        <Text style={pc.likeCount}>{likeCount.toLocaleString()} {likeCount === 1 ? "like" : "likes"}</Text>
-      )}
-
-      {/* Caption */}
-      {post.caption ? (
-        <View style={pc.captionWrap}>
-          <Text style={pc.caption} numberOfLines={showFullCaption ? undefined : 2}>
-            <Text style={pc.captionName}>{post.author_name} </Text>
-            {renderHashtags(post.caption)}
-          </Text>
-          {post.caption.length > 100 && (
-            <TouchableOpacity onPress={() => setShowFullCaption(!showFullCaption)}>
-              <Text style={pc.moreText}>{showFullCaption ? 'less' : 'more'}</Text>
+          {/* View comments */}
+          {post.comment_count > 0 && (
+            <TouchableOpacity onPress={openComments}>
+              <Text style={pc.viewComments}>View all {post.comment_count} comments</Text>
             </TouchableOpacity>
           )}
-        </View>
-      ) : null}
 
-      {/* View comments */}
-      {post.comment_count > 0 && (
-        <TouchableOpacity onPress={openComments}>
-          <Text style={pc.viewComments}>View all {post.comment_count} comments</Text>
-        </TouchableOpacity>
+          <Text style={pc.timestamp}>{timeAgo(post.created_at).toUpperCase()}</Text>
+        </>
       )}
-
-      <Text style={pc.timestamp}>{timeAgo(post.created_at).toUpperCase()}</Text>
 
       {/* Full Screen Media Viewer */}
       <Modal visible={showMediaViewer} transparent animationType="fade" onRequestClose={() => setShowMediaViewer(false)}>
@@ -544,6 +580,7 @@ const pc = StyleSheet.create({
   metaText: { fontSize: 11, color: colors.muted },
   sponsoredLabel: { fontSize: 10, color: '#f59e0b', fontWeight: '700', backgroundColor: 'rgba(245,158,11,0.12)', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 },
   dot: { fontSize: 11, color: colors.dim },
+  videoCard: { width, backgroundColor: '#000' },
   media: { width, height: width },
   actions: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 10, paddingVertical: 8 },
   actionsLeft: { flexDirection: "row", gap: 4 },
@@ -586,6 +623,17 @@ export default function FeedScreen({ navigation }) {
   const [showJoinFamily, setShowJoinFamily] = useState(false);
   const [showBiometricPrompt, setShowBiometricPrompt] = useState(false);
   const [biometricType, setBiometricType] = useState('fingerprint');
+  const [visiblePostId, setVisiblePostId] = useState(null);
+
+  const viewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 60,  // post must be 60% visible to count
+  }).current;
+
+  const onViewableItemsChanged = useRef(({ viewableItems }) => {
+    if (viewableItems.length > 0) {
+      setVisiblePostId(viewableItems[0].item.id);
+    }
+  }).current;
 
   // Check if we should show biometric prompt after login
   useEffect(() => {
@@ -633,6 +681,27 @@ export default function FeedScreen({ navigation }) {
   useFocusEffect(useCallback(() => {
     fetchFeed(true);
     fetchUnread();
+    // Re-enable audio when screen comes back into focus
+    import('expo-av').then(({ Audio }) => {
+      Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: false,
+        shouldDuckAndroid: true,
+      }).catch(() => {});
+    }).catch(() => {});
+    // Return cleanup: when screen loses focus, stop all videos by clearing visiblePostId
+    // and deactivate the audio session so sound stops immediately
+    return () => {
+      setVisiblePostId(null);
+      import('expo-av').then(({ Audio }) => {
+        Audio.setAudioModeAsync({
+          allowsRecordingIOS: false,
+          playsInSilentModeIOS: false,
+          staysActiveInBackground: false,
+        }).catch(() => {});
+      }).catch(() => {});
+    };
   }, []));
 
   // Reset badge immediately when Notifications screen is focused
@@ -772,6 +841,7 @@ export default function FeedScreen({ navigation }) {
               post={item}
               navigation={navigation}
               onUpdate={() => fetchFeed(true)}
+              isVisible={item.id === visiblePostId}
             />
           )}
           ListHeaderComponent={<ListHeader />}
@@ -784,6 +854,8 @@ export default function FeedScreen({ navigation }) {
             />
           }
           showsVerticalScrollIndicator={false}
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
           ListEmptyComponent={
             <View style={s.emptyWrap}>
               <LinearGradient colors={["rgba(124,58,237,0.15)", "rgba(59,130,246,0.1)"]} style={s.emptyCard}>

@@ -2,6 +2,29 @@ from extensions import db
 from datetime import datetime
 
 
+class Block(db.Model):
+    """Tracks users blocked by the current user."""
+    __tablename__ = "blocks"
+    id = db.Column(db.Integer, primary_key=True)
+    blocker_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    blocked_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    __table_args__ = (db.UniqueConstraint("blocker_id", "blocked_id"),)
+    blocker = db.relationship("User", foreign_keys=[blocker_id])
+    blocked = db.relationship("User", foreign_keys=[blocked_id])
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "blocker_id": self.blocker_id,
+            "blocked_id": self.blocked_id,
+            "blocked_name": self.blocked.name if self.blocked else None,
+            "blocked_username": self.blocked.username if self.blocked else None,
+            "blocked_avatar": self.blocked.avatar_url if self.blocked else None,
+            "created_at": self.created_at.isoformat(),
+        }
+
+
 class Connection(db.Model):
     __tablename__ = "connections"
     id = db.Column(db.Integer, primary_key=True)

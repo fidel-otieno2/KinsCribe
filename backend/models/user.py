@@ -18,6 +18,8 @@ class User(db.Model):
     website = db.Column(db.String(200), nullable=True)
     interests = db.Column(db.String(500), nullable=True)
     is_private = db.Column(db.Boolean, default=False)
+    show_activity = db.Column(db.Boolean, default=True)   # show online/active status to others
+    allow_dms = db.Column(db.Boolean, default=True)        # allow direct messages from non-followers
     google_id = db.Column(db.String(200), nullable=True, unique=True)
     apple_id = db.Column(db.String(200), nullable=True, unique=True)  # Added Apple ID
     
@@ -67,6 +69,8 @@ class User(db.Model):
             "website": self.website,
             "interests": self.interests.split(',') if self.interests else [],
             "is_private": self.is_private,
+            "show_activity": self.show_activity if self.show_activity is not None else True,
+            "allow_dms": self.allow_dms if self.allow_dms is not None else True,
             "account_type": self.account_type,
             "two_factor_enabled": self.two_factor_enabled,
             "has_password": bool(self.password),

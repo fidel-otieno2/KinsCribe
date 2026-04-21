@@ -111,11 +111,24 @@ export default function SettingsScreen({ navigation }) {
 
   // Privacy toggles
   const [privateAccount, setPrivateAccount] = useState(user?.is_private || false);
-  const [showActivity, setShowActivity] = useState(true);
-  const [allowDMs, setAllowDMs] = useState(true);
+  const [showActivity, setShowActivity] = useState(user?.show_activity !== false);
+  const [allowDMs, setAllowDMs] = useState(user?.allow_dms !== false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [pendingPrivate, setPendingPrivate] = useState(false);
   const [savingPrivacy, setSavingPrivacy] = useState(false);
+  // Activity status modal
+  const [showActivityModal, setShowActivityModal] = useState(false);
+  const [pendingActivity, setPendingActivity] = useState(true);
+  const [savingActivity, setSavingActivity] = useState(false);
+  // Allow DMs modal
+  const [showDMsModal, setShowDMsModal] = useState(false);
+  const [pendingDMs, setPendingDMs] = useState(true);
+  const [savingDMs, setSavingDMs] = useState(false);
+  // Blocked accounts modal
+  const [showBlockedModal, setShowBlockedModal] = useState(false);
+  const [blockedUsers, setBlockedUsers] = useState([]);
+  const [loadingBlocked, setLoadingBlocked] = useState(false);
+  const [unblocking, setUnblocking] = useState(null);
 
   useEffect(() => {
     checkBiometricStatus();
@@ -289,6 +302,85 @@ export default function SettingsScreen({ navigation }) {
     }
   };
 
+  const handleActivityToggle = (newVal) => {
+    setPendingActivity(newVal);
+    setShowActivityModal(true);
+  };
+
+  const confirmActivityChange = async () => {
+    setSavingActivity(true);
+    try {
+      await api.put('/auth/profile', { show_activity: pendingActivity });
+      await refreshUser();
+      setShowActivity(pendingActivity);
+      setShowActivityModal(false);
+      success(pendingActivity ? 'Activity status visible' : 'Activity status hidden');
+    } catch {
+      error('Failed to update activity setting');
+    } finally {
+      setSavingActivity(false);
+    }
+  };
+
+  const handleDMsToggle = (newVal) => {
+    setPendingDMs(newVal);
+    setShowDMsModal(true);
+  };
+
+  const confirmDMsChange = async () => {
+    setSavingDMs(true);
+    try {
+      await api.put('/auth/profile', { allow_dms: pendingDMs });
+      await refreshUser();
+      setAllowDMs(pendingDMs);
+      setShowDMsModal(false);
+      success(pendingDMs ? 'Direct messages enabled' : 'Direct messages restricted');
+    } catch {
+      error('Failed to update DM setting');
+    } finally {
+      setSavingDMs(false);
+    }
+  };
+
+  const openBlockedAccounts = async () => {
+    setShowBlockedModal(true);
+    setLoadingBlocked(true);
+    try {
+      const { data } = await api.get('/connections/blocked');
+      setBlockedUsers(data.blocked || []);
+    } catch {
+      // Table may not exist yet on first load — just show empty state
+      setBlockedUsers([]);
+    } finally {
+      setLoadingBlocked(false);
+    }
+  };
+
+  const handleUnblock = async (blockedId, name) => {
+    Alert.alert(
+      `Unblock ${name}?`,
+      'They will be able to see your posts and follow you again.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Unblock',
+          onPress: async () => {
+            setUnblocking(blockedId);
+            try {
+              await api.post(`/connections/${blockedId}/unblock`);
+              setBlockedUsers(prev => prev.filter(b => b.blocked_id !== blockedId));
+              success(`${name} unblocked`);
+            } catch {
+              error('Failed to unblock');
+            } finally {
+              setUnblocking(null);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const confirmDeleteAccount = async () => {
     setDeletingAccount(true);
     try {
@@ -435,11 +527,56 @@ export default function SettingsScreen({ navigation }) {
             />
           </View>
           <Divider />
-          <Row icon="eye-outline" label="Show Activity Status" toggle toggled={showActivity} onPress={() => setShowActivity(v => !v)} />
+          <View style={s.row}>
+            <View style={[s.rowIcon, { backgroundColor: 'rgba(16,185,129,0.15)' }]}>
+              <Ionicons name="eye-outline" size={18} color="#10b981" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.rowLabel}>Show Activity Status</Text>
+              <Text style={s.rowSubLabel}>
+                {showActivity
+                  ? 'Others can see when you were last active'
+                  : 'Your activity status is hidden from everyone'}
+              </Text>
+            </View>
+            <Switch
+              value={showActivity}
+              onValueChange={handleActivityToggle}
+              trackColor={{ true: '#10b981', false: colors.border2 }}
+              thumbColor="#fff"
+            />
+          </View>
           <Divider />
-          <Row icon="chatbubble-outline" label="Allow Direct Messages" toggle toggled={allowDMs} onPress={() => setAllowDMs(v => !v)} />
+          <View style={s.row}>
+            <View style={[s.rowIcon, { backgroundColor: 'rgba(59,130,246,0.15)' }]}>
+              <Ionicons name="chatbubble-outline" size={18} color="#3b82f6" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.rowLabel}>Allow Direct Messages</Text>
+              <Text style={s.rowSubLabel}>
+                {allowDMs
+                  ? 'Anyone can send you a message'
+                  : 'Only people you follow can message you'}
+              </Text>
+            </View>
+            <Switch
+              value={allowDMs}
+              onValueChange={handleDMsToggle}
+              trackColor={{ true: '#3b82f6', false: colors.border2 }}
+              thumbColor="#fff"
+            />
+          </View>
           <Divider />
-          <Row icon="ban-outline" iconColor="#f87171" label="Blocked Accounts" onPress={() => Alert.alert('Blocked', 'No blocked accounts')} />
+          <TouchableOpacity style={s.row} onPress={openBlockedAccounts} activeOpacity={0.7}>
+            <View style={[s.rowIcon, { backgroundColor: 'rgba(248,113,113,0.15)' }]}>
+              <Ionicons name="ban-outline" size={18} color="#f87171" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[s.rowLabel, { color: '#f87171' }]}>Blocked Accounts</Text>
+              <Text style={s.rowSubLabel}>Manage people you have blocked</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.dim} />
+          </TouchableOpacity>
         </Section>
 
         {/* Notifications */}
@@ -725,6 +862,212 @@ export default function SettingsScreen({ navigation }) {
         onSuccess={() => success('Password changed successfully!')}
       />
 
+      {/* Activity Status Modal */}
+      <Modal visible={showActivityModal} transparent animationType="fade" onRequestClose={() => setShowActivityModal(false)}>
+        <View style={s.modalOverlay}>
+          <BlurView intensity={20} tint="dark" style={s.confirmModal}>
+            <LinearGradient
+              colors={pendingActivity ? ['rgba(16,185,129,0.1)', 'rgba(15,23,42,0.98)'] : ['rgba(100,116,139,0.1)', 'rgba(15,23,42,0.98)']}
+              style={StyleSheet.absoluteFill}
+            />
+            <View style={s.confirmIconWrap}>
+              <LinearGradient
+                colors={pendingActivity ? ['#10b981', '#059669'] : ['#475569', '#334155']}
+                style={s.confirmIcon}
+              >
+                <Ionicons name={pendingActivity ? 'eye' : 'eye-off'} size={26} color="#fff" />
+              </LinearGradient>
+            </View>
+            <Text style={s.confirmTitle}>
+              {pendingActivity ? 'Show Activity Status?' : 'Hide Activity Status?'}
+            </Text>
+            <View style={s.privacyInfoBox}>
+              {pendingActivity ? (
+                <>
+                  <View style={s.privacyInfoRow}>
+                    <Ionicons name="checkmark-circle" size={16} color="#34d399" />
+                    <Text style={s.privacyInfoText}>People you chat with can see when you were last active</Text>
+                  </View>
+                  <View style={s.privacyInfoRow}>
+                    <Ionicons name="checkmark-circle" size={16} color="#34d399" />
+                    <Text style={s.privacyInfoText}>Shows "Active now" or "Active X mins ago" in messages</Text>
+                  </View>
+                  <View style={s.privacyInfoRow}>
+                    <Ionicons name="information-circle" size={16} color="#94a3b8" />
+                    <Text style={s.privacyInfoText}>You will also be able to see others' activity status</Text>
+                  </View>
+                </>
+              ) : (
+                <>
+                  <View style={s.privacyInfoRow}>
+                    <Ionicons name="checkmark-circle" size={16} color="#a78bfa" />
+                    <Text style={s.privacyInfoText}>No one can see when you were last active</Text>
+                  </View>
+                  <View style={s.privacyInfoRow}>
+                    <Ionicons name="checkmark-circle" size={16} color="#a78bfa" />
+                    <Text style={s.privacyInfoText}>"Active" indicator will be hidden in messages</Text>
+                  </View>
+                  <View style={s.privacyInfoRow}>
+                    <Ionicons name="information-circle" size={16} color="#94a3b8" />
+                    <Text style={s.privacyInfoText}>You will also not be able to see others' activity status</Text>
+                  </View>
+                </>
+              )}
+            </View>
+            <View style={[s.confirmBtns, { marginTop: 8 }]}>
+              <TouchableOpacity style={s.confirmCancelBtn} onPress={() => setShowActivityModal(false)} activeOpacity={0.8}>
+                <Text style={s.confirmCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.confirmRemoveBtn} onPress={confirmActivityChange} disabled={savingActivity} activeOpacity={0.8}>
+                <LinearGradient
+                  colors={pendingActivity ? ['#10b981', '#059669'] : ['#475569', '#334155']}
+                  style={s.confirmRemoveBtnGrad}
+                >
+                  {savingActivity
+                    ? <ActivityIndicator color="#fff" size="small" />
+                    : <Text style={s.confirmRemoveText}>{pendingActivity ? 'Show Status' : 'Hide Status'}</Text>}
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </BlurView>
+        </View>
+      </Modal>
+
+      {/* Allow DMs Modal */}
+      <Modal visible={showDMsModal} transparent animationType="fade" onRequestClose={() => setShowDMsModal(false)}>
+        <View style={s.modalOverlay}>
+          <BlurView intensity={20} tint="dark" style={s.confirmModal}>
+            <LinearGradient
+              colors={pendingDMs ? ['rgba(59,130,246,0.1)', 'rgba(15,23,42,0.98)'] : ['rgba(100,116,139,0.1)', 'rgba(15,23,42,0.98)']}
+              style={StyleSheet.absoluteFill}
+            />
+            <View style={s.confirmIconWrap}>
+              <LinearGradient
+                colors={pendingDMs ? ['#3b82f6', '#2563eb'] : ['#475569', '#334155']}
+                style={s.confirmIcon}
+              >
+                <Ionicons name={pendingDMs ? 'chatbubble' : 'chatbubble-outline'} size={26} color="#fff" />
+              </LinearGradient>
+            </View>
+            <Text style={s.confirmTitle}>
+              {pendingDMs ? 'Allow Direct Messages?' : 'Restrict Direct Messages?'}
+            </Text>
+            <View style={s.privacyInfoBox}>
+              {pendingDMs ? (
+                <>
+                  <View style={s.privacyInfoRow}>
+                    <Ionicons name="checkmark-circle" size={16} color="#60a5fa" />
+                    <Text style={s.privacyInfoText}>Anyone on KinsCribe can send you a message</Text>
+                  </View>
+                  <View style={s.privacyInfoRow}>
+                    <Ionicons name="checkmark-circle" size={16} color="#60a5fa" />
+                    <Text style={s.privacyInfoText}>Messages from strangers go to your inbox directly</Text>
+                  </View>
+                </>
+              ) : (
+                <>
+                  <View style={s.privacyInfoRow}>
+                    <Ionicons name="checkmark-circle" size={16} color="#a78bfa" />
+                    <Text style={s.privacyInfoText}>Only people you follow can send you messages</Text>
+                  </View>
+                  <View style={s.privacyInfoRow}>
+                    <Ionicons name="checkmark-circle" size={16} color="#a78bfa" />
+                    <Text style={s.privacyInfoText}>Others will see a "Can't send message" notice</Text>
+                  </View>
+                  <View style={s.privacyInfoRow}>
+                    <Ionicons name="information-circle" size={16} color="#94a3b8" />
+                    <Text style={s.privacyInfoText}>Existing conversations are not affected</Text>
+                  </View>
+                </>
+              )}
+            </View>
+            <View style={[s.confirmBtns, { marginTop: 8 }]}>
+              <TouchableOpacity style={s.confirmCancelBtn} onPress={() => setShowDMsModal(false)} activeOpacity={0.8}>
+                <Text style={s.confirmCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.confirmRemoveBtn} onPress={confirmDMsChange} disabled={savingDMs} activeOpacity={0.8}>
+                <LinearGradient
+                  colors={pendingDMs ? ['#3b82f6', '#2563eb'] : ['#475569', '#334155']}
+                  style={s.confirmRemoveBtnGrad}
+                >
+                  {savingDMs
+                    ? <ActivityIndicator color="#fff" size="small" />
+                    : <Text style={s.confirmRemoveText}>{pendingDMs ? 'Allow DMs' : 'Restrict DMs'}</Text>}
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </BlurView>
+        </View>
+      </Modal>
+
+      {/* Blocked Accounts Modal */}
+      <Modal visible={showBlockedModal} transparent animationType="slide" onRequestClose={() => setShowBlockedModal(false)}>
+        <View style={s.blockedOverlay}>
+          <BlurView intensity={20} tint="dark" style={s.blockedSheet}>
+            <LinearGradient colors={['rgba(248,113,113,0.06)', 'rgba(15,23,42,0.98)']} style={StyleSheet.absoluteFill} />
+            <View style={s.blockedHandle} />
+            <View style={s.blockedHeader}>
+              <View style={s.blockedHeaderLeft}>
+                <View style={[s.rowIcon, { backgroundColor: 'rgba(248,113,113,0.15)' }]}>
+                  <Ionicons name="ban" size={18} color="#f87171" />
+                </View>
+                <View>
+                  <Text style={s.blockedTitle}>Blocked Accounts</Text>
+                  <Text style={s.blockedSubtitle}>{blockedUsers.length} {blockedUsers.length === 1 ? 'account' : 'accounts'} blocked</Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={() => setShowBlockedModal(false)} style={s.blockedCloseBtn}>
+                <Ionicons name="close" size={22} color={colors.muted} />
+              </TouchableOpacity>
+            </View>
+
+            {loadingBlocked ? (
+              <View style={s.blockedLoading}>
+                <ActivityIndicator color="#f87171" size="large" />
+                <Text style={s.blockedLoadingText}>Loading blocked accounts...</Text>
+              </View>
+            ) : blockedUsers.length === 0 ? (
+              <View style={s.blockedEmpty}>
+                <LinearGradient colors={['rgba(248,113,113,0.12)', 'rgba(248,113,113,0.04)']} style={s.blockedEmptyIcon}>
+                  <Ionicons name="shield-checkmark-outline" size={40} color="#f87171" />
+                </LinearGradient>
+                <Text style={s.blockedEmptyTitle}>No blocked accounts</Text>
+                <Text style={s.blockedEmptyText}>People you block won't be able to see your posts or contact you.</Text>
+              </View>
+            ) : (
+              <ScrollView style={s.blockedList} showsVerticalScrollIndicator={false}>
+                {blockedUsers.map((b) => (
+                  <View key={b.id} style={s.blockedRow}>
+                    <View style={s.blockedAvatar}>
+                      {b.blocked_avatar
+                        ? <Image source={{ uri: b.blocked_avatar }} style={{ width: '100%', height: '100%' }} />
+                        : <Text style={s.blockedAvatarLetter}>{b.blocked_name?.[0]?.toUpperCase() || '?'}</Text>}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.blockedName}>{b.blocked_name}</Text>
+                      {b.blocked_username && (
+                        <Text style={s.blockedUsername}>@{b.blocked_username}</Text>
+                      )}
+                    </View>
+                    <TouchableOpacity
+                      style={s.unblockBtn}
+                      onPress={() => handleUnblock(b.blocked_id, b.blocked_name)}
+                      disabled={unblocking === b.blocked_id}
+                      activeOpacity={0.8}
+                    >
+                      {unblocking === b.blocked_id
+                        ? <ActivityIndicator size="small" color="#f87171" />
+                        : <Text style={s.unblockBtnText}>Unblock</Text>}
+                    </TouchableOpacity>
+                  </View>
+                ))}
+                <View style={{ height: 40 }} />
+              </ScrollView>
+            )}
+          </BlurView>
+        </View>
+      </Modal>
+
       {/* Privacy Change Confirmation Modal */}
       <Modal visible={showPrivacyModal} transparent animationType="fade" onRequestClose={() => setShowPrivacyModal(false)}>
         <View style={s.modalOverlay}>
@@ -869,4 +1212,27 @@ const s = StyleSheet.create({
   privacyInfoBox: { marginHorizontal: 20, marginBottom: 20, gap: 10 },
   privacyInfoRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   privacyInfoText: { flex: 1, fontSize: 13, color: colors.muted, lineHeight: 19 },
+  // Blocked accounts modal
+  blockedOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.6)' },
+  blockedSheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, overflow: 'hidden', maxHeight: '80%', minHeight: 300 },
+  blockedHandle: { width: 40, height: 4, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 2, alignSelf: 'center', marginTop: 12, marginBottom: 4 },
+  blockedHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 0.5, borderBottomColor: 'rgba(248,113,113,0.15)' },
+  blockedHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  blockedTitle: { fontSize: 17, fontWeight: '800', color: colors.text },
+  blockedSubtitle: { fontSize: 12, color: colors.muted, marginTop: 1 },
+  blockedCloseBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(255,255,255,0.06)', alignItems: 'center', justifyContent: 'center' },
+  blockedLoading: { alignItems: 'center', paddingVertical: 48, gap: 12 },
+  blockedLoadingText: { color: colors.muted, fontSize: 14 },
+  blockedEmpty: { alignItems: 'center', paddingVertical: 40, paddingHorizontal: 32, gap: 14 },
+  blockedEmptyIcon: { width: 88, height: 88, borderRadius: 44, alignItems: 'center', justifyContent: 'center' },
+  blockedEmptyTitle: { fontSize: 18, fontWeight: '800', color: colors.text },
+  blockedEmptyText: { fontSize: 13, color: colors.muted, textAlign: 'center', lineHeight: 19 },
+  blockedList: { paddingHorizontal: 20, paddingTop: 8 },
+  blockedRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: 'rgba(255,255,255,0.05)' },
+  blockedAvatar: { width: 46, height: 46, borderRadius: 23, backgroundColor: colors.primary, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  blockedAvatarLetter: { color: '#fff', fontWeight: '700', fontSize: 18 },
+  blockedName: { fontSize: 15, fontWeight: '700', color: colors.text },
+  blockedUsername: { fontSize: 12, color: colors.muted, marginTop: 1 },
+  unblockBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: radius.full, borderWidth: 1.5, borderColor: '#f87171', minWidth: 80, alignItems: 'center' },
+  unblockBtnText: { color: '#f87171', fontWeight: '700', fontSize: 13 },
 });

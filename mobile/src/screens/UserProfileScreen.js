@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, Image, TouchableOpacity,
-  ActivityIndicator, ScrollView, Dimensions, Alert,
+  ActivityIndicator, ScrollView, Dimensions, Alert, Modal,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -26,6 +26,9 @@ export default function UserProfileScreen({ route, navigation }) {
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
   const [tab, setTab] = useState('posts');
+  const [showBlockModal, setShowBlockModal] = useState(false);
+  const [isBlocked, setIsBlocked] = useState(false);
+  const [blocking, setBlocking] = useState(false);
 
   useEffect(() => {
     if (userId === me?.id) {
@@ -35,9 +38,10 @@ export default function UserProfileScreen({ route, navigation }) {
 
   const fetchAll = useCallback(async () => {
     try {
-      const [postsRes, statusRes] = await Promise.all([
+      const [postsRes, statusRes, blockRes] = await Promise.all([
         api.get(`/posts/user/${userId}`).catch(() => ({ data: { posts: [], is_private: false, locked: false } })),
         api.get(`/connections/${userId}/status`).catch(() => ({ data: { connected: false, status: null, follows_you: false } })),
+        api.get(`/connections/${userId}/block-status`).catch(() => ({ data: { blocked: false } })),
       ]);
       const searchRes = await api.get(`/connections/search?q=${userName || ''}`).catch(() => null);
       const found = searchRes?.data?.users?.find(u => u.id === userId);
@@ -47,6 +51,7 @@ export default function UserProfileScreen({ route, navigation }) {
       setLocked(postsRes.data.locked || false);
       setConnStatus(statusRes.data.status);
       setFollowsYou(statusRes.data.follows_you);
+      setIsBlocked(blockRes.data.blocked || false);
     } catch {} finally { setLoading(false); }
   }, [userId]);
 
@@ -66,16 +71,27 @@ export default function UserProfileScreen({ route, navigation }) {
     } catch {} finally { setConnecting(false); }
   };
 
-  const handleBlock = () => Alert.alert(
-    'Block Account',
-    `Block @${profile?.username || profile?.name}? They won't be able to see your posts or contact you.`,
-    [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Block', style: 'destructive', onPress: async () => {
-        try { await api.post(`/connections/${userId}/block`); navigation.goBack(); } catch {}
-      }},
-    ]
-  );
+  const handleBlock = () => setShowBlockModal(true);
+
+  const confirmBlock = async () => {
+    setBlocking(true);
+    try {
+      await api.post(`/connections/${userId}/block`);
+      setIsBlocked(true);
+      setConnStatus(null);
+      setShowBlockModal(false);
+      navigation.goBack();
+    } catch {} finally { setBlocking(false); }
+  };
+
+  const handleUnblock = async () => {
+    setBlocking(true);
+    try {
+      await api.post(`/connections/${userId}/unblock`);
+      setIsBlocked(false);
+      setShowBlockModal(false);
+    } catch {} finally { setBlocking(false); }
+  };
 
   const handleMute = () => Alert.alert(
     'Mute Account',
@@ -127,7 +143,7 @@ export default function UserProfileScreen({ route, navigation }) {
           'Choose an action',
           [
             { text: 'Mute', onPress: handleMute },
-            { text: 'Block', style: 'destructive', onPress: handleBlock },
+            { text: isBlocked ? 'Unblock' : 'Block', style: 'destructive', onPress: handleBlock },
             { text: 'Report', onPress: () => Alert.alert('Reported', 'Thank you for your report.') },
             { text: 'Cancel', style: 'cancel' },
           ]
@@ -190,7 +206,7 @@ export default function UserProfileScreen({ route, navigation }) {
             connStatus === 'pending' && s.actionBtnPending,
           ]}
           onPress={toggleConnect}
-          disabled={connecting}
+          disabled={connecting || isBlocked}
           activeOpacity={0.8}
         >
           {connecting ? (
@@ -213,6 +229,15 @@ export default function UserProfileScreen({ route, navigation }) {
         <TouchableOpacity style={s.actionBtnOutline} onPress={openDM} activeOpacity={0.8}>
           <Ionicons name="chatbubble-outline" size={14} color={colors.text} />
           <Text style={s.actionBtnOutlineText}>Message</Text>
+        </TouchableOpacity>
+
+        {/* Block button */}
+        <TouchableOpacity
+          style={[s.actionBtnIcon, isBlocked && s.actionBtnIconActive]}
+          onPress={handleBlock}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="ban-outline" size={18} color={isBlocked ? '#f87171' : colors.muted} />
         </TouchableOpacity>
       </View>
 
@@ -323,6 +348,89 @@ export default function UserProfileScreen({ route, navigation }) {
           ))
         )}
       </ScrollView>
+
+      {/* Block / Unblock Confirmation Modal */}
+      <Modal visible={showBlockModal} transparent animationType="fade" onRequestClose={() => setShowBlockModal(false)}>
+        <View style={s.modalOverlay}>
+          <BlurView intensity={20} tint="dark" style={s.blockModal}>
+            <LinearGradient
+              colors={isBlocked ? ['rgba(16,185,129,0.08)', 'rgba(15,23,42,0.98)'] : ['rgba(248,113,113,0.08)', 'rgba(15,23,42,0.98)']}
+              style={StyleSheet.absoluteFill}
+            />
+            {/* Avatar */}
+            <View style={s.blockAvatarWrap}>
+              <LinearGradient colors={isBlocked ? ['#10b981', '#059669'] : ['#f87171', '#ef4444']} style={s.blockAvatarRing}>
+                <View style={s.blockAvatarInner}>
+                  {(profile?.avatar_url || userAvatar)
+                    ? <Image source={{ uri: profile?.avatar_url || userAvatar }} style={{ width: '100%', height: '100%' }} />
+                    : <Text style={s.blockAvatarLetter}>{(profile?.name || userName)?.[0]?.toUpperCase()}</Text>}
+                </View>
+              </LinearGradient>
+            </View>
+
+            <Text style={s.blockTitle}>
+              {isBlocked ? `Unblock ${profile?.name || userName}?` : `Block ${profile?.name || userName}?`}
+            </Text>
+
+            {isBlocked ? (
+              <View style={s.blockInfoBox}>
+                <View style={s.blockInfoRow}>
+                  <Ionicons name="checkmark-circle" size={16} color="#34d399" />
+                  <Text style={s.blockInfoText}>They will be able to see your posts and follow you again</Text>
+                </View>
+                <View style={s.blockInfoRow}>
+                  <Ionicons name="checkmark-circle" size={16} color="#34d399" />
+                  <Text style={s.blockInfoText}>They can send you messages again</Text>
+                </View>
+              </View>
+            ) : (
+              <View style={s.blockInfoBox}>
+                <View style={s.blockInfoRow}>
+                  <Ionicons name="close-circle" size={16} color="#f87171" />
+                  <Text style={s.blockInfoText}>They won't be able to see your posts or stories</Text>
+                </View>
+                <View style={s.blockInfoRow}>
+                  <Ionicons name="close-circle" size={16} color="#f87171" />
+                  <Text style={s.blockInfoText}>They won't be able to follow you or send messages</Text>
+                </View>
+                <View style={s.blockInfoRow}>
+                  <Ionicons name="close-circle" size={16} color="#f87171" />
+                  <Text style={s.blockInfoText}>They won't be notified that you blocked them</Text>
+                </View>
+                <View style={s.blockInfoRow}>
+                  <Ionicons name="information-circle" size={16} color="#94a3b8" />
+                  <Text style={s.blockInfoText}>You can unblock them anytime from Settings → Privacy</Text>
+                </View>
+              </View>
+            )}
+
+            <View style={s.blockBtns}>
+              <TouchableOpacity
+                style={s.blockCancelBtn}
+                onPress={() => setShowBlockModal(false)}
+                activeOpacity={0.8}
+              >
+                <Text style={s.blockCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={s.blockConfirmBtn}
+                onPress={isBlocked ? handleUnblock : confirmBlock}
+                disabled={blocking}
+                activeOpacity={0.8}
+              >
+                <LinearGradient
+                  colors={isBlocked ? ['#10b981', '#059669'] : ['#f87171', '#ef4444']}
+                  style={s.blockConfirmGrad}
+                >
+                  {blocking
+                    ? <ActivityIndicator color="#fff" size="small" />
+                    : <Text style={s.blockConfirmText}>{isBlocked ? 'Unblock' : 'Block'}</Text>}
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </BlurView>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -384,4 +492,24 @@ const s = StyleSheet.create({
   lockedFollowBtnGrad: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 13 },
   lockedFollowBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
   blurGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 1.5, opacity: 0.3 },
+  // Block modal
+  modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.75)', paddingHorizontal: 28 },
+  blockModal: { width: '100%', borderRadius: 24, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(248,113,113,0.2)', paddingBottom: 24 },
+  blockAvatarWrap: { alignItems: 'center', marginTop: 28, marginBottom: 16 },
+  blockAvatarRing: { width: 80, height: 80, borderRadius: 40, padding: 3, alignItems: 'center', justifyContent: 'center' },
+  blockAvatarInner: { width: 72, height: 72, borderRadius: 36, overflow: 'hidden', backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.bg },
+  blockAvatarLetter: { color: '#fff', fontWeight: '800', fontSize: 28 },
+  blockTitle: { fontSize: 20, fontWeight: '800', color: colors.text, textAlign: 'center', marginBottom: 16, paddingHorizontal: 20 },
+  blockInfoBox: { marginHorizontal: 20, marginBottom: 24, gap: 10 },
+  blockInfoRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  blockInfoText: { flex: 1, fontSize: 13, color: colors.muted, lineHeight: 19 },
+  blockBtns: { flexDirection: 'row', gap: 12, paddingHorizontal: 20 },
+  blockCancelBtn: { flex: 1, paddingVertical: 13, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border2, alignItems: 'center', backgroundColor: 'rgba(30,41,59,0.8)' },
+  blockCancelText: { color: colors.text, fontWeight: '600', fontSize: 15 },
+  blockConfirmBtn: { flex: 1, borderRadius: radius.md, overflow: 'hidden' },
+  blockConfirmGrad: { paddingVertical: 13, alignItems: 'center', justifyContent: 'center' },
+  blockConfirmText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  // Block icon button in action row
+  actionBtnIcon: { width: 36, height: 36, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border2, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.04)' },
+  actionBtnIconActive: { borderColor: 'rgba(248,113,113,0.5)', backgroundColor: 'rgba(248,113,113,0.08)' },
 });

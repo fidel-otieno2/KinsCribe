@@ -59,9 +59,9 @@ def create_app():
 
 
 def _safe_migrate():
-    """Run db.create_all + migrations synchronously before app starts."""
+    """Run db.create_all() + migrations synchronously before app starts."""
     try:
-        db.create_all()
+        db.create_all()  # creates any NEW tables (blocks, etc.) without dropping existing ones
         print("db.create_all completed")
     except Exception as e:
         print(f"db.create_all error: {e}")
@@ -135,6 +135,19 @@ def _run_migrations():
         # Connections table migrations
         "ALTER TABLE connections ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'accepted'",
         "UPDATE connections SET status = 'accepted' WHERE status IS NULL",
+        # Users privacy fields
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS show_activity BOOLEAN DEFAULT TRUE",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS allow_dms BOOLEAN DEFAULT TRUE",
+        # Blocks table
+        """
+        CREATE TABLE IF NOT EXISTS blocks (
+            id SERIAL PRIMARY KEY,
+            blocker_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            blocked_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            created_at TIMESTAMP DEFAULT NOW(),
+            UNIQUE(blocker_id, blocked_id)
+        )
+        """,
         # Public stories table migrations
         "ALTER TABLE public_stories ADD COLUMN IF NOT EXISTS music_url VARCHAR(300)",
         "ALTER TABLE public_stories ADD COLUMN IF NOT EXISTS music_name VARCHAR(200)",

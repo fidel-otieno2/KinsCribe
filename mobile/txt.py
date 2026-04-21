@@ -25,9 +25,9 @@ Login Options
 # • Follow suggestions during onboarding
 # • Privacy mode selection: public or private account
 # 2. Public Home Feed (Like Instagram)
-Feed• Photo posts — single image and carousel (multiple images)
-• Video posts — reels-style short video
-• Text-only posts
+# Feed• Photo posts — single image and carousel (multiple images)
+# • Video posts — reels-style short video
+# • Text-only posts
 • Like, comment, share, and save posts
 • Bookmark posts and organise into collections
 • Suggested posts from accounts you do not follow

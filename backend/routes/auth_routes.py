@@ -456,6 +456,10 @@ def update_profile():
         user.interests = data.get("interests", "")
     if "is_private" in data:
         user.is_private = bool(data["is_private"])
+    if "show_activity" in data:
+        user.show_activity = bool(data["show_activity"])
+    if "allow_dms" in data:
+        user.allow_dms = bool(data["allow_dms"])
     if "phone" in data:
         user.phone = data["phone"] or None
     db.session.commit()
