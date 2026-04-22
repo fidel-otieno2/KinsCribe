@@ -117,6 +117,7 @@ export default function ChatScreen({ route, navigation }) {
   const [searchResults, setSearchResults] = useState([]);
   const [pollQuestion, setPollQuestion] = useState('');
   const [pollOptions, setPollOptions] = useState(['Option 1', 'Option 2']);
+  const [showPollModal, setShowPollModal] = useState(false);
   const voiceSlideAnim = useRef(new Animated.Value(0)).current;
   // Thread view
   const [voiceSlideOffset, setVoiceSlideOffset] = useState(0);
@@ -221,6 +222,17 @@ export default function ChatScreen({ route, navigation }) {
     return () => clearInterval(typingRef.current);
   }, [convId, otherUserId]);
 
+  // Keep our presence fresh while chat is open
+  useEffect(() => {
+    let alive = true;
+    const ping = async () => {
+      try { await api.post('/messages/presence/ping'); } catch {}
+    };
+    ping();
+    const id = setInterval(() => { if (alive) ping(); }, 45000);
+    return () => { alive = false; clearInterval(id); };
+  }, []);
+
   // Signal typing + handle @mention autocomplete
   const handleTextChange = (val) => {
     setText(val);
@@ -293,6 +305,22 @@ export default function ChatScreen({ route, navigation }) {
     } catch {} finally { setSending(false); }
   };
 
+  const sendPoll = async () => {
+    if (!pollQuestion.trim()) return;
+    const opts = (pollOptions || []).map(o => (o || '').trim()).filter(Boolean);
+    if (opts.length < 2) return;
+    setShowPollModal(false);
+    setSending(true);
+    try {
+      const payload = { poll: { question: pollQuestion.trim(), options: opts } };
+      const { data } = await api.post(`/messages/conversations/${convId}/messages`, payload);
+      setMessages(prev => [...prev, data.message]);
+      setPollQuestion('');
+      setPollOptions(['Option 1', 'Option 2']);
+      setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 100);
+    } catch {} finally { setSending(false); }
+  };
+
   const sendImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -326,6 +354,40 @@ export default function ChatScreen({ route, navigation }) {
       setReplyTo(null);
     } catch {
       setMessages(prev => prev.filter(m => m.id === tempId));
+    }
+  };
+
+  const sendCamera = async () => {
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.75,
+    });
+    if (result.canceled) return;
+    const asset = result.assets[0];
+    const tempId = `temp-${Date.now()}`;
+    const optimisticMsg = {
+      id: tempId,
+      media_url: asset.uri,
+      media_type: 'image',
+      sender_id: user?.id,
+      sender_name: user?.name,
+      created_at: new Date().toISOString(),
+      is_read: false,
+      sending: true,
+    };
+    setMessages(prev => [...prev, optimisticMsg]);
+    setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 50);
+    try {
+      const formData = new FormData();
+      formData.append("file", { uri: asset.uri, type: "image/jpeg", name: "camera.jpg" });
+      if (replyTo) formData.append("reply_to_id", replyTo.id);
+      const { data } = await api.post(`/messages/conversations/${convId}/messages`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      setMessages(prev => prev.map(m => m.id === tempId ? data.message : m));
+      setReplyTo(null);
+    } catch {
+      setMessages(prev => prev.filter(m => m.id !== tempId));
     }
   };
 
@@ -539,7 +601,10 @@ export default function ChatScreen({ route, navigation }) {
     const options = isMe
       ? [
           { text: 'Delete for me', style: 'destructive', onPress: async () => {
-            try { await api.delete(`/messages/messages/${msgId}`); setMessages(prev => prev.filter(m => m.id !== msgId)); } catch {}
+            try { await api.delete(`/messages/messages/${msgId}?scope=me`); setMessages(prev => prev.filter(m => m.id !== msgId)); } catch {}
+          }},
+          { text: 'Delete for everyone', style: 'destructive', onPress: async () => {
+            try { await api.delete(`/messages/messages/${msgId}?scope=everyone`); setMessages(prev => prev.filter(m => m.id !== msgId)); } catch {}
           }},
           { text: t('cancel'), style: 'cancel' },
         ]
@@ -581,7 +646,8 @@ export default function ChatScreen({ route, navigation }) {
           </View>
         )}
 
-        <View style={cs.msgInner}>
+        <View style={[cs.msgInner, isMe ? { alignItems: 'flex-end' } : { alignItems: 'flex-start' }]}>
+          {item.forwarded_from_id && (
             <View style={[cs.forwardedLabel, isMe && { alignSelf: 'flex-end' }]}>
               <Ionicons name="arrow-redo-outline" size={11} color={colors.dim} />
               <AppText style={cs.forwardedText}>Forwarded</AppText>
@@ -947,6 +1013,9 @@ export default function ChatScreen({ route, navigation }) {
             <TouchableOpacity onPress={sendImage} style={cs.inputAction}>
               <Ionicons name="image-outline" size={22} color={colors.muted} />
             </TouchableOpacity>
+            <TouchableOpacity onPress={sendCamera} style={cs.inputAction}>
+              <Ionicons name="camera-outline" size={22} color={colors.muted} />
+            </TouchableOpacity>
             <TouchableOpacity onPress={() => setShowGifPicker(true)} style={cs.inputAction}>
               <AppText style={cs.gifLabel}>GIF</AppText>
             </TouchableOpacity>
@@ -958,6 +1027,9 @@ export default function ChatScreen({ route, navigation }) {
                 <Ionicons name="time-outline" size={22} color="#f59e0b" />
               </TouchableOpacity>
             )}
+            <TouchableOpacity onPress={() => setShowPollModal(true)} style={cs.inputAction}>
+              <Ionicons name="bar-chart-outline" size={22} color="#8b5cf6" />
+            </TouchableOpacity>
             <TouchableOpacity style={cs.inputAction} onPress={() => setShowAI(true)}>
               <Ionicons name="sparkles-outline" size={22} color="#8b5cf6" />
             </TouchableOpacity>
@@ -1287,8 +1359,9 @@ export default function ChatScreen({ route, navigation }) {
               <TouchableOpacity
                 key={opt.label}
                 style={[cs.muteRow, i === arr.length - 1 && { borderBottomWidth: 0 }]}
-                onPress={() => {
+                onPress={async () => {
                   setMuteOptions(false);
+                  try { await api.patch(`/messages/conversations/${convId}/settings`, { is_muted: true }); } catch {}
                   Alert.alert('Muted', `${title} muted for ${opt.label}`);
                 }}
               >
@@ -1388,6 +1461,48 @@ export default function ChatScreen({ route, navigation }) {
         </Pressable>
       </Modal>
 
+      {/* Poll composer */}
+      <Modal visible={showPollModal} transparent animationType="fade" onRequestClose={() => setShowPollModal(false)}>
+        <Pressable style={cs.optionsOverlay} onPress={() => setShowPollModal(false)}>
+          <Pressable style={cs.optionsSheet}>
+            <View style={cs.optionsHandle} />
+            <AppText style={cs.optionsTitle}>Create poll</AppText>
+            <View style={{ paddingHorizontal: 20, paddingBottom: 10, gap: 10 }}>
+              <TextInput
+                style={[cs.searchInput, { backgroundColor: colors.bgSecondary, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10 }]}
+                placeholder="Question"
+                placeholderTextColor={colors.dim}
+                value={pollQuestion}
+                onChangeText={setPollQuestion}
+              />
+              {pollOptions.map((opt, idx) => (
+                <TextInput
+                  key={idx}
+                  style={[cs.searchInput, { backgroundColor: colors.bgSecondary, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10 }]}
+                  placeholder={`Option ${idx + 1}`}
+                  placeholderTextColor={colors.dim}
+                  value={opt}
+                  onChangeText={(v) => setPollOptions(prev => prev.map((p, i) => i === idx ? v : p))}
+                />
+              ))}
+              <TouchableOpacity
+                style={[cs.optionsCancelBtn, { marginTop: 0 }]}
+                onPress={() => setPollOptions(prev => [...prev, `Option ${prev.length + 1}`])}
+              >
+                <AppText style={cs.optionsCancelText}>Add option</AppText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[cs.blockConfirmBtn, { marginTop: 6, backgroundColor: 'rgba(124,58,237,0.14)', borderColor: 'rgba(124,58,237,0.3)' }]}
+                onPress={sendPoll}
+                disabled={sending}
+              >
+                <AppText style={[cs.blockConfirmText, { color: colors.primary }]}>Send poll</AppText>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
     </KeyboardAvoidingView>
   );
 }
@@ -1415,38 +1530,15 @@ const cs = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-end',
     marginVertical: 2,
-    paddingHorizontal: 10,
+    paddingHorizontal: 0,
   },
   msgRowMe: {
-    flexDirection: 'row-reverse',
+    justifyContent: 'flex-end',
   },
-  avatarCol: { width: 32, marginRight: 6 },
+  avatarCol: { width: 32, marginHorizontal: 6 },
+  msgInner: { flex: 1, maxWidth: '100%' },
 
-  bubble: {
-    maxWidth: '75%',
-    borderRadius: 18,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOpacity: 0.18,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  bubbleMe: {
-    backgroundColor: colors.primary,
-    borderBottomRightRadius: 4,
-    borderTopRightRadius: 18,
-    borderTopLeftRadius: 18,
-    borderBottomLeftRadius: 18,
-    alignSelf: 'flex-end',
-  },
-  bubbleThem: {
-    backgroundColor: colors.bgCard,
-    borderBottomLeftRadius: 4,
-    borderTopRightRadius: 18,
-    borderTopLeftRadius: 18,
-    borderBottomRightRadius: 18,
-    alignSelf: 'flex-start',
-  },
+  // Bubble layout/styling lives in MessageBubble
   senderName: { fontSize: 11, fontWeight: '700', color: colors.gold, paddingHorizontal: 12, paddingTop: 8, paddingBottom: 2 },
   replyPreview: { flexDirection: "row", gap: 6, backgroundColor: "rgba(0,0,0,0.15)", margin: 8, marginBottom: 4, borderRadius: 10, padding: 8 },
   replyBar: { width: 3, backgroundColor: colors.gold, borderRadius: 2 },

@@ -199,8 +199,9 @@ function RootNavigator() {
     );
   }
 
-  // Profile is complete when username and bio are set
-  const isProfileComplete = !!(user?.username && user?.bio);
+  // Profile is complete when username is set.
+  // Bio is optional in onboarding, so it should not block navigation.
+  const isProfileComplete = !!user?.username;
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false, animation: "fade_from_bottom" }}>

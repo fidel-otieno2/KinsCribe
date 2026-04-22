@@ -173,7 +173,6 @@ def suggestions():
     already.add(current.id)
     users = User.query.filter(
         User.id.notin_(already),
-        User.username.isnot(None),
     ).order_by(db.func.random()).limit(20).all()
     current_id = current.id
     result = []

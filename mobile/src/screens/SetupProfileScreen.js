@@ -125,20 +125,42 @@ function PhotoStep({ onNext }) {
 function ProfileStep({ onNext, required }) {
   const { user, refreshUser } = useAuth();
   const { t } = useTranslation();
+  const [username, setUsername] = useState(user?.username || '');
   const [bio, setBio] = useState(user?.bio || '');
   const [website, setWebsite] = useState(user?.website || '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const usernameRequired = required || !user?.username;
 
   const handleNext = async () => {
+    const normalizedUsername = username.trim().toLowerCase();
+    if (usernameRequired && !normalizedUsername) { setError('Please add a username to continue.'); return; }
+    if (normalizedUsername && !/^[a-z0-9._]{3,30}$/.test(normalizedUsername)) {
+      setError('Username must be 3-30 chars and use letters, numbers, . or _.');
+      return;
+    }
     if (required && !bio.trim()) { setError('Please add a bio to continue.'); return; }
     setError('');
     setSaving(true);
+    let ok = false;
     try {
-      await api.put('/auth/profile', { bio, website });
+      if (normalizedUsername && normalizedUsername !== (user?.username || '').toLowerCase()) {
+        const { data } = await api.get('/auth/username/check', {
+          params: { username: normalizedUsername, email: user?.email || '' },
+        });
+        if (!data?.available) {
+          setError(data?.error || 'Username is already taken.');
+          return;
+        }
+      }
+      await api.put('/auth/profile', { username: normalizedUsername || undefined, bio, website });
       await refreshUser();
+      ok = true;
     } catch {}
-    finally { setSaving(false); onNext(); }
+    finally {
+      setSaving(false);
+      if (ok) onNext();
+    }
   };
 
   return (
@@ -147,6 +169,19 @@ function ProfileStep({ onNext, required }) {
       <AppText style={s.stepSub}>Add a bio and website so people know who you are</AppText>
 
       {error ? <AppText style={s.stepError}>{error}</AppText> : null}
+
+      <AppText style={s.fieldLabel}>Username {usernameRequired && <AppText style={{ color: '#e11d48' }}>*</AppText>}</AppText>
+      <View style={s.inputRow}>
+        <Ionicons name="at-outline" size={18} color={colors.muted} />
+        <TextInput
+          style={s.inputInner}
+          placeholder="username"
+          placeholderTextColor={colors.dim}
+          autoCapitalize="none"
+          value={username}
+          onChangeText={(v) => { setUsername(v); setError(''); }}
+        />
+      </View>
 
       <AppText style={s.fieldLabel}>Bio {required && <AppText style={{ color: '#e11d48' }}>*</AppText>}</AppText>
       <TextInput
@@ -175,7 +210,7 @@ function ProfileStep({ onNext, required }) {
       </View>
 
       <GradientButton label={t('continue')} onPress={handleNext} loading={saving} style={{ width: '100%', marginTop: 20 }} />
-      {!required && (
+      {!required && !!user?.username && (
         <TouchableOpacity onPress={onNext} style={{ marginTop: 14 }}>
           <AppText style={s.skip}>Skip for now</AppText>
         </TouchableOpacity>
@@ -315,10 +350,17 @@ function DiscoverStep({ onDone }) {
 
   useEffect(() => {
     api.get('/connections/suggestions')
-      .then(({ data }) => setSuggestions((data.suggestions || []).slice(0, 10)))
+      .then(({ data }) => {
+        const list = (data.suggestions || []).slice(0, 10);
+        setSuggestions(list);
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
+
+  const handleDone = (source) => {
+    onDone();
+  };
 
   const toggleFollow = async (userId) => {
     try {
@@ -372,10 +414,10 @@ function DiscoverStep({ onDone }) {
 
       <GradientButton
         label={followed.size > 0 ? `Continue (${followed.size} connected)` : 'Continue'}
-        onPress={onDone}
+        onPress={() => handleDone('continue')}
         style={{ width: '100%', marginTop: 24 }}
       />
-      <TouchableOpacity onPress={onDone} style={{ marginTop: 14, paddingVertical: 8 }} activeOpacity={0.7}>
+      <TouchableOpacity onPress={() => handleDone('skip')} style={{ marginTop: 14, paddingVertical: 8 }} activeOpacity={0.7}>
         <AppText style={s.skip}>Skip for now</AppText>
       </TouchableOpacity>
     </View>

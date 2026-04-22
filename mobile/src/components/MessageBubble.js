@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View, StyleSheet, Image, TouchableOpacity, Animated,
   Modal, Pressable, Dimensions, ActivityIndicator,
@@ -9,6 +9,7 @@ import { Video, ResizeMode } from 'expo-av';
 import { Audio } from 'expo-av';
 import AppText from './AppText';
 import { colors, gradients } from '../theme';
+import api from '../api/axios';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 const SPEEDS = [1, 1.5, 2];
@@ -17,6 +18,20 @@ const BARS = 28;
 function timeStr(dateStr) {
   const d = new Date(dateStr);
   return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+}
+
+function MentionText({ text, isMe }) {
+  if (!text) return null;
+  const parts = String(text).split(/(@\w+)/g);
+  return (
+    <AppText style={[s.text, isMe ? s.textMe : s.textThem]}>
+      {parts.map((p, idx) => (
+        /^@\w+/.test(p)
+          ? <AppText key={idx} style={[s.text, isMe ? s.textMe : s.textThem, s.mention]}>{p}</AppText>
+          : p
+      ))}
+    </AppText>
+  );
 }
 
 // ── Fullscreen Image Viewer ───────────────────────────────────────────────────
@@ -203,6 +218,7 @@ function VoicePlayer({ uri, isMe }) {
 // ── Main MessageBubble ────────────────────────────────────────────────────────
 export default function MessageBubble({ item, isMe, showName, onLongPress, onPress }) {
   const [viewingImage, setViewingImage] = useState(false);
+  const [pollState, setPollState] = useState(item.poll || null);
 
   const hasMedia = !!item.media_url;
   const isImage = hasMedia && item.media_type === 'image';
@@ -213,6 +229,12 @@ export default function MessageBubble({ item, isMe, showName, onLongPress, onPre
   const isSticker = !hasMedia && !!item.text && /^(\p{Emoji_Presentation}|\p{Extended_Pictographic})(\uFE0F|\u20E3|[\uD800-\uDFFF])*$/u.test(item.text.trim());
   const isMediaOnly = hasMedia && !item.text;
   const isSending = !!item.sending;
+
+  const { bubbleMaxW, mediaW } = useMemo(() => {
+    const max = Math.min(340, Math.floor(SCREEN_W * 0.78));
+    const mw = Math.min(max, Math.floor(SCREEN_W * 0.72));
+    return { bubbleMaxW: max, mediaW: mw };
+  }, []);
 
   return (
     <View style={[s.wrapper, isMe ? s.wrapperMe : s.wrapperThem]}>
@@ -227,8 +249,23 @@ export default function MessageBubble({ item, isMe, showName, onLongPress, onPre
           isAudio && s.bubbleAudio,
           (isMediaOnly || isGif) && s.bubbleMedia,
           isSticker && s.bubbleSticker,
+          { maxWidth: bubbleMaxW },
         ]}
       >
+        {/* Bubble background skin */}
+        {!isSticker && (
+          isMe ? (
+            <LinearGradient
+              colors={['#3797F0', '#6366f1']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={s.bgFill}
+            />
+          ) : (
+            <View style={s.bgFillThem} />
+          )
+        )}
+
         {/* Sender name — family group only */}
         {showName && (
           <AppText style={s.senderName}>{item.sender_name}</AppText>
@@ -253,7 +290,7 @@ export default function MessageBubble({ item, isMe, showName, onLongPress, onPre
         {isImage && (
           <>
             <TouchableOpacity activeOpacity={0.92} onPress={() => setViewingImage(true)}>
-              <Image source={{ uri: item.media_url }} style={s.mediaImage} resizeMode="cover" />
+              <Image source={{ uri: item.media_url }} style={[s.mediaImage, { width: mediaW }]} resizeMode="cover" />
             </TouchableOpacity>
             {viewingImage && (
               <ImageViewer uri={item.media_url} onClose={() => setViewingImage(false)} />
@@ -265,7 +302,7 @@ export default function MessageBubble({ item, isMe, showName, onLongPress, onPre
         {isGif && (
           <Image
             source={{ uri: item.media_url }}
-            style={s.gifImage}
+            style={[s.gifImage, { width: mediaW }]}
             resizeMode="cover"
           />
         )}
@@ -279,10 +316,40 @@ export default function MessageBubble({ item, isMe, showName, onLongPress, onPre
         {/* Sticker — big emoji, no bubble background */}
         {isSticker ? (
           <AppText style={s.stickerText}>{item.text}</AppText>
+        ) : pollState ? (
+          <View style={s.pollWrap}>
+            <AppText style={[s.pollQuestion, isMe && { color: '#fff' }]}>{pollState.question}</AppText>
+            <View style={{ gap: 8 }}>
+              {pollState.options.map((opt, idx) => {
+                const total = pollState.total_votes || 0;
+                const count = pollState.vote_counts?.[idx] || 0;
+                const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+                const selected = pollState.user_vote === idx;
+                return (
+                  <TouchableOpacity
+                    key={idx}
+                    activeOpacity={0.85}
+                    style={[s.pollOption, selected && s.pollOptionSelected]}
+                    onPress={async () => {
+                      try {
+                        const { data } = await api.post(`/messages/polls/${pollState.id}/vote`, { option_index: idx });
+                        setPollState(data.poll);
+                      } catch {}
+                    }}
+                  >
+                    <View style={[s.pollFill, { width: `${pct}%`, opacity: isMe ? 0.35 : 0.25 }]} />
+                    <AppText style={[s.pollOptionText, isMe && { color: '#fff' }]}>{opt}</AppText>
+                    <AppText style={[s.pollPct, isMe && { color: 'rgba(255,255,255,0.8)' }]}>{pct}%</AppText>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <AppText style={[s.pollMeta, isMe && { color: 'rgba(255,255,255,0.7)' }]}>
+              {pollState.total_votes || 0} vote{(pollState.total_votes || 0) === 1 ? '' : 's'}
+            </AppText>
+          </View>
         ) : !!item.text ? (
-          <AppText style={[s.text, isMe ? s.textMe : s.textThem]}>
-            {item.text}
-          </AppText>
+          <MentionText text={item.text} isMe={isMe} />
         ) : null}
 
         {/* Sending overlay */}
@@ -314,7 +381,6 @@ export default function MessageBubble({ item, isMe, showName, onLongPress, onPre
 const s = StyleSheet.create({
   wrapper: {
     marginVertical: 2,
-    paddingHorizontal: 10,
     flexDirection: 'row',
     alignItems: 'flex-end',
   },
@@ -322,38 +388,38 @@ const s = StyleSheet.create({
   wrapperThem: { justifyContent: 'flex-start' },
 
   bubble: {
-    maxWidth: '75%',
-    borderRadius: 18,
+    borderRadius: 22,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 3,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   bubbleMe: {
-    backgroundColor: colors.primary,
-    borderBottomRightRadius: 4,
-    borderTopRightRadius: 18,
-    borderTopLeftRadius: 18,
-    borderBottomLeftRadius: 18,
+    backgroundColor: 'transparent',
+    borderBottomRightRadius: 6,
   },
   bubbleThem: {
-    backgroundColor: colors.bgCard,
-    borderBottomLeftRadius: 4,
-    borderTopRightRadius: 18,
-    borderTopLeftRadius: 18,
-    borderBottomRightRadius: 18,
+    backgroundColor: 'transparent',
+    borderBottomLeftRadius: 6,
+  },
+  bgFill: { ...StyleSheet.absoluteFillObject },
+  bgFillThem: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.06)',
   },
   bubbleAudio: {
     minWidth: 220,
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
-  bubbleMedia: { padding: 0 },
+  bubbleMedia: { paddingHorizontal: 0, paddingVertical: 0 },
   bubbleSticker: {
     backgroundColor: 'transparent',
     shadowOpacity: 0,
     elevation: 0,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
   },
   stickerText: {
     fontSize: 72,
@@ -386,11 +452,11 @@ const s = StyleSheet.create({
   replyText: { fontSize: 11, color: colors.muted },
 
   // Image
-  mediaImage: { width: 220, height: 280 },
-  gifImage: { width: 220, height: 180 },
+  mediaImage: { aspectRatio: 4 / 5, backgroundColor: '#0b0b0f' },
+  gifImage: { aspectRatio: 16 / 9, backgroundColor: '#0b0b0f' },
 
   // Video
-  videoWrap: { width: 220, height: 280 },
+  videoWrap: { width: 240, aspectRatio: 4 / 5, backgroundColor: '#0b0b0f' },
   videoOverlay: {
     ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
@@ -401,18 +467,43 @@ const s = StyleSheet.create({
   videoPlayGrad: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
   // Text
-  text: { fontSize: 15, lineHeight: 22, paddingHorizontal: 12, paddingVertical: 8 },
+  text: { fontSize: 15, lineHeight: 20, letterSpacing: 0.1 },
   textMe: { color: '#fff' },
-  textThem: { color: colors.text },
+  textThem: { color: '#111827' },
+  mention: { fontWeight: '800', color: '#93c5fd' },
+
+  // Poll
+  pollWrap: { paddingVertical: 4, gap: 10 },
+  pollQuestion: { fontSize: 15, fontWeight: '800', color: '#111827' },
+  pollOption: {
+    borderRadius: 14,
+    overflow: 'hidden',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  pollOptionSelected: {
+    borderColor: 'rgba(255,255,255,0.38)',
+  },
+  pollFill: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+  },
+  pollOptionText: { flex: 1, fontSize: 14, fontWeight: '600', color: '#111827' },
+  pollPct: { fontSize: 12, fontWeight: '800', color: 'rgba(17,24,39,0.65)' },
+  pollMeta: { fontSize: 11, fontWeight: '700', color: 'rgba(17,24,39,0.55)' },
 
   // Footer
   footer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-end',
-    paddingHorizontal: 10,
-    paddingBottom: 6,
-    paddingTop: 2,
+    paddingTop: 4,
     gap: 2,
   },
   footerOverlay: {
@@ -427,7 +518,7 @@ const s = StyleSheet.create({
   },
   time: { fontSize: 10 },
   timeMe: { color: 'rgba(255,255,255,0.55)' },
-  timeThem: { color: colors.dim },
+  timeThem: { color: 'rgba(17,24,39,0.55)' },
 
   sendingOverlay: {
     ...StyleSheet.absoluteFillObject,
