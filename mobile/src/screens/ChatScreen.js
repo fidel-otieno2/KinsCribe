@@ -2,9 +2,11 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import {
   View, FlatList, TouchableOpacity, StyleSheet,
   TextInput, KeyboardAvoidingView, Platform, Image,
-  ActivityIndicator, StatusBar, Alert, Animated, ScrollView, Clipboard,
+  ActivityIndicator, StatusBar, Alert, Animated, ScrollView, Clipboard, Modal, Pressable,
 } from "react-native";
 import AppText from '../components/AppText';
+import MessageBubble from '../components/MessageBubble';
+import GifPicker from '../components/GifPicker';
 import { useTranslation } from '../i18n';
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -15,101 +17,11 @@ import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
 import { colors, radius } from "../theme";
 
-// ── Voice Note Player ─────────────────────────────────────────
-function VoiceNotePlayer({ uri, isMe }) {
-  const [sound, setSound] = useState(null);
-  const [playing, setPlaying] = useState(false);
-  const [duration, setDuration] = useState(0);
-  const [position, setPosition] = useState(0);
-  const progressAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    return () => { sound?.unloadAsync(); };
-  }, [sound]);
-
-  const toggle = async () => {
-    if (!sound) {
-      try {
-        await Audio.setAudioModeAsync({ playsInSilentModeIOS: true, allowsRecordingIOS: false });
-        const { sound: s, status } = await Audio.Sound.createAsync(
-          { uri },
-          { shouldPlay: true },
-          (st) => {
-            if (st.isLoaded) {
-              setPosition(st.positionMillis || 0);
-              setDuration(st.durationMillis || 0);
-              const prog = st.durationMillis ? (st.positionMillis / st.durationMillis) : 0;
-              progressAnim.setValue(prog);
-              if (st.didJustFinish) { setPlaying(false); setPosition(0); progressAnim.setValue(0); }
-            }
-          }
-        );
-        setSound(s);
-        setPlaying(true);
-        if (status.durationMillis) setDuration(status.durationMillis);
-      } catch { Alert.alert('Error', 'Could not play voice note'); }
-    } else if (playing) {
-      await sound.pauseAsync();
-      setPlaying(false);
-    } else {
-      await sound.playAsync();
-      setPlaying(true);
-    }
-  };
-
-  const fmtMs = (ms) => {
-    const s = Math.floor((ms || 0) / 1000);
-    return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
-  };
-
-  const progress = duration > 0 ? position / duration : 0;
-
-  return (
-    <View style={[vnp.wrap, isMe ? vnp.wrapMe : vnp.wrapThem]}>
-      <TouchableOpacity onPress={toggle} style={vnp.playBtn}>
-        <Ionicons name={playing ? 'pause' : 'play'} size={18} color={isMe ? '#fff' : colors.primary} />
-      </TouchableOpacity>
-      <View style={vnp.trackWrap}>
-        <View style={vnp.track}>
-          <View style={[vnp.fill, { width: `${Math.round(progress * 100)}%`, backgroundColor: isMe ? 'rgba(255,255,255,0.8)' : colors.primary }]} />
-          {/* Waveform bars */}
-          {[...Array(20)].map((_, i) => {
-            const h = 4 + Math.sin(i * 1.3) * 6 + Math.cos(i * 0.7) * 4;
-            const filled = i / 20 <= progress;
-            return (
-              <View key={i} style={[vnp.bar, {
-                height: Math.max(4, h),
-                backgroundColor: filled
-                  ? (isMe ? 'rgba(255,255,255,0.9)' : colors.primary)
-                  : (isMe ? 'rgba(255,255,255,0.3)' : 'rgba(74,124,63,0.3)'),
-              }]} />
-            );
-          })}
-        </View>
-        <AppText style={[vnp.time, { color: isMe ? 'rgba(255,255,255,0.7)' : colors.muted }]}>
-          {fmtMs(playing || position > 0 ? position : duration)}
-        </AppText>
-      </View>
-    </View>
-  );
-}
-
-const vnp = StyleSheet.create({
-  wrap: { flexDirection: 'row', alignItems: 'center', gap: 10, minWidth: 180, maxWidth: 240 },
-  wrapMe: {},
-  wrapThem: {},
-  playBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' },
-  trackWrap: { flex: 1, gap: 4 },
-  track: { flexDirection: 'row', alignItems: 'center', gap: 2, height: 24, position: 'relative' },
-  fill: { position: 'absolute', left: 0, top: 0, bottom: 0, borderRadius: 2, opacity: 0 },
-  bar: { width: 3, borderRadius: 2, flex: 0 },
-  time: { fontSize: 10, fontWeight: '600' },
-});
-
 function timeStr(dateStr) {
   const d = new Date(dateStr);
   return d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true });
 }
+
 
 function Avatar({ uri, name, size = 32 }) {
   return uri ? (
@@ -156,12 +68,20 @@ export default function ChatScreen({ route, navigation }) {
   const [smartReplies, setSmartReplies] = useState([]);
   const [forwardMsg, setForwardMsg] = useState(null);
   const [conversations, setConversations] = useState([]);
+  const [showGifPicker, setShowGifPicker] = useState(false);
+  const [showOptions, setShowOptions] = useState(false);
+  const [showMuteOptions, setMuteOptions] = useState(false);
+  const [showBlockModal, setShowBlockModal] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
+  const [pollQuestion, setPollQuestion] = useState('');
+  const [pollOptions, setPollOptions] = useState(['Option 1', 'Option 2']);
+  const voiceSlideAnim = useRef(new Animated.Value(0)).current;
   // Thread view
-  const [threadMsg, setThreadMsg] = useState(null);
+  const [voiceSlideOffset, setVoiceSlideOffset] = useState(0);
   // @mention autocomplete
+  const [threadMsg, setThreadMsg] = useState(null);
   const [mentionQuery, setMentionQuery] = useState('');
   const [mentionSuggestions, setMentionSuggestions] = useState([]);
   const [participants, setParticipants] = useState([]);
@@ -319,19 +239,34 @@ export default function ChatScreen({ route, navigation }) {
       quality: 0.7,
     });
     if (result.canceled) return;
-    setSending(true);
+
+    const asset = result.assets[0];
+    const tempId = `temp-${Date.now()}`;
+    const optimisticMsg = {
+      id: tempId,
+      media_url: asset.uri,
+      media_type: 'image',
+      sender_id: user?.id,
+      sender_name: user?.name,
+      created_at: new Date().toISOString(),
+      is_read: false,
+      sending: true,
+    };
+    setMessages(prev => [...prev, optimisticMsg]);
+    setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 50);
+
     try {
-      const asset = result.assets[0];
       const formData = new FormData();
       formData.append("file", { uri: asset.uri, type: "image/jpeg", name: "photo.jpg" });
       if (replyTo) formData.append("reply_to_id", replyTo.id);
       const { data } = await api.post(`/messages/conversations/${convId}/messages`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-      setMessages(prev => [...prev, data.message]);
+      setMessages(prev => prev.map(m => m.id === tempId ? data.message : m));
       setReplyTo(null);
-      setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 100);
-    } catch {} finally { setSending(false); }
+    } catch {
+      setMessages(prev => prev.filter(m => m.id === tempId));
+    }
   };
 
   const sendMemory = async () => {
@@ -368,6 +303,7 @@ export default function ChatScreen({ route, navigation }) {
       await rec.startAsync();
       setRecording(rec);
       setIsRecording(true);
+      setVoiceSlideOffset(0);
       setRecordDuration(0);
       recordTimerRef.current = setInterval(() => setRecordDuration(d => d + 1), 1000);
       Animated.loop(
@@ -379,17 +315,32 @@ export default function ChatScreen({ route, navigation }) {
     } catch { Alert.alert('Error', 'Could not start recording'); }
   };
 
-  const stopVoiceRecording = async (cancel = false) => {
+  const cancelVoiceRecording = async () => {
     if (!recording) return;
     clearInterval(recordTimerRef.current);
     micScaleAnim.stopAnimation();
     micScaleAnim.setValue(1);
+    voiceSlideAnim.setValue(0);
+    setVoiceSlideOffset(0);
+    try {
+      await recording.stopAndUnloadAsync();
+    } catch {}
+    setRecording(null);
+    setIsRecording(false);
+  };
+
+  const stopVoiceRecording = async () => {
+    if (!recording) return;
+    clearInterval(recordTimerRef.current);
+    micScaleAnim.stopAnimation();
+    micScaleAnim.setValue(1);
+    voiceSlideAnim.setValue(0);
+    setVoiceSlideOffset(0);
     try {
       await recording.stopAndUnloadAsync();
       const uri = recording.getURI();
       setRecording(null);
       setIsRecording(false);
-      if (cancel || !uri) return;
       setSending(true);
       const formData = new FormData();
       formData.append('file', { uri, type: 'audio/m4a', name: 'voice.m4a' });
@@ -401,6 +352,33 @@ export default function ChatScreen({ route, navigation }) {
       setReplyTo(null);
       setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 100);
     } catch {} finally { setSending(false); }
+  };
+
+  const sendGif = async (gif) => {
+    const tempId = `temp-${Date.now()}`;
+    const optimisticMsg = {
+      id: tempId,
+      media_url: gif.url,
+      media_type: 'gif',
+      sender_id: user?.id,
+      sender_name: user?.name,
+      created_at: new Date().toISOString(),
+      is_read: false,
+      sending: true,
+    };
+    setShowGifPicker(false);
+    setMessages(prev => [...prev, optimisticMsg]);
+    setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 50);
+
+    try {
+      const { data } = await api.post(`/messages/conversations/${convId}/messages`, {
+        media_url: gif.url,
+        media_type: 'gif',
+      });
+      setMessages(prev => prev.map(m => m.id === tempId ? data.message : m));
+    } catch {
+      setMessages(prev => prev.filter(m => m.id !== tempId));
+    }
   };
 
   // ── Forward message ───────────────────────────────────────
@@ -485,8 +463,7 @@ export default function ChatScreen({ route, navigation }) {
           </View>
         )}
 
-        <View style={{ maxWidth: '75%' }}>
-          {/* Forwarded label */}
+        <View style={{ flex: 1 }}>
           {item.forwarded_from_id && (
             <View style={[cs.forwardedLabel, isMe && { alignSelf: 'flex-end' }]}>
               <Ionicons name="arrow-redo-outline" size={11} color={colors.dim} />
@@ -494,8 +471,10 @@ export default function ChatScreen({ route, navigation }) {
             </View>
           )}
 
-          <TouchableOpacity
-            activeOpacity={0.85}
+          <MessageBubble
+            item={item}
+            isMe={isMe}
+            showName={showName}
             onPress={() => handleBubbleTap(item)}
             onLongPress={() => {
               const actions = [
@@ -514,77 +493,23 @@ export default function ChatScreen({ route, navigation }) {
               actions.push({ text: 'Cancel', style: 'cancel' });
               Alert.alert('Message', item.text ? `"${item.text.slice(0, 40)}${item.text.length > 40 ? '...' : ''}"` : 'Media message', actions);
             }}
-            delayLongPress={250}
-          >
-            <View style={[cs.bubble, isMe ? cs.bubbleMe : cs.bubbleThem]}>
-              {showName && <AppText style={cs.senderName}>{item.sender_name}</AppText>}
+          />
 
-              {/* Reply preview */}
-              {item.reply_to_id && (
+          {Object.keys(reactionGroups).length > 0 && (
+            <View style={[cs.reactionsRow, isMe && { alignSelf: 'flex-end' }]}>
+              {Object.entries(reactionGroups).map(([emoji, count]) => (
                 <TouchableOpacity
-                  style={cs.replyPreview}
-                  onPress={() => {
-                    const idx = messages.findIndex(m => m.id === item.reply_to_id);
-                    if (idx >= 0) flatRef.current?.scrollToIndex({ index: idx, animated: true });
-                  }}
+                  key={emoji}
+                  style={[cs.reactionPill, myReaction === emoji && cs.reactionPillMine]}
+                  onPress={() => reactToMessage(item.id, emoji)}
                 >
-                  <View style={cs.replyBar} />
-                  <View style={{ flex: 1 }}>
-                    <AppText style={cs.replyName}>{item.reply_to_sender}</AppText>
-                    <AppText style={cs.replyText} numberOfLines={1}>{item.reply_to_text || '📎 Media'}</AppText>
-                  </View>
+                  <AppText style={cs.reactionEmoji}>{emoji}</AppText>
+                  {count > 1 && <AppText style={cs.reactionCount}>{count}</AppText>}
                 </TouchableOpacity>
-              )}
-
-              {/* Image */}
-              {item.media_url && item.media_type === 'image' && (
-                <Image source={{ uri: item.media_url }} style={cs.msgImage} resizeMode="cover" />
-              )}
-
-              {/* Audio */}
-              {item.media_url && item.media_type === 'audio' && (
-                <VoiceNotePlayer uri={item.media_url} isMe={isMe} />
-              )}
-
-              {/* Text with @mention highlighting */}
-              {item.text ? (
-                <MentionText
-                  text={item.text}
-                  isMe={isMe}
-                  style={[cs.msgText, isMe && cs.msgTextMe]}
-                />
-              ) : null}
-
-              <View style={cs.msgFooter}>
-                <AppText style={[cs.msgTime, isMe && cs.msgTimeMe]}>
-                  {timeStr(item.created_at)}
-                </AppText>
-                {isMe && (
-                  <AppText style={cs.msgStatus}>
-                    {item.is_read ? '✓✓' : '✓'}
-                  </AppText>
-                )}
-              </View>
-
-              {/* Reactions */}
-              {Object.keys(reactionGroups).length > 0 && (
-                <View style={cs.reactionsRow}>
-                  {Object.entries(reactionGroups).map(([emoji, count]) => (
-                    <TouchableOpacity
-                      key={emoji}
-                      style={[cs.reactionPill, myReaction === emoji && cs.reactionPillMine]}
-                      onPress={() => reactToMessage(item.id, emoji)}
-                    >
-                      <AppText style={cs.reactionEmoji}>{emoji}</AppText>
-                      {count > 1 && <AppText style={cs.reactionCount}>{count}</AppText>}
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
+              ))}
             </View>
-          </TouchableOpacity>
+          )}
 
-          {/* Thread reply count */}
           {threadReplies.length > 0 && (
             <TouchableOpacity
               style={[cs.threadBtn, isMe && { alignSelf: 'flex-end' }]}
@@ -683,22 +608,20 @@ export default function ChatScreen({ route, navigation }) {
             }} style={{ padding: 4 }}>
               <Ionicons name="sparkles-outline" size={22} color="#f59e0b" />
             </TouchableOpacity>
+            <TouchableOpacity style={{ padding: 4 }} onPress={() => Alert.alert('Coming soon', 'Video call feature in development')}>
+              <Ionicons name="videocam-outline" size={22} color="#10b981" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setShowPollModal(true)} style={{ padding: 4 }}>
+              <Ionicons name="bar-chart-outline" size={22} color="#8b5cf6" />
+            </TouchableOpacity>
           </>
         )}
-        <TouchableOpacity onPress={() => setShowSearch(s => !s)} style={{ padding: 4 }}>
-          <Ionicons name="search-outline" size={20} color={colors.muted} />
+        <TouchableOpacity onPress={() => setShowSearch(s => !s)} style={cs.headerIconBtn}>
+          <Ionicons name={showSearch ? 'search' : 'search-outline'} size={20} color={showSearch ? colors.primary : colors.muted} />
         </TouchableOpacity>
         {type === "private" && (
-          <TouchableOpacity onPress={() => Alert.alert(
-            'Chat Options',
-            '',
-            [
-              { text: disappearing ? 'Turn off disappearing messages' : 'Turn on disappearing messages (24h)', onPress: toggleDisappearing },
-              { text: 'Mute notifications', onPress: () => Alert.alert('Muted', 'Notifications muted for this chat') },
-              { text: 'Cancel', style: 'cancel' },
-            ]
-          )}>
-            <Ionicons name="ellipsis-vertical" size={22} color={colors.muted} />
+          <TouchableOpacity onPress={() => setShowOptions(true)} style={cs.headerIconBtn}>
+            <Ionicons name="ellipsis-vertical" size={20} color={colors.muted} />
           </TouchableOpacity>
         )}
       </LinearGradient>
@@ -946,22 +869,33 @@ export default function ChatScreen({ route, navigation }) {
         <TouchableOpacity onPress={sendImage} style={cs.inputAction}>
           <Ionicons name="image-outline" size={24} color={colors.muted} />
         </TouchableOpacity>
+        <TouchableOpacity onPress={() => setShowGifPicker(true)} style={cs.inputAction}>
+          <AppText style={{ fontSize: 13, fontWeight: '800', color: colors.muted }}>GIF</AppText>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => Alert.alert('Stickers', 'Sticker packs coming soon')} style={cs.inputAction}>
+          <Ionicons name="happy-outline" size={24} color="#f59e0b" />
+        </TouchableOpacity>
         {type === 'family' && (
           <TouchableOpacity onPress={sendMemory} style={cs.inputAction}>
             <Ionicons name="time-outline" size={24} color="#f59e0b" />
           </TouchableOpacity>
         )}
+        <TouchableOpacity style={cs.inputAction} onPress={() => navigation.navigate('MediaEditor')}>
+          <Ionicons name="sparkles-outline" size={24} color="#8b5cf6" />
+        </TouchableOpacity>
 
         {isRecording ? (
-          <View style={cs.voiceRecordingRow}>
-            <Animated.View style={{ transform: [{ scale: micScaleAnim }] }}>
-              <Ionicons name="mic" size={20} color="#e0245e" />
-            </Animated.View>
-            <AppText style={cs.voiceTimer}>
-              {String(Math.floor(recordDuration / 60)).padStart(2, '0')}:{String(recordDuration % 60).padStart(2, '0')}
-            </AppText>
-            <AppText style={cs.voiceHint}>Release to send · Slide left to cancel</AppText>
-          </View>
+          <Animated.View style={{ transform: [{ translateX: voiceSlideAnim }] }}>
+            <View style={cs.voiceRecordingRow}>
+              <Animated.View style={{ transform: [{ scale: micScaleAnim }] }}>
+                <Ionicons name="mic" size={20} color="#e0245e" />
+              </Animated.View>
+              <AppText style={cs.voiceTimer}>
+                {String(Math.floor(recordDuration / 60)).padStart(2, '0')}:{String(recordDuration % 60).padStart(2, '0')}
+              </AppText>
+              <AppText style={cs.voiceHint}>Slide to cancel</AppText>
+            </View>
+          </Animated.View>
         ) : (
           <View style={cs.inputWrap}>
             <TextInput
@@ -992,47 +926,270 @@ export default function ChatScreen({ route, navigation }) {
           <TouchableOpacity
             style={cs.micBtn}
             onPressIn={startVoiceRecording}
-            onPressOut={() => stopVoiceRecording(false)}
-            delayLongPress={100}
+            onPressOut={stopVoiceRecording}
+            onLongPress={cancelVoiceRecording}
+            delayLongPress={500}
           >
             <Ionicons name={isRecording ? 'stop-circle' : 'mic-outline'} size={26} color={isRecording ? '#e0245e' : colors.muted} />
           </TouchableOpacity>
         )}
       </View>
+      <GifPicker
+        visible={showGifPicker}
+        onClose={() => setShowGifPicker(false)}
+        onSelect={sendGif}
+      />
+
+      {/* Block User Modal */}
+      <Modal visible={showBlockModal} transparent animationType="fade" onRequestClose={() => setShowBlockModal(false)}>
+        <Pressable style={cs.optionsOverlay} onPress={() => setShowBlockModal(false)}>
+          <Pressable style={cs.optionsSheet}>
+            <View style={cs.optionsHandle} />
+
+            <View style={cs.blockHeader}>
+              <View style={cs.blockIconCircle}>
+                <Ionicons name="ban" size={30} color="#e0245e" />
+              </View>
+              <AppText style={cs.blockTitle}>Block {title}?</AppText>
+              <AppText style={cs.blockSub}>
+                {title} won't be able to send you messages, see your profile, or find you in search.
+              </AppText>
+            </View>
+
+            <View style={cs.blockInfoRow}>
+              <View style={cs.blockInfoItem}>
+                <Ionicons name="chatbubble-ellipses-outline" size={22} color={colors.muted} />
+                <AppText style={cs.blockInfoText}>No messages</AppText>
+              </View>
+              <View style={cs.blockInfoDivider} />
+              <View style={cs.blockInfoItem}>
+                <Ionicons name="eye-off-outline" size={22} color={colors.muted} />
+                <AppText style={cs.blockInfoText}>Hidden profile</AppText>
+              </View>
+              <View style={cs.blockInfoDivider} />
+              <View style={cs.blockInfoItem}>
+                <Ionicons name="search-outline" size={22} color={colors.muted} />
+                <AppText style={cs.blockInfoText}>Not searchable</AppText>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={cs.blockConfirmBtn}
+              onPress={() => {
+                setShowBlockModal(false);
+                Alert.alert('Blocked', `${title} has been blocked.`);
+              }}
+            >
+              <AppText style={cs.blockConfirmText}>Block {title}</AppText>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={cs.optionsCancelBtn} onPress={() => setShowBlockModal(false)}>
+              <AppText style={cs.optionsCancelText}>Cancel</AppText>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Mute Notifications Modal */}
+      <Modal visible={showMuteOptions} transparent animationType="fade" onRequestClose={() => setMuteOptions(false)}>
+        <Pressable style={cs.optionsOverlay} onPress={() => setMuteOptions(false)}>
+          <Pressable style={cs.optionsSheet}>
+            <View style={cs.optionsHandle} />
+
+            <View style={cs.muteHeader}>
+              <View style={cs.muteIconCircle}>
+                <Ionicons name="notifications-off" size={26} color={colors.primary} />
+              </View>
+              <AppText style={cs.muteTitle}>Mute Notifications</AppText>
+              <AppText style={cs.muteSub}>Choose how long to mute {title}</AppText>
+            </View>
+
+            {[
+              { label: '1 hour', sub: 'Until later today', icon: 'time-outline', color: '#3b82f6' },
+              { label: '8 hours', sub: 'Until tonight', icon: 'moon-outline', color: '#8b5cf6' },
+              { label: '24 hours', sub: 'Until tomorrow', icon: 'sunny-outline', color: '#f59e0b' },
+              { label: '7 days', sub: 'For a week', icon: 'calendar-outline', color: '#10b981' },
+              { label: 'Always', sub: 'Until you unmute', icon: 'notifications-off-outline', color: '#e0245e' },
+            ].map((opt, i, arr) => (
+              <TouchableOpacity
+                key={opt.label}
+                style={[cs.muteRow, i === arr.length - 1 && { borderBottomWidth: 0 }]}
+                onPress={() => {
+                  setMuteOptions(false);
+                  Alert.alert('Muted', `${title} muted for ${opt.label}`);
+                }}
+              >
+                <View style={[cs.optionsIconWrap, { backgroundColor: `${opt.color}18` }]}>
+                  <Ionicons name={opt.icon} size={20} color={opt.color} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <AppText style={cs.muteRowLabel}>{opt.label}</AppText>
+                  <AppText style={cs.muteRowSub}>{opt.sub}</AppText>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={colors.dim} />
+              </TouchableOpacity>
+            ))}
+
+            <TouchableOpacity style={cs.optionsCancelBtn} onPress={() => setMuteOptions(false)}>
+              <AppText style={cs.optionsCancelText}>Cancel</AppText>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Modern Options Sheet — private chat only */}
+      <Modal visible={showOptions} transparent animationType="fade" onRequestClose={() => setShowOptions(false)}>
+        <Pressable style={cs.optionsOverlay} onPress={() => setShowOptions(false)}>
+          <Pressable style={cs.optionsSheet}>
+            <View style={cs.optionsHandle} />
+            <AppText style={cs.optionsTitle}>Chat Options</AppText>
+
+            <TouchableOpacity
+              style={cs.optionsRow}
+              onPress={() => { setShowOptions(false); toggleDisappearing(); }}
+            >
+              <View style={[cs.optionsIconWrap, { backgroundColor: 'rgba(245,158,11,0.12)' }]}>
+                <Ionicons name="timer-outline" size={20} color="#f59e0b" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <AppText style={cs.optionsRowTitle}>
+                  {disappearing ? 'Turn off disappearing messages' : 'Disappearing messages'}
+                </AppText>
+                <AppText style={cs.optionsRowSub}>
+                  {disappearing ? 'Currently on · 24h' : 'Messages delete after 24 hours'}
+                </AppText>
+              </View>
+              <View style={[cs.optionsBadge, disappearing && cs.optionsBadgeOn]}>
+                <AppText style={[cs.optionsBadgeText, disappearing && { color: '#10b981' }]}>
+                  {disappearing ? 'ON' : 'OFF'}
+                </AppText>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={cs.optionsRow}
+              onPress={() => {
+                setShowOptions(false);
+                setMuteOptions(true);
+              }}
+            >
+              <View style={[cs.optionsIconWrap, { backgroundColor: 'rgba(124,58,237,0.12)' }]}>
+                <Ionicons name="notifications-off-outline" size={20} color={colors.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <AppText style={cs.optionsRowTitle}>Mute notifications</AppText>
+                <AppText style={cs.optionsRowSub}>Stop alerts from this chat</AppText>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={cs.optionsRow}
+              onPress={() => { setShowOptions(false); otherUserId && navigation.navigate('UserProfile', { userId: otherUserId, userName: title }); }}
+            >
+              <View style={[cs.optionsIconWrap, { backgroundColor: 'rgba(59,130,246,0.12)' }]}>
+                <Ionicons name="person-outline" size={20} color="#3b82f6" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <AppText style={cs.optionsRowTitle}>View profile</AppText>
+                <AppText style={cs.optionsRowSub}>See {title}'s full profile</AppText>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[cs.optionsRow, { borderBottomWidth: 0 }]}
+              onPress={() => { setShowOptions(false); setShowBlockModal(true); }}
+            >
+              <View style={[cs.optionsIconWrap, { backgroundColor: 'rgba(224,36,94,0.12)' }]}>
+                <Ionicons name="ban-outline" size={20} color="#e0245e" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <AppText style={[cs.optionsRowTitle, { color: '#e0245e' }]}>Block {title}</AppText>
+                <AppText style={cs.optionsRowSub}>They won't be able to message you</AppText>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={cs.optionsCancelBtn} onPress={() => setShowOptions(false)}>
+              <AppText style={cs.optionsCancelText}>Cancel</AppText>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
     </KeyboardAvoidingView>
   );
 }
 
 const cs = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  header: { flexDirection: "row", alignItems: "center", paddingTop: 52, paddingBottom: 12, paddingHorizontal: 16, gap: 12, borderBottomWidth: 0.5, borderBottomColor: colors.border },
-  backBtn: { padding: 4 },
+  header: { flexDirection: "row", alignItems: "center", paddingTop: 52, paddingBottom: 12, paddingHorizontal: 16, gap: 10, borderBottomWidth: 0.5, borderBottomColor: colors.border },
+  backBtn: { padding: 6 },
   headerAvatar: { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center" },
   headerInfo: { flex: 1 },
   headerTitle: { fontSize: 16, fontWeight: "700", color: colors.text },
   headerSub: { fontSize: 12, color: colors.muted },
-  messagesList: { padding: 16, paddingBottom: 8 },
-  msgRow: { flexDirection: "row", marginBottom: 2, alignItems: "flex-end", paddingHorizontal: 12 },
-  msgRowMe: { flexDirection: "row-reverse" },
-  avatarCol: { width: 28, marginRight: 6 },
-  avatarFallback: { backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" },
-  bubble: { maxWidth: "72%", borderRadius: 20, paddingVertical: 8, paddingHorizontal: 12 },
-  bubbleMe: { backgroundColor: colors.primary, borderBottomRightRadius: 4, marginLeft: 40 },
-  bubbleThem: { backgroundColor: colors.bgCard, borderBottomLeftRadius: 4, marginRight: 40 },
-  senderName: { fontSize: 11, fontWeight: "700", color: colors.gold, marginBottom: 2 },
-  replyPreview: { flexDirection: "row", gap: 6, backgroundColor: "rgba(0,0,0,0.18)", borderRadius: 10, padding: 6, marginBottom: 6 },
+  headerIconBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  messagesList: { padding: 8, paddingBottom: 8 },
+  msgRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    marginVertical: 2,
+    paddingHorizontal: 10,
+  },
+  msgRowMe: {
+    flexDirection: 'row-reverse',
+  },
+  avatarCol: { width: 32, marginRight: 6 },
+
+  bubble: {
+    maxWidth: '75%',
+    borderRadius: 18,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  bubbleMe: {
+    backgroundColor: colors.primary,
+    borderBottomRightRadius: 4,
+    borderTopRightRadius: 18,
+    borderTopLeftRadius: 18,
+    borderBottomLeftRadius: 18,
+    alignSelf: 'flex-end',
+  },
+  bubbleThem: {
+    backgroundColor: colors.bgCard,
+    borderBottomLeftRadius: 4,
+    borderTopRightRadius: 18,
+    borderTopLeftRadius: 18,
+    borderBottomRightRadius: 18,
+    alignSelf: 'flex-start',
+  },
+  senderName: { fontSize: 11, fontWeight: '700', color: colors.gold, paddingHorizontal: 12, paddingTop: 8, paddingBottom: 2 },
+  replyPreview: { flexDirection: "row", gap: 6, backgroundColor: "rgba(0,0,0,0.15)", margin: 8, marginBottom: 4, borderRadius: 10, padding: 8 },
   replyBar: { width: 3, backgroundColor: colors.gold, borderRadius: 2 },
   replyName: { fontSize: 11, fontWeight: "700", color: colors.gold },
   replyText: { fontSize: 11, color: colors.muted },
-  msgImage: { width: 200, height: 200, borderRadius: 14, marginBottom: 2 },
-  msgText: { fontSize: 15, color: colors.text, lineHeight: 20 },
-  msgTextMe: { color: "#fff" },
-  msgTime: { fontSize: 10, color: colors.dim, marginTop: 3, textAlign: "right" },
-  msgTimeMe: { color: "rgba(255,255,255,0.55)" },
-  reactionsRow: { flexDirection: "row", flexWrap: "wrap", gap: 3, marginTop: 4 },
-  reactionPill: { flexDirection: "row", alignItems: "center", backgroundColor: colors.bgElevated, borderRadius: 12, paddingHorizontal: 6, paddingVertical: 2, gap: 2, borderWidth: 0.5, borderColor: colors.border },
+  msgImage: { width: '100%' },
+  audioBubble: { paddingHorizontal: 12, paddingTop: 10, paddingBottom: 6, width: '80%', alignSelf: 'flex-start' },
+  msgText: { fontSize: 15, lineHeight: 21, paddingHorizontal: 12, paddingVertical: 8 },
+  msgTextMe: { color: '#fff' },
+  msgTextThem: { color: colors.text },
+  msgTime: { fontSize: 10, color: colors.dim },
+  msgTimeMe: { color: 'rgba(255,255,255,0.5)' },
+  reactionsRow: { flexDirection: "row", flexWrap: "wrap", gap: 4, paddingHorizontal: 10, paddingBottom: 8 },
+  reactionPill: { flexDirection: "row", alignItems: "center", backgroundColor: colors.bgElevated, borderRadius: 12, paddingHorizontal: 7, paddingVertical: 3, gap: 3, borderWidth: 0.5, borderColor: colors.border },
   reactionEmoji: { fontSize: 13 },
-  reactionCount: { fontSize: 11, color: colors.muted },
+  reactionCount: { fontSize: 11, color: colors.muted, fontWeight: '600' },
   msgActions: { padding: 4, alignSelf: "center" },
   reactionPicker: { position: "absolute", bottom: 44, left: 34, borderRadius: 20, overflow: "hidden", zIndex: 10 },
   reactionPickerMe: { left: "auto", right: 34 },
@@ -1084,13 +1241,13 @@ const cs = StyleSheet.create({
   forwardedLabel: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 2, alignSelf: 'flex-start' },
   forwardedText: { fontSize: 11, color: colors.dim, fontStyle: 'italic' },
   // Message footer
-  msgFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 3, marginTop: 2 },
-  msgStatus: { fontSize: 11, color: 'rgba(255,255,255,0.6)' },
+  msgFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 3, paddingHorizontal: 10, paddingBottom: 6, paddingTop: 2 },
+  msgStatus: { fontSize: 11, color: 'rgba(255,255,255,0.45)' },
+  msgStatusRead: { color: '#a5f3fc' },
   // Audio bubble (legacy, kept for safety)
-  audioBubble: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4 },
   audioLabel: { fontSize: 13, color: colors.muted, fontStyle: 'italic' },
   // Reactions
-  reactionPillMine: { backgroundColor: 'rgba(124,58,237,0.25)', borderWidth: 1, borderColor: 'rgba(124,58,237,0.5)' },
+  reactionPillMine: { backgroundColor: 'rgba(124,58,237,0.2)', borderColor: 'rgba(124,58,237,0.5)' },
   reactionActionsRow: { flexDirection: 'row', gap: 4, paddingHorizontal: 8, paddingBottom: 8, borderTopWidth: 0.5, borderTopColor: 'rgba(255,255,255,0.1)', paddingTop: 6 },
   reactionAction: { flex: 1, alignItems: 'center', gap: 3, paddingVertical: 4 },
   reactionActionText: { fontSize: 10, color: colors.muted },
@@ -1112,4 +1269,218 @@ const cs = StyleSheet.create({
   mentionAvatar: { width: 34, height: 34, borderRadius: 17 },
   mentionName: { fontSize: 14, fontWeight: '600' },
   mentionUsername: { fontSize: 12 },
+
+  // Options modal
+  optionsOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-end',
+  },
+  optionsSheet: {
+    backgroundColor: '#1a1a2e',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingBottom: 34,
+    borderTopWidth: 0.5,
+    borderTopColor: 'rgba(255,255,255,0.08)',
+  },
+  optionsHandle: {
+    width: 36,
+    height: 4,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  optionsTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.muted,
+    textAlign: 'center',
+    paddingVertical: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  optionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 0.5,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
+  },
+  optionsIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  optionsRowTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 2,
+  },
+  optionsRowSub: {
+    fontSize: 12,
+    color: colors.muted,
+  },
+  optionsBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  optionsBadgeOn: {
+    backgroundColor: 'rgba(16,185,129,0.12)',
+    borderColor: 'rgba(16,185,129,0.3)',
+  },
+  optionsBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.muted,
+    letterSpacing: 0.5,
+  },
+  optionsCancelBtn: {
+    marginHorizontal: 20,
+    marginTop: 12,
+    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    alignItems: 'center',
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  optionsCancelText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.text,
+  },
+
+  // Mute modal
+  muteHeader: {
+    alignItems: 'center',
+    paddingVertical: 20,
+    paddingHorizontal: 24,
+    borderBottomWidth: 0.5,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
+    gap: 6,
+  },
+  muteIconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(124,58,237,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+    borderWidth: 0.5,
+    borderColor: 'rgba(124,58,237,0.25)',
+  },
+  muteTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  muteSub: {
+    fontSize: 13,
+    color: colors.muted,
+    textAlign: 'center',
+  },
+  muteRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 0.5,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
+  },
+  muteRowLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 2,
+  },
+  muteRowSub: {
+    fontSize: 12,
+    color: colors.muted,
+  },
+
+  // Block modal
+  blockHeader: {
+    alignItems: 'center',
+    paddingTop: 24,
+    paddingBottom: 20,
+    paddingHorizontal: 24,
+    gap: 8,
+  },
+  blockIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(224,36,94,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(224,36,94,0.2)',
+  },
+  blockTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  blockSub: {
+    fontSize: 13,
+    color: colors.muted,
+    textAlign: 'center',
+    lineHeight: 19,
+  },
+  blockInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 20,
+    marginBottom: 20,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: 14,
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.08)',
+    paddingVertical: 16,
+  },
+  blockInfoItem: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 6,
+  },
+  blockInfoDivider: {
+    width: 0.5,
+    height: 36,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  blockInfoText: {
+    fontSize: 11,
+    color: colors.muted,
+    fontWeight: '500',
+  },
+  blockConfirmBtn: {
+    marginHorizontal: 20,
+    marginBottom: 10,
+    paddingVertical: 15,
+    borderRadius: 14,
+    backgroundColor: 'rgba(224,36,94,0.12)',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(224,36,94,0.3)',
+  },
+  blockConfirmText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#e0245e',
+  },
 });

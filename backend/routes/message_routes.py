@@ -198,8 +198,8 @@ def send_message(conv_id):
     data = request.form if request.files else request.get_json(force=True, silent=True) or {}
 
     # Handle GIF (no upload needed, just store URL)
-    if data.get("gif_url"):
-        media_url = data.get("gif_url")
+    if data.get("gif_url") or (data.get("media_type") == "gif" and data.get("media_url")):
+        media_url = data.get("gif_url") or data.get("media_url")
         media_type = "gif"
 
     # Parse mentions

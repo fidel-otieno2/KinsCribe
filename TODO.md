@@ -1,28 +1,39 @@
-## StoryCard Backend Integration Plan
+# KinsCribe Messages Restyle/Restructure TODO
 
-**Information Gathered:**
+## Status: In Progress ✅
 
-- Story model: to_dict() has like_count/comment_count/repost_count
-- Routes: /feed returns liked_by_me/saved_by_me flags ✓, toggle like/save/comment/delete work
-- StoryCard: Syntax broken from previous edits (\\n, em-dashes), dummy state, needs real API
+### 1. [✅] Create/Update TODO.md (Done)
 
-**Plan:**
+### 2. [ ] Enhance ChatScreen.js
+   - Add GIF/sticker/effects buttons to input row
+   - Voice cancel slide gesture
+   - Family poll button
+   - Video call header icon
+   - Custom themed modals for prompts
 
-1. **Fix StoryCard.js syntax + wire all buttons** (main)
-   - Initialize liked = story.liked_by_me, saved = story.saved_by_me
-   - Like toggle → API POST /like → optimistic UI + refresh onUpdate
-   - Save toggle → API POST /save → optimistic UI
-   - Comment POST + list from story.comments
-   - 3-dots: Delete (owner), Save toggle, Share, Repost (+count), Report
-2. **Backend**: Feed already good, add report endpoint if missing
+### 3. [ ] Polish MessagesScreen.js
+   - Family card: Add Timeline/Memory buttons
+   - Search: Message search tab
+   - New Group header button
+   - Gradient shimmers on cards
 
-**Dependent Files:**
+### 4. [ ] Refine MessageCard.js
+   - Disappearing media timer
+   - View once badges
+   - Voice pause/resume polish
 
-- mobile/src/components/StoryCard.js (fix + connect)
+### 5. [ ] Global styles
+   - Shared message theme constants
+   - Pop-in/swipe animations
 
-**Followup:**
+### 6. [ ] Test
+   - Run `cd mobile && npx expo start --clear`
+   - Verify features on simulator
+   - Check family/1-1 chats, bubbles, voice, reactions
 
-- cd mobile && npx expo start --clear
-- Test FeedScreen buttons persist, one like/user, 3-dots work
+### 7. [ ] Attempt completion
 
-<ask_followup_question>Ready to fix StoryCard.js syntax and connect all buttons to real backend APIs?</ask_followup_question>
+**Next step:** Start with ChatScreen enhancements.
+
+**Updated:** By BLACKBOXAI
+

@@ -5,6 +5,7 @@ import {
   Modal, FlatList, KeyboardAvoidingView, Platform,
   Animated,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import AppText from '../components/AppText';
 import { Video, ResizeMode } from 'expo-av';
 import { Audio } from 'expo-av';
@@ -264,7 +265,22 @@ const lp = StyleSheet.create({
 // ── Main MediaEditorScreen ────────────────────────────────────────────────────
 export default function MediaEditorScreen({ route, navigation }) {
   const { t } = useTranslation();
-  const { mediaFile, mediaType } = route.params;
+  const [mediaFile, setMediaFile] = useState(route.params?.mediaFile ?? null);
+  const [mediaType, setMediaType] = useState(route.params?.mediaType ?? null);
+
+  useEffect(() => {
+    if (!mediaFile) {
+      ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.All,
+        quality: 0.8,
+      }).then(result => {
+        if (result.canceled) { navigation.goBack(); return; }
+        const asset = result.assets[0];
+        setMediaFile(asset);
+        setMediaType(asset.type === 'video' ? 'video' : 'image');
+      }).catch(() => navigation.goBack());
+    }
+  }, []);
   const { toast, hide, success, error, info } = useToast();
 
   const videoRef = useRef(null);
