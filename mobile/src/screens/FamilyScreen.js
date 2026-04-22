@@ -270,6 +270,18 @@ const mt = StyleSheet.create({
 });
 
 // ── Timeline Tab ──────────────────────────────────────────────
+function ChatRedirect({ navigation, family, onDone }) {
+  useEffect(() => {
+    navigation.navigate('Chat', {
+      conversationId: null,
+      title: `${family?.name || 'Family'} Chat`,
+      type: 'family',
+    });
+    onDone();
+  }, []);
+  return null;
+}
+
 function TimelineTab({ navigation }) {
   const [stories, setStories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -352,7 +364,7 @@ export default function FamilyScreen({ navigation }) {
       setFamily(data.family);
       setMembers(data.members || []);
     } catch (err) {
-      if (err.response?.status === 404) navigation.replace('FamilyGate');
+      if (err.response?.status === 404) navigation.navigate('JoinFamily');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -443,16 +455,7 @@ export default function FamilyScreen({ navigation }) {
 
       {/* Tab content */}
       {tab === 'feed' && <FamilyFeedTab navigation={navigation} userRole={user?.role} />}
-      {tab === 'chat' && (() => {
-        // Auto-navigate to family chat
-        navigation.navigate('Chat', {
-          conversationId: null,
-          title: `${family?.name || 'Family'} Chat`,
-          type: 'family',
-        });
-        setTab('feed');
-        return null;
-      })()}
+      {tab === 'chat' && <ChatRedirect navigation={navigation} family={family} onDone={() => setTab('feed')} />}
       {tab === 'members' && <MembersTab members={members} user={user} family={family} navigation={navigation} success={success} error={error} />}
       {tab === 'timeline' && <TimelineTab navigation={navigation} />}
     </View>

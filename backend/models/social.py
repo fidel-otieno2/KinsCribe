@@ -288,9 +288,11 @@ class Message(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     text = db.Column(db.Text, nullable=True)
     media_url = db.Column(db.String(300), nullable=True)
-    media_type = db.Column(db.String(20), nullable=True)
+    media_type = db.Column(db.String(20), nullable=True)  # image|video|audio|gif
     is_read = db.Column(db.Boolean, default=False)
     reply_to_id = db.Column(db.Integer, db.ForeignKey("messages.id"), nullable=True)
+    forwarded_from_id = db.Column(db.Integer, db.ForeignKey("messages.id"), nullable=True)
+    mentions = db.Column(db.Text, nullable=True)  # JSON array of user_ids mentioned
     disappears_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     conversation_id = db.Column(db.Integer, db.ForeignKey("conversations.id"), nullable=False)
@@ -298,14 +300,27 @@ class Message(db.Model):
     sender = db.relationship("User", foreign_keys=[sender_id])
     reactions = db.relationship("MessageReaction", backref="message", lazy=True, cascade="all, delete")
     reply_to = db.relationship("Message", remote_side=[id], foreign_keys=[reply_to_id])
+    forwarded_from = db.relationship("Message", remote_side=[id], foreign_keys=[forwarded_from_id])
+    polls = db.relationship("MessagePoll", backref="message", lazy=True, cascade="all, delete",
+                            primaryjoin="Message.id == MessagePoll.message_id")
 
-    def to_dict(self):
+    def to_dict(self, current_user_id=None):
+        import json
+        poll = self.polls[0].to_dict(current_user_id) if self.polls else None
+        mentions_list = []
+        if self.mentions:
+            try: mentions_list = json.loads(self.mentions)
+            except: pass
         return {
             "id": self.id, "text": self.text, "media_url": self.media_url,
             "media_type": self.media_type, "is_read": self.is_read,
             "reply_to_id": self.reply_to_id,
             "reply_to_text": self.reply_to.text if self.reply_to else None,
             "reply_to_sender": self.reply_to.sender.name if self.reply_to and self.reply_to.sender else None,
+            "forwarded_from_id": self.forwarded_from_id,
+            "forwarded_from_sender": self.forwarded_from.sender.name if self.forwarded_from and self.forwarded_from.sender else None,
+            "mentions": mentions_list,
+            "poll": poll,
             "conversation_id": self.conversation_id, "sender_id": self.sender_id,
             "sender_name": self.sender.name if self.sender else None,
             "sender_avatar": self.sender.avatar_url if self.sender else None,
@@ -327,3 +342,101 @@ class MessageReaction(db.Model):
     def to_dict(self):
         return {"id": self.id, "emoji": self.emoji, "user_id": self.user_id,
                 "user_name": self.user.name if self.user else None, "message_id": self.message_id}
+
+
+class ConversationSettings(db.Model):
+    """Per-user settings for a conversation (pin, mute, archive)."""
+    __tablename__ = "conversation_settings"
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    conversation_id = db.Column(db.Integer, db.ForeignKey("conversations.id"), nullable=False)
+    is_pinned = db.Column(db.Boolean, default=False)
+    is_muted = db.Column(db.Boolean, default=False)
+    is_archived = db.Column(db.Boolean, default=False)
+    __table_args__ = (db.UniqueConstraint("user_id", "conversation_id"),)
+
+    def to_dict(self):
+        return {
+            "conversation_id": self.conversation_id,
+            "is_pinned": self.is_pinned,
+            "is_muted": self.is_muted,
+            "is_archived": self.is_archived,
+        }
+
+
+class MessageRequest(db.Model):
+    """Message request from a non-connection."""
+    __tablename__ = "message_requests"
+    id = db.Column(db.Integer, primary_key=True)
+    sender_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    receiver_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    conversation_id = db.Column(db.Integer, db.ForeignKey("conversations.id"), nullable=False)
+    status = db.Column(db.String(20), default="pending")  # pending | accepted | declined
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    __table_args__ = (db.UniqueConstraint("sender_id", "receiver_id"),)
+    sender = db.relationship("User", foreign_keys=[sender_id])
+    receiver = db.relationship("User", foreign_keys=[receiver_id])
+
+    def to_dict(self):
+        # Fetch the first message in the conversation as a preview
+        first_msg = Message.query.filter_by(
+            conversation_id=self.conversation_id,
+            sender_id=self.sender_id
+        ).order_by(Message.created_at.asc()).first()
+        preview = None
+        if first_msg:
+            if first_msg.text:
+                preview = first_msg.text
+            elif first_msg.media_type == 'image':
+                preview = '📷 Photo'
+            elif first_msg.media_type == 'audio':
+                preview = '🎤 Voice message'
+            elif first_msg.media_type == 'video':
+                preview = '🎥 Video'
+        return {
+            "id": self.id,
+            "sender_id": self.sender_id,
+            "sender_name": self.sender.name if self.sender else None,
+            "sender_avatar": self.sender.avatar_url if self.sender else None,
+            "sender_username": self.sender.username if self.sender else None,
+            "receiver_id": self.receiver_id,
+            "conversation_id": self.conversation_id,
+            "preview_text": preview,
+            "status": self.status,
+            "created_at": self.created_at.isoformat(),
+        }
+
+
+class MessagePoll(db.Model):
+    """Poll inside a chat message."""
+    __tablename__ = "message_polls"
+    id = db.Column(db.Integer, primary_key=True)
+    message_id = db.Column(db.Integer, db.ForeignKey("messages.id"), nullable=False)
+    question = db.Column(db.String(300), nullable=False)
+    options = db.Column(db.Text, nullable=False)  # JSON array of strings
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    votes = db.relationship("MessagePollVote", backref="poll", lazy=True, cascade="all, delete")
+
+    def to_dict(self, current_user_id=None):
+        import json
+        opts = json.loads(self.options) if self.options else []
+        vote_counts = {}
+        user_vote = None
+        for v in self.votes:
+            vote_counts[v.option_index] = vote_counts.get(v.option_index, 0) + 1
+            if current_user_id and v.user_id == current_user_id:
+                user_vote = v.option_index
+        return {
+            "id": self.id, "question": self.question, "options": opts,
+            "vote_counts": vote_counts, "user_vote": user_vote,
+            "total_votes": len(self.votes),
+        }
+
+
+class MessagePollVote(db.Model):
+    __tablename__ = "message_poll_votes"
+    id = db.Column(db.Integer, primary_key=True)
+    poll_id = db.Column(db.Integer, db.ForeignKey("message_polls.id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    option_index = db.Column(db.Integer, nullable=False)
+    __table_args__ = (db.UniqueConstraint("poll_id", "user_id"),)

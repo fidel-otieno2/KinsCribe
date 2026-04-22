@@ -52,6 +52,8 @@ import AccountSwitcherScreen from "./src/screens/AccountSwitcherScreen";
 import OnThisDayScreen from "./src/screens/OnThisDayScreen";
 import ConnectionCRMScreen from "./src/screens/ConnectionCRMScreen";
 import EditProfileScreen from "./src/screens/EditProfileScreen";
+import PostDetailScreen from "./src/screens/PostDetailScreen";
+import MessageRequestsScreen from "./src/screens/MessageRequestsScreen";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -197,8 +199,8 @@ function RootNavigator() {
     );
   }
 
-  // Profile is complete when username, bio, and at least 1 interest are set
-  const isProfileComplete = !!(user?.username && user?.bio && user?.interests?.length > 0);
+  // Profile is complete when username and bio are set
+  const isProfileComplete = !!(user?.username && user?.bio);
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false, animation: "fade_from_bottom" }}>
@@ -245,6 +247,10 @@ function RootNavigator() {
           <Stack.Screen name="OnThisDay" component={OnThisDayScreen} options={{ animation: "slide_from_right" }} />
           <Stack.Screen name="ConnectionCRM" component={ConnectionCRMScreen} options={{ animation: "slide_from_right" }} />
           <Stack.Screen name="EditProfile" component={EditProfileScreen} options={{ animation: "slide_from_right" }} />
+          <Stack.Screen name="PostDetail" component={PostDetailScreen} options={{ animation: "slide_from_right" }} />
+          <Stack.Screen name="MessageRequests" component={MessageRequestsScreen} options={{ animation: "slide_from_right" }} />
+          <Stack.Screen name="JoinFamily" component={JoinFamilyScreen} options={{ animation: "slide_from_right" }} />
+          <Stack.Screen name="FamilyGate" component={FamilyGateScreen} options={{ animation: "slide_from_right" }} />
         </>
       )}
     </Stack.Navigator>

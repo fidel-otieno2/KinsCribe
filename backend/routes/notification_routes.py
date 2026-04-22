@@ -14,6 +14,9 @@ notification_bp = Blueprint("notifications", __name__)
 # In production this should be a DB table, but works for now
 _read_store = {}
 
+# In-memory store for mention notifications { user_id: [notif_dict, ...] }
+_mention_store = {}
+
 
 def _get_all_notifications(user):
     notifs = []
@@ -194,6 +197,10 @@ def _get_all_notifications(user):
                 "post_media": post.media_url,
                 "created_at": post.created_at.isoformat(),
             })
+
+    # ── 7. Mention notifications ──────────────────────────────
+    for mention_notif in _mention_store.get(user.id, []):
+        notifs.append(mention_notif)
 
     notifs.sort(key=lambda x: x["created_at"], reverse=True)
     return notifs[:60]

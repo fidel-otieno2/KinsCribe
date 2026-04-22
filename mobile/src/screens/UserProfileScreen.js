@@ -35,7 +35,7 @@ export default function UserProfileScreen({ route, navigation }) {
 
   useEffect(() => {
     if (userId === me?.id) {
-      navigation.replace('Main', { screen: 'Profile' });
+      navigation.goBack();
     }
   }, [userId, me]);
 

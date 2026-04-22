@@ -11,6 +11,20 @@ def me():
     return User.query.get(int(get_jwt_identity()))
 
 
+@connection_bp.route("/<int:user_id>/profile", methods=["GET"])
+@jwt_required()
+def get_user_profile(user_id):
+    """Return full public profile for any user by ID."""
+    current_id = int(get_jwt_identity())
+    user = User.query.get_or_404(user_id)
+    d = user.to_dict()
+    # Add connection count / interest count
+    from models.social import Connection
+    d["connection_count"] = Connection.query.filter_by(following_id=user_id, status="accepted").count()
+    d["interest_count"] = Connection.query.filter_by(follower_id=user_id, status="accepted").count()
+    return jsonify({"user": d})
+
+
 @connection_bp.route("/<int:user_id>/toggle", methods=["POST"])
 @jwt_required()
 def toggle_connection(user_id):
@@ -157,7 +171,10 @@ def suggestions():
     current = me()
     already = {c.following_id for c in Connection.query.filter_by(follower_id=current.id).all()}
     already.add(current.id)
-    users = User.query.filter(User.id.notin_(already)).order_by(db.func.random()).limit(20).all()
+    users = User.query.filter(
+        User.id.notin_(already),
+        User.username.isnot(None),
+    ).order_by(db.func.random()).limit(20).all()
     current_id = current.id
     result = []
     for u in users:

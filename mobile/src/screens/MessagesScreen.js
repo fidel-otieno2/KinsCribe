@@ -42,22 +42,35 @@ export default function MessagesScreen({ navigation }) {
   const [search, setSearch] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
-  const [pinnedIds, setPinnedIds] = useState(new Set());
-  const [mutedIds, setMutedIds] = useState(new Set());
-  const [archivedIds, setArchivedIds] = useState(new Set());
+  const [convSettings, setConvSettings] = useState({});
+  const [requestCount, setRequestCount] = useState(0);
   const [openingDM, setOpeningDM] = useState(null);
 
   const fetchConversations = async () => {
     try {
-      const { data } = await api.get("/messages/conversations");
-      const all = data.conversations || [];
-      const family = all.find(c => c.type === "family");
-      const dms = all.filter(c => c.type === "private");
-      setFamilyConv(family || null);
-      setConversations(dms);
+      const [convRes, settingsRes, reqRes] = await Promise.all([
+        api.get('/messages/conversations'),
+        api.get('/messages/conversations/settings/all').catch(() => ({ data: {} })),
+        api.get('/messages/requests').catch(() => ({ data: { requests: [] } })),
+      ]);
+      const all = convRes.data.conversations || [];
+      setFamilyConv(all.find(c => c.type === 'family') || null);
+      setConversations(all.filter(c => c.type === 'private'));
+      setConvSettings(settingsRes.data || {});
+      setRequestCount((reqRes.data.requests || []).length);
     } catch (err) {
-      console.log("conv error:", err.message);
+      console.log('conv error:', err.message);
     } finally { setLoading(false); }
+  };
+
+  const updateSetting = async (convId, key, value) => {
+    setConvSettings(prev => ({
+      ...prev,
+      [String(convId)]: { ...(prev[String(convId)] || {}), [key]: value },
+    }));
+    try {
+      await api.patch(`/messages/conversations/${convId}/settings`, { [key]: value });
+    } catch {}
   };
 
   const ensureFamilyChat = async () => {
@@ -135,8 +148,9 @@ export default function MessagesScreen({ navigation }) {
     const other = item.other_user;
     const lastMsg = item.last_message;
     const unread = item.unread_count > 0;
-    const isPinned = pinnedIds.has(item.id);
-    const isMuted = mutedIds.has(item.id);
+    const cfg = convSettings[String(item.id)] || {};
+    const isPinned = cfg.is_pinned || false;
+    const isMuted = cfg.is_muted || false;
     return (
       <TouchableOpacity
         style={[s.row, { borderBottomColor: theme.border }, isPinned && { backgroundColor: 'rgba(124,58,237,0.06)' }]}
@@ -145,9 +159,9 @@ export default function MessagesScreen({ navigation }) {
           other?.name || 'Chat',
           '',
           [
-            { text: isPinned ? 'Unpin' : 'Pin to top', onPress: () => setPinnedIds(prev => { const n = new Set(prev); isPinned ? n.delete(item.id) : n.add(item.id); return n; }) },
-            { text: isMuted ? 'Unmute' : 'Mute notifications', onPress: () => setMutedIds(prev => { const n = new Set(prev); isMuted ? n.delete(item.id) : n.add(item.id); return n; }) },
-            { text: 'Archive', onPress: () => setArchivedIds(prev => new Set([...prev, item.id])) },
+            { text: isPinned ? 'Unpin' : 'Pin to top', onPress: () => updateSetting(item.id, 'is_pinned', !isPinned) },
+            { text: isMuted ? 'Unmute' : 'Mute notifications', onPress: () => updateSetting(item.id, 'is_muted', !isMuted) },
+            { text: 'Archive', onPress: () => updateSetting(item.id, 'is_archived', true) },
             { text: 'Cancel', style: 'cancel' },
           ]
         )}
@@ -183,9 +197,19 @@ export default function MessagesScreen({ navigation }) {
       {/* Header */}
       <View style={s.header}>
         <AppText style={[s.title, { color: theme.text }]}>{t('messages')}</AppText>
-        <TouchableOpacity onPress={() => navigation.navigate("Search")}>
-          <Ionicons name="person-add-outline" size={24} color={theme.text} />
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
+          <TouchableOpacity onPress={() => navigation.navigate('MessageRequests')} style={{ position: 'relative' }}>
+            <Ionicons name="mail-outline" size={24} color={theme.text} />
+            {requestCount > 0 && (
+              <View style={s.badge}>
+                <AppText style={s.badgeText}>{requestCount}</AppText>
+              </View>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => navigation.navigate('Search')}>
+            <Ionicons name="person-add-outline" size={24} color={theme.text} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Search */}
@@ -285,7 +309,7 @@ export default function MessagesScreen({ navigation }) {
             </View>
           ) : (
             <FlatList
-              data={[...conversations.filter(c => !archivedIds.has(c.id))].sort((a, b) => (pinnedIds.has(b.id) ? 1 : 0) - (pinnedIds.has(a.id) ? 1 : 0))}
+              data={[...conversations.filter(c => !(convSettings[String(c.id)]?.is_archived))].sort((a, b) => ((convSettings[String(b.id)]?.is_pinned ? 1 : 0) - (convSettings[String(a.id)]?.is_pinned ? 1 : 0)))}
               keyExtractor={i => String(i.id)}
               renderItem={renderDM}
               showsVerticalScrollIndicator={false}
@@ -328,4 +352,6 @@ const s = StyleSheet.create({
   emptyWrap: { alignItems: "center", marginTop: 60, gap: 8 },
   emptyTitle: { fontSize: 17, fontWeight: "700", color: colors.text },
   emptyText: { fontSize: 13, color: colors.muted, textAlign: "center", paddingHorizontal: 40 },
+  badge: { position: 'absolute', top: -4, right: -6, backgroundColor: colors.primary, borderRadius: 8, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
+  badgeText: { color: '#fff', fontSize: 9, fontWeight: '800' },
 });

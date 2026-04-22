@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, FlatList, TouchableOpacity, StyleSheet,
   Image, ActivityIndicator, Alert, RefreshControl,
-  ScrollView, Dimensions, Share, Modal, Linking, Text,
+  ScrollView, Dimensions, Share, Modal, Linking, TextInput,
 } from 'react-native';
 import AppText from '../components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -48,16 +48,20 @@ export default function ProfileScreen({ navigation }) {
   const [feedLayout, setFeedLayout] = useState('grid'); // 'grid' | 'list'
   const [stats, setStats] = useState({ posts: 0, connections: 0, interests: 0 });
   const [listModal, setListModal] = useState({ visible: false, type: null, data: [], loading: false });
+  const [myStories, setMyStories] = useState([]);
+  const [addHighlight, setAddHighlight] = useState({ visible: false, title: '', selected: [], saving: false });
+  const [viewHighlight, setViewHighlight] = useState({ visible: false, highlight: null, index: 0 });
 
   const fetchAll = useCallback(async () => {
     if (!user) return;
     try {
-      const [postsRes, savedRes, highlightsRes, taggedRes, likedRes] = await Promise.all([
+      const [postsRes, savedRes, highlightsRes, taggedRes, likedRes, storiesRes] = await Promise.all([
         api.get(`/posts/user/${user.id}`).catch(() => ({ data: { posts: [] } })),
         api.get('/pstories/saved').catch(() => ({ data: { posts: [] } })),
         api.get(`/pstories/highlights?user_id=${user.id}`).catch(() => ({ data: { highlights: [] } })),
         api.get(`/posts/tagged/${user.id}`).catch(() => ({ data: { posts: [] } })),
         api.get(`/posts/liked/${user.id}`).catch(() => ({ data: { posts: [] } })),
+        api.get('/pstories/my').catch(() => ({ data: { stories: [] } })),
       ]);
       const allPosts = postsRes.data.posts || [];
       setPosts(allPosts);
@@ -65,6 +69,7 @@ export default function ProfileScreen({ navigation }) {
       setTaggedPosts(taggedRes.data.posts || []);
       setLikedPosts(likedRes.data.posts || []);
       setHighlights(highlightsRes.data.highlights || []);
+      setMyStories(storiesRes.data.stories || []);
       setStats({
         posts: allPosts.length,
         connections: user.connection_count || 0,
@@ -123,6 +128,50 @@ export default function ProfileScreen({ navigation }) {
     }
   };
 
+  const openAddHighlight = () => setAddHighlight({ visible: true, title: '', selected: [], saving: false });
+
+  const toggleStorySelect = (story) => {
+    setAddHighlight(prev => {
+      const exists = prev.selected.find(s => s.id === story.id);
+      return {
+        ...prev,
+        selected: exists ? prev.selected.filter(s => s.id !== story.id) : [...prev.selected, story],
+      };
+    });
+  };
+
+  const saveHighlight = async () => {
+    if (!addHighlight.title.trim()) return error('Give your highlight a title');
+    if (addHighlight.selected.length === 0) return error('Select at least one story');
+    setAddHighlight(prev => ({ ...prev, saving: true }));
+    try {
+      const items = addHighlight.selected.map(s => ({
+        story_id: s.id, media_url: s.media_url, media_type: s.media_type || 'image',
+      }));
+      const cover_url = addHighlight.selected[0]?.media_url || null;
+      await api.post('/pstories/highlights', { title: addHighlight.title.trim(), cover_url, items });
+      setAddHighlight({ visible: false, title: '', selected: [], saving: false });
+      success('Highlight created');
+      fetchAll();
+    } catch {
+      error('Failed to create highlight');
+      setAddHighlight(prev => ({ ...prev, saving: false }));
+    }
+  };
+
+  const deleteHighlight = (h) => {
+    Alert.alert('Delete Highlight', `Delete "${h.title}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: async () => {
+        try {
+          await api.delete(`/pstories/highlights/${h.id}`);
+          setHighlights(prev => prev.filter(x => x.id !== h.id));
+          success('Highlight deleted');
+        } catch { error('Failed to delete'); }
+      }},
+    ]);
+  };
+
   const handleShare = async () => {
     try {
       const ref = Math.random().toString(36).slice(2, 12);
@@ -135,33 +184,45 @@ export default function ProfileScreen({ navigation }) {
     } catch {}
   };
 
-  const renderGridItem = (item) => (
-    <TouchableOpacity key={item.id} style={s.gridItem} activeOpacity={0.85}>
-      {item.media_url ? (
-        <Image source={{ uri: item.media_url }} style={s.gridImg} resizeMode="cover" />
-      ) : (
-        <View style={[s.gridImg, s.gridText]}>
-          <AppText style={s.gridCaption} numberOfLines={4}>{item.caption}</AppText>
-        </View>
-      )}
-      {item.media_type === 'carousel' && (
-        <View style={s.carouselBadge}>
-          <Ionicons name="copy-outline" size={12} color="#fff" />
-        </View>
-      )}
-      {item.media_type === 'video' && (
-        <View style={s.videoBadge}>
-          <Ionicons name="play" size={12} color="#fff" />
-        </View>
-      )}
-      {item.like_count > 0 && (
-        <View style={s.gridLikes}>
-          <Ionicons name="heart" size={10} color="#fff" />
-          <AppText style={s.gridLikesText}>{item.like_count}</AppText>
-        </View>
-      )}
-    </TouchableOpacity>
-  );
+  const videoThumb = (url) => {
+    if (!url) return null;
+    return url
+      .replace('/video/upload/', '/video/upload/so_0,w_400/')
+      .replace(/\.(mp4|mov|avi|webm)(\?.*)?$/, '.jpg');
+  };
+
+  const renderGridItem = (item) => {
+    const isVideo = item.media_type === 'video';
+    const thumbUri = isVideo ? videoThumb(item.media_url) : item.media_url;
+    return (
+      <TouchableOpacity key={item.id} style={s.gridItem} activeOpacity={0.85}
+        onPress={() => navigation.navigate('PostDetail', { postId: item.id })}>
+        {thumbUri ? (
+          <Image source={{ uri: thumbUri }} style={s.gridImg} resizeMode="cover" />
+        ) : (
+          <View style={[s.gridImg, s.gridText, { backgroundColor: theme.bgSecondary }]}>
+            <AppText style={[s.gridCaption, { color: theme.text }]} numberOfLines={4}>{item.caption}</AppText>
+          </View>
+        )}
+        {item.media_type === 'carousel' && (
+          <View style={s.carouselBadge}>
+            <Ionicons name="copy-outline" size={12} color="#fff" />
+          </View>
+        )}
+        {isVideo && (
+          <View style={s.videoBadge}>
+            <Ionicons name="play" size={14} color="#fff" />
+          </View>
+        )}
+        {item.like_count > 0 && (
+          <View style={s.gridLikes}>
+            <Ionicons name="heart" size={10} color="#fff" />
+            <AppText style={s.gridLikesText}>{item.like_count}</AppText>
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
 
   const currentData =
     tab === 'saved' ? savedPosts :
@@ -261,49 +322,86 @@ export default function ProfileScreen({ navigation }) {
 
       {/* Action buttons */}
       <View style={s.actionRow}>
-        <TouchableOpacity style={[s.editBtn, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]} onPress={() => navigation.navigate('EditProfile')}>
+        <TouchableOpacity
+          style={[s.editBtn, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]}
+          onPress={() => navigation.navigate('EditProfile')}
+          activeOpacity={0.75}
+        >
+          <Ionicons name="pencil-outline" size={15} color={theme.text} />
           <AppText style={[s.editBtnText, { color: theme.text }]}>{t('edit_profile')}</AppText>
         </TouchableOpacity>
-        <TouchableOpacity style={[s.shareBtn, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]} onPress={handleShare}>
-          <Ionicons name="share-outline" size={18} color={theme.text} />
+        <TouchableOpacity
+          style={[s.editBtn, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]}
+          onPress={handleShare}
+          activeOpacity={0.75}
+        >
+          <Ionicons name="share-outline" size={15} color={theme.text} />
+          <AppText style={[s.editBtnText, { color: theme.text }]}>Share</AppText>
         </TouchableOpacity>
-        <TouchableOpacity style={[s.shareBtn, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]} onPress={() => setShowQR(true)}>
-          <Ionicons name="qr-code-outline" size={18} color={theme.text} />
+        <TouchableOpacity
+          style={[s.editBtn, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]}
+          onPress={() => setShowQR(true)}
+          activeOpacity={0.75}
+        >
+          <Ionicons name="qr-code-outline" size={15} color={theme.text} />
+          <AppText style={[s.editBtnText, { color: theme.text }]}>QR</AppText>
         </TouchableOpacity>
-        <TouchableOpacity style={[s.shareBtn, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]} onPress={() => navigation.navigate('Family')}>
-          <Ionicons name="people-outline" size={18} color={theme.text} />
+      </View>
+      <View style={[s.actionRow, { marginTop: -6 }]}>
+        <TouchableOpacity
+          style={[s.editBtn, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]}
+          onPress={() => navigation.navigate('Family')}
+          activeOpacity={0.75}
+        >
+          <Ionicons name="people-outline" size={15} color={theme.gold} />
+          <AppText style={[s.editBtnText, { color: theme.gold }]}>Family</AppText>
         </TouchableOpacity>
-        <TouchableOpacity style={[s.shareBtn, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]} onPress={() => navigation.navigate('PostInsights')}>
-          <Ionicons name="bar-chart-outline" size={18} color={theme.text} />
+        <TouchableOpacity
+          style={[s.editBtn, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]}
+          onPress={() => navigation.navigate('PostInsights')}
+          activeOpacity={0.75}
+        >
+          <Ionicons name="bar-chart-outline" size={15} color={theme.primary} />
+          <AppText style={[s.editBtnText, { color: theme.primary }]}>Insights</AppText>
         </TouchableOpacity>
-        <TouchableOpacity style={[s.shareBtn, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]} onPress={() => navigation.navigate('ConnectionCRM')}>
-          <Ionicons name="people-circle-outline" size={18} color={theme.text} />
+        <TouchableOpacity
+          style={[s.editBtn, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]}
+          onPress={() => navigation.navigate('ConnectionCRM')}
+          activeOpacity={0.75}
+        >
+          <Ionicons name="people-circle-outline" size={15} color={theme.brown} />
+          <AppText style={[s.editBtnText, { color: theme.brown }]}>CRM</AppText>
         </TouchableOpacity>
       </View>
 
       {/* Story Highlights */}
-      {highlights.length > 0 && (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.highlightsRow}>
-          <TouchableOpacity style={s.highlightItem} onPress={() => {}}>
-            <View style={[s.highlightCircle, s.highlightAdd, { backgroundColor: theme.bgSecondary, borderColor: theme.border2 }]}>
-              <Ionicons name="add" size={22} color={theme.primary} />
-            </View>
-            <AppText style={[s.highlightLabel, { color: theme.text }]}>New</AppText>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.highlightsRow}>
+        {/* Always-visible New button */}
+        <TouchableOpacity style={s.highlightItem} onPress={openAddHighlight} activeOpacity={0.8}>
+          <View style={[s.highlightCircle, s.highlightAdd, { backgroundColor: theme.bgSecondary, borderColor: theme.border2 }]}>
+            <Ionicons name="add" size={24} color={theme.primary} />
+          </View>
+          <AppText style={[s.highlightLabel, { color: theme.muted }]}>New</AppText>
+        </TouchableOpacity>
+        {highlights.map(h => (
+          <TouchableOpacity
+            key={h.id}
+            style={s.highlightItem}
+            activeOpacity={0.8}
+            onPress={() => setViewHighlight({ visible: true, highlight: h, index: 0 })}
+            onLongPress={() => deleteHighlight(h)}
+          >
+            <LinearGradient colors={['#C4A35A', '#4A7C3F']} style={s.highlightRing}>
+              <View style={[s.highlightCircle, { borderColor: theme.bg }]}>
+                {h.cover_url
+                  ? <Image source={{ uri: h.cover_url }} style={s.highlightImg} />
+                  : <Ionicons name="star" size={20} color="#fff" />}
+              </View>
+            </LinearGradient>
+            <AppText style={[s.highlightLabel, { color: theme.text }]} numberOfLines={1}>{h.title}</AppText>
           </TouchableOpacity>
-          {highlights.map(h => (
-            <TouchableOpacity key={h.id} style={s.highlightItem}>
-              <LinearGradient colors={['#7c3aed', '#3b82f6']} style={s.highlightRing}>
-                <View style={[s.highlightCircle, { backgroundColor: theme.bgSecondary, borderColor: theme.bg }]}>
-                  {h.cover_url
-                    ? <Image source={{ uri: h.cover_url }} style={s.highlightImg} />
-                    : <Ionicons name="star" size={20} color="#fff" />}
-                </View>
-              </LinearGradient>
-              <AppText style={[s.highlightLabel, { color: theme.text }]} numberOfLines={1}>{h.title}</AppText>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      )}
+        ))}
+      </ScrollView>
 
       {/* Tabs */}
       <View style={[s.tabRow, { borderTopColor: theme.border }]}>
@@ -390,6 +488,161 @@ export default function ProfileScreen({ navigation }) {
         </View>
       </Modal>
 
+      {/* Add Highlight Modal */}
+      <Modal
+        visible={addHighlight.visible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setAddHighlight(prev => ({ ...prev, visible: false }))}
+      >
+        <View style={s.modalOverlay}>
+          <View style={[s.modalSheet, { backgroundColor: theme.bgCard, maxHeight: '85%' }]}>
+            <View style={[s.modalHeader, { borderBottomColor: theme.border }]}>
+              <AppText style={[s.modalTitle, { color: theme.text }]}>New Highlight</AppText>
+              <TouchableOpacity onPress={() => setAddHighlight(prev => ({ ...prev, visible: false }))} style={s.modalClose}>
+                <Ionicons name="close" size={22} color={theme.muted} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView contentContainerStyle={{ padding: 16 }}>
+              {/* Title input */}
+              <View style={[s.hlInput, { backgroundColor: theme.bgSecondary, borderColor: theme.border2, marginBottom: 16 }]}>
+                <TextInput
+                  value={addHighlight.title}
+                  onChangeText={t => setAddHighlight(prev => ({ ...prev, title: t }))}
+                  placeholder="Highlight name (e.g. Summer 2024)"
+                  placeholderTextColor={theme.dim}
+                  style={[s.hlInputText, { color: theme.text }]}
+                  maxLength={30}
+                />
+              </View>
+              {/* Story picker */}
+              <AppText style={[s.hlPickerLabel, { color: theme.muted, marginBottom: 10 }]}>Select stories to include</AppText>
+              {myStories.length === 0 ? (
+                <View style={s.hlEmpty}>
+                  <Ionicons name="images-outline" size={36} color={theme.dim} />
+                  <AppText style={[{ color: theme.muted, fontSize: 13, textAlign: 'center' }]}>No active stories. Post a story first.</AppText>
+                </View>
+              ) : (
+                <View style={s.hlGrid}>
+                  {myStories.map(story => {
+                    const selected = addHighlight.selected.find(s => s.id === story.id);
+                    return (
+                      <TouchableOpacity
+                        key={story.id}
+                        style={[s.hlStoryThumb, selected && s.hlStorySelected]}
+                        onPress={() => toggleStorySelect(story)}
+                        activeOpacity={0.8}
+                      >
+                        {story.media_url
+                          ? <Image source={{ uri: story.media_url }} style={s.hlThumbImg} resizeMode="cover" />
+                          : <View style={[s.hlThumbImg, { backgroundColor: theme.bgElevated, alignItems: 'center', justifyContent: 'center' }]}>
+                              <Ionicons name="text" size={20} color={theme.muted} />
+                            </View>}
+                        {selected && (
+                          <View style={s.hlCheckOverlay}>
+                            <Ionicons name="checkmark-circle" size={22} color="#fff" />
+                          </View>
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
+            </ScrollView>
+            <View style={[s.hlFooter, { borderTopColor: theme.border, backgroundColor: theme.bgCard }]}>
+              <TouchableOpacity
+                style={[s.hlSaveBtn, { backgroundColor: theme.primary, opacity: addHighlight.saving ? 0.7 : 1 }]}
+                onPress={saveHighlight}
+                disabled={addHighlight.saving}
+                activeOpacity={0.8}
+              >
+                {addHighlight.saving
+                  ? <ActivityIndicator color="#fff" size="small" />
+                  : <AppText style={s.hlSaveBtnText}>Add Highlight</AppText>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* View Highlight Modal */}
+      <Modal
+        visible={viewHighlight.visible}
+        transparent={false}
+        animationType="fade"
+        onRequestClose={() => setViewHighlight(prev => ({ ...prev, visible: false }))}
+      >
+        <View style={[s.hlViewer, { backgroundColor: '#000' }]}>
+          {viewHighlight.highlight?.items?.length > 0 ? (
+            <>
+              {/* Progress bars */}
+              <View style={s.hlProgressRow}>
+                {viewHighlight.highlight.items.map((_, i) => (
+                  <View key={i} style={[s.hlProgressBar, { backgroundColor: i <= viewHighlight.index ? '#fff' : 'rgba(255,255,255,0.3)' }]} />
+                ))}
+              </View>
+              {/* Media */}
+              <Image
+                source={{ uri: viewHighlight.highlight.items[viewHighlight.index]?.media_url }}
+                style={s.hlViewerImg}
+                resizeMode="contain"
+              />
+              {/* Title */}
+              <View style={s.hlViewerHeader}>
+                <View style={[s.hlViewerAvatar, { backgroundColor: theme.primary }]}>
+                  {user?.avatar_url
+                    ? <Image source={{ uri: user.avatar_url }} style={{ width: '100%', height: '100%' }} />
+                    : <AppText style={{ color: '#fff', fontWeight: '800' }}>{user?.name?.[0]}</AppText>}
+                </View>
+                <View>
+                  <AppText style={s.hlViewerName}>{user?.name}</AppText>
+                  <AppText style={s.hlViewerTitle}>{viewHighlight.highlight.title}</AppText>
+                </View>
+              </View>
+              {/* Tap zones: left = prev, right = next */}
+              <View style={s.hlTapRow}>
+                <TouchableOpacity
+                  style={{ flex: 1 }}
+                  onPress={() => setViewHighlight(prev => ({ ...prev, index: Math.max(0, prev.index - 1) }))}
+                />
+                <TouchableOpacity
+                  style={{ flex: 1 }}
+                  onPress={() => {
+                    const total = viewHighlight.highlight.items.length;
+                    if (viewHighlight.index < total - 1) {
+                      setViewHighlight(prev => ({ ...prev, index: prev.index + 1 }));
+                    } else {
+                      setViewHighlight(prev => ({ ...prev, visible: false }));
+                    }
+                  }}
+                />
+              </View>
+            </>
+          ) : (
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+              <AppText style={{ color: '#fff' }}>No items in this highlight</AppText>
+            </View>
+          )}
+          {/* Close */}
+          <TouchableOpacity
+            style={s.hlViewerClose}
+            onPress={() => setViewHighlight(prev => ({ ...prev, visible: false }))}
+          >
+            <Ionicons name="close" size={28} color="#fff" />
+          </TouchableOpacity>
+          {/* Delete button */}
+          <TouchableOpacity
+            style={s.hlViewerDelete}
+            onPress={() => {
+              setViewHighlight(prev => ({ ...prev, visible: false }));
+              setTimeout(() => deleteHighlight(viewHighlight.highlight), 300);
+            }}
+          >
+            <Ionicons name="trash-outline" size={22} color="#ff6b6b" />
+          </TouchableOpacity>
+        </View>
+      </Modal>
+
       {/* QR Modal */}
       <Modal visible={showQR} transparent animationType="fade" onRequestClose={() => setShowQR(false)}>
         <TouchableOpacity style={s.qrOverlay} activeOpacity={1} onPress={() => setShowQR(false)}>
@@ -429,7 +682,8 @@ export default function ProfileScreen({ navigation }) {
         ) : feedLayout === 'list' ? (
           <View style={{ paddingHorizontal: 1 }}>
             {currentData.map(item => (
-              <TouchableOpacity key={item.id} style={[s.listItem, { borderBottomColor: theme.border }]} activeOpacity={0.85}>
+              <TouchableOpacity key={item.id} style={[s.listItem, { borderBottomColor: theme.border }]} activeOpacity={0.85}
+                onPress={() => navigation.navigate('PostDetail', { postId: item.id })}>
                 {item.media_url && <Image source={{ uri: item.media_url }} style={s.listImg} resizeMode="cover" />}
                 <View style={s.listInfo}>
                   <AppText style={[s.listCaption, { color: theme.text }]} numberOfLines={2}>{item.caption}</AppText>
@@ -482,17 +736,41 @@ const s = StyleSheet.create({
   bio: { fontSize: 13, color: colors.muted, lineHeight: 18, marginBottom: 4 },
   websiteRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
   websiteText: { fontSize: 13, fontWeight: '600', textDecorationLine: 'underline', flex: 1 },
-  actionRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingBottom: 14 },
-  editBtn: { flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: radius.md, borderWidth: 1 },
-  editBtnText: { fontWeight: '700', fontSize: 14 },
-  shareBtn: { width: 40, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, borderWidth: 1 },
+  actionRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingBottom: 8 },
+  editBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 9, borderRadius: radius.md, borderWidth: 1 },
+  editBtnText: { fontWeight: '700', fontSize: 13 },
   highlightsRow: { paddingHorizontal: 16, paddingBottom: 14, gap: 16 },
-  highlightItem: { alignItems: 'center', gap: 4, width: 64 },
-  highlightRing: { width: 64, height: 64, borderRadius: 32, padding: 2.5, alignItems: 'center', justifyContent: 'center' },
-  highlightCircle: { width: 57, height: 57, borderRadius: 28.5, overflow: 'hidden', backgroundColor: colors.bgSecondary, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.bg },
-  highlightAdd: { borderWidth: 1.5, borderColor: colors.border2, borderStyle: 'dashed' },
+  highlightItem: { alignItems: 'center', gap: 4, width: 68 },
+  highlightRing: { width: 68, height: 68, borderRadius: 34, padding: 2.5, alignItems: 'center', justifyContent: 'center' },
+  highlightCircle: { width: 61, height: 61, borderRadius: 30.5, overflow: 'hidden', backgroundColor: colors.bgSecondary, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.bg },
+  highlightAdd: { borderWidth: 1.5, borderColor: colors.border2, borderStyle: 'dashed', width: 68, height: 68, borderRadius: 34 },
   highlightImg: { width: '100%', height: '100%' },
-  highlightLabel: { fontSize: 11, color: colors.text, textAlign: 'center', maxWidth: 64 },
+  highlightLabel: { fontSize: 11, color: colors.text, textAlign: 'center', maxWidth: 68 },
+  // Add highlight modal
+  hlInput: { borderRadius: radius.md, borderWidth: 1, paddingHorizontal: 14, height: 48, justifyContent: 'center' },
+  hlInputText: { fontSize: 15 },
+  hlPickerLabel: { fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
+  hlEmpty: { alignItems: 'center', gap: 10, paddingVertical: 24 },
+  hlGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
+  hlStoryThumb: { width: (width - 56) / 4, height: (width - 56) / 4, borderRadius: 8, overflow: 'hidden', borderWidth: 2, borderColor: 'transparent' },
+  hlStorySelected: { borderColor: colors.primary },
+  hlThumbImg: { width: '100%', height: '100%' },
+  hlCheckOverlay: { position: 'absolute', top: 4, right: 4 },
+  hlFooter: { padding: 16, borderTopWidth: 0.5 },
+  hlSaveBtn: { borderRadius: radius.full, paddingVertical: 14, alignItems: 'center' },
+  hlSaveBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  // Viewer
+  hlViewer: { flex: 1 },
+  hlProgressRow: { flexDirection: 'row', gap: 4, position: 'absolute', top: 52, left: 12, right: 12, zIndex: 10 },
+  hlProgressBar: { flex: 1, height: 2.5, borderRadius: 2 },
+  hlViewerImg: { width, height: '100%' },
+  hlViewerHeader: { position: 'absolute', top: 64, left: 16, flexDirection: 'row', alignItems: 'center', gap: 10, zIndex: 10 },
+  hlViewerAvatar: { width: 36, height: 36, borderRadius: 18, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  hlViewerName: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  hlViewerTitle: { color: 'rgba(255,255,255,0.7)', fontSize: 12 },
+  hlTapRow: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, flexDirection: 'row', zIndex: 5 },
+  hlViewerClose: { position: 'absolute', top: 52, right: 16, zIndex: 20, padding: 4 },
+  hlViewerDelete: { position: 'absolute', bottom: 48, right: 20, zIndex: 20, backgroundColor: 'rgba(0,0,0,0.5)', padding: 10, borderRadius: 20 },
   tabRow: { flexDirection: 'row', borderTopWidth: 0.5, borderTopColor: colors.border },
   tabBtn: { flex: 1, alignItems: 'center', paddingVertical: 11 },
   tabBtnActive: { borderBottomWidth: 1.5, borderBottomColor: colors.primary },
@@ -502,7 +780,7 @@ const s = StyleSheet.create({
   gridText: { backgroundColor: colors.bgSecondary, alignItems: 'center', justifyContent: 'center', padding: 8 },
   gridCaption: { color: colors.text, fontSize: 11, textAlign: 'center' },
   carouselBadge: { position: 'absolute', top: 6, right: 6, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 4, padding: 3 },
-  videoBadge: { position: 'absolute', top: 6, right: 6, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 4, padding: 3 },
+  videoBadge: { position: 'absolute', top: 6, right: 6, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 12, padding: 5, width: 26, height: 26, alignItems: 'center', justifyContent: 'center' },
   gridLikes: { position: 'absolute', bottom: 4, left: 4, flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 10 },
   gridLikesText: { color: '#fff', fontSize: 10, fontWeight: '600' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },

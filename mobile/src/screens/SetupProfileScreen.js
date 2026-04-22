@@ -314,9 +314,10 @@ function DiscoverStep({ onDone }) {
   const [followed, setFollowed] = useState(new Set());
 
   useEffect(() => {
-    api.get('/connections/suggestions').then(({ data }) => {
-      setSuggestions((data.suggestions || []).slice(0, 10));
-    }).catch(() => {}).finally(() => setLoading(false));
+    api.get('/connections/suggestions')
+      .then(({ data }) => setSuggestions((data.suggestions || []).slice(0, 10)))
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
 
   const toggleFollow = async (userId) => {
@@ -331,19 +332,19 @@ function DiscoverStep({ onDone }) {
   };
 
   return (
-    <View style={s.stepContent}>
+    <View style={{ width: '100%', alignItems: 'center' }}>
       <AppText style={s.stepTitle}>People you may know</AppText>
       <AppText style={s.stepSub}>Connect with people to build your feed</AppText>
 
       {loading ? (
-        <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />
+        <ActivityIndicator color={colors.primary} style={{ marginTop: 40, marginBottom: 40 }} />
       ) : suggestions.length === 0 ? (
         <View style={s.noSuggestions}>
           <Ionicons name="people-outline" size={48} color={colors.dim} />
           <AppText style={s.noSuggestionsText}>No suggestions yet</AppText>
         </View>
       ) : (
-        <ScrollView style={{ width: '100%' }} showsVerticalScrollIndicator={false}>
+        <View style={{ width: '100%' }}>
           {suggestions.map(u => (
             <View key={u.id} style={s.suggestionRow}>
               <View style={s.suggestionAvatar}>
@@ -358,22 +359,23 @@ function DiscoverStep({ onDone }) {
               <TouchableOpacity
                 style={[s.followBtn, followed.has(u.id) && s.followBtnActive]}
                 onPress={() => toggleFollow(u.id)}
+                activeOpacity={0.8}
               >
                 <AppText style={[s.followBtnText, followed.has(u.id) && s.followBtnTextActive]}>
-                  {followed.has(u.id) ? 'Connected' : 'Connect'}
+                  {followed.has(u.id) ? 'Connected ✓' : 'Connect'}
                 </AppText>
               </TouchableOpacity>
             </View>
           ))}
-        </ScrollView>
+        </View>
       )}
 
       <GradientButton
         label={followed.size > 0 ? `Continue (${followed.size} connected)` : 'Continue'}
         onPress={onDone}
-        style={{ width: '100%', marginTop: 20 }}
+        style={{ width: '100%', marginTop: 24 }}
       />
-      <TouchableOpacity onPress={onDone} style={{ marginTop: 14 }}>
+      <TouchableOpacity onPress={onDone} style={{ marginTop: 14, paddingVertical: 8 }} activeOpacity={0.7}>
         <AppText style={s.skip}>Skip for now</AppText>
       </TouchableOpacity>
     </View>
@@ -400,8 +402,9 @@ export default function SetupProfileScreen({ navigation }) {
   };
 
   const done = async () => {
-    await refreshUser().catch(() => {});
-    navigation.replace('FamilyGate');
+    try {
+      await refreshUser();
+    } catch {}
   };
 
   return (
