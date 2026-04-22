@@ -209,6 +209,8 @@ export default function MessageBubble({ item, isMe, showName, onLongPress, onPre
   const isGif = hasMedia && item.media_type === 'gif';
   const isVideo = hasMedia && item.media_type === 'video';
   const isAudio = hasMedia && item.media_type === 'audio';
+  // Sticker = single emoji character (no media, no long text)
+  const isSticker = !hasMedia && !!item.text && /^(\p{Emoji_Presentation}|\p{Extended_Pictographic})(\uFE0F|\u20E3|[\uD800-\uDFFF])*$/u.test(item.text.trim());
   const isMediaOnly = hasMedia && !item.text;
   const isSending = !!item.sending;
 
@@ -224,6 +226,7 @@ export default function MessageBubble({ item, isMe, showName, onLongPress, onPre
           isMe ? s.bubbleMe : s.bubbleThem,
           isAudio && s.bubbleAudio,
           (isMediaOnly || isGif) && s.bubbleMedia,
+          isSticker && s.bubbleSticker,
         ]}
       >
         {/* Sender name — family group only */}
@@ -273,12 +276,14 @@ export default function MessageBubble({ item, isMe, showName, onLongPress, onPre
         {/* Voice — tap anywhere on the row to play */}
         {isAudio && <VoicePlayer uri={item.media_url} isMe={isMe} />}
 
-        {/* Text */}
-        {!!item.text && (
+        {/* Sticker — big emoji, no bubble background */}
+        {isSticker ? (
+          <AppText style={s.stickerText}>{item.text}</AppText>
+        ) : !!item.text ? (
           <AppText style={[s.text, isMe ? s.textMe : s.textThem]}>
             {item.text}
           </AppText>
-        )}
+        ) : null}
 
         {/* Sending overlay */}
         {isSending && (
@@ -345,6 +350,17 @@ const s = StyleSheet.create({
     paddingVertical: 10,
   },
   bubbleMedia: { padding: 0 },
+  bubbleSticker: {
+    backgroundColor: 'transparent',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  stickerText: {
+    fontSize: 72,
+    lineHeight: 80,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+  },
 
   senderName: {
     fontSize: 11,

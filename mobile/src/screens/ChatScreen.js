@@ -7,10 +7,11 @@ import {
 import AppText from '../components/AppText';
 import MessageBubble from '../components/MessageBubble';
 import GifPicker from '../components/GifPicker';
+import StickerPicker from '../components/StickerPicker';
+import AIAssistant from '../components/AIAssistant';
 import { useTranslation } from '../i18n';
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { BlurView } from "expo-blur";
 import * as ImagePicker from "expo-image-picker";
 import { Audio } from "expo-av";
 import api from "../api/axios";
@@ -50,6 +51,42 @@ function MentionText({ text, isMe, style }) {
   );
 }
 
+// ── Floating heart burst on double-tap ─────────────────────────────────
+function HeartBurst({ x, y }) {
+  const scale = useRef(new Animated.Value(0)).current;
+  const opacity = useRef(new Animated.Value(1)).current;
+  const translateY = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.spring(scale, { toValue: 1, friction: 4, tension: 80, useNativeDriver: true }),
+      Animated.timing(translateY, { toValue: -80, duration: 800, useNativeDriver: true }),
+      Animated.sequence([
+        Animated.delay(400),
+        Animated.timing(opacity, { toValue: 0, duration: 400, useNativeDriver: true }),
+      ]),
+    ]).start();
+  }, []);
+
+  return (
+    <Animated.Text
+      style={[
+        {
+          position: 'absolute',
+          left: x - 24,
+          top: y - 24,
+          fontSize: 48,
+          zIndex: 9999,
+          pointerEvents: 'none',
+        },
+        { transform: [{ scale }, { translateY }], opacity },
+      ]}
+    >
+      ❤️
+    </Animated.Text>
+  );
+}
+
 export default function ChatScreen({ route, navigation }) {
   const { t } = useTranslation();
   const { conversationId: initialConvId, title, avatar, type, otherUserId } = route.params;
@@ -69,6 +106,9 @@ export default function ChatScreen({ route, navigation }) {
   const [forwardMsg, setForwardMsg] = useState(null);
   const [conversations, setConversations] = useState([]);
   const [showGifPicker, setShowGifPicker] = useState(false);
+  const [showStickerPicker, setShowStickerPicker] = useState(false);
+  const [showAI, setShowAI] = useState(false);
+  const [inputFocused, setInputFocused] = useState(false);
   const [showOptions, setShowOptions] = useState(false);
   const [showMuteOptions, setMuteOptions] = useState(false);
   const [showBlockModal, setShowBlockModal] = useState(false);
@@ -88,11 +128,15 @@ export default function ChatScreen({ route, navigation }) {
   // Double-tap tracking
   const lastTapRef = useRef({});
   // Voice note
-  const [recording, setRecording] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
   const [recordDuration, setRecordDuration] = useState(0);
+  const [recordLocked, setRecordLocked] = useState(false);
+  const [meterLevel, setMeterLevel] = useState(0);
+  const recordingRef = useRef(null); // use ref not state to avoid stale closure
   const recordTimerRef = useRef(null);
-  const micScaleAnim = useRef(new Animated.Value(1)).current;
+  const micPulseAnim = useRef(new Animated.Value(1)).current;
+  const lockSlideAnim = useRef(new Animated.Value(0)).current;
+  const cancelSlideAnim = useRef(new Animated.Value(0)).current;
   const flatRef = useRef(null);
   const pollRef = useRef(null);
   const typingRef = useRef(null);
@@ -195,12 +239,17 @@ export default function ChatScreen({ route, navigation }) {
     setMentionQuery('');
   };
 
-  // Double-tap to react ❤️
-  const handleBubbleTap = (item) => {
+  const [heartAnim, setHeartAnim] = useState(null); // { id, x, y }
+
+  // Double-tap to react ❤️ with floating heart animation
+  const handleBubbleTap = (item, evt) => {
     const now = Date.now();
     const last = lastTapRef.current[item.id] || 0;
     if (now - last < 300) {
       reactToMessage(item.id, '❤️');
+      const { pageX, pageY } = evt?.nativeEvent || {};
+      setHeartAnim({ id: Date.now(), x: pageX || 160, y: pageY || 400 });
+      setTimeout(() => setHeartAnim(null), 900);
     }
     lastTapRef.current[item.id] = now;
   };
@@ -294,53 +343,86 @@ export default function ChatScreen({ route, navigation }) {
 
   // ── Voice notes ──────────────────────────────────────────
   const startVoiceRecording = async () => {
+    // Force cleanup of any existing recording synchronously via ref
+    if (recordingRef.current) {
+      try { await recordingRef.current.stopAndUnloadAsync(); } catch {}
+      recordingRef.current = null;
+    }
     try {
       const { granted } = await Audio.requestPermissionsAsync();
       if (!granted) { Alert.alert('Permission needed', 'Microphone access is required'); return; }
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
-      const rec = new Audio.Recording();
-      await rec.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
-      await rec.startAsync();
-      setRecording(rec);
+
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: false,
+        shouldDuckAndroid: true,
+      });
+
+      const { recording: rec } = await Audio.Recording.createAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY,
+        (status) => {
+          if (status.isRecording && status.metering != null) {
+            setMeterLevel(Math.max(0, (status.metering + 60) / 60));
+          }
+        },
+        100
+      );
+
+      recordingRef.current = rec;
       setIsRecording(true);
-      setVoiceSlideOffset(0);
+      setRecordLocked(false);
       setRecordDuration(0);
+      setMeterLevel(0);
       recordTimerRef.current = setInterval(() => setRecordDuration(d => d + 1), 1000);
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(micScaleAnim, { toValue: 1.3, duration: 400, useNativeDriver: true }),
-          Animated.timing(micScaleAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
-        ])
-      ).start();
-    } catch { Alert.alert('Error', 'Could not start recording'); }
+
+      Animated.loop(Animated.sequence([
+        Animated.timing(micPulseAnim, { toValue: 1.2, duration: 700, useNativeDriver: true }),
+        Animated.timing(micPulseAnim, { toValue: 1, duration: 700, useNativeDriver: true }),
+      ])).start();
+      Animated.parallel([
+        Animated.spring(lockSlideAnim, { toValue: 1, friction: 6, useNativeDriver: true }),
+        Animated.spring(cancelSlideAnim, { toValue: 1, friction: 6, useNativeDriver: true }),
+      ]).start();
+    } catch (e) {
+      console.error('Recording start error:', e);
+      recordingRef.current = null;
+      try { await Audio.setAudioModeAsync({ allowsRecordingIOS: false }); } catch {}
+    }
+  };
+
+  const stopAnimations = () => {
+    micPulseAnim.stopAnimation();
+    micPulseAnim.setValue(1);
+    lockSlideAnim.setValue(0);
+    cancelSlideAnim.setValue(0);
+    clearInterval(recordTimerRef.current);
   };
 
   const cancelVoiceRecording = async () => {
-    if (!recording) return;
-    clearInterval(recordTimerRef.current);
-    micScaleAnim.stopAnimation();
-    micScaleAnim.setValue(1);
-    voiceSlideAnim.setValue(0);
-    setVoiceSlideOffset(0);
-    try {
-      await recording.stopAndUnloadAsync();
-    } catch {}
-    setRecording(null);
+    if (!recordingRef.current) return;
+    stopAnimations();
+    try { await recordingRef.current.stopAndUnloadAsync(); } catch {}
+    recordingRef.current = null;
+    try { await Audio.setAudioModeAsync({ allowsRecordingIOS: false, playsInSilentModeIOS: false }); } catch {}
     setIsRecording(false);
+    setRecordLocked(false);
+    setRecordDuration(0);
+    setMeterLevel(0);
   };
 
   const stopVoiceRecording = async () => {
-    if (!recording) return;
-    clearInterval(recordTimerRef.current);
-    micScaleAnim.stopAnimation();
-    micScaleAnim.setValue(1);
-    voiceSlideAnim.setValue(0);
-    setVoiceSlideOffset(0);
+    if (!recordingRef.current) return;
+    stopAnimations();
+    const rec = recordingRef.current;
+    recordingRef.current = null;
     try {
-      await recording.stopAndUnloadAsync();
-      const uri = recording.getURI();
-      setRecording(null);
+      await rec.stopAndUnloadAsync();
+      const uri = rec.getURI();
       setIsRecording(false);
+      setRecordLocked(false);
+      setMeterLevel(0);
+      await Audio.setAudioModeAsync({ allowsRecordingIOS: false, playsInSilentModeIOS: false });
       setSending(true);
       const formData = new FormData();
       formData.append('file', { uri, type: 'audio/m4a', name: 'voice.m4a' });
@@ -352,6 +434,30 @@ export default function ChatScreen({ route, navigation }) {
       setReplyTo(null);
       setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 100);
     } catch {} finally { setSending(false); }
+  };
+
+  const sendSticker = async (emoji) => {
+    const tempId = `temp-${Date.now()}`;
+    const optimisticMsg = {
+      id: tempId,
+      text: emoji,
+      sender_id: user?.id,
+      sender_name: user?.name,
+      created_at: new Date().toISOString(),
+      is_read: false,
+      sending: true,
+    };
+    setShowStickerPicker(false);
+    setMessages(prev => [...prev, optimisticMsg]);
+    setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 50);
+    try {
+      const { data } = await api.post(`/messages/conversations/${convId}/messages`, {
+        text: emoji,
+      });
+      setMessages(prev => prev.map(m => m.id === tempId ? data.message : m));
+    } catch {
+      setMessages(prev => prev.filter(m => m.id !== tempId));
+    }
   };
 
   const sendGif = async (gif) => {
@@ -383,7 +489,7 @@ export default function ChatScreen({ route, navigation }) {
 
   // ── Forward message ───────────────────────────────────────
   const openForward = async (msg) => {
-    setShowReactions(null);
+    setMsgActionSheet(null);
     try {
       const { data } = await api.get('/messages/conversations');
       setConversations(data.conversations || []);
@@ -410,7 +516,7 @@ export default function ChatScreen({ route, navigation }) {
   };
 
   const reactToMessage = async (msgId, emoji) => {
-    setShowReactions(null);
+    setMsgActionSheet(null);
     try {
       await api.post(`/messages/messages/${msgId}/react`, { emoji });
       fetchMessages(true);
@@ -475,7 +581,7 @@ export default function ChatScreen({ route, navigation }) {
             item={item}
             isMe={isMe}
             showName={showName}
-            onPress={() => handleBubbleTap(item)}
+            onPress={(evt) => handleBubbleTap(item, evt)}
             onLongPress={() => setMsgActionSheet({ item, isMe })}
           />
 
@@ -515,6 +621,9 @@ export default function ChatScreen({ route, navigation }) {
   return (
     <KeyboardAvoidingView style={cs.container} behavior={Platform.OS === "ios" ? "padding" : "height"}>
       <StatusBar barStyle="light-content" />
+
+      {/* Floating heart on double-tap */}
+      {heartAnim && <HeartBurst x={heartAnim.x} y={heartAnim.y} key={heartAnim.id} />}
 
       {/* Header */}
       <LinearGradient colors={["#0f172a", "#1a0a2e"]} style={cs.header}>
@@ -813,47 +922,102 @@ export default function ChatScreen({ route, navigation }) {
       )}
 
       {/* Input */}
-      <View style={cs.inputRow}>
-        <TouchableOpacity onPress={sendImage} style={cs.inputAction}>
-          <Ionicons name="image-outline" size={24} color={colors.muted} />
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => setShowGifPicker(true)} style={cs.inputAction}>
-          <AppText style={{ fontSize: 13, fontWeight: '800', color: colors.muted }}>GIF</AppText>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => Alert.alert('Stickers', 'Sticker packs coming soon')} style={cs.inputAction}>
-          <Ionicons name="happy-outline" size={24} color="#f59e0b" />
-        </TouchableOpacity>
-        {type === 'family' && (
-          <TouchableOpacity onPress={sendMemory} style={cs.inputAction}>
-            <Ionicons name="time-outline" size={24} color="#f59e0b" />
+      <View style={[cs.inputRow, inputFocused && cs.inputRowFocused]}>
+
+        {/* Action buttons — hidden when focused */}
+        {!inputFocused && (
+          <View style={cs.inputActions}>
+            <TouchableOpacity onPress={sendImage} style={cs.inputAction}>
+              <Ionicons name="image-outline" size={22} color={colors.muted} />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setShowGifPicker(true)} style={cs.inputAction}>
+              <AppText style={cs.gifLabel}>GIF</AppText>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setShowStickerPicker(true)} style={cs.inputAction}>
+              <Ionicons name="happy-outline" size={22} color="#f59e0b" />
+            </TouchableOpacity>
+            {type === 'family' && (
+              <TouchableOpacity onPress={sendMemory} style={cs.inputAction}>
+                <Ionicons name="time-outline" size={22} color="#f59e0b" />
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity style={cs.inputAction} onPress={() => setShowAI(true)}>
+              <Ionicons name="sparkles-outline" size={22} color="#8b5cf6" />
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Collapse button when focused */}
+        {inputFocused && (
+          <TouchableOpacity
+            style={cs.collapseBtn}
+            onPress={() => setInputFocused(false)}
+          >
+            <Ionicons name="chevron-forward" size={20} color={colors.muted} />
           </TouchableOpacity>
         )}
-        <TouchableOpacity style={cs.inputAction} onPress={() => navigation.navigate('MediaEditor')}>
-          <Ionicons name="sparkles-outline" size={24} color="#8b5cf6" />
-        </TouchableOpacity>
 
         {isRecording ? (
-          <Animated.View style={{ transform: [{ translateX: voiceSlideAnim }] }}>
-            <View style={cs.voiceRecordingRow}>
-              <Animated.View style={{ transform: [{ scale: micScaleAnim }] }}>
-                <Ionicons name="mic" size={20} color="#e0245e" />
-              </Animated.View>
-              <AppText style={cs.voiceTimer}>
-                {String(Math.floor(recordDuration / 60)).padStart(2, '0')}:{String(recordDuration % 60).padStart(2, '0')}
+          <View style={cs.voiceActiveWrap}>
+            {/* Cancel */}
+            <Animated.View style={{
+              opacity: cancelSlideAnim,
+              transform: [{ translateX: cancelSlideAnim.interpolate({ inputRange: [0,1], outputRange: [-16, 0] }) }],
+            }}>
+              <TouchableOpacity style={cs.voiceCancelBtn} onPress={cancelVoiceRecording}>
+                <Ionicons name="trash-outline" size={17} color="#e0245e" />
+              </TouchableOpacity>
+            </Animated.View>
+
+            {/* Live waveform + timer */}
+            <View style={cs.voiceMiddle}>
+              <View style={cs.voiceWaveRow}>
+                {[...Array(22)].map((_, i) => {
+                  const base = 3 + Math.abs(Math.sin(i * 0.9) * 8);
+                  const live = base + meterLevel * 16 * Math.abs(Math.sin(i * 1.3 + recordDuration));
+                  return (
+                    <View
+                      key={i}
+                      style={[cs.voiceBar, { height: Math.min(live, 26) }]}
+                    />
+                  );
+                })}
+              </View>
+              <AppText style={cs.voiceTimerText}>
+                {String(Math.floor(recordDuration / 60)).padStart(2,'0')}:{String(recordDuration % 60).padStart(2,'0')}
               </AppText>
-              <AppText style={cs.voiceHint}>Slide to cancel</AppText>
             </View>
-          </Animated.View>
+
+            {/* Lock or Send */}
+            {recordLocked ? (
+              <TouchableOpacity style={cs.voiceSendBtn} onPress={stopVoiceRecording}>
+                <LinearGradient colors={['#7c3aed','#3b82f6']} style={cs.voiceSendGrad}>
+                  <Ionicons name="send" size={16} color="#fff" />
+                </LinearGradient>
+              </TouchableOpacity>
+            ) : (
+              <Animated.View style={{
+                opacity: lockSlideAnim,
+                transform: [{ translateY: lockSlideAnim.interpolate({ inputRange: [0,1], outputRange: [16, 0] }) }],
+              }}>
+                <TouchableOpacity style={cs.voiceLockBtn} onPress={() => setRecordLocked(true)}>
+                  <Ionicons name="lock-closed" size={15} color="#fff" />
+                </TouchableOpacity>
+              </Animated.View>
+            )}
+          </View>
         ) : (
-          <View style={cs.inputWrap}>
+          <View style={[cs.inputWrap, inputFocused && cs.inputWrapFocused]}>
             <TextInput
               style={cs.input}
               placeholder={t('message_placeholder')}
               placeholderTextColor={colors.dim}
               value={text}
               onChangeText={handleTextChange}
+              onFocus={() => setInputFocused(true)}
+              onBlur={() => { if (!text.trim()) setInputFocused(false); }}
               multiline
-              maxLength={1000}
+              maxLength={2000}
             />
           </View>
         )}
@@ -871,15 +1035,20 @@ export default function ChatScreen({ route, navigation }) {
                 </LinearGradient>}
           </TouchableOpacity>
         ) : (
-          <TouchableOpacity
-            style={cs.micBtn}
-            onPressIn={startVoiceRecording}
-            onPressOut={stopVoiceRecording}
-            onLongPress={cancelVoiceRecording}
-            delayLongPress={500}
-          >
-            <Ionicons name={isRecording ? 'stop-circle' : 'mic-outline'} size={26} color={isRecording ? '#e0245e' : colors.muted} />
-          </TouchableOpacity>
+          <Animated.View style={{ transform: [{ scale: micPulseAnim }] }}>
+            <TouchableOpacity
+              style={cs.micBtn}
+              onPressIn={startVoiceRecording}
+              onPressOut={() => { if (!recordLocked) stopVoiceRecording(); }}
+            >
+              <LinearGradient
+                colors={['rgba(124,58,237,0.15)', 'rgba(59,130,246,0.1)']}
+                style={cs.micBtnGrad}
+              >
+                <Ionicons name="mic-outline" size={22} color={colors.primary} />
+              </LinearGradient>
+            </TouchableOpacity>
+          </Animated.View>
         )}
       </View>
       {/* ── Message Action Sheet ─────────────────────────────── */}
@@ -1003,6 +1172,20 @@ export default function ChatScreen({ route, navigation }) {
           </Pressable>
         </Pressable>
       </Modal>
+
+      <AIAssistant
+        visible={showAI}
+        onClose={() => setShowAI(false)}
+        currentText={text}
+        lastMessage={messages.filter(m => m.sender_id !== user?.id).slice(-1)[0]?.text}
+        onUseText={(t) => setText(t)}
+      />
+
+      <StickerPicker
+        visible={showStickerPicker}
+        onClose={() => setShowStickerPicker(false)}
+        onSelect={sendSticker}
+      />
 
       <GifPicker
         visible={showGifPicker}
@@ -1269,10 +1452,51 @@ const cs = StyleSheet.create({
   replyBarLine: { width: 3, height: "100%", backgroundColor: colors.primary, borderRadius: 2 },
   replyBarName: { fontSize: 12, fontWeight: "700", color: colors.primary },
   replyBarText: { fontSize: 12, color: colors.muted },
-  inputRow: { flexDirection: "row", alignItems: "flex-end", gap: 8, paddingHorizontal: 12, paddingVertical: 10, borderTopWidth: 0.5, borderTopColor: colors.border, backgroundColor: colors.bg },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderTopWidth: 0.5,
+    borderTopColor: colors.border,
+    backgroundColor: colors.bg,
+  },
+  inputRowFocused: {
+    paddingVertical: 10,
+  },
+  inputActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
   inputAction: { padding: 6, paddingBottom: 8 },
-  inputWrap: { flex: 1, backgroundColor: colors.bgSecondary, borderRadius: 22, paddingHorizontal: 14, paddingVertical: 8, maxHeight: 100 },
-  input: { color: colors.text, fontSize: 15, maxHeight: 80 },
+  gifLabel: { fontSize: 12, fontWeight: '800', color: colors.muted },
+  collapseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  inputWrap: {
+    flex: 1,
+    backgroundColor: colors.bgSecondary,
+    borderRadius: 22,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    maxHeight: 120,
+    borderWidth: 0.5,
+    borderColor: 'transparent',
+  },
+  inputWrapFocused: {
+    maxHeight: 160,
+    borderColor: 'rgba(124,58,237,0.4)',
+    backgroundColor: colors.bgSecondary,
+  },
+  input: { color: colors.text, fontSize: 15, lineHeight: 22 },
   sendBtn: { width: 40, height: 40, borderRadius: 20, overflow: "hidden" },
   sendBtnDisabled: { opacity: 0.4 },
   sendGrad: { flex: 1, alignItems: "center", justifyContent: "center" },
@@ -1288,11 +1512,65 @@ const cs = StyleSheet.create({
   smartRepliesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 12, paddingVertical: 8, borderTopWidth: 0.5, borderTopColor: colors.border },
   smartReplyChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: 'rgba(124,58,237,0.15)', borderWidth: 1, borderColor: 'rgba(124,58,237,0.3)' },
   smartReplyText: { fontSize: 13, color: colors.primary, fontWeight: '500' },
-  // Voice
-  micBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  voiceRecordingRow: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(224,36,94,0.08)', borderRadius: 22, paddingHorizontal: 14, paddingVertical: 8 },
-  voiceTimer: { fontSize: 14, color: '#e0245e', fontWeight: '700', minWidth: 40 },
-  voiceHint: { fontSize: 11, color: colors.dim, flex: 1 },
+  micBtn: {
+    width: 44, height: 44, borderRadius: 22, overflow: 'hidden',
+    borderWidth: 1, borderColor: 'rgba(124,58,237,0.3)',
+  },
+  micBtnGrad: {
+    flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 22,
+  },
+
+  // Voice recording active UI
+  voiceActiveWrap: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: 'rgba(224,36,94,0.08)',
+    borderRadius: 24,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(224,36,94,0.2)',
+  },
+  voiceCancelBtn: {
+    width: 34, height: 34, borderRadius: 17,
+    backgroundColor: 'rgba(224,36,94,0.12)',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: 'rgba(224,36,94,0.25)',
+  },
+  voiceMiddle: {
+    flex: 1, alignItems: 'center', gap: 4,
+  },
+  voiceWaveRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    height: 24,
+  },
+  voiceBar: {
+    width: 3,
+    borderRadius: 2,
+    backgroundColor: '#e0245e',
+    minHeight: 3,
+  },
+  voiceTimerText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#e0245e',
+    letterSpacing: 0.5,
+  },
+  voiceLockBtn: {
+    width: 34, height: 34, borderRadius: 17,
+    backgroundColor: '#7c3aed',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  voiceSendBtn: {
+    width: 38, height: 38, borderRadius: 19, overflow: 'hidden',
+  },
+  voiceSendGrad: {
+    flex: 1, alignItems: 'center', justifyContent: 'center',
+  },
   // Search
   searchBar: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.bgSecondary, paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: colors.border },
   searchInput: { flex: 1, color: colors.text, fontSize: 14 },
