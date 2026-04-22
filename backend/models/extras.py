@@ -261,31 +261,6 @@ class VerifiedBadge(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
-class MessageRequest(db.Model):
-    """DM requests from people you don't follow"""
-    __tablename__ = "message_requests"
-    id = db.Column(db.Integer, primary_key=True)
-    from_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
-    to_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
-    message = db.Column(db.Text, nullable=True)
-    status = db.Column(db.String(20), default="pending")  # pending|accepted|declined
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    __table_args__ = (db.UniqueConstraint("from_user_id", "to_user_id"),)
-
-    def to_dict(self):
-        from models.user import User
-        sender = User.query.get(self.from_user_id)
-        return {
-            "id": self.id, "from_user_id": self.from_user_id,
-            "to_user_id": self.to_user_id, "message": self.message,
-            "status": self.status,
-            "sender_name": sender.name if sender else None,
-            "sender_avatar": sender.avatar_url if sender else None,
-            "sender_username": sender.username if sender else None,
-            "created_at": self.created_at.isoformat()
-        }
-
-
 class Storybook(db.Model):
     __tablename__ = "storybooks"
     id = db.Column(db.Integer, primary_key=True)

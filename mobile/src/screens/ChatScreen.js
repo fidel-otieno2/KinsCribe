@@ -15,6 +15,97 @@ import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
 import { colors, radius } from "../theme";
 
+// ── Voice Note Player ─────────────────────────────────────────
+function VoiceNotePlayer({ uri, isMe }) {
+  const [sound, setSound] = useState(null);
+  const [playing, setPlaying] = useState(false);
+  const [duration, setDuration] = useState(0);
+  const [position, setPosition] = useState(0);
+  const progressAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    return () => { sound?.unloadAsync(); };
+  }, [sound]);
+
+  const toggle = async () => {
+    if (!sound) {
+      try {
+        await Audio.setAudioModeAsync({ playsInSilentModeIOS: true, allowsRecordingIOS: false });
+        const { sound: s, status } = await Audio.Sound.createAsync(
+          { uri },
+          { shouldPlay: true },
+          (st) => {
+            if (st.isLoaded) {
+              setPosition(st.positionMillis || 0);
+              setDuration(st.durationMillis || 0);
+              const prog = st.durationMillis ? (st.positionMillis / st.durationMillis) : 0;
+              progressAnim.setValue(prog);
+              if (st.didJustFinish) { setPlaying(false); setPosition(0); progressAnim.setValue(0); }
+            }
+          }
+        );
+        setSound(s);
+        setPlaying(true);
+        if (status.durationMillis) setDuration(status.durationMillis);
+      } catch { Alert.alert('Error', 'Could not play voice note'); }
+    } else if (playing) {
+      await sound.pauseAsync();
+      setPlaying(false);
+    } else {
+      await sound.playAsync();
+      setPlaying(true);
+    }
+  };
+
+  const fmtMs = (ms) => {
+    const s = Math.floor((ms || 0) / 1000);
+    return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+  };
+
+  const progress = duration > 0 ? position / duration : 0;
+
+  return (
+    <View style={[vnp.wrap, isMe ? vnp.wrapMe : vnp.wrapThem]}>
+      <TouchableOpacity onPress={toggle} style={vnp.playBtn}>
+        <Ionicons name={playing ? 'pause' : 'play'} size={18} color={isMe ? '#fff' : colors.primary} />
+      </TouchableOpacity>
+      <View style={vnp.trackWrap}>
+        <View style={vnp.track}>
+          <View style={[vnp.fill, { width: `${Math.round(progress * 100)}%`, backgroundColor: isMe ? 'rgba(255,255,255,0.8)' : colors.primary }]} />
+          {/* Waveform bars */}
+          {[...Array(20)].map((_, i) => {
+            const h = 4 + Math.sin(i * 1.3) * 6 + Math.cos(i * 0.7) * 4;
+            const filled = i / 20 <= progress;
+            return (
+              <View key={i} style={[vnp.bar, {
+                height: Math.max(4, h),
+                backgroundColor: filled
+                  ? (isMe ? 'rgba(255,255,255,0.9)' : colors.primary)
+                  : (isMe ? 'rgba(255,255,255,0.3)' : 'rgba(74,124,63,0.3)'),
+              }]} />
+            );
+          })}
+        </View>
+        <AppText style={[vnp.time, { color: isMe ? 'rgba(255,255,255,0.7)' : colors.muted }]}>
+          {fmtMs(playing || position > 0 ? position : duration)}
+        </AppText>
+      </View>
+    </View>
+  );
+}
+
+const vnp = StyleSheet.create({
+  wrap: { flexDirection: 'row', alignItems: 'center', gap: 10, minWidth: 180, maxWidth: 240 },
+  wrapMe: {},
+  wrapThem: {},
+  playBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' },
+  trackWrap: { flex: 1, gap: 4 },
+  track: { flexDirection: 'row', alignItems: 'center', gap: 2, height: 24, position: 'relative' },
+  fill: { position: 'absolute', left: 0, top: 0, bottom: 0, borderRadius: 2, opacity: 0 },
+  bar: { width: 3, borderRadius: 2, flex: 0 },
+  time: { fontSize: 10, fontWeight: '600' },
+});
+
 function timeStr(dateStr) {
   const d = new Date(dateStr);
   return d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true });
@@ -407,10 +498,7 @@ export default function ChatScreen({ route, navigation }) {
 
               {/* Audio */}
               {item.media_url && item.media_type === 'audio' && (
-                <View style={cs.audioBubble}>
-                  <Ionicons name="mic" size={14} color={isMe ? '#c4b5fd' : colors.primary} />
-                  <AppText style={[cs.audioLabel, isMe && { color: '#c4b5fd' }]}>Voice message</AppText>
-                </View>
+                <VoiceNotePlayer uri={item.media_url} isMe={isMe} />
               )}
 
               {/* Text with @mention highlighting */}
@@ -840,30 +928,30 @@ const cs = StyleSheet.create({
   headerTitle: { fontSize: 16, fontWeight: "700", color: colors.text },
   headerSub: { fontSize: 12, color: colors.muted },
   messagesList: { padding: 16, paddingBottom: 8 },
-  msgRow: { flexDirection: "row", marginBottom: 4, alignItems: "flex-end", gap: 6 },
+  msgRow: { flexDirection: "row", marginBottom: 2, alignItems: "flex-end", paddingHorizontal: 12 },
   msgRowMe: { flexDirection: "row-reverse" },
-  avatarCol: { width: 32 },
+  avatarCol: { width: 28, marginRight: 6 },
   avatarFallback: { backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" },
-  bubble: { maxWidth: "75%", borderRadius: 18, padding: 10, paddingHorizontal: 14 },
-  bubbleMe: { backgroundColor: "#7c3aed", borderBottomRightRadius: 4 },
-  bubbleThem: { backgroundColor: colors.bgSecondary, borderBottomLeftRadius: 4 },
-  senderName: { fontSize: 12, fontWeight: "700", color: "#a78bfa", marginBottom: 3 },
-  replyPreview: { flexDirection: "row", gap: 6, backgroundColor: "rgba(0,0,0,0.2)", borderRadius: 8, padding: 6, marginBottom: 6 },
-  replyBar: { width: 3, backgroundColor: "#a78bfa", borderRadius: 2 },
-  replyName: { fontSize: 11, fontWeight: "700", color: "#a78bfa" },
+  bubble: { maxWidth: "72%", borderRadius: 20, paddingVertical: 8, paddingHorizontal: 12 },
+  bubbleMe: { backgroundColor: colors.primary, borderBottomRightRadius: 4, marginLeft: 40 },
+  bubbleThem: { backgroundColor: colors.bgCard, borderBottomLeftRadius: 4, marginRight: 40 },
+  senderName: { fontSize: 11, fontWeight: "700", color: colors.gold, marginBottom: 2 },
+  replyPreview: { flexDirection: "row", gap: 6, backgroundColor: "rgba(0,0,0,0.18)", borderRadius: 10, padding: 6, marginBottom: 6 },
+  replyBar: { width: 3, backgroundColor: colors.gold, borderRadius: 2 },
+  replyName: { fontSize: 11, fontWeight: "700", color: colors.gold },
   replyText: { fontSize: 11, color: colors.muted },
-  msgImage: { width: 200, height: 200, borderRadius: 12, marginBottom: 4 },
-  msgText: { fontSize: 15, color: colors.text, lineHeight: 21 },
+  msgImage: { width: 200, height: 200, borderRadius: 14, marginBottom: 2 },
+  msgText: { fontSize: 15, color: colors.text, lineHeight: 20 },
   msgTextMe: { color: "#fff" },
-  msgTime: { fontSize: 10, color: colors.dim, marginTop: 4, textAlign: "right" },
-  msgTimeMe: { color: "rgba(255,255,255,0.6)" },
-  reactionsRow: { flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 4 },
-  reactionPill: { flexDirection: "row", alignItems: "center", backgroundColor: "rgba(255,255,255,0.1)", borderRadius: 12, paddingHorizontal: 6, paddingVertical: 2, gap: 2 },
-  reactionEmoji: { fontSize: 14 },
+  msgTime: { fontSize: 10, color: colors.dim, marginTop: 3, textAlign: "right" },
+  msgTimeMe: { color: "rgba(255,255,255,0.55)" },
+  reactionsRow: { flexDirection: "row", flexWrap: "wrap", gap: 3, marginTop: 4 },
+  reactionPill: { flexDirection: "row", alignItems: "center", backgroundColor: colors.bgElevated, borderRadius: 12, paddingHorizontal: 6, paddingVertical: 2, gap: 2, borderWidth: 0.5, borderColor: colors.border },
+  reactionEmoji: { fontSize: 13 },
   reactionCount: { fontSize: 11, color: colors.muted },
   msgActions: { padding: 4, alignSelf: "center" },
-  reactionPicker: { position: "absolute", bottom: 40, left: 40, borderRadius: 20, overflow: "hidden", zIndex: 10 },
-  reactionPickerMe: { left: "auto", right: 40 },
+  reactionPicker: { position: "absolute", bottom: 44, left: 34, borderRadius: 20, overflow: "hidden", zIndex: 10 },
+  reactionPickerMe: { left: "auto", right: 34 },
   reactionPickerRow: { flexDirection: "row", padding: 8, gap: 4 },
   reactionOption: { padding: 6 },
   replyBar2: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: colors.bgSecondary, paddingHorizontal: 16, paddingVertical: 8, borderTopWidth: 0.5, borderTopColor: colors.border },
@@ -909,9 +997,9 @@ const cs = StyleSheet.create({
   forwardedLabel: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 2, alignSelf: 'flex-start' },
   forwardedText: { fontSize: 11, color: colors.dim, fontStyle: 'italic' },
   // Message footer
-  msgFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4, marginTop: 4 },
+  msgFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 3, marginTop: 2 },
   msgStatus: { fontSize: 11, color: 'rgba(255,255,255,0.6)' },
-  // Audio bubble
+  // Audio bubble (legacy, kept for safety)
   audioBubble: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4 },
   audioLabel: { fontSize: 13, color: colors.muted, fontStyle: 'italic' },
   // Reactions

@@ -4,8 +4,8 @@ from extensions import db
 from models.user import User
 from models.extras import (FamilyTreeNode, FamilyEvent, FamilyRecipe, FamilyTask,
                             FamilyBudget, PostInsight, CloseFriend, ScheduledPost,
-                            VerifiedBadge, MessageRequest)
-from models.social import Post, Connection
+                            VerifiedBadge)
+from models.social import Post, Connection, MessageRequest
 from datetime import datetime, date
 import cloudinary, cloudinary.uploader, os, json
 
@@ -466,7 +466,7 @@ def delete_scheduled(post_id):
 def get_message_requests():
     current_id = int(get_jwt_identity())
     requests_list = MessageRequest.query.filter_by(
-        to_user_id=current_id, status="pending"
+        receiver_id=current_id, status="pending"
     ).order_by(MessageRequest.created_at.desc()).all()
     return jsonify({"requests": [r.to_dict() for r in requests_list]})
 
@@ -475,7 +475,7 @@ def get_message_requests():
 @jwt_required()
 def accept_message_request(req_id):
     req = MessageRequest.query.get_or_404(req_id)
-    if req.to_user_id != int(get_jwt_identity()):
+    if req.receiver_id != int(get_jwt_identity()):
         return jsonify({"error": "Not authorized"}), 403
     req.status = "accepted"
     db.session.commit()
@@ -486,7 +486,7 @@ def accept_message_request(req_id):
 @jwt_required()
 def decline_message_request(req_id):
     req = MessageRequest.query.get_or_404(req_id)
-    if req.to_user_id != int(get_jwt_identity()):
+    if req.receiver_id != int(get_jwt_identity()):
         return jsonify({"error": "Not authorized"}), 403
     req.status = "declined"
     db.session.commit()
