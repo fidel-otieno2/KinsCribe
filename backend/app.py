@@ -114,6 +114,8 @@ def _run_migrations():
         # Messages table migrations
         "ALTER TABLE messages ADD COLUMN IF NOT EXISTS disappears_at TIMESTAMP",
         "ALTER TABLE messages ADD COLUMN IF NOT EXISTS reply_to_id INTEGER",
+        "ALTER TABLE messages ADD COLUMN IF NOT EXISTS forwarded_from_id INTEGER",
+        "ALTER TABLE messages ADD COLUMN IF NOT EXISTS mentions TEXT",
         "ALTER TABLE messages ADD COLUMN IF NOT EXISTS media_type VARCHAR(20)",
         # Posts table migrations
         "ALTER TABLE posts ADD COLUMN IF NOT EXISTS media_urls TEXT",
