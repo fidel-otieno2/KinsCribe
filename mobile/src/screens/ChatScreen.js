@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   View, FlatList, TouchableOpacity, StyleSheet,
   TextInput, KeyboardAvoidingView, Platform, Image,
@@ -141,6 +141,17 @@ export default function ChatScreen({ route, navigation }) {
   const pollRef = useRef(null);
   const typingRef = useRef(null);
 
+  // Cleanup recording on unmount
+  useEffect(() => {
+    return () => {
+      if (recordingRef.current) {
+        recordingRef.current.stopAndUnloadAsync().catch(() => {});
+        recordingRef.current = null;
+      }
+      clearInterval(recordTimerRef.current);
+    };
+  }, []);
+
   const fetchMessages = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
@@ -185,7 +196,7 @@ export default function ChatScreen({ route, navigation }) {
   useEffect(() => {
     fetchMessages();
     // Poll every 3 seconds for new messages
-    pollRef.current = setInterval(() => fetchMessages(true), 3000);
+    pollRef.current = setInterval(() => fetchMessages(true), 8000);
     return () => clearInterval(pollRef.current);
   }, [fetchMessages]);
 
@@ -206,7 +217,7 @@ export default function ChatScreen({ route, navigation }) {
       } catch {}
     };
     pollTyping(); pollPresence();
-    typingRef.current = setInterval(() => { pollTyping(); pollPresence(); }, 4000);
+    typingRef.current = setInterval(() => { pollTyping(); pollPresence(); }, 8000);
     return () => clearInterval(typingRef.current);
   }, [convId, otherUserId]);
 
@@ -343,10 +354,11 @@ export default function ChatScreen({ route, navigation }) {
 
   // ── Voice notes ──────────────────────────────────────────
   const startVoiceRecording = async () => {
-    // Force cleanup of any existing recording synchronously via ref
+    // Null out ref immediately to prevent double-start
     if (recordingRef.current) {
       try { await recordingRef.current.stopAndUnloadAsync(); } catch {}
       recordingRef.current = null;
+      await new Promise(r => setTimeout(r, 200)); // let native session release
     }
     try {
       const { granted } = await Audio.requestPermissionsAsync();
@@ -544,7 +556,7 @@ export default function ChatScreen({ route, navigation }) {
     }
   };
 
-  const renderMessage = ({ item, index }) => {
+  const renderMessage = useCallback(({ item, index }) => {
     const isMe = item.sender_id === user?.id;
     const showAvatar = !isMe && (index === 0 || messages[index - 1]?.sender_id !== item.sender_id);
     const showName = type === "family" && !isMe && showAvatar;
@@ -569,8 +581,7 @@ export default function ChatScreen({ route, navigation }) {
           </View>
         )}
 
-        <View style={{ flex: 1 }}>
-          {item.forwarded_from_id && (
+        <View style={cs.msgInner}>
             <View style={[cs.forwardedLabel, isMe && { alignSelf: 'flex-end' }]}>
               <Ionicons name="arrow-redo-outline" size={11} color={colors.dim} />
               <AppText style={cs.forwardedText}>Forwarded</AppText>
@@ -616,7 +627,9 @@ export default function ChatScreen({ route, navigation }) {
         {/* Reaction picker removed — handled by msgActionSheet modal */}
       </View>
     );
-  };
+  }, [messages, user, type, pinnedMsg, msgActionSheet, navigation]);
+
+  const messageKeyExtractor = useCallback((i) => String(i.id), []);
 
   return (
     <KeyboardAvoidingView style={cs.container} behavior={Platform.OS === "ios" ? "padding" : "height"}>
@@ -785,10 +798,14 @@ export default function ChatScreen({ route, navigation }) {
         <FlatList
           ref={flatRef}
           data={messages}
-          keyExtractor={i => String(i.id)}
+          keyExtractor={messageKeyExtractor}
           renderItem={renderMessage}
           contentContainerStyle={cs.messagesList}
           showsVerticalScrollIndicator={false}
+          removeClippedSubviews
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          initialNumToRender={15}
           ListEmptyComponent={
             <View style={cs.emptyWrap}>
               <Ionicons name="chatbubble-outline" size={40} color={colors.dim} />
@@ -1038,14 +1055,17 @@ export default function ChatScreen({ route, navigation }) {
           <Animated.View style={{ transform: [{ scale: micPulseAnim }] }}>
             <TouchableOpacity
               style={cs.micBtn}
-              onPressIn={startVoiceRecording}
-              onPressOut={() => { if (!recordLocked) stopVoiceRecording(); }}
+              onPress={isRecording ? stopVoiceRecording : startVoiceRecording}
             >
               <LinearGradient
-                colors={['rgba(124,58,237,0.15)', 'rgba(59,130,246,0.1)']}
+                colors={isRecording ? ['#e0245e', '#c0185e'] : ['rgba(124,58,237,0.15)', 'rgba(59,130,246,0.1)']}
                 style={cs.micBtnGrad}
               >
-                <Ionicons name="mic-outline" size={22} color={colors.primary} />
+                <Ionicons
+                  name={isRecording ? 'stop' : 'mic-outline'}
+                  size={20}
+                  color={isRecording ? '#fff' : colors.primary}
+                />
               </LinearGradient>
             </TouchableOpacity>
           </Animated.View>
