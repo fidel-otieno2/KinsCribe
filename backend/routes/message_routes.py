@@ -393,6 +393,22 @@ def add_family_member(conv_id):
     return jsonify({"message": "Added"})
 
 
+@message_bp.route("/conversations/<int:conv_id>/pin", methods=["POST"])
+@jwt_required()
+def pin_message(conv_id):
+    """Pin or unpin a message in a family conversation."""
+    user = me()
+    conv = Conversation.query.get_or_404(conv_id)
+    msg_id = (request.json or {}).get("message_id")
+    # Unpin if same message
+    if conv.pinned_message_id == msg_id:
+        conv.pinned_message_id = None
+    else:
+        conv.pinned_message_id = msg_id
+    db.session.commit()
+    return jsonify({"pinned_message_id": conv.pinned_message_id})
+
+
 @message_bp.route("/conversations/<int:conv_id>/participants", methods=["GET"])
 @jwt_required()
 def get_participants(conv_id):

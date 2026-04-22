@@ -4,8 +4,12 @@ from models.family import Family
 from models.user import User
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from flask_mail import Message
+import json
 
 family_bp = Blueprint("family", __name__)
+
+# In-memory pinned messages store: { family_id: [msg_dict, ...] }
+_pinned_store = {}
 
 
 def current_user():
@@ -155,3 +159,121 @@ def create_announcement():
     db.session.add(story)
     db.session.commit()
     return jsonify({"announcement": story.to_dict()}), 201
+
+
+# ── Pinned Messages ───────────────────────────────────────────
+
+@family_bp.route("/pinned-messages", methods=["GET"])
+@jwt_required()
+def get_pinned_messages():
+    user = current_user()
+    if not user.family_id:
+        return jsonify({"pinned": []})
+    return jsonify({"pinned": _pinned_store.get(user.family_id, [])})
+
+
+@family_bp.route("/pinned-messages", methods=["POST"])
+@jwt_required()
+def pin_message():
+    """Admin pins a message to the family room."""
+    user = current_user()
+    if not user.family_id:
+        return jsonify({"error": "Not in a family"}), 403
+    if user.role != "admin":
+        return jsonify({"error": "Only admins can pin messages"}), 403
+    data = request.get_json() or {}
+    msg = {
+        "id": data.get("message_id"),
+        "text": data.get("text"),
+        "sender_name": data.get("sender_name"),
+        "pinned_by": user.name,
+        "pinned_at": __import__("datetime").datetime.utcnow().isoformat(),
+    }
+    fid = user.family_id
+    if fid not in _pinned_store:
+        _pinned_store[fid] = []
+    # Keep max 5 pinned messages
+    _pinned_store[fid] = [m for m in _pinned_store[fid] if m["id"] != msg["id"]]
+    _pinned_store[fid].insert(0, msg)
+    _pinned_store[fid] = _pinned_store[fid][:5]
+    return jsonify({"pinned": _pinned_store[fid]}), 201
+
+
+@family_bp.route("/pinned-messages/<int:msg_id>", methods=["DELETE"])
+@jwt_required()
+def unpin_message(msg_id):
+    user = current_user()
+    if not user.family_id or user.role != "admin":
+        return jsonify({"error": "Admins only"}), 403
+    fid = user.family_id
+    _pinned_store[fid] = [m for m in _pinned_store.get(fid, []) if m["id"] != msg_id]
+    return jsonify({"ok": True})
+
+
+# ── Family Memories (old photos/videos) ───────────────────────
+
+@family_bp.route("/memories", methods=["GET"])
+@jwt_required()
+def get_memories():
+    """Return family stories that have media (photos/videos) as memories."""
+    from models.story import Story
+    user = current_user()
+    if not user.family_id:
+        return jsonify({"memories": []})
+    memories = Story.query.filter(
+        Story.family_id == user.family_id,
+        Story.media_url.isnot(None)
+    ).order_by(Story.story_date.desc().nullslast(), Story.created_at.desc()).limit(50).all()
+    return jsonify({"memories": [s.to_dict() for s in memories]})
+
+
+@family_bp.route("/memories", methods=["POST"])
+@jwt_required()
+def share_memory():
+    """Share a memory (old photo/video) to the family room."""
+    import cloudinary
+    import cloudinary.uploader
+    import os
+    cloudinary.config(
+        cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
+        api_key=os.getenv("CLOUDINARY_API_KEY"),
+        api_secret=os.getenv("CLOUDINARY_API_SECRET")
+    )
+    from models.story import Story
+    user = current_user()
+    if not user.family_id:
+        return jsonify({"error": "Not in a family"}), 403
+
+    media_url = None
+    media_type = None
+    if "file" in request.files:
+        file = request.files["file"]
+        mime = file.content_type or ""
+        resource_type = "video" if "video" in mime else "image"
+        media_type = "video" if "video" in mime else "image"
+        result = cloudinary.uploader.upload(file, resource_type=resource_type, folder="kinscribe/memories")
+        media_url = result["secure_url"]
+
+    data = request.form if request.files else request.get_json(force=True, silent=True) or {}
+    story_date_str = data.get("story_date")
+    story_date = None
+    if story_date_str:
+        try:
+            from datetime import date
+            story_date = date.fromisoformat(story_date_str)
+        except Exception:
+            pass
+
+    story = Story(
+        title=data.get("title") or "Family Memory",
+        content=data.get("caption") or data.get("content") or "",
+        media_url=media_url,
+        media_type=media_type,
+        story_date=story_date,
+        privacy="family",
+        family_id=user.family_id,
+        user_id=user.id,
+    )
+    db.session.add(story)
+    db.session.commit()
+    return jsonify({"memory": story.to_dict()}), 201

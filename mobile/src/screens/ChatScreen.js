@@ -144,6 +144,7 @@ export default function ChatScreen({ route, navigation }) {
   const { user } = useAuth();
   const [convId, setConvId] = useState(initialConvId);
   const [messages, setMessages] = useState([]);
+  const [pinnedMsg, setPinnedMsg] = useState(null);
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -189,6 +190,13 @@ export default function ChatScreen({ route, navigation }) {
       const { data } = await api.get(`/messages/conversations/${cid}/messages`);
       const msgs = data.messages || [];
       setMessages(msgs);
+      // Load pinned message for family chat
+      if (type === 'family' && data.pinned_message_id) {
+        const pinned = msgs.find(m => m.id === data.pinned_message_id);
+        setPinnedMsg(pinned || null);
+      } else {
+        setPinnedMsg(null);
+      }
       if (!silent && msgs.length > 0) {
         const last = msgs[msgs.length - 1];
         if (last.sender_id !== user?.id && last.text) {
@@ -319,6 +327,29 @@ export default function ChatScreen({ route, navigation }) {
       if (replyTo) formData.append("reply_to_id", replyTo.id);
       const { data } = await api.post(`/messages/conversations/${convId}/messages`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
+      });
+      setMessages(prev => [...prev, data.message]);
+      setReplyTo(null);
+      setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 100);
+    } catch {} finally { setSending(false); }
+  };
+
+  const sendMemory = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.All,
+      quality: 0.8,
+    });
+    if (result.canceled) return;
+    setSending(true);
+    try {
+      const asset = result.assets[0];
+      const isVideo = asset.type === 'video';
+      const formData = new FormData();
+      formData.append('file', { uri: asset.uri, type: isVideo ? 'video/mp4' : 'image/jpeg', name: isVideo ? 'memory.mp4' : 'memory.jpg' });
+      formData.append('text', '📸 Shared a memory');
+      if (replyTo) formData.append('reply_to_id', replyTo.id);
+      const { data } = await api.post(`/messages/conversations/${convId}/messages`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
       setMessages(prev => [...prev, data.message]);
       setReplyTo(null);
@@ -467,7 +498,21 @@ export default function ChatScreen({ route, navigation }) {
             activeOpacity={0.85}
             onPress={() => handleBubbleTap(item)}
             onLongPress={() => {
-              setShowReactions(showReactions === item.id ? null : item.id);
+              const actions = [
+                { text: '↩️ Reply', onPress: () => setReplyTo(item) },
+                { text: '📋 Copy', onPress: () => { if (item.text) require('@react-native-clipboard/clipboard').default.setString(item.text); } },
+                { text: '➡️ Forward', onPress: () => { setForwardMsg(item); api.get('/messages/conversations').then(({data}) => setConversations(data.conversations || [])).catch(()=>{}); } },
+              ];
+              if (type === 'family') {
+                actions.push({ text: pinnedMsg?.id === item.id ? '📌 Unpin' : '📌 Pin', onPress: async () => {
+                  const newId = pinnedMsg?.id === item.id ? null : item.id;
+                  await api.post(`/messages/conversations/${convId}/pin`, { message_id: newId }).catch(()=>{});
+                  setPinnedMsg(newId ? item : null);
+                }});
+              }
+              if (isMe) actions.push({ text: '🗑️ Delete', style: 'destructive', onPress: () => deleteMessage(item.id, true) });
+              actions.push({ text: 'Cancel', style: 'cancel' });
+              Alert.alert('Message', item.text ? `"${item.text.slice(0, 40)}${item.text.length > 40 ? '...' : ''}"` : 'Media message', actions);
             }}
             delayLongPress={250}
           >
@@ -626,9 +671,19 @@ export default function ChatScreen({ route, navigation }) {
         </TouchableOpacity>
 
         {type === "family" && (
-          <TouchableOpacity onPress={() => navigation.navigate('Family')}>
-            <Ionicons name="information-circle-outline" size={24} color={colors.muted} />
-          </TouchableOpacity>
+          <>
+            <TouchableOpacity onPress={() => navigation.navigate('Family')} style={{ padding: 4 }}>
+              <Ionicons name="information-circle-outline" size={24} color={colors.muted} />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={async () => {
+              try {
+                const { data } = await api.post('/ai/family-summary', { messages });
+                Alert.alert('💬 Family Chat Summary', data.summary || 'No summary available');
+              } catch { Alert.alert('Error', 'Failed to generate summary'); }
+            }} style={{ padding: 4 }}>
+              <Ionicons name="sparkles-outline" size={22} color="#f59e0b" />
+            </TouchableOpacity>
+          </>
         )}
         <TouchableOpacity onPress={() => setShowSearch(s => !s)} style={{ padding: 4 }}>
           <Ionicons name="search-outline" size={20} color={colors.muted} />
@@ -647,6 +702,30 @@ export default function ChatScreen({ route, navigation }) {
           </TouchableOpacity>
         )}
       </LinearGradient>
+
+      {/* Pinned message banner */}
+      {type === 'family' && pinnedMsg && (
+        <TouchableOpacity
+          style={cs.pinnedBanner}
+          onPress={() => {
+            const idx = messages.findIndex(m => m.id === pinnedMsg.id);
+            if (idx >= 0) flatRef.current?.scrollToIndex({ index: idx, animated: true });
+          }}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="pin" size={14} color="#f59e0b" />
+          <View style={{ flex: 1 }}>
+            <AppText style={cs.pinnedLabel}>Pinned Message</AppText>
+            <AppText style={cs.pinnedText} numberOfLines={1}>{pinnedMsg.text || '📎 Media'}</AppText>
+          </View>
+          <TouchableOpacity onPress={async () => {
+            await api.post(`/messages/conversations/${convId}/pin`, { message_id: null });
+            setPinnedMsg(null);
+          }}>
+            <Ionicons name="close" size={16} color={colors.muted} />
+          </TouchableOpacity>
+        </TouchableOpacity>
+      )}
 
       {/* Search bar */}
       {showSearch && (
@@ -867,6 +946,11 @@ export default function ChatScreen({ route, navigation }) {
         <TouchableOpacity onPress={sendImage} style={cs.inputAction}>
           <Ionicons name="image-outline" size={24} color={colors.muted} />
         </TouchableOpacity>
+        {type === 'family' && (
+          <TouchableOpacity onPress={sendMemory} style={cs.inputAction}>
+            <Ionicons name="time-outline" size={24} color="#f59e0b" />
+          </TouchableOpacity>
+        )}
 
         {isRecording ? (
           <View style={cs.voiceRecordingRow}>
@@ -968,6 +1052,9 @@ const cs = StyleSheet.create({
   emptyWrap: { alignItems: "center", marginTop: 80, gap: 10 },
   emptyText: { color: colors.muted, fontSize: 14, textAlign: 'center', marginTop: 20 },
   disappearBanner: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(245,158,11,0.1)', paddingHorizontal: 16, paddingVertical: 8, borderTopWidth: 0.5, borderTopColor: 'rgba(245,158,11,0.3)' },
+  pinnedBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(245,158,11,0.08)', paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: 0.5, borderBottomColor: 'rgba(245,158,11,0.2)' },
+  pinnedLabel: { fontSize: 10, fontWeight: '700', color: '#f59e0b', textTransform: 'uppercase', letterSpacing: 0.5 },
+  pinnedText: { fontSize: 13, color: colors.text },
   disappearText: { fontSize: 12, color: '#f59e0b', fontWeight: '600' },
   typingBanner: { paddingHorizontal: 16, paddingVertical: 6, backgroundColor: 'rgba(124,58,237,0.08)' },
   typingText: { fontSize: 12, color: colors.muted, fontStyle: 'italic' },

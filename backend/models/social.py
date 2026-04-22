@@ -245,6 +245,7 @@ class Conversation(db.Model):
     type = db.Column(db.String(20), default="private")
     name = db.Column(db.String(100), nullable=True)
     family_id = db.Column(db.Integer, db.ForeignKey("families.id"), nullable=True)
+    pinned_message_id = db.Column(db.Integer, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     messages = db.relationship("Message", backref="conversation", lazy=True, cascade="all, delete")
     participants = db.relationship("ConversationParticipant", backref="conversation", lazy=True, cascade="all, delete")
@@ -270,7 +271,8 @@ class Conversation(db.Model):
             "id": self.id, "type": self.type, "name": self.name,
             "family_id": self.family_id, "other_user": other,
             "last_message": last_msg.to_dict() if last_msg else None,
-            "unread_count": unread, "created_at": self.created_at.isoformat()
+            "unread_count": unread, "created_at": self.created_at.isoformat(),
+            "pinned_message_id": self.pinned_message_id,
         }
 
 

@@ -126,3 +126,41 @@ Return only the JSON object."""
         return jsonify(result)
     except Exception:
         return jsonify({"tone": "neutral", "score": 5, "suggestion": ""})
+
+
+@ai_bp.route("/family-summary", methods=["POST"])
+@jwt_required()
+def family_chat_summary():
+    """Generate an AI summary of recent family chat messages."""
+    import json as _json
+    user = current_user()
+    messages = (request.json or {}).get("messages", [])
+    if not messages:
+        return jsonify({"summary": "No messages to summarise yet."})
+
+    # Build a readable transcript (last 30 messages)
+    transcript_lines = []
+    for m in messages[-30:]:
+        sender = m.get("sender_name") or "Someone"
+        text = m.get("text") or ("[media]" if m.get("media_url") else "")
+        if text:
+            transcript_lines.append(f"{sender}: {text}")
+
+    transcript = "\n".join(transcript_lines)
+    if not transcript.strip():
+        return jsonify({"summary": "No text messages to summarise."})
+
+    prompt = f"""You are KinsCribe AI, a warm family assistant.
+Here is a recent family group chat transcript:
+
+{transcript}
+
+Write a warm, friendly summary of what the family has been talking about.
+Highlight key topics, decisions, plans, or memorable moments.
+Keep it to 3-5 sentences. Be warm and personal."""
+
+    try:
+        summary = chat_completion(prompt)
+        return jsonify({"summary": summary})
+    except Exception as e:
+        return jsonify({"summary": "Could not generate summary right now."}), 500
