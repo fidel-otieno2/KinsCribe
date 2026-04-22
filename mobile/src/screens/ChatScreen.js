@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import {
   View, FlatList, TouchableOpacity, StyleSheet,
   TextInput, KeyboardAvoidingView, Platform, Image,
-  ActivityIndicator, StatusBar, Alert, Animated, ScrollView,
+  ActivityIndicator, StatusBar, Alert, Animated, ScrollView, Clipboard,
 } from "react-native";
 import AppText from '../components/AppText';
 import { useTranslation } from '../i18n';
@@ -500,7 +500,7 @@ export default function ChatScreen({ route, navigation }) {
             onLongPress={() => {
               const actions = [
                 { text: '↩️ Reply', onPress: () => setReplyTo(item) },
-                { text: '📋 Copy', onPress: () => { if (item.text) require('@react-native-clipboard/clipboard').default.setString(item.text); } },
+                { text: '📋 Copy', onPress: () => { if (item.text) Clipboard.setString(item.text); } },
                 { text: '➡️ Forward', onPress: () => { setForwardMsg(item); api.get('/messages/conversations').then(({data}) => setConversations(data.conversations || [])).catch(()=>{}); } },
               ];
               if (type === 'family') {

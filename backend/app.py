@@ -110,6 +110,7 @@ def _run_migrations():
         # Conversations table migrations
         "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS name VARCHAR(100)",
         "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS family_id INTEGER",
+        "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS pinned_message_id INTEGER",
         # Messages table migrations
         "ALTER TABLE messages ADD COLUMN IF NOT EXISTS disappears_at TIMESTAMP",
         "ALTER TABLE messages ADD COLUMN IF NOT EXISTS reply_to_id INTEGER",

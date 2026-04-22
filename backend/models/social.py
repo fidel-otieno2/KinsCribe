@@ -245,7 +245,6 @@ class Conversation(db.Model):
     type = db.Column(db.String(20), default="private")
     name = db.Column(db.String(100), nullable=True)
     family_id = db.Column(db.Integer, db.ForeignKey("families.id"), nullable=True)
-    pinned_message_id = db.Column(db.Integer, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     messages = db.relationship("Message", backref="conversation", lazy=True, cascade="all, delete")
     participants = db.relationship("ConversationParticipant", backref="conversation", lazy=True, cascade="all, delete")
@@ -267,12 +266,19 @@ class Conversation(db.Model):
                 Message.sender_id != current_user_id,
                 Message.is_read == False
             ).count()
+        # Fetch pinned_message_id via raw SQL since column may not exist yet
+        from sqlalchemy import text
+        try:
+            result = db.session.execute(text("SELECT pinned_message_id FROM conversations WHERE id = :id"), {"id": self.id})
+            pinned = result.scalar()
+        except Exception:
+            pinned = None
         return {
             "id": self.id, "type": self.type, "name": self.name,
             "family_id": self.family_id, "other_user": other,
             "last_message": last_msg.to_dict() if last_msg else None,
             "unread_count": unread, "created_at": self.created_at.isoformat(),
-            "pinned_message_id": self.pinned_message_id,
+            "pinned_message_id": pinned,
         }
 
 

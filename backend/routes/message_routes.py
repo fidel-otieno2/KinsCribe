@@ -397,16 +397,18 @@ def add_family_member(conv_id):
 @jwt_required()
 def pin_message(conv_id):
     """Pin or unpin a message in a family conversation."""
-    user = me()
-    conv = Conversation.query.get_or_404(conv_id)
+    from sqlalchemy import text
     msg_id = (request.json or {}).get("message_id")
-    # Unpin if same message
-    if conv.pinned_message_id == msg_id:
-        conv.pinned_message_id = None
-    else:
-        conv.pinned_message_id = msg_id
-    db.session.commit()
-    return jsonify({"pinned_message_id": conv.pinned_message_id})
+    try:
+        # Get current pinned
+        result = db.session.execute(text("SELECT pinned_message_id FROM conversations WHERE id = :id"), {"id": conv_id})
+        current = result.scalar()
+        new_id = None if current == msg_id else msg_id
+        db.session.execute(text("UPDATE conversations SET pinned_message_id = :pid WHERE id = :id"), {"pid": new_id, "id": conv_id})
+        db.session.commit()
+        return jsonify({"pinned_message_id": new_id})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @message_bp.route("/conversations/<int:conv_id>/participants", methods=["GET"])

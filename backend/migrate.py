@@ -59,6 +59,7 @@ def run_migrations():
             
             # Conversations table migrations
             "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS name VARCHAR(100)",
+            "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS pinned_message_id INTEGER",
         ]
         
         print(f"🚀 Running {len(migrations)} migrations...")
