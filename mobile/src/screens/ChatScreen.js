@@ -61,7 +61,7 @@ export default function ChatScreen({ route, navigation }) {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [replyTo, setReplyTo] = useState(null);
-  const [showReactions, setShowReactions] = useState(null);
+  const [msgActionSheet, setMsgActionSheet] = useState(null); // { item, isMe }
   const [disappearing, setDisappearing] = useState(false);
   const [typingNames, setTypingNames] = useState([]);
   const [otherStatus, setOtherStatus] = useState(null);
@@ -476,23 +476,7 @@ export default function ChatScreen({ route, navigation }) {
             isMe={isMe}
             showName={showName}
             onPress={() => handleBubbleTap(item)}
-            onLongPress={() => {
-              const actions = [
-                { text: '↩️ Reply', onPress: () => setReplyTo(item) },
-                { text: '📋 Copy', onPress: () => { if (item.text) Clipboard.setString(item.text); } },
-                { text: '➡️ Forward', onPress: () => { setForwardMsg(item); api.get('/messages/conversations').then(({data}) => setConversations(data.conversations || [])).catch(()=>{}); } },
-              ];
-              if (type === 'family') {
-                actions.push({ text: pinnedMsg?.id === item.id ? '📌 Unpin' : '📌 Pin', onPress: async () => {
-                  const newId = pinnedMsg?.id === item.id ? null : item.id;
-                  await api.post(`/messages/conversations/${convId}/pin`, { message_id: newId }).catch(()=>{});
-                  setPinnedMsg(newId ? item : null);
-                }});
-              }
-              if (isMe) actions.push({ text: '🗑️ Delete', style: 'destructive', onPress: () => deleteMessage(item.id, true) });
-              actions.push({ text: 'Cancel', style: 'cancel' });
-              Alert.alert('Message', item.text ? `"${item.text.slice(0, 40)}${item.text.length > 40 ? '...' : ''}"` : 'Media message', actions);
-            }}
+            onLongPress={() => setMsgActionSheet({ item, isMe })}
           />
 
           {Object.keys(reactionGroups).length > 0 && (
@@ -523,43 +507,7 @@ export default function ChatScreen({ route, navigation }) {
           )}
         </View>
 
-        {/* Reaction picker (long press) */}
-        {showReactions === item.id && (
-          <BlurView intensity={60} tint="dark" style={[cs.reactionPicker, isMe && cs.reactionPickerMe]}>
-            <View style={cs.reactionPickerRow}>
-              {REACTIONS.map(e => (
-                <TouchableOpacity
-                  key={e}
-                  onPress={() => reactToMessage(item.id, e)}
-                  style={[cs.reactionOption, myReaction === e && cs.reactionOptionActive]}
-                >
-                  <AppText style={{ fontSize: 24 }}>{e}</AppText>
-                </TouchableOpacity>
-              ))}
-            </View>
-            {/* Action row */}
-            <View style={cs.reactionActionsRow}>
-              <TouchableOpacity style={cs.reactionAction} onPress={() => { setReplyTo(item); setShowReactions(null); }}>
-                <Ionicons name="return-down-back-outline" size={18} color={colors.muted} />
-                <AppText style={cs.reactionActionText}>Reply</AppText>
-              </TouchableOpacity>
-              <TouchableOpacity style={cs.reactionAction} onPress={() => { setThreadMsg(item); setShowReactions(null); }}>
-                <Ionicons name="chatbubbles-outline" size={18} color={colors.muted} />
-                <AppText style={cs.reactionActionText}>Thread</AppText>
-              </TouchableOpacity>
-              <TouchableOpacity style={cs.reactionAction} onPress={() => { openForward(item); setShowReactions(null); }}>
-                <Ionicons name="arrow-redo-outline" size={18} color={colors.muted} />
-                <AppText style={cs.reactionActionText}>Forward</AppText>
-              </TouchableOpacity>
-              {isMe && (
-                <TouchableOpacity style={cs.reactionAction} onPress={() => { deleteMessage(item.id, isMe); setShowReactions(null); }}>
-                  <Ionicons name="trash-outline" size={18} color="#e0245e" />
-                  <AppText style={[cs.reactionActionText, { color: '#e0245e' }]}>Delete</AppText>
-                </TouchableOpacity>
-              )}
-            </View>
-          </BlurView>
-        )}
+        {/* Reaction picker removed — handled by msgActionSheet modal */}
       </View>
     );
   };
@@ -934,6 +882,128 @@ export default function ChatScreen({ route, navigation }) {
           </TouchableOpacity>
         )}
       </View>
+      {/* ── Message Action Sheet ─────────────────────────────── */}
+      <Modal
+        visible={!!msgActionSheet}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setMsgActionSheet(null)}
+      >
+        <Pressable style={cs.asOverlay} onPress={() => setMsgActionSheet(null)}>
+          <Pressable style={cs.asSheet}>
+            <View style={cs.asHandle} />
+
+            {/* Message preview */}
+            {msgActionSheet?.item?.text ? (
+              <View style={cs.asPreview}>
+                <AppText style={cs.asPreviewText} numberOfLines={2}>
+                  {msgActionSheet.item.text}
+                </AppText>
+              </View>
+            ) : msgActionSheet?.item?.media_url ? (
+              <View style={cs.asPreview}>
+                <Ionicons name="image-outline" size={18} color={colors.muted} />
+                <AppText style={cs.asPreviewText}>Media message</AppText>
+              </View>
+            ) : null}
+
+            {/* Emoji reactions */}
+            <View style={cs.asReactionsRow}>
+              {REACTIONS.map(e => {
+                const myReaction = (msgActionSheet?.item?.reactions || []).find(r => r.user_id === user?.id)?.emoji;
+                const isActive = myReaction === e;
+                return (
+                  <TouchableOpacity
+                    key={e}
+                    style={[cs.asReactionBtn, isActive && cs.asReactionBtnActive]}
+                    onPress={() => {
+                      reactToMessage(msgActionSheet.item.id, e);
+                      setMsgActionSheet(null);
+                    }}
+                  >
+                    <AppText style={cs.asReactionEmoji}>{e}</AppText>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Action rows */}
+            <TouchableOpacity style={cs.asRow} onPress={() => { setReplyTo(msgActionSheet.item); setMsgActionSheet(null); }}>
+              <View style={[cs.asIconWrap, { backgroundColor: 'rgba(59,130,246,0.12)' }]}>
+                <Ionicons name="return-down-back-outline" size={20} color="#3b82f6" />
+              </View>
+              <AppText style={cs.asRowText}>Reply</AppText>
+              <Ionicons name="chevron-forward" size={16} color={colors.dim} />
+            </TouchableOpacity>
+
+            {msgActionSheet?.item?.text ? (
+              <TouchableOpacity style={cs.asRow} onPress={() => { Clipboard.setString(msgActionSheet.item.text); setMsgActionSheet(null); }}>
+                <View style={[cs.asIconWrap, { backgroundColor: 'rgba(16,185,129,0.12)' }]}>
+                  <Ionicons name="copy-outline" size={20} color="#10b981" />
+                </View>
+                <AppText style={cs.asRowText}>Copy text</AppText>
+                <Ionicons name="chevron-forward" size={16} color={colors.dim} />
+              </TouchableOpacity>
+            ) : null}
+
+            <TouchableOpacity style={cs.asRow} onPress={() => {
+              setForwardMsg(msgActionSheet.item);
+              api.get('/messages/conversations').then(({ data }) => setConversations(data.conversations || [])).catch(() => {});
+              setMsgActionSheet(null);
+            }}>
+              <View style={[cs.asIconWrap, { backgroundColor: 'rgba(124,58,237,0.12)' }]}>
+                <Ionicons name="arrow-redo-outline" size={20} color={colors.primary} />
+              </View>
+              <AppText style={cs.asRowText}>Forward</AppText>
+              <Ionicons name="chevron-forward" size={16} color={colors.dim} />
+            </TouchableOpacity>
+
+            <TouchableOpacity style={cs.asRow} onPress={() => { setThreadMsg(msgActionSheet.item); setMsgActionSheet(null); }}>
+              <View style={[cs.asIconWrap, { backgroundColor: 'rgba(245,158,11,0.12)' }]}>
+                <Ionicons name="chatbubbles-outline" size={20} color="#f59e0b" />
+              </View>
+              <AppText style={cs.asRowText}>Reply in thread</AppText>
+              <Ionicons name="chevron-forward" size={16} color={colors.dim} />
+            </TouchableOpacity>
+
+            {type === 'family' && (
+              <TouchableOpacity style={cs.asRow} onPress={async () => {
+                const item = msgActionSheet.item;
+                const newId = pinnedMsg?.id === item.id ? null : item.id;
+                await api.post(`/messages/conversations/${convId}/pin`, { message_id: newId }).catch(() => {});
+                setPinnedMsg(newId ? item : null);
+                setMsgActionSheet(null);
+              }}>
+                <View style={[cs.asIconWrap, { backgroundColor: 'rgba(245,158,11,0.12)' }]}>
+                  <Ionicons name="pin-outline" size={20} color="#f59e0b" />
+                </View>
+                <AppText style={cs.asRowText}>
+                  {pinnedMsg?.id === msgActionSheet?.item?.id ? 'Unpin message' : 'Pin message'}
+                </AppText>
+                <Ionicons name="chevron-forward" size={16} color={colors.dim} />
+              </TouchableOpacity>
+            )}
+
+            {msgActionSheet?.isMe && (
+              <TouchableOpacity style={[cs.asRow, { borderBottomWidth: 0 }]} onPress={() => {
+                deleteMessage(msgActionSheet.item.id, true);
+                setMsgActionSheet(null);
+              }}>
+                <View style={[cs.asIconWrap, { backgroundColor: 'rgba(224,36,94,0.12)' }]}>
+                  <Ionicons name="trash-outline" size={20} color="#e0245e" />
+                </View>
+                <AppText style={[cs.asRowText, { color: '#e0245e' }]}>Delete message</AppText>
+                <Ionicons name="chevron-forward" size={16} color="#e0245e" />
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity style={cs.asCancelBtn} onPress={() => setMsgActionSheet(null)}>
+              <AppText style={cs.asCancelText}>Cancel</AppText>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       <GifPicker
         visible={showGifPicker}
         onClose={() => setShowGifPicker(false)}
@@ -1269,6 +1339,101 @@ const cs = StyleSheet.create({
   mentionAvatar: { width: 34, height: 34, borderRadius: 17 },
   mentionName: { fontSize: 14, fontWeight: '600' },
   mentionUsername: { fontSize: 12 },
+
+  // Message action sheet
+  asOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
+  asSheet: {
+    backgroundColor: '#13131f',
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
+    paddingBottom: 36,
+    borderTopWidth: 0.5,
+    borderTopColor: 'rgba(255,255,255,0.07)',
+  },
+  asHandle: {
+    width: 36, height: 4,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginTop: 10, marginBottom: 6,
+  },
+  asPreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: 20,
+    marginBottom: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 12,
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  asPreviewText: {
+    fontSize: 13,
+    color: colors.muted,
+    flex: 1,
+    fontStyle: 'italic',
+  },
+  asReactionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 0.5,
+    borderBottomColor: 'rgba(255,255,255,0.07)',
+    marginBottom: 6,
+  },
+  asReactionBtn: {
+    width: 44, height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  asReactionBtnActive: {
+    backgroundColor: 'rgba(124,58,237,0.25)',
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+  },
+  asReactionEmoji: { fontSize: 24 },
+  asRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 0.5,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
+  },
+  asIconWrap: {
+    width: 38, height: 38,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  asRowText: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '500',
+    color: colors.text,
+  },
+  asCancelBtn: {
+    marginHorizontal: 20,
+    marginTop: 12,
+    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    alignItems: 'center',
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  asCancelText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.text,
+  },
 
   // Options modal
   optionsOverlay: {
