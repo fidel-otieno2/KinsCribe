@@ -116,7 +116,7 @@ export default function ChatScreen({ route, navigation }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [pollQuestion, setPollQuestion] = useState('');
-  const [pollOptions, setPollOptions] = useState(['Option 1', 'Option 2']);
+  const [pollOptions, setPollOptions] = useState(['', '']);
   const [showPollModal, setShowPollModal] = useState(false);
   const voiceSlideAnim = useRef(new Animated.Value(0)).current;
   // Thread view
@@ -316,7 +316,7 @@ export default function ChatScreen({ route, navigation }) {
       const { data } = await api.post(`/messages/conversations/${convId}/messages`, payload);
       setMessages(prev => [...prev, data.message]);
       setPollQuestion('');
-      setPollOptions(['Option 1', 'Option 2']);
+      setPollOptions(['', '']);
       setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 100);
     } catch {} finally { setSending(false); }
   };
@@ -1033,6 +1033,9 @@ export default function ChatScreen({ route, navigation }) {
             <TouchableOpacity style={cs.inputAction} onPress={() => setShowAI(true)}>
               <Ionicons name="sparkles-outline" size={22} color="#8b5cf6" />
             </TouchableOpacity>
+            <TouchableOpacity style={cs.inputAction} onPress={() => setShowPollModal(true)}>
+              <Ionicons name="bar-chart-outline" size={22} color="#10b981" />
+            </TouchableOpacity>
           </View>
         )}
 
@@ -1462,45 +1465,117 @@ export default function ChatScreen({ route, navigation }) {
       </Modal>
 
       {/* Poll composer */}
-      <Modal visible={showPollModal} transparent animationType="fade" onRequestClose={() => setShowPollModal(false)}>
-        <Pressable style={cs.optionsOverlay} onPress={() => setShowPollModal(false)}>
-          <Pressable style={cs.optionsSheet}>
-            <View style={cs.optionsHandle} />
-            <AppText style={cs.optionsTitle}>Create poll</AppText>
-            <View style={{ paddingHorizontal: 20, paddingBottom: 10, gap: 10 }}>
+      <Modal visible={showPollModal} transparent animationType="slide" onRequestClose={() => setShowPollModal(false)}>
+        <Pressable style={cs.optionsOverlay} onPress={() => setShowPollModal(false)} />
+        <View style={cs.pollSheet}>
+          <View style={cs.optionsHandle} />
+
+          {/* Header */}
+          <View style={cs.pollHeader}>
+            <View style={cs.pollHeaderIcon}>
+              <LinearGradient colors={['#7c3aed','#3b82f6']} style={cs.pollHeaderGrad}>
+                <Ionicons name="bar-chart" size={18} color="#fff" />
+              </LinearGradient>
+            </View>
+            <View style={{ flex: 1 }}>
+              <AppText style={cs.pollTitle}>Create a Poll</AppText>
+              <AppText style={cs.pollSubtitle}>Ask your family something</AppText>
+            </View>
+            <TouchableOpacity onPress={() => setShowPollModal(false)} style={cs.pollCloseBtn}>
+              <Ionicons name="close" size={20} color={colors.muted} />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={cs.pollBody}
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* Question input */}
+            <AppText style={cs.pollLabel}>Question</AppText>
+            <View style={cs.pollInputWrap}>
+              <Ionicons name="help-circle-outline" size={18} color={colors.primary} />
               <TextInput
-                style={[cs.searchInput, { backgroundColor: colors.bgSecondary, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10 }]}
-                placeholder="Question"
+                style={cs.pollInput}
+                placeholder="What do you want to ask?"
                 placeholderTextColor={colors.dim}
                 value={pollQuestion}
                 onChangeText={setPollQuestion}
+                multiline
+                maxLength={200}
               />
-              {pollOptions.map((opt, idx) => (
+            </View>
+
+            {/* Options */}
+            <AppText style={cs.pollLabel}>Options <AppText style={cs.pollLabelCount}>({pollOptions.length}/10)</AppText></AppText>
+            {pollOptions.map((opt, idx) => (
+              <View key={idx} style={cs.pollOptionRow}>
+                <View style={cs.pollOptionNum}>
+                  <AppText style={cs.pollOptionNumText}>{idx + 1}</AppText>
+                </View>
                 <TextInput
-                  key={idx}
-                  style={[cs.searchInput, { backgroundColor: colors.bgSecondary, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10 }]}
+                  style={cs.pollOptionInput}
                   placeholder={`Option ${idx + 1}`}
                   placeholderTextColor={colors.dim}
                   value={opt}
-                  onChangeText={(v) => setPollOptions(prev => prev.map((p, i) => i === idx ? v : p))}
+                  onChangeText={v => setPollOptions(prev => prev.map((p, i) => i === idx ? v : p))}
+                  maxLength={100}
                 />
-              ))}
+                {pollOptions.length > 2 && (
+                  <TouchableOpacity
+                    style={cs.pollDeleteBtn}
+                    onPress={() => setPollOptions(prev => prev.filter((_, i) => i !== idx))}
+                  >
+                    <Ionicons name="close-circle" size={20} color="#e0245e" />
+                  </TouchableOpacity>
+                )}
+              </View>
+            ))}
+
+            {/* Add option */}
+            {pollOptions.length < 10 && (
               <TouchableOpacity
-                style={[cs.optionsCancelBtn, { marginTop: 0 }]}
-                onPress={() => setPollOptions(prev => [...prev, `Option ${prev.length + 1}`])}
+                style={cs.pollAddBtn}
+                onPress={() => setPollOptions(prev => [...prev, ''])}
               >
-                <AppText style={cs.optionsCancelText}>Add option</AppText>
+                <Ionicons name="add-circle-outline" size={18} color={colors.primary} />
+                <AppText style={cs.pollAddText}>Add option</AppText>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[cs.blockConfirmBtn, { marginTop: 6, backgroundColor: 'rgba(124,58,237,0.14)', borderColor: 'rgba(124,58,237,0.3)' }]}
-                onPress={sendPoll}
-                disabled={sending}
+            )}
+
+            {/* Send */}
+            <TouchableOpacity
+              style={[
+                cs.pollSendBtn,
+                (!pollQuestion.trim() || pollOptions.filter(o => o.trim()).length < 2) && cs.pollSendBtnDisabled,
+              ]}
+              onPress={sendPoll}
+              disabled={sending || !pollQuestion.trim() || pollOptions.filter(o => o.trim()).length < 2}
+              activeOpacity={0.85}
+            >
+              <LinearGradient
+                colors={['#7c3aed','#3b82f6']}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                style={cs.pollSendGrad}
               >
-                <AppText style={[cs.blockConfirmText, { color: colors.primary }]}>Send poll</AppText>
-              </TouchableOpacity>
-            </View>
-          </Pressable>
-        </Pressable>
+                {sending
+                  ? <ActivityIndicator color="#fff" size="small" />
+                  : <>
+                      <Ionicons name="send" size={16} color="#fff" />
+                      <AppText style={cs.pollSendText}>Send Poll</AppText>
+                    </>}
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <AppText style={cs.pollHint}>
+              {pollOptions.filter(o => o.trim()).length < 2
+                ? 'Add at least 2 options to send'
+                : !pollQuestion.trim()
+                ? 'Enter a question to send'
+                : `Ready · ${pollOptions.filter(o => o.trim()).length} options`}
+            </AppText>
+          </ScrollView>
+        </View>
       </Modal>
 
     </KeyboardAvoidingView>
@@ -1823,6 +1898,77 @@ const cs = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: colors.text,
+  },
+
+  // Poll modal
+  pollSheet: {
+    backgroundColor: '#0f172a',
+    borderTopLeftRadius: 26, borderTopRightRadius: 26,
+    maxHeight: '88%',
+    borderTopWidth: 0.5, borderTopColor: 'rgba(255,255,255,0.08)',
+  },
+  pollHeader: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingHorizontal: 16, paddingVertical: 14,
+    borderBottomWidth: 0.5, borderBottomColor: 'rgba(255,255,255,0.07)',
+  },
+  pollHeaderIcon: { width: 40, height: 40, borderRadius: 12, overflow: 'hidden' },
+  pollHeaderGrad: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  pollTitle: { fontSize: 16, fontWeight: '700', color: colors.text },
+  pollSubtitle: { fontSize: 12, color: colors.muted, marginTop: 1 },
+  pollCloseBtn: {
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  pollBody: { padding: 16, paddingBottom: 40, gap: 6 },
+  pollLabel: {
+    fontSize: 11, fontWeight: '700', color: colors.muted,
+    textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 6, marginTop: 10,
+  },
+  pollLabelCount: { color: colors.dim, fontWeight: '500' },
+  pollInputWrap: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 10,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 14, padding: 12,
+    borderWidth: 0.5, borderColor: 'rgba(124,58,237,0.25)',
+  },
+  pollInput: {
+    flex: 1, color: colors.text, fontSize: 15,
+    lineHeight: 22, minHeight: 40,
+  },
+  pollOptionRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8,
+  },
+  pollOptionNum: {
+    width: 28, height: 28, borderRadius: 14,
+    backgroundColor: 'rgba(124,58,237,0.15)',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 0.5, borderColor: 'rgba(124,58,237,0.3)',
+  },
+  pollOptionNumText: { fontSize: 12, fontWeight: '700', color: colors.primary },
+  pollOptionInput: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11,
+    color: colors.text, fontSize: 14,
+    borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.1)',
+  },
+  pollDeleteBtn: { padding: 4 },
+  pollAddBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingVertical: 12, paddingHorizontal: 4, marginBottom: 6,
+  },
+  pollAddText: { fontSize: 14, color: colors.primary, fontWeight: '600' },
+  pollSendBtn: { borderRadius: 14, overflow: 'hidden', marginTop: 8 },
+  pollSendBtnDisabled: { opacity: 0.45 },
+  pollSendGrad: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 8, paddingVertical: 15,
+  },
+  pollSendText: { fontSize: 15, fontWeight: '700', color: '#fff' },
+  pollHint: {
+    fontSize: 12, color: colors.dim, textAlign: 'center', marginTop: 8,
   },
 
   // Options modal
