@@ -12,6 +12,7 @@ import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../i18n';
 import { colors, radius } from '../theme';
+import ProfileGroupsSection from '../components/ProfileGroupsSection';
 
 const { width } = Dimensions.get('window');
 const GRID = (width - 3) / 3;
@@ -33,6 +34,7 @@ export default function UserProfileScreen({ route, navigation }) {
   const [isBlocked, setIsBlocked] = useState(false);
   const [blocking, setBlocking] = useState(false);
   const [mutualCount, setMutualCount] = useState(0);
+  const [userGroups, setUserGroups] = useState({ admin_groups: [], member_groups: [] });
 
   useEffect(() => {
     if (userId === me?.id) {
@@ -58,6 +60,9 @@ export default function UserProfileScreen({ route, navigation }) {
       setFollowsYou(statusRes.data.follows_you);
       setIsBlocked(blockRes.data.blocked || false);
       setMutualCount(mutualRes.data.count || 0);
+      api.get(`/family/user/${userId}/groups`)
+        .then(r => setUserGroups({ admin_groups: r.data.admin_groups || [], member_groups: r.data.member_groups || [] }))
+        .catch(() => {});
     } catch {} finally { setLoading(false); }
   }, [userId]);
 
@@ -283,6 +288,12 @@ export default function UserProfileScreen({ route, navigation }) {
       )}
 
       {/* Tab toggle — only show if not locked */}
+      <ProfileGroupsSection
+        adminGroups={userGroups.admin_groups}
+        memberGroups={userGroups.member_groups}
+        onGroupPress={() => {}}
+      />
+
       {!locked && (
         <View style={s.tabRow}>
           <TouchableOpacity style={[s.tabBtn, tab === 'posts' && s.tabBtnActive]} onPress={() => setTab('posts')}>

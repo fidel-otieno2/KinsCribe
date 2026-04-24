@@ -382,3 +382,22 @@ def share_memory():
     db.session.add(story)
     db.session.commit()
     return jsonify({"memory": story.to_dict()}), 201
+
+
+@family_bp.route("/user/<int:user_id>/groups", methods=["GET"])
+@jwt_required()
+def user_groups(user_id):
+    """Return admin_groups and member_groups for any user (for profile display)."""
+    memberships = FamilyMember.query.filter_by(user_id=user_id).all()
+    admin_groups = []
+    member_groups = []
+    for fm in memberships:
+        f = Family.query.get(fm.family_id)
+        if not f:
+            continue
+        entry = {"id": f.id, "name": f.name, "cover_url": f.cover_url, "member_count": len(f.family_members)}
+        if fm.role == "admin":
+            admin_groups.append(entry)
+        else:
+            member_groups.append(entry)
+    return jsonify({"admin_groups": admin_groups, "member_groups": member_groups})

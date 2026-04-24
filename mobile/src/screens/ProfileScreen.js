@@ -18,6 +18,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Toast from '../components/Toast';
 import useToast from '../hooks/useToast';
 import QRCode from 'react-native-qrcode-svg';
+import ProfileGroupsSection from '../components/ProfileGroupsSection';
 
 const { width } = Dimensions.get('window');
 const GRID = (width - 3) / 3;
@@ -50,6 +51,7 @@ export default function ProfileScreen({ navigation }) {
   const [listModal, setListModal] = useState({ visible: false, type: null, data: [], loading: false });
   const [myStories, setMyStories] = useState([]);
   const [family, setFamily] = useState(null);
+  const [myGroups, setMyGroups] = useState({ admin_groups: [], member_groups: [] });
   const [addHighlight, setAddHighlight] = useState({ visible: false, title: '', selected: [], saving: false });
   const [viewHighlight, setViewHighlight] = useState({ visible: false, highlight: null, index: 0 });
 
@@ -74,6 +76,9 @@ export default function ProfileScreen({ navigation }) {
       if (user?.family_id) {
         api.get('/family/my-family').then(r => setFamily(r.data.family)).catch(() => {});
       }
+      api.get(`/family/user/${user.id}/groups`)
+        .then(r => setMyGroups({ admin_groups: r.data.admin_groups || [], member_groups: r.data.member_groups || [] }))
+        .catch(() => {});
       setStats({
         posts: allPosts.length,
         connections: user.connection_count || 0,
@@ -421,6 +426,13 @@ export default function ProfileScreen({ navigation }) {
           <Ionicons name="chevron-forward" size={16} color={theme.dim} />
         </TouchableOpacity>
       )}
+
+      {/* Groups (admin + member) */}
+      <ProfileGroupsSection
+        adminGroups={myGroups.admin_groups}
+        memberGroups={myGroups.member_groups}
+        onGroupPress={() => navigation.navigate('Family')}
+      />
 
       {/* Story Highlights */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.highlightsRow}>
