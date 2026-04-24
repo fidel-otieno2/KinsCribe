@@ -206,6 +206,24 @@ def _run_migrations():
             created_at TIMESTAMP DEFAULT NOW()
         )
         """,
+        # Multi-family membership
+        """
+        CREATE TABLE IF NOT EXISTS family_members (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            family_id INTEGER NOT NULL REFERENCES families(id) ON DELETE CASCADE,
+            role VARCHAR(20) DEFAULT 'member',
+            joined_at TIMESTAMP DEFAULT NOW(),
+            UNIQUE(user_id, family_id)
+        )
+        """,
+        """
+        INSERT INTO family_members (user_id, family_id, role, joined_at)
+        SELECT id, family_id, role, created_at
+        FROM users
+        WHERE family_id IS NOT NULL
+        ON CONFLICT (user_id, family_id) DO NOTHING
+        """,
     ]
 
     try:

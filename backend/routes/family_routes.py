@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from extensions import db, mail
-from models.family import Family
+from models.family import Family, FamilyMember
 from models.user import User
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from flask_mail import Message
@@ -20,9 +20,6 @@ def current_user():
 @jwt_required()
 def create_family():
     user = current_user()
-    if user.family_id:
-        return jsonify({"error": "You already belong to a family"}), 400
-
     data = request.json
     family = Family(
         name=data["name"],
@@ -32,10 +29,16 @@ def create_family():
     db.session.add(family)
     db.session.flush()
 
-    user.family_id = family.id
-    user.role = "admin"
-    db.session.commit()
+    # Add to join table as admin
+    membership = FamilyMember(user_id=user.id, family_id=family.id, role="admin")
+    db.session.add(membership)
 
+    # Set as primary family if user has none
+    if not user.family_id:
+        user.family_id = family.id
+        user.role = "admin"
+
+    db.session.commit()
     return jsonify({"family": family.to_dict()}), 201
 
 
@@ -43,15 +46,24 @@ def create_family():
 @jwt_required()
 def join_family():
     user = current_user()
-    if user.family_id:
-        return jsonify({"error": "You already belong to a family"}), 400
-
     code = request.json.get("invite_code")
     family = Family.query.filter_by(invite_code=code).first()
     if not family:
         return jsonify({"error": "Invalid invite code"}), 404
 
-    user.family_id = family.id
+    # Check if already a member of THIS family
+    existing = FamilyMember.query.filter_by(user_id=user.id, family_id=family.id).first()
+    if existing:
+        return jsonify({"error": "You are already a member of this family"}), 400
+
+    # Add to join table
+    membership = FamilyMember(user_id=user.id, family_id=family.id, role="member")
+    db.session.add(membership)
+
+    # Set as primary family if user has none
+    if not user.family_id:
+        user.family_id = family.id
+
     db.session.commit()
     return jsonify({"message": f"Joined {family.name}", "family": family.to_dict()})
 
@@ -82,43 +94,136 @@ def invite_by_email():
 @jwt_required()
 def my_family():
     user = current_user()
-    if not user.family_id:
+    # Use family_id param if switching families, else default to primary
+    family_id = request.args.get("family_id", user.family_id, type=int)
+    if not family_id:
         return jsonify({"error": "You are not in a family yet"}), 404
 
-    family = Family.query.get(user.family_id)
-    members = [m.to_dict() for m in family.members]
+    # Verify user is actually a member
+    membership = FamilyMember.query.filter_by(user_id=user.id, family_id=family_id).first()
+    if not membership:
+        # Fall back to legacy family_id check
+        if user.family_id != family_id:
+            return jsonify({"error": "You are not a member of this family"}), 403
+
+    family = Family.query.get(family_id)
+    if not family:
+        return jsonify({"error": "Family not found"}), 404
+
+    # Get members from join table, fall back to legacy
+    fm_list = FamilyMember.query.filter_by(family_id=family_id).all()
+    if fm_list:
+        members = []
+        for fm in fm_list:
+            u = User.query.get(fm.user_id)
+            if u:
+                d = u.to_dict()
+                d["role"] = fm.role
+                members.append(d)
+    else:
+        members = [m.to_dict() for m in family.members]
+
     return jsonify({"family": family.to_dict(), "members": members})
+
+
+@family_bp.route("/my-families", methods=["GET"])
+@jwt_required()
+def my_families():
+    """Return all families the current user belongs to."""
+    user = current_user()
+    memberships = FamilyMember.query.filter_by(user_id=user.id).all()
+    families = []
+    for fm in memberships:
+        f = Family.query.get(fm.family_id)
+        if f:
+            d = f.to_dict()
+            d["my_role"] = fm.role
+            d["is_primary"] = (f.id == user.family_id)
+            families.append(d)
+    return jsonify({"families": families})
+
+
+@family_bp.route("/switch", methods=["POST"])
+@jwt_required()
+def switch_family():
+    """Switch the user's active (primary) family."""
+    user = current_user()
+    family_id = request.json.get("family_id")
+    membership = FamilyMember.query.filter_by(user_id=user.id, family_id=family_id).first()
+    if not membership:
+        return jsonify({"error": "You are not a member of this family"}), 403
+    user.family_id = family_id
+    user.role = membership.role
+    db.session.commit()
+    return jsonify({"message": "Switched family", "family_id": family_id})
+
+
+@family_bp.route("/leave", methods=["POST"])
+@jwt_required()
+def leave_family():
+    """Leave a specific family."""
+    user = current_user()
+    family_id = request.json.get("family_id", user.family_id)
+    membership = FamilyMember.query.filter_by(user_id=user.id, family_id=family_id).first()
+    if not membership:
+        return jsonify({"error": "You are not a member of this family"}), 404
+    db.session.delete(membership)
+    # If leaving primary family, switch to another one if available
+    if user.family_id == family_id:
+        other = FamilyMember.query.filter(
+            FamilyMember.user_id == user.id,
+            FamilyMember.family_id != family_id
+        ).first()
+        user.family_id = other.family_id if other else None
+        user.role = other.role if other else "member"
+    db.session.commit()
+    return jsonify({"message": "Left family"})
 
 
 @family_bp.route("/members/<int:member_id>/role", methods=["PATCH"])
 @jwt_required()
 def update_member_role(member_id):
     admin = current_user()
-    if admin.role != "admin":
+    admin_membership = FamilyMember.query.filter_by(user_id=admin.id, family_id=admin.family_id).first()
+    if not admin_membership or admin_membership.role != "admin":
         return jsonify({"error": "Admins only"}), 403
 
-    member = User.query.get(member_id)
-    if not member or member.family_id != admin.family_id:
+    membership = FamilyMember.query.filter_by(user_id=member_id, family_id=admin.family_id).first()
+    if not membership:
         return jsonify({"error": "Member not found in your family"}), 404
 
-    member.role = request.json.get("role", "member")
+    new_role = request.json.get("role", "member")
+    membership.role = new_role
+    # Keep user.role in sync if this is their primary family
+    member = User.query.get(member_id)
+    if member and member.family_id == admin.family_id:
+        member.role = new_role
     db.session.commit()
-    return jsonify({"message": "Role updated", "user": member.to_dict()})
+    return jsonify({"message": "Role updated"})
 
 
 @family_bp.route("/members/<int:member_id>", methods=["DELETE"])
 @jwt_required()
 def remove_member(member_id):
     admin = current_user()
-    if admin.role != "admin":
+    admin_membership = FamilyMember.query.filter_by(user_id=admin.id, family_id=admin.family_id).first()
+    if not admin_membership or admin_membership.role != "admin":
         return jsonify({"error": "Admins only"}), 403
 
-    member = User.query.get(member_id)
-    if not member or member.family_id != admin.family_id:
+    membership = FamilyMember.query.filter_by(user_id=member_id, family_id=admin.family_id).first()
+    if not membership:
         return jsonify({"error": "Member not found"}), 404
 
-    member.family_id = None
-    member.role = "member"
+    db.session.delete(membership)
+    # If this was their primary family, clear it
+    member = User.query.get(member_id)
+    if member and member.family_id == admin.family_id:
+        other = FamilyMember.query.filter(
+            FamilyMember.user_id == member_id,
+            FamilyMember.family_id != admin.family_id
+        ).first()
+        member.family_id = other.family_id if other else None
+        member.role = other.role if other else "member"
     db.session.commit()
     return jsonify({"message": "Member removed"})
 
