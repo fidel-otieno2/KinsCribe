@@ -195,22 +195,60 @@ Example format: ["caption 1", "caption 2"]"""
 @ai_bp.route("/hashtags", methods=["POST"])
 @jwt_required()
 def generate_hashtags():
-    """Generate relevant hashtags for a post."""
-    caption = (request.json or {}).get("caption", "").strip()
+    data = request.json or {}
+    caption = data.get("caption", "").strip()
+    location = data.get("location", "").strip()
+    tone = data.get("tone", "warm")
+    count = min(int(data.get("count", 10)), 30)
     if not caption:
         return jsonify({"hashtags": []}), 400
-    prompt = f"""Generate 8-10 relevant hashtags for this social media post: "{caption}"
-Mix popular and niche tags. Return only a JSON array of strings like ["#family", "#memories"].
-No explanation, just the JSON array."""
+
+    location_hint = f" Location: {location}." if location else ""
+    prompt = f"""You are a social media hashtag expert.
+Caption: "{caption}"
+Tone: {tone}{location_hint}
+
+Generate {count} hashtags. Categorize each as: trending, location, niche, community, or personal.
+Rate each as: high, medium, or low (reach potential).
+
+Return ONLY a JSON array. Each item must have: tag, category, level.
+Example:
+[
+  {{"tag": "#NairobiVibes", "category": "location", "level": "high"}},
+  {{"tag": "#ChillMoments", "category": "niche", "level": "medium"}}
+]
+No explanation. Just the JSON array."""
     try:
         import json as _json
         raw = chat_completion(prompt)
-        tags = _json.loads(raw)
-        if isinstance(tags, list):
-            return jsonify({"hashtags": tags[:10]})
+        # Strip markdown code blocks if present
+        raw = raw.strip().strip('`')
+        if raw.startswith('json'):
+            raw = raw[4:].strip()
+        hashtags = _json.loads(raw)
+        if isinstance(hashtags, list):
+            # Validate structure
+            result = []
+            for h in hashtags:
+                if isinstance(h, dict) and 'tag' in h:
+                    tag = h['tag'] if h['tag'].startswith('#') else f"#{h['tag']}"
+                    result.append({
+                        'tag': tag,
+                        'category': h.get('category', 'niche'),
+                        'level': h.get('level', 'medium'),
+                    })
+                elif isinstance(h, str):
+                    result.append({'tag': h if h.startswith('#') else f'#{h}', 'category': 'niche', 'level': 'medium'})
+            return jsonify({"hashtags": result[:count]})
     except Exception:
         pass
-    return jsonify({"hashtags": ["#family", "#memories", "#kinscribe"]})
+    # Fallback
+    return jsonify({"hashtags": [
+        {"tag": "#explore", "category": "trending", "level": "high"},
+        {"tag": "#viral", "category": "trending", "level": "high"},
+        {"tag": "#photooftheday", "category": "niche", "level": "medium"},
+        {"tag": "#lifestyle", "category": "community", "level": "medium"},
+    ]})
 
 
 @ai_bp.route("/improve", methods=["POST"])

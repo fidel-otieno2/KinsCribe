@@ -66,8 +66,10 @@ export default function CreateScreen({ navigation }) {
   const [toneResult, setToneResult] = useState(null);
   const [checkingTone, setCheckingTone] = useState(false);
   const [generatingCaption, setGeneratingCaption] = useState(false);
-  const [hashtagSuggestions, setHashtagSuggestions] = useState([]);
+  const [hashtagSuggestions, setHashtagSuggestions] = useState([]); // [{ tag, category, level }]
   const [loadingHashtags, setLoadingHashtags] = useState(false);
+  const [hashtagCount, setHashtagCount] = useState('balanced'); // minimal|balanced|maximum
+  const [showHashtagPanel, setShowHashtagPanel] = useState(false);
   // Caption panel
   const [captionOptions, setCaptionOptions] = useState([]);
   const [showCaptionPanel, setShowCaptionPanel] = useState(false);
@@ -228,30 +230,67 @@ export default function CreateScreen({ navigation }) {
     if (!text || text.length < 5) return;
     setLoadingHashtags(true);
     try {
-      const { data } = await api.post('/ai/hashtags', { caption: text });
+      const countMap = { minimal: 5, balanced: 10, maximum: 25 };
+      const { data } = await api.post('/ai/hashtags', {
+        caption: text,
+        location,
+        tone: selectedTone,
+        count: countMap[hashtagCount] || 10,
+      });
       setHashtagSuggestions(data.hashtags || []);
+      if (data.hashtags?.length) setShowHashtagPanel(true);
     } catch {
-      setHashtagSuggestions(['#explore', '#trending', '#viral', '#photooftheday']);
+      setHashtagSuggestions([
+        { tag: '#explore', category: 'trending', level: 'high' },
+        { tag: '#viral', category: 'trending', level: 'high' },
+        { tag: '#photooftheday', category: 'niche', level: 'medium' },
+      ]);
     } finally { setLoadingHashtags(false); }
   };
 
   const suggestHashtags = async () => {
     const text = caption.trim();
-    if (!text) return info('Write a caption first');
+    setShowHashtagPanel(true);
+    setHashtagSuggestions([]);
     setLoadingHashtags(true);
     try {
-      const { data } = await api.post('/ai/hashtags', { caption: text });
+      const countMap = { minimal: 5, balanced: 10, maximum: 25 };
+      const { data } = await api.post('/ai/hashtags', {
+        caption: text || buildContext(),
+        location,
+        tone: selectedTone,
+        count: countMap[hashtagCount] || 10,
+      });
       setHashtagSuggestions(data.hashtags || []);
     } catch {
-      setHashtagSuggestions(['#explore', '#trending', '#viral', '#photooftheday']);
+      setHashtagSuggestions([
+        { tag: '#explore', category: 'trending', level: 'high' },
+        { tag: '#viral', category: 'trending', level: 'high' },
+        { tag: '#photooftheday', category: 'niche', level: 'medium' },
+      ]);
     } finally { setLoadingHashtags(false); }
   };
 
   const addHashtag = (tag) => {
-    const current = hashtags.trim();
-    if (current.includes(tag)) return;
-    setHashtags(current ? `${current} ${tag}` : tag);
-    setHashtagSuggestions(prev => prev.filter(h => h !== tag));
+    const clean = tag.startsWith('#') ? tag : `#${tag}`;
+    if (hashtags.includes(clean)) return;
+    setHashtags(prev => prev.trim() ? `${prev.trim()} ${clean}` : clean);
+    setHashtagSuggestions(prev => prev.filter(h => h.tag !== clean));
+  };
+
+  const addAllHashtags = () => {
+    const all = hashtagSuggestions.map(h => h.tag).join(' ');
+    setHashtags(prev => prev.trim() ? `${prev.trim()} ${all}` : all);
+    setHashtagSuggestions([]);
+    setShowHashtagPanel(false);
+  };
+
+  const copyHashtags = () => {
+    const all = hashtagSuggestions.map(h => h.tag).join(' ');
+    // Clipboard not available without native module — insert directly
+    setHashtags(prev => prev.trim() ? `${prev.trim()} ${all}` : all);
+    setShowHashtagPanel(false);
+    info('Hashtags added!');
   };
 
   // ─── MEDIA PICKER ───────────────────────────────────────────────
@@ -862,7 +901,7 @@ export default function CreateScreen({ navigation }) {
               </View>
             )}
 
-            {/* Hashtag field + AI suggestions */}
+            {/* Hashtag field + AI panel */}
             <View style={[s.fieldRow, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]}>
               <Ionicons name="pricetag-outline" size={18} color={theme.muted} />
               <TextInput
@@ -873,21 +912,143 @@ export default function CreateScreen({ navigation }) {
                 onChangeText={setHashtags}
                 autoCapitalize="none"
               />
-              <TouchableOpacity onPress={suggestHashtags} disabled={loadingHashtags}>
+              <TouchableOpacity
+                style={s.htSparkleBtn}
+                onPress={suggestHashtags}
+              >
                 {loadingHashtags
-                  ? <ActivityIndicator size="small" color="#7c3aed" />
-                  : <Ionicons name="sparkles-outline" size={16} color="#7c3aed" />}
+                  ? <ActivityIndicator size="small" color="#a78bfa" />
+                  : <>
+                      <Ionicons name="sparkles" size={13} color="#a78bfa" />
+                      <AppText style={s.htSparkleTxt}>AI</AppText>
+                    </>}
               </TouchableOpacity>
             </View>
 
-            {hashtagSuggestions.length > 0 && (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.hashtagSuggestRow}>
-                {hashtagSuggestions.map(tag => (
-                  <TouchableOpacity key={tag} style={s.hashtagChip} onPress={() => addHashtag(tag)}>
-                    <AppText style={s.hashtagChipText}>+ {tag}</AppText>
+            {/* AI Hashtag Panel */}
+            {showHashtagPanel && (
+              <View style={[s.htPanel, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]}>
+                {/* Header */}
+                <View style={s.htPanelHeader}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Ionicons name="pricetag" size={14} color="#a78bfa" />
+                    <AppText style={s.htPanelTitle}>AI Hashtag Engine</AppText>
+                  </View>
+                  <TouchableOpacity onPress={() => setShowHashtagPanel(false)}>
+                    <Ionicons name="close" size={18} color={theme.muted} />
                   </TouchableOpacity>
-                ))}
-              </ScrollView>
+                </View>
+
+                {/* Count selector */}
+                <AppText style={[s.cpLabel, { color: theme.muted }]}>HOW MANY</AppText>
+                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+                  {[
+                    { k: 'minimal', l: 'Minimal', sub: '5 tags' },
+                    { k: 'balanced', l: 'Balanced', sub: '10 tags' },
+                    { k: 'maximum', l: 'Maximum', sub: '25 tags' },
+                  ].map(o => (
+                    <TouchableOpacity
+                      key={o.k}
+                      style={[s.htCountBtn, { borderColor: theme.border2 }, hashtagCount === o.k && s.htCountBtnActive]}
+                      onPress={() => setHashtagCount(o.k)}
+                    >
+                      <AppText style={[s.htCountLabel, { color: hashtagCount === o.k ? '#a78bfa' : theme.text }]}>{o.l}</AppText>
+                      <AppText style={[s.htCountSub, { color: theme.muted }]}>{o.sub}</AppText>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {/* Generate button */}
+                <TouchableOpacity
+                  style={[s.cpGenerateBtn, loadingHashtags && { opacity: 0.6 }]}
+                  onPress={suggestHashtags}
+                  disabled={loadingHashtags}
+                >
+                  <LinearGradient colors={['#7c3aed', '#3b82f6']} style={s.cpGenerateGrad}>
+                    {loadingHashtags
+                      ? <ActivityIndicator color="#fff" size="small" />
+                      : <Ionicons name="sparkles" size={16} color="#fff" />}
+                    <AppText style={s.cpGenerateText}>
+                      {loadingHashtags ? 'Generating...' : 'Generate Hashtags'}
+                    </AppText>
+                  </LinearGradient>
+                </TouchableOpacity>
+
+                {/* Skeleton */}
+                {loadingHashtags && hashtagSuggestions.length === 0 && (
+                  <View style={{ gap: 8, marginTop: 12 }}>
+                    {[160, 200, 140, 180].map((w, i) => (
+                      <View key={i} style={[s.cpSkeleton, { width: w, backgroundColor: theme.bgSecondary }]} />
+                    ))}
+                  </View>
+                )}
+
+                {/* Results grouped by category */}
+                {hashtagSuggestions.length > 0 && (
+                  <>
+                    {/* Add all + Regenerate row */}
+                    <View style={s.htActionsRow}>
+                      <TouchableOpacity style={s.htAddAllBtn} onPress={addAllHashtags}>
+                        <Ionicons name="add-circle" size={14} color="#10b981" />
+                        <AppText style={s.htAddAllText}>Add All</AppText>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={s.htRegenBtn} onPress={suggestHashtags}>
+                        <Ionicons name="refresh" size={14} color="#a78bfa" />
+                        <AppText style={s.htRegenText}>Regenerate</AppText>
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* Category groups */}
+                    {['trending', 'location', 'niche', 'community', 'personal'].map(cat => {
+                      const items = hashtagSuggestions.filter(h => h.category === cat);
+                      if (!items.length) return null;
+                      const catMeta = {
+                        trending:  { icon: '🔥', label: 'Trending',  color: '#f59e0b' },
+                        location:  { icon: '📍', label: 'Location',  color: '#3b82f6' },
+                        niche:     { icon: '🎯', label: 'Niche',     color: '#8b5cf6' },
+                        community: { icon: '👥', label: 'Community', color: '#10b981' },
+                        personal:  { icon: '🧠', label: 'Personal',  color: '#ec4899' },
+                      }[cat];
+                      return (
+                        <View key={cat} style={{ marginBottom: 10 }}>
+                          <View style={s.htCatHeader}>
+                            <AppText style={s.htCatIcon}>{catMeta.icon}</AppText>
+                            <AppText style={[s.htCatLabel, { color: catMeta.color }]}>{catMeta.label}</AppText>
+                          </View>
+                          <View style={s.htChipsWrap}>
+                            {items.map(h => {
+                              const added = hashtags.includes(h.tag);
+                              const levelColor = h.level === 'high' ? '#10b981' : h.level === 'medium' ? '#f59e0b' : '#64748b';
+                              return (
+                                <TouchableOpacity
+                                  key={h.tag}
+                                  style={[s.htChip, { borderColor: added ? '#10b981' : theme.border2, backgroundColor: added ? 'rgba(16,185,129,0.1)' : 'rgba(124,58,237,0.07)' }]}
+                                  onPress={() => addHashtag(h.tag)}
+                                  disabled={added}
+                                >
+                                  <View style={[s.htLevelDot, { backgroundColor: levelColor }]} />
+                                  <AppText style={[s.htChipText, { color: added ? '#10b981' : theme.text }]}>{h.tag}</AppText>
+                                  {added && <Ionicons name="checkmark" size={11} color="#10b981" />}
+                                </TouchableOpacity>
+                              );
+                            })}
+                          </View>
+                        </View>
+                      );
+                    })}
+
+                    {/* Legend */}
+                    <View style={s.htLegend}>
+                      {[{ c: '#10b981', l: 'High reach' }, { c: '#f59e0b', l: 'Medium' }, { c: '#64748b', l: 'Niche' }].map(l => (
+                        <View key={l.l} style={s.htLegendItem}>
+                          <View style={[s.htLevelDot, { backgroundColor: l.c }]} />
+                          <AppText style={[s.htLegendText, { color: theme.muted }]}>{l.l}</AppText>
+                        </View>
+                      ))}
+                    </View>
+                  </>
+                )}
+              </View>
             )}
 
             {/* Other fields */}
@@ -1218,10 +1379,31 @@ const s = StyleSheet.create({
   fieldRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: radius.md, paddingHorizontal: 14, marginBottom: 10, borderWidth: 1 },
   fieldInput: { flex: 1, paddingVertical: 12, fontSize: 14 },
 
-  // Hashtag suggestions
-  hashtagSuggestRow: { marginBottom: 10, marginTop: -4 },
-  hashtagChip: { backgroundColor: 'rgba(124,58,237,0.15)', borderRadius: radius.full, paddingHorizontal: 12, paddingVertical: 6, marginRight: 6, borderWidth: 0.5, borderColor: 'rgba(124,58,237,0.3)' },
-  hashtagChipText: { color: '#a78bfa', fontSize: 12, fontWeight: '600' },
+  // Hashtag panel
+  htSparkleBtn: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(124,58,237,0.15)', paddingHorizontal: 9, paddingVertical: 5, borderRadius: radius.full },
+  htSparkleTxt: { color: '#a78bfa', fontSize: 11, fontWeight: '700' },
+  htPanel: { borderRadius: radius.md, borderWidth: 1, padding: 14, marginBottom: 12 },
+  htPanelHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  htPanelTitle: { fontSize: 14, fontWeight: '700', color: '#a78bfa' },
+  htCountBtn: { flex: 1, borderWidth: 1, borderRadius: radius.md, paddingVertical: 8, alignItems: 'center' },
+  htCountBtnActive: { backgroundColor: 'rgba(124,58,237,0.15)', borderColor: '#7c3aed' },
+  htCountLabel: { fontSize: 12, fontWeight: '700' },
+  htCountSub: { fontSize: 10, marginTop: 2 },
+  htActionsRow: { flexDirection: 'row', gap: 8, marginBottom: 12, marginTop: 4 },
+  htAddAllBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 9, borderRadius: radius.md, backgroundColor: 'rgba(16,185,129,0.12)', borderWidth: 1, borderColor: 'rgba(16,185,129,0.3)' },
+  htAddAllText: { color: '#10b981', fontSize: 13, fontWeight: '700' },
+  htRegenBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 9, borderRadius: radius.md, backgroundColor: 'rgba(124,58,237,0.1)', borderWidth: 1, borderColor: 'rgba(124,58,237,0.25)' },
+  htRegenText: { color: '#a78bfa', fontSize: 13, fontWeight: '700' },
+  htCatHeader: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 6 },
+  htCatIcon: { fontSize: 13 },
+  htCatLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  htChipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  htChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 6, borderRadius: radius.full, borderWidth: 1 },
+  htLevelDot: { width: 6, height: 6, borderRadius: 3 },
+  htChipText: { fontSize: 12, fontWeight: '600' },
+  htLegend: { flexDirection: 'row', gap: 12, marginTop: 8, paddingTop: 8, borderTopWidth: 0.5, borderTopColor: 'rgba(100,116,139,0.2)' },
+  htLegendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  htLegendText: { fontSize: 10 },
 
   // Music
   selectedMusicRow: { flex: 1, flexDirection: 'row', alignItems: 'center', paddingVertical: 12 },
