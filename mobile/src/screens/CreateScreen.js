@@ -37,12 +37,26 @@ const PRIVACY_OPTS = [
 const BG_COLORS = ['#7c3aed', '#3b82f6', '#ec4899', '#10b981', '#f59e0b', '#e11d48', '#0f172a'];
 
 const MUSIC_LIBRARY = [
-  { id: '1', title: 'Golden Hour', artist: 'JVKE', duration: '3:24' },
-  { id: '2', title: 'Sunflower', artist: 'Post Malone', duration: '2:38' },
-  { id: '3', title: 'Blinding Lights', artist: 'The Weeknd', duration: '3:20' },
-  { id: '4', title: 'Stay', artist: 'The Kid LAROI', duration: '2:21' },
-  { id: '5', title: 'Levitating', artist: 'Dua Lipa', duration: '3:23' },
-  { id: '6', title: 'Watermelon Sugar', artist: 'Harry Styles', duration: '2:54' },
+  { id: '1',  title: 'Lofi Study',       artist: 'Chill Beats',   mood: 'chill',     preview_url: 'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=lofi-study-112191.mp3',                duration: '2:30' },
+  { id: '2',  title: 'Summer Walk',      artist: 'Olexy',         mood: 'chill',     preview_url: 'https://cdn.pixabay.com/download/audio/2021/08/04/audio_0625c1539c.mp3?filename=summer-walk-152722.mp3',                duration: '2:47' },
+  { id: '3',  title: 'Inspiring',        artist: 'Mixaund',       mood: 'hype',      preview_url: 'https://cdn.pixabay.com/download/audio/2022/01/18/audio_d0c6ff1c23.mp3?filename=inspiring-cinematic-116199.mp3',         duration: '2:08' },
+  { id: '4',  title: 'Upbeat Vibes',     artist: 'Muzaproduction',mood: 'hype',      preview_url: 'https://cdn.pixabay.com/download/audio/2022/03/15/audio_8cb749d5d4.mp3?filename=upbeat-fun-kids-112169.mp3',             duration: '2:15' },
+  { id: '5',  title: 'Happy Day',        artist: 'Lesfm',         mood: 'hype',      preview_url: 'https://cdn.pixabay.com/download/audio/2022/06/07/audio_5bb7b2e3e4.mp3?filename=happy-day-113985.mp3',                  duration: '2:22' },
+  { id: '6',  title: 'Romantic Piano',   artist: 'Lesfm',         mood: 'romantic',  preview_url: 'https://cdn.pixabay.com/download/audio/2022/10/25/audio_946b0939c8.mp3?filename=romantic-piano-116191.mp3',             duration: '3:10' },
+  { id: '7',  title: 'Soft Piano',       artist: 'Lesfm',         mood: 'romantic',  preview_url: 'https://cdn.pixabay.com/download/audio/2021/11/25/audio_5bfb8a4d2e.mp3?filename=soft-piano-100-bpm-121529.mp3',         duration: '2:55' },
+  { id: '8',  title: 'Sad Piano',        artist: 'Lesfm',         mood: 'sad',       preview_url: 'https://cdn.pixabay.com/download/audio/2022/04/27/audio_67f8b9a3c2.mp3?filename=sad-piano-112191.mp3',                  duration: '2:40' },
+  { id: '9',  title: 'Emotional',        artist: 'Lesfm',         mood: 'sad',       preview_url: 'https://cdn.pixabay.com/download/audio/2022/08/02/audio_884fe92c21.mp3?filename=emotional-piano-112191.mp3',             duration: '3:05' },
+  { id: '10', title: 'Old Memories',     artist: 'Lesfm',         mood: 'nostalgic', preview_url: 'https://cdn.pixabay.com/download/audio/2022/03/10/audio_270f49b53e.mp3?filename=old-memories-112191.mp3',              duration: '2:50' },
+  { id: '11', title: 'Nostalgia',        artist: 'Lesfm',         mood: 'nostalgic', preview_url: 'https://cdn.pixabay.com/download/audio/2022/09/14/audio_946b0939c8.mp3?filename=nostalgia-112191.mp3',                 duration: '3:20' },
+];
+
+const MOODS = [
+  { key: 'all',       label: 'All',       emoji: '🎵' },
+  { key: 'chill',     label: 'Chill',     emoji: '🌿' },
+  { key: 'hype',      label: 'Hype',      emoji: '🔥' },
+  { key: 'romantic',  label: 'Romantic',  emoji: '❤️' },
+  { key: 'sad',       label: 'Sad',       emoji: '💔' },
+  { key: 'nostalgic', label: 'Nostalgic', emoji: '🌌' },
 ];
 
 export default function CreateScreen({ navigation }) {
@@ -91,6 +105,13 @@ export default function CreateScreen({ navigation }) {
   // Music state
   const [showMusicModal, setShowMusicModal] = useState(false);
   const [selectedMusic, setSelectedMusic] = useState(null);
+  const [musicSearch, setMusicSearch] = useState('');
+  const [musicMoodFilter, setMusicMoodFilter] = useState('all');
+  const [playingPreview, setPlayingPreview] = useState(null); // track id
+  const [suggestingMusic, setSuggestingMusic] = useState(false);
+  const [aiMusicSuggestions, setAiMusicSuggestions] = useState([]);
+  const musicSoundRef = useRef(null);
+  const [startTime, setStartTime] = useState(0);
 
   // Schedule state — custom picker, no native module needed
   const [showSchedulePicker, setShowSchedulePicker] = useState(false);
@@ -536,6 +557,7 @@ export default function CreateScreen({ navigation }) {
         formData.append('privacy', privacy);
         formData.append('bg_color', bgColor);
         if (textContent) formData.append('text_content', textContent);
+      if (selectedMusic) formData.append('music', JSON.stringify({ title: selectedMusic.title, artist: selectedMusic.artist, cover: selectedMusic.cover || '', preview_url: selectedMusic.preview_url || '', start_time: selectedMusic.start_time || 0 }));
         if (selectedMusic) formData.append('music_id', selectedMusic.id);
         if (mediaFiles[0]) {
           formData.append('file', { uri: mediaFiles[0].uri, type: mediaFiles[0].type === 'video' ? 'video/mp4' : 'image/jpeg', name: 'story_media.jpg' });
@@ -581,34 +603,196 @@ export default function CreateScreen({ navigation }) {
     } finally { setLoading(false); }
   };
 
-  // ─── MUSIC MODAL ────────────────────────────────────────────────
+  // ─── MUSIC PLAYBACK ─────────────────────────────────────────────
+  const stopPreview = async () => {
+    try {
+      if (musicSoundRef.current) {
+        await musicSoundRef.current.stopAsync();
+        await musicSoundRef.current.unloadAsync();
+        musicSoundRef.current = null;
+      }
+    } catch {}
+    setPlayingPreview(null);
+  };
+
+  const togglePreview = async (track) => {
+    if (playingPreview === track.id) { await stopPreview(); return; }
+    await stopPreview();
+    if (!track.preview_url) { info('No preview for this track'); return; }
+    try {
+      await Audio.setAudioModeAsync({ playsInSilentModeIOS: true, allowsRecordingIOS: false });
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: track.preview_url },
+        { shouldPlay: true, progressUpdateIntervalMillis: 500 },
+        (st) => { if (st.isLoaded && st.didJustFinish) setPlayingPreview(null); }
+      );
+      musicSoundRef.current = sound;
+      setPlayingPreview(track.id);
+    } catch (e) {
+      console.log('Preview error:', e);
+      setPlayingPreview(null);
+      info('Preview unavailable — tap track name to select it');
+    }
+  };
+
+  const selectMusic = async (track) => {
+    await stopPreview();
+    setSelectedMusic({ ...track, start_time: startTime });
+    setShowMusicModal(false);
+  };
+
+  const suggestMusicForCaption = async () => {
+    setSuggestingMusic(true);
+    const moodMap = {
+      warm: 'chill', funny: 'hype', deep: 'sad', romantic: 'romantic',
+      savage: 'hype', inspiring: 'hype', nostalgic: 'nostalgic',
+      chill: 'chill', sad: 'sad', bold: 'hype', poetic: 'nostalgic',
+    };
+    const mood = moodMap[selectedTone] || 'chill';
+    const suggestions = MUSIC_LIBRARY.filter(t => t.mood === mood).slice(0, 4);
+    setAiMusicSuggestions(suggestions);
+    setMusicMoodFilter(mood);
+    setSuggestingMusic(false);
+  };
+
+  const filteredMusic = MUSIC_LIBRARY.filter(t => {
+    const matchesMood = musicMoodFilter === 'all' || t.mood === musicMoodFilter;
+    const matchesSearch = !musicSearch ||
+      t.title.toLowerCase().includes(musicSearch.toLowerCase()) ||
+      t.artist.toLowerCase().includes(musicSearch.toLowerCase());
+    return matchesMood && matchesSearch;
+  });
+
+  // ─── MUSIC MODAL ─────────────────────────────────────────────────
   const MusicModal = () => (
-    <Modal visible={showMusicModal} animationType="slide" transparent>
-      <View style={[s.modalOverlay]}>
-        <View style={[s.modalSheet, { backgroundColor: theme.bgCard }]}>
+    <Modal visible={showMusicModal} animationType="slide" transparent onRequestClose={() => { stopPreview(); setShowMusicModal(false); }}>
+      <View style={s.modalOverlay}>
+        <View style={[s.musicSheet, { backgroundColor: theme.bgCard }]}>
           <View style={s.modalHandle} />
-          <AppText style={[s.modalTitle, { color: theme.text }]}>Add Music</AppText>
-          <FlatList
-            data={MUSIC_LIBRARY}
-            keyExtractor={i => i.id}
-            renderItem={({ item }) => (
+
+          {/* Header */}
+          <View style={s.musicSheetHeader}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Ionicons name="musical-notes" size={18} color="#a78bfa" />
+              <AppText style={[s.modalTitle, { color: theme.text, marginBottom: 0 }]}>Add Music</AppText>
+            </View>
+            <TouchableOpacity
+              style={[s.musicAiBtn, suggestingMusic && { opacity: 0.6 }]}
+              onPress={suggestMusicForCaption}
+              disabled={suggestingMusic}
+            >
+              {suggestingMusic
+                ? <ActivityIndicator size="small" color="#a78bfa" />
+                : <Ionicons name="sparkles" size={13} color="#a78bfa" />}
+              <AppText style={s.musicAiBtnText}>AI Match</AppText>
+            </TouchableOpacity>
+          </View>
+
+          {/* AI suggestions */}
+          {aiMusicSuggestions.length > 0 && (
+            <>
+              <AppText style={[s.cpLabel, { color: theme.muted, paddingHorizontal: 16, marginBottom: 8 }]}>AI SUGGESTED FOR YOUR VIBE</AppText>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.musicAiRow}>
+                {aiMusicSuggestions.map(t => (
+                  <TouchableOpacity
+                    key={t.id}
+                    style={[s.musicAiCard, { borderColor: selectedMusic?.id === t.id ? '#7c3aed' : theme.border2 }]}
+                    onPress={() => selectMusic(t)}
+                  >
+                    {t.cover
+                      ? <Image source={{ uri: t.cover }} style={s.musicAiCover} />
+                      : <View style={[s.musicAiCover, { backgroundColor: '#7c3aed22', alignItems: 'center', justifyContent: 'center' }]}>
+                          <Ionicons name="musical-notes" size={16} color="#7c3aed" />
+                        </View>}
+                    <AppText style={[s.musicAiTitle, { color: theme.text }]} numberOfLines={1}>{t.title}</AppText>
+                    <AppText style={[s.musicAiArtist, { color: theme.muted }]} numberOfLines={1}>{t.artist}</AppText>
+                    <TouchableOpacity style={s.musicAiPlay} onPress={() => togglePreview(t)}>
+                      <Ionicons name={playingPreview === t.id ? 'pause' : 'play'} size={12} color="#fff" style={playingPreview !== t.id && { marginLeft: 1 }} />
+                    </TouchableOpacity>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </>
+          )}
+
+          {/* Search */}
+          <View style={[s.musicSearchRow, { backgroundColor: theme.bgSecondary, borderColor: theme.border2 }]}>
+            <Ionicons name="search" size={15} color={theme.muted} />
+            <TextInput
+              style={[s.musicSearchInput, { color: theme.text }]}
+              placeholder="Search songs, artists..."
+              placeholderTextColor={theme.dim}
+              value={musicSearch}
+              onChangeText={setMusicSearch}
+            />
+            {musicSearch ? <TouchableOpacity onPress={() => setMusicSearch('')}><Ionicons name="close-circle" size={15} color={theme.muted} /></TouchableOpacity> : null}
+          </View>
+
+          {/* Mood filter */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.musicMoodRow}>
+            {MOODS.map(m => (
               <TouchableOpacity
-                style={[s.musicRow, { borderBottomColor: theme.border }, selectedMusic?.id === item.id && { backgroundColor: 'rgba(124,58,237,0.1)' }]}
-                onPress={() => { setSelectedMusic(item); setShowMusicModal(false); }}
+                key={m.key}
+                style={[s.musicMoodChip, { borderColor: theme.border2 }, musicMoodFilter === m.key && s.musicMoodChipActive]}
+                onPress={() => setMusicMoodFilter(m.key)}
               >
-                <View style={[s.musicIcon, { backgroundColor: 'rgba(124,58,237,0.15)' }]}>
-                  <Ionicons name="musical-notes" size={18} color="#7c3aed" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <AppText style={[s.musicTitle, { color: theme.text }]}>{item.title}</AppText>
-                  <AppText style={[s.musicArtist, { color: theme.muted }]}>{item.artist}</AppText>
-                </View>
-                <AppText style={[s.musicDuration, { color: theme.muted }]}>{item.duration}</AppText>
-                {selectedMusic?.id === item.id && <Ionicons name="checkmark-circle" size={18} color="#7c3aed" style={{ marginLeft: 8 }} />}
+                <AppText style={s.musicMoodEmoji}>{m.emoji}</AppText>
+                <AppText style={[s.musicMoodLabel, { color: musicMoodFilter === m.key ? '#a78bfa' : theme.muted }]}>{m.label}</AppText>
               </TouchableOpacity>
-            )}
+            ))}
+          </ScrollView>
+
+          {/* Track list */}
+          <FlatList
+            data={filteredMusic}
+            keyExtractor={i => i.id}
+            style={{ flex: 1 }}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
+              <View style={{ alignItems: 'center', paddingTop: 30 }}>
+                <Ionicons name="musical-notes-outline" size={36} color={theme.dim} />
+                <AppText style={{ color: theme.muted, marginTop: 8 }}>No tracks found</AppText>
+              </View>
+            }
+            renderItem={({ item }) => {
+              const isSelected = selectedMusic?.id === item.id;
+              const isPlaying = playingPreview === item.id;
+              const moodColor = item.mood === 'hype' ? '#f59e0b' : item.mood === 'romantic' ? '#ec4899' : item.mood === 'sad' ? '#3b82f6' : item.mood === 'nostalgic' ? '#8b5cf6' : '#10b981';
+              return (
+                <TouchableOpacity
+                  style={[s.musicRow, { borderBottomColor: theme.border }, isSelected && { backgroundColor: 'rgba(124,58,237,0.08)' }]}
+                  onPress={() => selectMusic(item)}
+                >
+                  {item.cover
+                    ? <Image source={{ uri: item.cover }} style={s.musicCover} />
+                    : <View style={[s.musicCover, { backgroundColor: 'rgba(124,58,237,0.15)', alignItems: 'center', justifyContent: 'center' }]}>
+                        <Ionicons name="musical-notes" size={18} color="#7c3aed" />
+                      </View>}
+                  <View style={{ flex: 1 }}>
+                    <AppText style={[s.musicTitle, { color: theme.text }]} numberOfLines={1}>{item.title}</AppText>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                      <AppText style={[s.musicArtist, { color: theme.muted }]}>{item.artist}</AppText>
+                      <View style={[s.musicMoodTag, { backgroundColor: moodColor + '22' }]}>
+                        <AppText style={[s.musicMoodTagText, { color: moodColor }]}>
+                          {MOODS.find(m => m.key === item.mood)?.emoji} {item.mood}
+                        </AppText>
+                      </View>
+                    </View>
+                  </View>
+                  <AppText style={[s.musicDuration, { color: theme.muted }]}>{item.duration}</AppText>
+                  <TouchableOpacity
+                    style={[s.musicPlayBtn, { backgroundColor: isPlaying ? '#7c3aed' : 'rgba(124,58,237,0.15)' }]}
+                    onPress={() => togglePreview(item)}
+                  >
+                    <Ionicons name={isPlaying ? 'pause' : 'play'} size={13} color={isPlaying ? '#fff' : '#7c3aed'} style={!isPlaying && { marginLeft: 1 }} />
+                  </TouchableOpacity>
+                  {isSelected && <Ionicons name="checkmark-circle" size={18} color="#7c3aed" style={{ marginLeft: 6 }} />}
+                </TouchableOpacity>
+              );
+            }}
           />
-          <TouchableOpacity style={[s.modalClose, { borderColor: theme.border2 }]} onPress={() => setShowMusicModal(false)}>
+
+          <TouchableOpacity style={[s.modalClose, { borderColor: theme.border2 }]} onPress={() => { stopPreview(); setShowMusicModal(false); }}>
             <AppText style={{ color: theme.text, fontWeight: '600' }}>Cancel</AppText>
           </TouchableOpacity>
         </View>
@@ -1195,25 +1379,43 @@ export default function CreateScreen({ navigation }) {
             </View>
 
             {/* Music picker */}
-            <TouchableOpacity
-              style={[s.fieldRow, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]}
-              onPress={() => setShowMusicModal(true)}
-            >
-              <Ionicons name="musical-notes-outline" size={18} color={theme.muted} />
-              {selectedMusic ? (
-                <View style={s.selectedMusicRow}>
-                  <AppText style={[s.selectedMusicTitle, { color: theme.text }]}>{selectedMusic.title}</AppText>
-                  <AppText style={[s.selectedMusicArtist, { color: theme.muted }]}> · {selectedMusic.artist}</AppText>
-                </View>
-              ) : (
-                <AppText style={[s.fieldInput, { color: theme.dim, paddingVertical: 12 }]}>Add music</AppText>
-              )}
-              {selectedMusic && (
-                <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); setSelectedMusic(null); }}>
-                  <Ionicons name="close-circle" size={16} color={theme.muted} />
+            {selectedMusic ? (
+              <View style={[s.musicCard, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]}>
+                <TouchableOpacity style={s.musicCardPlay} onPress={() => togglePreview(selectedMusic)}>
+                  <LinearGradient colors={['#7c3aed', '#3b82f6']} style={s.musicCardPlayGrad}>
+                    <Ionicons name={playingPreview === selectedMusic.id ? 'pause' : 'play'} size={16} color="#fff" style={playingPreview !== selectedMusic.id && { marginLeft: 2 }} />
+                  </LinearGradient>
                 </TouchableOpacity>
-              )}
-            </TouchableOpacity>
+                <View style={{ flex: 1 }}>
+                  <AppText style={[s.musicCardTitle, { color: theme.text }]} numberOfLines={1}>{selectedMusic.title}</AppText>
+                  <AppText style={[s.musicCardArtist, { color: theme.muted }]} numberOfLines={1}>{selectedMusic.artist}</AppText>
+                  {playingPreview === selectedMusic.id && (
+                    <View style={s.musicCardWave}>
+                      {[...Array(16)].map((_, i) => (
+                        <View key={i} style={[s.musicCardBar, { height: 4 + Math.abs(Math.sin(i * 0.8) * 10), backgroundColor: '#7c3aed' }]} />
+                      ))}
+                    </View>
+                  )}
+                </View>
+                <TouchableOpacity onPress={() => setShowMusicModal(true)} style={{ padding: 6 }}>
+                  <Ionicons name="swap-horizontal" size={16} color={theme.muted} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => { stopPreview(); setSelectedMusic(null); }} style={{ padding: 6 }}>
+                  <Ionicons name="close-circle" size={18} color={theme.muted} />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={[s.fieldRow, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]}
+                onPress={() => setShowMusicModal(true)}
+              >
+                <Ionicons name="musical-notes-outline" size={18} color={theme.muted} />
+                <AppText style={[s.fieldInput, { color: theme.dim, paddingVertical: 12 }]}>Add music</AppText>
+                <View style={s.musicAddBadge}>
+                  <AppText style={s.musicAddBadgeText}>+ Add</AppText>
+                </View>
+              </TouchableOpacity>
+            )}
 
             {/* Schedule */}
             <TouchableOpacity
@@ -1536,6 +1738,36 @@ const s = StyleSheet.create({
   selectedMusicRow: { flex: 1, flexDirection: 'row', alignItems: 'center', paddingVertical: 12 },
   selectedMusicTitle: { fontSize: 14, fontWeight: '600' },
   selectedMusicArtist: { fontSize: 13 },
+  musicCard: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: radius.md, borderWidth: 1, padding: 10, marginBottom: 10 },
+  musicCardPlay: { width: 38, height: 38, borderRadius: 19, overflow: 'hidden' },
+  musicCardPlayGrad: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  musicCardTitle: { fontSize: 14, fontWeight: '700' },
+  musicCardArtist: { fontSize: 12, marginTop: 1 },
+  musicCardWave: { flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 4, height: 14 },
+  musicCardBar: { width: 2.5, borderRadius: 2, backgroundColor: '#7c3aed' },
+  musicAddBadge: { backgroundColor: 'rgba(124,58,237,0.15)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: radius.full },
+  musicAddBadgeText: { color: '#7c3aed', fontSize: 11, fontWeight: '700' },
+  musicSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 12, paddingBottom: 36, maxHeight: '88%', flex: 1 },
+  musicSheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, marginBottom: 12 },
+  musicAiBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(124,58,237,0.15)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.full },
+  musicAiBtnText: { color: '#a78bfa', fontSize: 12, fontWeight: '700' },
+  musicAiRow: { paddingHorizontal: 16, marginBottom: 12 },
+  musicAiCard: { width: 110, borderRadius: radius.md, borderWidth: 1, padding: 8, marginRight: 10, alignItems: 'center' },
+  musicAiCover: { width: 60, height: 60, borderRadius: 10, marginBottom: 6 },
+  musicAiTitle: { fontSize: 11, fontWeight: '700', textAlign: 'center' },
+  musicAiArtist: { fontSize: 10, textAlign: 'center', marginTop: 2 },
+  musicAiPlay: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#7c3aed', alignItems: 'center', justifyContent: 'center', marginTop: 6 },
+  musicSearchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: radius.md, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8, marginHorizontal: 16, marginBottom: 10 },
+  musicSearchInput: { flex: 1, fontSize: 14 },
+  musicMoodRow: { paddingHorizontal: 16, marginBottom: 8 },
+  musicMoodChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.full, borderWidth: 1, marginRight: 8, backgroundColor: 'rgba(124,58,237,0.05)' },
+  musicMoodChipActive: { backgroundColor: 'rgba(124,58,237,0.18)', borderColor: '#7c3aed' },
+  musicMoodEmoji: { fontSize: 13 },
+  musicMoodLabel: { fontSize: 12, fontWeight: '600' },
+  musicCover: { width: 44, height: 44, borderRadius: 8 },
+  musicMoodTag: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+  musicMoodTagText: { fontSize: 10, fontWeight: '600' },
+  musicPlayBtn: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginLeft: 6 },
 
   // Privacy
   label: { fontSize: 11, fontWeight: '600', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 8 },
@@ -1595,8 +1827,7 @@ const s = StyleSheet.create({
   modalSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 12, paddingBottom: 36, maxHeight: '70%' },
   modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(100,116,139,0.4)', alignSelf: 'center', marginBottom: 16 },
   modalTitle: { fontSize: 18, fontWeight: '700', paddingHorizontal: 20, marginBottom: 12 },
-  musicRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingHorizontal: 20, borderBottomWidth: 0.5 },
-  musicIcon: { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  musicRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 0.5 },
   musicTitle: { fontSize: 14, fontWeight: '600' },
   musicArtist: { fontSize: 12, marginTop: 2 },
   musicDuration: { fontSize: 12 },
