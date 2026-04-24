@@ -185,7 +185,7 @@ export default function MessagesScreen({ navigation }) {
             >
               {lastMsg
                 ? lastMsg.media_url
-                  ? lastMsg.media_type === 'audio' ? '🎤 Voice message' : lastMsg.media_type === 'video' ? '🎥 Video' : '📷 Photo'
+                  ? lastMsg.media_type === 'audio' ? '🎤 Voice message' : lastMsg.media_type === 'video' ? '🎥 Video' : lastMsg.media_type === 'gif' ? '🎞️ GIF' : '📷 Photo'
                   : lastMsg.text
                 : 'Start a conversation'}
             </AppText>
@@ -347,7 +347,7 @@ export default function MessagesScreen({ navigation }) {
                         </View>
                         <AppText style={ms.familyCardPreview} numberOfLines={1}>
                           {familyConv.last_message
-                            ? `${familyConv.last_message.sender_name}: ${familyConv.last_message.media_url ? '📎 Media' : familyConv.last_message.text}`
+                            ? `${familyConv.last_message.sender_name}: ${familyConv.last_message.media_url ? (familyConv.last_message.media_type === 'gif' ? '🎞️ GIF' : familyConv.last_message.media_type === 'audio' ? '🎤 Voice message' : familyConv.last_message.media_type === 'video' ? '🎥 Video' : '📷 Photo') : familyConv.last_message.text}`
                             : 'Your family space 🏡'}
                         </AppText>
                       </View>

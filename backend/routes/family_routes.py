@@ -16,6 +16,70 @@ def current_user():
     return User.query.get(int(get_jwt_identity()))
 
 
+@family_bp.route("/public/<int:family_id>", methods=["GET"])
+@jwt_required()
+def family_public(family_id):
+    """Return public info about a family. Full details only if the requester is a member."""
+    user = current_user()
+    family = Family.query.get(family_id)
+    if not family:
+        return jsonify({"error": "Family not found"}), 404
+
+    # Check membership via join table
+    membership = FamilyMember.query.filter_by(user_id=user.id, family_id=family_id).first()
+    # Also accept legacy family_id on user
+    is_member = bool(membership) or (user.family_id == family_id)
+
+    # Public info — anyone can see
+    public_data = {
+        "id": family.id,
+        "name": family.name,
+        "description": family.description,
+        "member_count": len(FamilyMember.query.filter_by(family_id=family_id).all()) or len(family.members),
+        "created_at": family.created_at.isoformat(),
+    }
+
+    if not is_member:
+        # Non-member: only name, description, member count, created_at
+        # Plus first-name + avatar of up to 6 members (no emails, no roles, no invite code)
+        fm_list = FamilyMember.query.filter_by(family_id=family_id).limit(6).all()
+        preview_members = []
+        for fm in fm_list:
+            u = User.query.get(fm.user_id)
+            if u:
+                preview_members.append({
+                    "id": u.id,
+                    "name": u.name.split()[0],  # first name only
+                    "avatar_url": u.avatar_url,
+                })
+        return jsonify({
+            "family": public_data,
+            "members": preview_members,
+            "is_member": False,
+        })
+
+    # Member: full info
+    fm_list = FamilyMember.query.filter_by(family_id=family_id).all()
+    full_members = []
+    for fm in fm_list:
+        u = User.query.get(fm.user_id)
+        if u:
+            d = u.to_dict()
+            d["role"] = fm.role
+            full_members.append(d)
+
+    full_data = {
+        **public_data,
+        "invite_code": family.invite_code,
+    }
+
+    return jsonify({
+        "family": full_data,
+        "members": full_members,
+        "is_member": True,
+    })
+
+
 @family_bp.route("/create", methods=["POST"])
 @jwt_required()
 def create_family():
@@ -387,17 +451,21 @@ def share_memory():
 @family_bp.route("/user/<int:user_id>/groups", methods=["GET"])
 @jwt_required()
 def user_groups(user_id):
-    """Return admin_groups and member_groups for any user (for profile display)."""
-    memberships = FamilyMember.query.filter_by(user_id=user_id).all()
+    """Return admin_groups and member_groups for any user based on users.family_id + users.role."""
+    target = User.query.get_or_404(user_id)
     admin_groups = []
     member_groups = []
-    for fm in memberships:
-        f = Family.query.get(fm.family_id)
-        if not f:
-            continue
-        entry = {"id": f.id, "name": f.name, "cover_url": f.cover_url, "member_count": len(f.family_members)}
-        if fm.role == "admin":
-            admin_groups.append(entry)
-        else:
-            member_groups.append(entry)
+    if target.family_id:
+        f = Family.query.get(target.family_id)
+        if f:
+            entry = {
+                "id": f.id,
+                "name": f.name,
+                "cover_url": f.cover_url,
+                "member_count": User.query.filter_by(family_id=f.id).count(),
+            }
+            if target.role == "admin":
+                admin_groups.append(entry)
+            else:
+                member_groups.append(entry)
     return jsonify({"admin_groups": admin_groups, "member_groups": member_groups})

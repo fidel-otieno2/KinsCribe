@@ -50,6 +50,10 @@ export default function PostDetailScreen({ route, navigation }) {
       setLikeCount(p.like_count);
       setSaved(p.saved_by_me);
       setComments(commentsRes.data.comments || []);
+      // Record view (fire-and-forget, skip own posts)
+      if (p.user_id !== user?.id) {
+        api.post(`/posts/${postId}/view`).catch(() => {});
+      }
     } catch { error('Failed to load post'); }
     finally { setLoading(false); }
   }, [postId]);

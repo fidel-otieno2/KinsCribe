@@ -10,7 +10,7 @@ import { useTranslation } from '../i18n';
 import { colors, radius, shadows } from '../theme';
 import GradientButton from '../components/GradientButton';
 
-export default function FamilyGateScreen() {
+export default function FamilyGateScreen({ navigation }) {
   const { user, refreshUser } = useAuth();
   const { t } = useTranslation();
   const [view, setView] = useState(null);
@@ -18,19 +18,32 @@ export default function FamilyGateScreen() {
   const [createForm, setCreateForm] = useState({ name: '', description: '' });
   const [inviteCode, setInviteCode] = useState('');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   const handleCreate = async () => {
-    setError(''); setLoading(true);
-    try { await api.post('/family/create', createForm); await refreshUser(); }
-    catch (err) { setError(err.response?.data?.error || 'Failed'); }
-    finally { setLoading(false); }
+    if (!createForm.name.trim()) return setError('Please enter a family name');
+    setError(''); setSuccess(''); setLoading(true);
+    try {
+      const { data } = await api.post('/family/create', createForm);
+      await refreshUser();
+      setSuccess(`"${data.family.name}" created! Taking you in...`);
+      setTimeout(() => navigation.replace('Main'), 1200);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to create family. Please try again.');
+    } finally { setLoading(false); }
   };
 
   const handleJoin = async () => {
-    setError(''); setLoading(true);
-    try { await api.post('/family/join', { invite_code: inviteCode }); await refreshUser(); }
-    catch (err) { setError(err.response?.data?.error || 'Invalid code'); }
-    finally { setLoading(false); }
+    if (!inviteCode.trim()) return setError('Please enter an invite code');
+    setError(''); setSuccess(''); setLoading(true);
+    try {
+      const { data } = await api.post('/family/join', { invite_code: inviteCode });
+      await refreshUser();
+      setSuccess(`Joined "${data.family.name}"! Taking you in...`);
+      setTimeout(() => navigation.replace('Main'), 1200);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Invalid code. Please try again.');
+    } finally { setLoading(false); }
   };
 
   return (
@@ -88,6 +101,13 @@ export default function FamilyGateScreen() {
                 <View style={s.errorBox}>
                   <Ionicons name="alert-circle" size={16} color="#f87171" />
                   <AppText style={s.errorText}>{error}</AppText>
+                </View>
+              ) : null}
+
+              {success ? (
+                <View style={s.successBox}>
+                  <Ionicons name="checkmark-circle" size={16} color="#34d399" />
+                  <AppText style={s.successText}>{success}</AppText>
                 </View>
               ) : null}
 
@@ -149,6 +169,8 @@ const s = StyleSheet.create({
   optSub: { fontSize: 12, color: colors.muted },
   errorBox: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(248,113,113,0.1)', borderWidth: 1, borderColor: 'rgba(248,113,113,0.3)', borderRadius: radius.sm, padding: 12, marginBottom: 16 },
   errorText: { color: '#f87171', fontSize: 13, flex: 1 },
+  successBox: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(52,211,153,0.1)', borderWidth: 1, borderColor: 'rgba(52,211,153,0.3)', borderRadius: radius.sm, padding: 12, marginBottom: 16 },
+  successText: { color: '#34d399', fontSize: 13, flex: 1, fontWeight: '600' },
   inputLabel: { fontSize: 13, color: colors.muted, marginBottom: 8, fontWeight: '500' },
   inputWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(30,41,59,0.8)', borderWidth: 1, borderColor: colors.border2, borderRadius: radius.md, paddingHorizontal: 14, marginBottom: 16 },
   input: { paddingVertical: 14, color: colors.text, fontSize: 14 },

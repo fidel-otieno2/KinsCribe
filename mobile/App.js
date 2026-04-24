@@ -56,6 +56,7 @@ import EditProfileScreen from "./src/screens/EditProfileScreen";
 import PostDetailScreen from "./src/screens/PostDetailScreen";
 import MessageRequestsScreen from "./src/screens/MessageRequestsScreen";
 import CallScreen from "./src/screens/CallScreen";
+import FamilyPublicScreen from "./src/screens/FamilyPublicScreen";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -270,6 +271,7 @@ function RootNavigator({ navigationRef }) {
           <Stack.Screen name="PostDetail" component={PostDetailScreen} options={{ animation: "slide_from_right" }} />
           <Stack.Screen name="MessageRequests" component={MessageRequestsScreen} options={{ animation: "slide_from_right" }} />
           <Stack.Screen name="Call" component={CallScreen} options={{ animation: "slide_from_bottom", presentation: "fullScreenModal" }} />
+          <Stack.Screen name="FamilyPublic" component={FamilyPublicScreen} options={{ animation: "slide_from_right" }} />
           <Stack.Screen name="JoinFamily" component={JoinFamilyScreen} options={{ animation: "slide_from_right" }} />
           <Stack.Screen name="FamilyGate" component={FamilyGateScreen} options={{ animation: "slide_from_right" }} />
         </>

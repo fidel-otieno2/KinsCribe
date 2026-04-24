@@ -385,7 +385,7 @@ export default function ProfileScreen({ navigation }) {
       <View style={[s.actionRow, { marginTop: -6 }]}>
         <TouchableOpacity
           style={[s.editBtn, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]}
-          onPress={() => navigation.navigate('Family')}
+          onPress={() => navigation.navigate('FamilyPublic', { familyId: user?.family_id })}
           activeOpacity={0.75}
         >
           <Ionicons name="people-outline" size={15} color={theme.gold} />
@@ -413,7 +413,7 @@ export default function ProfileScreen({ navigation }) {
       {family && (
         <TouchableOpacity
           style={[s.familyCard, { backgroundColor: theme.bgCard, borderColor: theme.borderFamily }]}
-          onPress={() => navigation.navigate('Family')}
+          onPress={() => navigation.navigate('FamilyPublic', { familyId: family.id })}
           activeOpacity={0.85}
         >
           <LinearGradient colors={['#8B5E3C', '#C4A35A']} style={s.familyIconWrap}>
@@ -426,13 +426,6 @@ export default function ProfileScreen({ navigation }) {
           <Ionicons name="chevron-forward" size={16} color={theme.dim} />
         </TouchableOpacity>
       )}
-
-      {/* Groups (admin + member) */}
-      <ProfileGroupsSection
-        adminGroups={myGroups.admin_groups}
-        memberGroups={myGroups.member_groups}
-        onGroupPress={() => navigation.navigate('Family')}
-      />
 
       {/* Story Highlights */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.highlightsRow}>
@@ -724,6 +717,12 @@ export default function ProfileScreen({ navigation }) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchAll(); }} tintColor={theme.primary} />}
       >
         <Header />
+        {/* Groups (admin + member) — rendered outside Header to preserve open/close state */}
+        <ProfileGroupsSection
+          adminGroups={myGroups.admin_groups}
+          memberGroups={myGroups.member_groups}
+          onGroupPress={() => navigation.navigate('Family')}
+        />
         {currentData.length === 0 ? (
           <View style={s.empty}>
             <Ionicons

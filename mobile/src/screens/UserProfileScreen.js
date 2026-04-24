@@ -288,11 +288,6 @@ export default function UserProfileScreen({ route, navigation }) {
       )}
 
       {/* Tab toggle — only show if not locked */}
-      <ProfileGroupsSection
-        adminGroups={userGroups.admin_groups}
-        memberGroups={userGroups.member_groups}
-        onGroupPress={() => {}}
-      />
 
       {!locked && (
         <View style={s.tabRow}>
@@ -317,6 +312,12 @@ export default function UserProfileScreen({ route, navigation }) {
     <View style={s.container}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
         <Header />
+        {/* Groups section — outside Header to keep open/close state stable */}
+        <ProfileGroupsSection
+          adminGroups={userGroups.admin_groups}
+          memberGroups={userGroups.member_groups}
+          onGroupPress={() => {}}
+        />
 
         {/* Private / locked state */}
         {locked ? (

@@ -369,20 +369,298 @@ def get_post_insights(post_id):
 @extras_bp.route("/insights/profile", methods=["GET"])
 @jwt_required()
 def profile_insights():
+    from models.social import Message, Conversation, ConversationParticipant, PublicStory, PublicStoryView
+    from models.family import FamilyMember
+    from models.story import Story
+    from models.notifications import Notification
+    from sqlalchemy import text, func
+    from datetime import timedelta
     current_id = int(get_jwt_identity())
+    user = me()
+    now = datetime.utcnow()
+    week_ago = now - timedelta(days=7)
+    month_ago = now - timedelta(days=30)
+
     posts = Post.query.filter_by(user_id=current_id).all()
     total_likes = sum(len(p.likes) for p in posts)
     total_comments = sum(len(p.comments) for p in posts)
     total_saves = sum(len(p.saves) for p in posts)
-    connections_count = Connection.query.filter_by(following_id=current_id).count()
-    interests_count = Connection.query.filter_by(follower_id=current_id).count()
+    total_shares = sum(p.share_count or 0 for p in posts)
+    total_views = sum(p.view_count or 0 for p in posts)
+    connections_count = Connection.query.filter_by(following_id=current_id, status="accepted").count()
+    interests_count = Connection.query.filter_by(follower_id=current_id, status="accepted").count()
+
+    # Engagement rate
+    eng_rate = 0
+    if total_views > 0:
+        eng_rate = round(((total_likes + total_comments + total_shares) / total_views) * 100, 1)
+
+    # Top 5 posts by engagement (likes + comments + saves)
+    top_posts = sorted(posts, key=lambda p: len(p.likes) + len(p.comments) + len(p.saves), reverse=True)[:5]
+
+    # Posts by type
+    type_counts = {}
+    for p in posts:
+        t = p.media_type or "text"
+        type_counts[t] = type_counts.get(t, 0) + 1
+
+    # Voice posts stats
+    voice_posts = [p for p in posts if p.media_type == "audio"]
+    voice_plays = sum(p.view_count or 0 for p in voice_posts)
+
+    # Weekly growth: connections gained in last 7 days
+    new_connections = Connection.query.filter(
+        Connection.following_id == current_id,
+        Connection.status == "accepted",
+        Connection.created_at >= week_ago
+    ).count()
+
+    # 7-day daily growth trend (new connections per day)
+    weekly_trend = []
+    for i in range(6, -1, -1):
+        day_start = now - timedelta(days=i+1)
+        day_end = now - timedelta(days=i)
+        count = Connection.query.filter(
+            Connection.following_id == current_id,
+            Connection.status == "accepted",
+            Connection.created_at >= day_start,
+            Connection.created_at < day_end
+        ).count()
+        weekly_trend.append({"day": day_start.strftime("%a"), "count": count})
+
+    # Top interactive connections (users who liked/commented most on my posts)
+    top_connections = []
+    try:
+        from models.social import PostLike, PostComment
+        post_ids = [p.id for p in posts]
+        if post_ids:
+            liker_counts = db.session.query(
+                PostLike.user_id, func.count(PostLike.id).label("cnt")
+            ).filter(
+                PostLike.post_id.in_(post_ids),
+                PostLike.user_id != current_id
+            ).group_by(PostLike.user_id).order_by(func.count(PostLike.id).desc()).limit(5).all()
+            for row in liker_counts:
+                u = User.query.get(row[0])
+                if u:
+                    top_connections.append({"id": u.id, "name": u.name, "avatar": u.avatar_url, "interactions": row[1]})
+    except Exception:
+        pass
+
+    # Messages stats
+    msgs_sent = 0
+    msgs_received = 0
+    active_convs = 0
+    top_chatters = []
+    try:
+        my_parts = ConversationParticipant.query.filter_by(user_id=current_id).all()
+        conv_ids = [p.conversation_id for p in my_parts]
+        active_convs = len(conv_ids)
+        msgs_sent = Message.query.filter_by(sender_id=current_id).count()
+        msgs_received = Message.query.filter(
+            Message.conversation_id.in_(conv_ids),
+            Message.sender_id != current_id
+        ).count()
+        if conv_ids:
+            top_raw = db.session.execute(text("""
+                SELECT m.sender_id, COUNT(*) as cnt
+                FROM messages m
+                WHERE m.conversation_id = ANY(:cids)
+                AND m.sender_id != :uid
+                GROUP BY m.sender_id
+                ORDER BY cnt DESC
+                LIMIT 5
+            """), {"cids": conv_ids, "uid": current_id}).fetchall()
+            for row in top_raw:
+                u = User.query.get(row[0])
+                if u:
+                    top_chatters.append({"id": u.id, "name": u.name, "avatar": u.avatar_url, "count": row[1]})
+    except Exception:
+        pass
+
+    # Notification insights
+    notif_data = {}
+    try:
+        total_notifs = Notification.query.filter_by(user_id=current_id).count()
+        unread_notifs = Notification.query.filter_by(user_id=current_id, is_read=False).count()
+        new_conn_notifs = Notification.query.filter(
+            Notification.user_id == current_id,
+            Notification.type == "connection",
+            Notification.created_at >= week_ago
+        ).count()
+        mention_notifs = Notification.query.filter(
+            Notification.user_id == current_id,
+            Notification.type == "mention",
+        ).count()
+        notif_data = {
+            "total": total_notifs,
+            "unread": unread_notifs,
+            "new_connections_notifs": new_conn_notifs,
+            "mentions": mention_notifs,
+        }
+    except Exception:
+        pass
+
+    # Public stories stats
+    stories_count = 0
+    story_views = 0
+    story_replies = 0
+    top_story = None
+    music_counts = {}
+    try:
+        my_stories = PublicStory.query.filter_by(user_id=current_id).all()
+        stories_count = len(my_stories)
+        story_views = sum(s.view_count or 0 for s in my_stories)
+        # replies = messages that reference a story (media_type='story_reply')
+        story_replies = Message.query.filter_by(sender_id=current_id, media_type="story_reply").count()
+        # Top story by views
+        if my_stories:
+            best = max(my_stories, key=lambda s: s.view_count or 0)
+            top_story = {
+                "id": best.id,
+                "media_url": best.media_url,
+                "media_type": best.media_type,
+                "views": best.view_count or 0,
+                "music_name": best.music_name,
+            }
+        # Music usage from stories
+        for s in my_stories:
+            if s.music_name:
+                music_counts[s.music_name] = music_counts.get(s.music_name, 0) + 1
+    except Exception:
+        pass
+
+    # Music from family stories
+    try:
+        fam_stories_all = Story.query.filter_by(user_id=current_id).all()
+        for s in fam_stories_all:
+            if s.music_name:
+                music_counts[s.music_name] = music_counts.get(s.music_name, 0) + 1
+    except Exception:
+        pass
+
+    top_music = sorted(music_counts.items(), key=lambda x: x[1], reverse=True)[:5]
+    top_music = [{"name": k, "count": v} for k, v in top_music]
+
+    # Family insights
+    family_data = {}
+    if user.family_id:
+        try:
+            fm_list = FamilyMember.query.filter_by(family_id=user.family_id).all()
+            fam_conv = Conversation.query.filter_by(type="family", family_id=user.family_id).first()
+            most_active_member = None
+            fam_msg_count = 0
+            fam_group_eng_rate = 0
+            if fam_conv:
+                fam_msg_count = Message.query.filter_by(conversation_id=fam_conv.id).count()
+                top_fam = db.session.execute(text("""
+                    SELECT sender_id, COUNT(*) as cnt
+                    FROM messages WHERE conversation_id = :cid
+                    GROUP BY sender_id ORDER BY cnt DESC LIMIT 1
+                """), {"cid": fam_conv.id}).fetchone()
+                if top_fam:
+                    u = User.query.get(top_fam[0])
+                    if u:
+                        most_active_member = {"id": u.id, "name": u.name, "avatar": u.avatar_url, "count": top_fam[1]}
+                # Group engagement rate: msgs / members
+                if len(fm_list) > 0:
+                    fam_group_eng_rate = round(fam_msg_count / len(fm_list), 1)
+            fam_stories_count = Story.query.filter_by(family_id=user.family_id).count()
+            # Most viewed family story
+            best_fam_story = Story.query.filter_by(family_id=user.family_id).order_by(
+                Story.repost_count.desc()
+            ).first()
+            # Mention count in family group
+            mention_count = 0
+            if fam_conv:
+                try:
+                    mention_count = db.session.execute(text("""
+                        SELECT COUNT(*) FROM messages
+                        WHERE conversation_id = :cid
+                        AND mentions IS NOT NULL AND mentions != '[]'
+                    """), {"cid": fam_conv.id}).scalar() or 0
+                except Exception:
+                    pass
+            family_data = {
+                "member_count": len(fm_list),
+                "total_messages": fam_msg_count,
+                "most_active_member": most_active_member,
+                "total_stories": fam_stories_count,
+                "group_engagement_rate": fam_group_eng_rate,
+                "mention_count": mention_count,
+                "most_viewed_story": best_fam_story.title if best_fam_story else None,
+            }
+        except Exception:
+            pass
+
+    # AI insights — dynamic based on real data
+    ai_insights = []
+    if type_counts.get("video", 0) > type_counts.get("image", 0):
+        ai_insights.append("Your videos get more engagement than photos — keep posting videos.")
+    elif type_counts.get("image", 0) > 0:
+        ai_insights.append("Posts with images perform well — try adding short videos to boost reach.")
+    if eng_rate >= 5:
+        ai_insights.append(f"Your {eng_rate}% engagement rate is excellent — you're in the top tier.")
+    elif eng_rate > 0:
+        ai_insights.append(f"Your engagement rate is {eng_rate}%. Replying to comments can push it above 5%.")
+    if new_connections > 5:
+        ai_insights.append(f"You gained {new_connections} new connections this week — your content is reaching new people.")
+    if top_music:
+        ai_insights.append(f"Stories with music get more views. Your most used song: '{top_music[0]['name']}'.")
+    if voice_posts:
+        ai_insights.append(f"You have {len(voice_posts)} voice posts with {voice_plays} total plays — voice content builds intimacy.")
+    if not ai_insights:
+        ai_insights.append("Post consistently and engage with comments to unlock deeper insights.")
+
     return jsonify({
+        # Overview
         "total_posts": len(posts),
         "total_likes": total_likes,
         "total_comments": total_comments,
         "total_saves": total_saves,
+        "total_shares": total_shares,
+        "total_views": total_views,
         "connections": connections_count,
-        "interests": interests_count
+        "interests": interests_count,
+        "new_connections_this_week": new_connections,
+        "engagement_rate": eng_rate,
+        # Content
+        "top_posts": [{
+            "id": p.id,
+            "caption": (p.caption or "")[:60],
+            "media_url": p.media_url,
+            "media_type": p.media_type,
+            "likes": len(p.likes),
+            "comments": len(p.comments),
+            "saves": len(p.saves),
+            "shares": p.share_count or 0,
+            "views": p.view_count or 0,
+        } for p in top_posts],
+        "content_types": type_counts,
+        "stories_count": stories_count,
+        "story_views": story_views,
+        "story_replies": story_replies,
+        "top_story": top_story,
+        # Voice
+        "voice_posts_count": len(voice_posts),
+        "voice_plays": voice_plays,
+        # Music
+        "top_music": top_music,
+        # Activity
+        "weekly_trend": weekly_trend,
+        # Audience
+        "top_connections": top_connections,
+        # Messaging
+        "messages_sent": msgs_sent,
+        "messages_received": msgs_received,
+        "active_conversations": active_convs,
+        "top_chatters": top_chatters,
+        # Notifications
+        "notifications": notif_data,
+        # Family
+        "family": family_data,
+        # AI
+        "ai_insights": ai_insights,
     })
 
 

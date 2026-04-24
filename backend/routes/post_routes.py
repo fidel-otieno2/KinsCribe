@@ -247,6 +247,18 @@ def liked_posts(user_id):
     return jsonify({"posts": result})
 
 
+@post_bp.route("/<int:post_id>/view", methods=["POST"])
+@jwt_required()
+def record_view(post_id):
+    current_id = int(get_jwt_identity())
+    post = Post.query.get_or_404(post_id)
+    # Don't count the author viewing their own post
+    if post.user_id != current_id:
+        post.view_count = (post.view_count or 0) + 1
+        db.session.commit()
+    return jsonify({"view_count": post.view_count or 0})
+
+
 @post_bp.route("/<int:post_id>/share", methods=["POST"])
 @jwt_required()
 def share_post(post_id):
