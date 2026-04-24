@@ -5,7 +5,7 @@ const config = getDefaultConfig(__dirname);
 // Exclude folders that don't exist / shouldn't be watched
 config.watchFolders = [__dirname];
 config.resolver.blockList = [
-  /dist\/.*/,
+  /^(?!.*node_modules).*\/dist\/.*/,
   /\.expo\/.*/,
 ];
 

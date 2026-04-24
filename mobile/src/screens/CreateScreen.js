@@ -10,7 +10,6 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useTranslation } from '../i18n';
@@ -80,9 +79,14 @@ export default function CreateScreen({ navigation }) {
   const [showMusicModal, setShowMusicModal] = useState(false);
   const [selectedMusic, setSelectedMusic] = useState(null);
 
-  // Schedule state
+  // Schedule state — custom picker, no native module needed
   const [showSchedulePicker, setShowSchedulePicker] = useState(false);
   const [scheduledDate, setScheduledDate] = useState(null);
+  const [pickerDay, setPickerDay] = useState(new Date().getDate());
+  const [pickerMonth, setPickerMonth] = useState(new Date().getMonth());
+  const [pickerYear, setPickerYear] = useState(new Date().getFullYear());
+  const [pickerHour, setPickerHour] = useState(new Date().getHours());
+  const [pickerMinute, setPickerMinute] = useState(0);
 
   // Story state
   const [textContent, setTextContent] = useState('');
@@ -175,12 +179,29 @@ export default function CreateScreen({ navigation }) {
   const generateCaption = async () => {
     setGeneratingCaption(true);
     try {
-      const payload = { context: location || 'general post' };
-      if (mediaFiles[0]) payload.mediaType = mediaFiles[0].type;
-      const { data } = await api.post('/ai/generate-caption', payload);
+      // Build context from whatever the user has: image, location, mode
+      let context = '';
+      if (mediaFiles.length > 0) {
+        const types = mediaFiles.map(f => f.type);
+        const hasVideo = types.includes('video');
+        const count = mediaFiles.length;
+        context = count > 1
+          ? `${count} photos${hasVideo ? ' and videos' : ''}`
+          : hasVideo ? 'a video' : 'a photo';
+      }
+      if (location) context += ` at ${location}`;
+      if (mode === 'family') context += ' for a family memory';
+      if (!context) context = 'a social media post';
+
+      const { data } = await api.post('/ai/caption', {
+        context,
+        tone: 'warm',
+      });
       if (data.caption) {
         setCaption(data.caption);
         checkTone(data.caption);
+        // Auto-suggest hashtags right after caption is generated
+        suggestHashtagsForCaption(data.caption);
       }
     } catch {
       info('Caption generation unavailable');
@@ -188,11 +209,23 @@ export default function CreateScreen({ navigation }) {
   };
 
   // ─── AI: HASHTAG SUGGESTIONS ────────────────────────────────────
-  const suggestHashtags = async () => {
-    if (!caption || caption.length < 10) return info('Write a caption first');
+  const suggestHashtagsForCaption = async (text) => {
+    if (!text || text.length < 5) return;
     setLoadingHashtags(true);
     try {
-      const { data } = await api.post('/ai/suggest-hashtags', { text: caption, location });
+      const { data } = await api.post('/ai/hashtags', { caption: text });
+      setHashtagSuggestions(data.hashtags || []);
+    } catch {
+      setHashtagSuggestions(['#explore', '#trending', '#viral', '#photooftheday']);
+    } finally { setLoadingHashtags(false); }
+  };
+
+  const suggestHashtags = async () => {
+    const text = caption.trim();
+    if (!text) return info('Write a caption first');
+    setLoadingHashtags(true);
+    try {
+      const { data } = await api.post('/ai/hashtags', { caption: text });
       setHashtagSuggestions(data.hashtags || []);
     } catch {
       setHashtagSuggestions(['#explore', '#trending', '#viral', '#photooftheday']);
@@ -272,15 +305,118 @@ export default function CreateScreen({ navigation }) {
     } catch { info('Could not process image'); }
   };
 
-  // ─── SCHEDULE ───────────────────────────────────────────────────
-  const onScheduleChange = (event, date) => {
-    setShowSchedulePicker(Platform.OS === 'ios');
-    if (date) setScheduledDate(date);
+  // ─── CUSTOM SCHEDULE PICKER ─────────────────────────────────────
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  const getDaysInMonth = (month, year) => new Date(year, month + 1, 0).getDate();
+
+  const confirmSchedule = () => {
+    const days = getDaysInMonth(pickerMonth, pickerYear);
+    const safeDay = Math.min(pickerDay, days);
+    const d = new Date(pickerYear, pickerMonth, safeDay, pickerHour, pickerMinute);
+
+    // In family mode, just set the story date string (past dates OK)
+    if (mode === 'family') {
+      setStoryDate(`${pickerYear}-${String(pickerMonth + 1).padStart(2, '0')}-${String(safeDay).padStart(2, '0')}`);
+      setShowSchedulePicker(false);
+      return;
+    }
+
+    if (d <= new Date()) return info('Please pick a future date and time');
+    setScheduledDate(d);
+    setShowSchedulePicker(false);
   };
 
   const formatSchedule = (date) => {
     if (!date) return '';
     return date.toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+  };
+
+  const captionDebounce = useRef(null);
+  const handleCaptionChange = (v) => {
+    setCaption(v);
+    checkTone(v);
+    // Auto-suggest hashtags after user stops typing for 1.5s
+    clearTimeout(captionDebounce.current);
+    if (v.length > 15) {
+      captionDebounce.current = setTimeout(() => suggestHashtagsForCaption(v), 1500);
+    } else {
+      setHashtagSuggestions([]);
+    }
+  };
+    <View style={s.pickerCol}>
+      <AppText style={s.pickerColLabel}>{label}</AppText>
+      <ScrollView style={s.pickerScroll} showsVerticalScrollIndicator={false}>
+        {values.map((v, i) => (
+          <TouchableOpacity key={i} style={[s.pickerItem, selected === v && s.pickerItemActive]} onPress={() => onSelect(v)}>
+            <AppText style={[s.pickerItemText, selected === v && s.pickerItemTextActive]}>
+              {String(v).padStart(2, '0')}
+            </AppText>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    </View>
+  );
+
+  const SchedulePickerModal = () => {
+    const now = new Date();
+    const years = [now.getFullYear(), now.getFullYear() + 1];
+    const days = Array.from({ length: getDaysInMonth(pickerMonth, pickerYear) }, (_, i) => i + 1);
+    const hours = Array.from({ length: 24 }, (_, i) => i);
+    const minutes = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
+
+    return (
+      <Modal visible={showSchedulePicker} animationType="slide" transparent>
+        <View style={s.modalOverlay}>
+          <View style={[s.modalSheet, { backgroundColor: theme.bgCard }]}>
+            <View style={s.modalHandle} />
+            <AppText style={[s.modalTitle, { color: theme.text }]}>Schedule Post</AppText>
+
+            <View style={s.pickerRow}>
+              <PickerColumn
+                label="Day"
+                values={days}
+                selected={pickerDay}
+                onSelect={setPickerDay}
+              />
+              <PickerColumn
+                label="Month"
+                values={MONTHS}
+                selected={MONTHS[pickerMonth]}
+                onSelect={(v) => setPickerMonth(MONTHS.indexOf(v))}
+              />
+              <PickerColumn
+                label="Year"
+                values={years}
+                selected={pickerYear}
+                onSelect={setPickerYear}
+              />
+              <PickerColumn
+                label="Hour"
+                values={hours}
+                selected={pickerHour}
+                onSelect={setPickerHour}
+              />
+              <PickerColumn
+                label="Min"
+                values={minutes}
+                selected={pickerMinute}
+                onSelect={setPickerMinute}
+              />
+            </View>
+
+            <View style={s.pickerActions}>
+              <TouchableOpacity style={[s.pickerCancelBtn, { borderColor: theme.border2 }]} onPress={() => setShowSchedulePicker(false)}>
+                <AppText style={{ color: theme.muted, fontWeight: '600' }}>Cancel</AppText>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.pickerConfirmBtn} onPress={confirmSchedule}>
+                <AppText style={{ color: '#fff', fontWeight: '700' }}>Confirm</AppText>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    );
   };
 
   // ─── POST SUBMIT ────────────────────────────────────────────────
@@ -399,6 +535,7 @@ export default function CreateScreen({ navigation }) {
     <KeyboardAvoidingView style={[s.container, { backgroundColor: theme.bg }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <Toast visible={toast.visible} type={toast.type} message={toast.message} onHide={hide} />
       <MusicModal />
+      <SchedulePickerModal />
 
       <LinearGradient
         colors={isDark ? ['#0f172a', '#1e1040', '#0f172a'] : [theme.bg, theme.bgSecondary, theme.bg]}
@@ -537,7 +674,7 @@ export default function CreateScreen({ navigation }) {
                 placeholderTextColor={theme.dim}
                 multiline
                 value={caption}
-                onChangeText={(v) => { setCaption(v); checkTone(v); }}
+                onChangeText={handleCaptionChange}
                 maxLength={2200}
               />
               <View style={s.captionFooter}>
@@ -661,16 +798,6 @@ export default function CreateScreen({ navigation }) {
                 </TouchableOpacity>
               )}
             </TouchableOpacity>
-
-            {showSchedulePicker && (
-              <DateTimePicker
-                value={scheduledDate || new Date()}
-                mode="datetime"
-                minimumDate={new Date()}
-                onChange={onScheduleChange}
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-              />
-            )}
 
             {/* Privacy */}
             <AppText style={[s.label, { color: theme.muted }]}>{t('audience')}</AppText>
@@ -839,18 +966,6 @@ export default function CreateScreen({ navigation }) {
               </AppText>
             </TouchableOpacity>
 
-            {showSchedulePicker && (
-              <DateTimePicker
-                value={new Date()}
-                mode="date"
-                maximumDate={new Date()}
-                onChange={(e, d) => {
-                  setShowSchedulePicker(false);
-                  if (d) setStoryDate(d.toISOString().split('T')[0]);
-                }}
-              />
-            )}
-
             <AppText style={[s.label, { color: theme.muted }]}>Privacy</AppText>
             <View style={s.privacyRow}>
               {[
@@ -982,4 +1097,17 @@ const s = StyleSheet.create({
   musicArtist: { fontSize: 12, marginTop: 2 },
   musicDuration: { fontSize: 12 },
   modalClose: { margin: 16, padding: 14, borderRadius: radius.md, borderWidth: 1, alignItems: 'center' },
+
+  // Custom schedule picker
+  pickerRow: { flexDirection: 'row', paddingHorizontal: 16, gap: 6, marginBottom: 20 },
+  pickerCol: { flex: 1, alignItems: 'center' },
+  pickerColLabel: { fontSize: 9, fontWeight: '700', color: '#7c3aed', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 8 },
+  pickerScroll: { height: 160 },
+  pickerItem: { paddingVertical: 8, paddingHorizontal: 4, borderRadius: 8, marginBottom: 2, alignItems: 'center' },
+  pickerItemActive: { backgroundColor: '#7c3aed' },
+  pickerItemText: { fontSize: 13, color: '#64748b', fontWeight: '500' },
+  pickerItemTextActive: { color: '#fff', fontWeight: '700' },
+  pickerActions: { flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingBottom: 8 },
+  pickerCancelBtn: { flex: 1, padding: 14, borderRadius: radius.md, borderWidth: 1, alignItems: 'center' },
+  pickerConfirmBtn: { flex: 1, padding: 14, borderRadius: radius.md, alignItems: 'center', backgroundColor: '#7c3aed' },
 });

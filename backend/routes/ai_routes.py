@@ -137,9 +137,14 @@ def generate_caption():
     tone = data.get("tone", "warm")  # warm | funny | inspiring | professional
     if not context:
         return jsonify({"caption": ""}), 400
-    prompt = f"""Write a compelling social media caption for this content: "{context}"
-Tone: {tone}. Keep it under 150 characters. Make it engaging and personal.
-Return only the caption text, no quotes, no explanation."""
+    prompt = f"""You are a creative social media caption writer.
+The user is posting: {context}
+Write a compelling, engaging caption. Tone: {tone}.
+Rules:
+- Under 150 characters
+- No hashtags (those come separately)
+- Make it feel personal and real, not generic
+- Return ONLY the caption text, no quotes, no explanation"""
     try:
         return jsonify({"caption": chat_completion(prompt).strip('"').strip()})
     except Exception:
