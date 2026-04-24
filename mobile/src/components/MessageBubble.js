@@ -16,7 +16,9 @@ const SPEEDS = [1, 1.5, 2];
 const BARS = 28;
 
 function timeStr(dateStr) {
+  if (!dateStr) return '';
   const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '';
   return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
 }
 

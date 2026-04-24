@@ -279,7 +279,7 @@ def send_message(conv_id):
                     "title": f"{user.name} mentioned you in a message",
                     "body": text_body[:80],
                     "conversation_id": conv_id,
-                    "created_at": msg.created_at.isoformat(),
+                    "created_at": msg.created_at.strftime('%Y-%m-%dT%H:%M:%SZ'),
                 })
 
     return jsonify({"message": msg.to_dict(user.id)}), 201
@@ -354,7 +354,7 @@ def get_presence(user_id):
         status = "recently"
     else:
         status = "offline"
-    return jsonify({"status": status, "last_seen": last_seen.isoformat(), "seconds_ago": int(diff)})
+    return jsonify({"status": status, "last_seen": last_seen.strftime('%Y-%m-%dT%H:%M:%SZ'), "seconds_ago": int(diff)})
 
 
 @message_bp.route("/conversations/<int:conv_id>/typing", methods=["POST"])

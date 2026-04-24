@@ -1,5 +1,12 @@
 from extensions import db
-from datetime import datetime
+from datetime import datetime, timezone
+
+
+def _iso(dt):
+    """Return UTC ISO string with Z suffix so JS parses it correctly."""
+    if dt is None:
+        return None
+    return dt.strftime('%Y-%m-%dT%H:%M:%SZ')
 
 
 class Block(db.Model):
@@ -21,7 +28,7 @@ class Block(db.Model):
             "blocked_name": self.blocked.name if self.blocked else None,
             "blocked_username": self.blocked.username if self.blocked else None,
             "blocked_avatar": self.blocked.avatar_url if self.blocked else None,
-            "created_at": self.created_at.isoformat(),
+            "created_at": _iso(self.created_at),
         }
 
 
@@ -38,7 +45,7 @@ class Connection(db.Model):
     def to_dict(self):
         return {"id": self.id, "follower_id": self.follower_id,
                 "following_id": self.following_id, "status": self.status,
-                "created_at": self.created_at.isoformat()}
+                "created_at": _iso(self.created_at)}
 
 
 class Post(db.Model):
@@ -104,7 +111,7 @@ class Post(db.Model):
             "alt_text": self.alt_text,
             "is_collab": self.is_collab, "collab_users": collab_users_list,
             "is_scheduled": self.is_scheduled,
-            "scheduled_at": self.scheduled_at.isoformat() if self.scheduled_at else None,
+            "scheduled_at": _iso(self.scheduled_at),
             "is_sponsored": self.is_sponsored or False,
             "sponsor_label": self.sponsor_label,
             "view_count": self.view_count, "share_count": self.share_count,
@@ -115,7 +122,7 @@ class Post(db.Model):
             "author_username": self.author.username if self.author else None,
             "author_avatar": self.author.avatar_url if self.author else None,
             "author_verified_badge": self.author.to_dict().get("verified_badge") if self.author else None,
-            "created_at": self.created_at.isoformat()
+            "created_at": _iso(self.created_at)
         }
 
 
@@ -156,7 +163,7 @@ class PostComment(db.Model):
             "author_avatar": self.commenter.avatar_url if self.commenter else None,
             "author_username": self.commenter.username if self.commenter else None,
             "reply_count": len(self.replies),
-            "created_at": self.created_at.isoformat()
+            "created_at": _iso(self.created_at)
         }
 
 
@@ -187,8 +194,8 @@ class PublicStory(db.Model):
             "music_url": self.music_url, "music_name": self.music_name,
             "privacy": self.privacy, "view_count": self.view_count,
             "viewed_by_me": viewed,
-            "expires_at": self.expires_at.isoformat(),
-            "created_at": self.created_at.isoformat(),
+            "expires_at": _iso(self.expires_at),
+            "created_at": _iso(self.created_at),
             "user_id": self.user_id,
             "author_name": self.author.name if self.author else None,
             "author_avatar": self.author.avatar_url if self.author else None,
@@ -218,7 +225,7 @@ class StoryHighlight(db.Model):
         return {
             "id": self.id, "title": self.title, "cover_url": self.cover_url,
             "user_id": self.user_id, "item_count": len(self.items),
-            "created_at": self.created_at.isoformat()
+            "created_at": _iso(self.created_at)
         }
 
 
@@ -235,7 +242,7 @@ class StoryHighlightItem(db.Model):
         return {
             "id": self.id, "highlight_id": self.highlight_id,
             "media_url": self.media_url, "media_type": self.media_type,
-            "created_at": self.created_at.isoformat()
+            "created_at": _iso(self.created_at)
         }
 
 
@@ -277,7 +284,7 @@ class Conversation(db.Model):
             "id": self.id, "type": self.type, "name": self.name,
             "family_id": self.family_id, "other_user": other,
             "last_message": last_msg.to_dict() if last_msg else None,
-            "unread_count": unread, "created_at": self.created_at.isoformat(),
+            "unread_count": unread, "created_at": _iso(self.created_at),
             "pinned_message_id": pinned,
         }
 
@@ -345,7 +352,7 @@ class Message(db.Model):
             "sender_avatar": self.sender.avatar_url if self.sender else None,
             "sender_username": self.sender.username if self.sender else None,
             "reactions": [r.to_dict() for r in self.reactions],
-            "created_at": self.created_at.isoformat()
+            "created_at": _iso(self.created_at)
         }
 
 
@@ -422,7 +429,7 @@ class MessageRequest(db.Model):
             "conversation_id": self.conversation_id,
             "preview_text": preview,
             "status": self.status,
-            "created_at": self.created_at.isoformat(),
+            "created_at": _iso(self.created_at),
         }
 
 

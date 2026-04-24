@@ -20,8 +20,22 @@ import { useAuth } from "../context/AuthContext";
 import { colors, radius } from "../theme";
 
 function timeStr(dateStr) {
+  if (!dateStr) return '';
   const d = new Date(dateStr);
-  return d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true });
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+}
+
+function lastSeenStr(status, secondsAgo) {
+  if (!status || status === 'online') return null;
+  if (secondsAgo != null) {
+    if (secondsAgo < 60) return 'Active just now';
+    if (secondsAgo < 3600) return `Active ${Math.floor(secondsAgo / 60)}m ago`;
+    if (secondsAgo < 86400) return `Active ${Math.floor(secondsAgo / 3600)}h ago`;
+    return `Active ${Math.floor(secondsAgo / 86400)}d ago`;
+  }
+  if (status === 'recently') return 'Active recently';
+  return 'Offline';
 }
 
 
@@ -102,7 +116,7 @@ export default function ChatScreen({ route, navigation }) {
   const [msgActionSheet, setMsgActionSheet] = useState(null); // { item, isMe }
   const [disappearing, setDisappearing] = useState(false);
   const [typingNames, setTypingNames] = useState([]);
-  const [otherStatus, setOtherStatus] = useState(null);
+  const [otherStatus, setOtherStatus] = useState(null); // { status, seconds_ago }
   const [smartReplies, setSmartReplies] = useState([]);
   const [forwardMsg, setForwardMsg] = useState(null);
   const [conversations, setConversations] = useState([]);
@@ -216,7 +230,7 @@ export default function ChatScreen({ route, navigation }) {
       if (!otherUserId) return;
       try {
         const { data } = await api.get(`/messages/presence/${otherUserId}`);
-        setOtherStatus(data.status);
+        setOtherStatus(data); // { status, seconds_ago, last_seen }
       } catch {}
     };
     pollTyping(); pollPresence();
@@ -729,9 +743,8 @@ export default function ChatScreen({ route, navigation }) {
           <AppText style={cs.headerTitle}>{title}</AppText>
           <AppText style={cs.headerSub}>
             {type === "family" ? t('family_group') :
-              otherStatus === "online" ? "🟢 Online" :
-              otherStatus === "recently" ? "Recently active" :
-              "Active recently"}
+              otherStatus?.status === "online" ? "🟢 Online" :
+              lastSeenStr(otherStatus?.status, otherStatus?.seconds_ago) || ""}
           </AppText>
         </TouchableOpacity>
 
