@@ -223,6 +223,18 @@ def send_message(conv_id):
     db.session.add(msg)
     db.session.flush()
 
+    # Save message_type if provided (call_started / call_ended)
+    msg_type = data.get("message_type", "text")
+    if msg_type and msg_type != "text":
+        try:
+            from sqlalchemy import text as sqlt
+            db.session.execute(
+                sqlt("UPDATE messages SET message_type = :t WHERE id = :id"),
+                {"t": msg_type, "id": msg.id}
+            )
+        except Exception:
+            pass
+
     # Handle poll
     poll_data = data.get("poll")
     if poll_data:

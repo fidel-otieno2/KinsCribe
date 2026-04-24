@@ -9,6 +9,7 @@ import { useEffect, useState, useRef } from "react";
 import * as Notifications from "expo-notifications";
 import api from "./src/api/axios";
 import { useTranslation } from "./src/i18n";
+import useIncomingCall from "./src/hooks/useIncomingCall";
 
 import { AuthProvider, useAuth } from "./src/context/AuthContext";
 import { ThemeProvider, useTheme } from "./src/context/ThemeContext";
@@ -54,6 +55,7 @@ import ConnectionCRMScreen from "./src/screens/ConnectionCRMScreen";
 import EditProfileScreen from "./src/screens/EditProfileScreen";
 import PostDetailScreen from "./src/screens/PostDetailScreen";
 import MessageRequestsScreen from "./src/screens/MessageRequestsScreen";
+import CallScreen from "./src/screens/CallScreen";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -187,9 +189,24 @@ const tabBadge = {
   dotText: { color: "#fff", fontSize: 9, fontWeight: "800" },
 };
 
-function RootNavigator() {
+function RootNavigator({ navigationRef }) {
   const { user, loading } = useAuth();
   const { theme, isDark } = useTheme();
+
+  // ── Incoming call polling ──────────────────────────────────
+  useIncomingCall((call) => {
+    if (!user) return;
+    navigationRef.current?.navigate('Call', {
+      callType: call.call_type,
+      callerName: call.caller_name,
+      callerAvatar: call.caller_avatar,
+      isIncoming: true,
+      conversationId: call.conversation_id,
+      incomingChannel: call.channel,
+      incomingToken: call.token,
+      incomingCallerId: call.caller_id,
+    });
+  });
 
   if (loading) {
     return (
@@ -204,7 +221,9 @@ function RootNavigator() {
   const isProfileComplete = !!user?.username;
 
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false, animation: "fade_from_bottom" }}>
+    <Stack.Navigator
+      screenOptions={{ headerShown: false, animation: "fade_from_bottom" }}
+    >
       {!user ? (
         <>
           <Stack.Screen name="Welcome" component={WelcomeScreen} />
@@ -250,6 +269,7 @@ function RootNavigator() {
           <Stack.Screen name="EditProfile" component={EditProfileScreen} options={{ animation: "slide_from_right" }} />
           <Stack.Screen name="PostDetail" component={PostDetailScreen} options={{ animation: "slide_from_right" }} />
           <Stack.Screen name="MessageRequests" component={MessageRequestsScreen} options={{ animation: "slide_from_right" }} />
+          <Stack.Screen name="Call" component={CallScreen} options={{ animation: "slide_from_bottom", presentation: "fullScreenModal" }} />
           <Stack.Screen name="JoinFamily" component={JoinFamilyScreen} options={{ animation: "slide_from_right" }} />
           <Stack.Screen name="FamilyGate" component={FamilyGateScreen} options={{ animation: "slide_from_right" }} />
         </>
@@ -284,13 +304,14 @@ function PushNotificationSetup() {
 }
 
 export default function App() {
+  const navRef = useRef(null);
   return (
     <ThemeProvider>
       <AuthProvider>
-        <NavigationContainer>
+        <NavigationContainer ref={navRef}>
           <StatusBar style="auto" />
           <PushNotificationSetup />
-          <RootNavigator />
+          <RootNavigator navigationRef={navRef} />
         </NavigationContainer>
       </AuthProvider>
     </ThemeProvider>

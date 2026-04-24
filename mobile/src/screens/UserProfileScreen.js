@@ -32,6 +32,7 @@ export default function UserProfileScreen({ route, navigation }) {
   const [showBlockModal, setShowBlockModal] = useState(false);
   const [isBlocked, setIsBlocked] = useState(false);
   const [blocking, setBlocking] = useState(false);
+  const [mutualCount, setMutualCount] = useState(0);
 
   useEffect(() => {
     if (userId === me?.id) {
@@ -41,10 +42,11 @@ export default function UserProfileScreen({ route, navigation }) {
 
   const fetchAll = useCallback(async () => {
     try {
-      const [postsRes, statusRes, blockRes] = await Promise.all([
+      const [postsRes, statusRes, blockRes, mutualRes] = await Promise.all([
         api.get(`/posts/user/${userId}`).catch(() => ({ data: { posts: [], is_private: false, locked: false } })),
         api.get(`/connections/${userId}/status`).catch(() => ({ data: { connected: false, status: null, follows_you: false } })),
         api.get(`/connections/${userId}/block-status`).catch(() => ({ data: { blocked: false } })),
+        api.get(`/connections/${userId}/mutual`).catch(() => ({ data: { count: 0 } })),
       ]);
       const searchRes = await api.get(`/connections/search?q=${userName || ''}`).catch(() => null);
       const found = searchRes?.data?.users?.find(u => u.id === userId);
@@ -55,6 +57,7 @@ export default function UserProfileScreen({ route, navigation }) {
       setConnStatus(statusRes.data.status);
       setFollowsYou(statusRes.data.follows_you);
       setIsBlocked(blockRes.data.blocked || false);
+      setMutualCount(mutualRes.data.count || 0);
     } catch {} finally { setLoading(false); }
   }, [userId]);
 
@@ -106,6 +109,13 @@ export default function UserProfileScreen({ route, navigation }) {
       }},
     ]
   );
+
+  const openVideoCall = () => navigation.navigate('Call', {
+    userId,
+    name: profile?.name || userName,
+    avatar: profile?.avatar_url || userAvatar,
+    callType: 'video',
+  });
 
   const openDM = async () => {
     try {
@@ -172,11 +182,11 @@ export default function UserProfileScreen({ route, navigation }) {
           </View>
           <View style={s.stat}>
             <AppText style={s.statNum}>{profile?.connection_count || 0}</AppText>
-            <AppText style={s.statLabel}>{t('followers')}</AppText>
+            <AppText style={s.statLabel}>{t('connections')}</AppText>
           </View>
           <View style={s.stat}>
             <AppText style={s.statNum}>{profile?.interest_count || 0}</AppText>
-            <AppText style={s.statLabel}>{t('following')}</AppText>
+            <AppText style={s.statLabel}>{t('interests')}</AppText>
           </View>
         </View>
       </View>
@@ -198,6 +208,9 @@ export default function UserProfileScreen({ route, navigation }) {
         {profile?.username && <AppText style={s.handle}>@{profile.username}</AppText>}
         {profile?.bio && <AppText style={s.bio}>{profile.bio}</AppText>}
         {followsYou && <AppText style={s.followsYouBadge}>{t('follows_you')}</AppText>}
+        {mutualCount > 0 && (
+          <AppText style={s.mutualText}>{mutualCount} mutual connection{mutualCount !== 1 ? 's' : ''}</AppText>
+        )}
       </View>
 
       {/* Action buttons */}
@@ -242,7 +255,32 @@ export default function UserProfileScreen({ route, navigation }) {
         >
           <Ionicons name="ban-outline" size={18} color={isBlocked ? '#f87171' : colors.muted} />
         </TouchableOpacity>
+
+        {/* Video call */}
+        <TouchableOpacity style={s.actionBtnIcon} onPress={openVideoCall} activeOpacity={0.8}>
+          <Ionicons name="videocam-outline" size={18} color={colors.primary} />
+        </TouchableOpacity>
       </View>
+
+      {/* Moments shortcut — only when connected */}
+      {connStatus === 'accepted' && (
+        <TouchableOpacity
+          style={[s.momentsBtn, { borderColor: colors.border2 }]}
+          onPress={() => navigation.navigate('Chat', {
+            conversationId: null,
+            title: profile?.name || userName,
+            avatar: profile?.avatar_url || userAvatar,
+            type: 'private',
+            otherUserId: userId,
+            openMedia: true,
+          })}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="images-outline" size={15} color={colors.gold} />
+          <AppText style={[s.momentsBtnText, { color: colors.gold }]}>Moments with {profile?.name?.split(' ')[0]}</AppText>
+          <Ionicons name="chevron-forward" size={14} color={colors.dim} />
+        </TouchableOpacity>
+      )}
 
       {/* Tab toggle — only show if not locked */}
       {!locked && (
@@ -319,7 +357,8 @@ export default function UserProfileScreen({ route, navigation }) {
         ) : tab === 'posts' ? (
           <View style={s.grid}>
             {posts.map(p => (
-              <TouchableOpacity key={p.id} style={s.gridItem} activeOpacity={0.9}>
+              <TouchableOpacity key={p.id} style={s.gridItem} activeOpacity={0.9}
+                onPress={() => navigation.navigate('PostDetail', { postId: p.id })}>
                 {p.media_url
                   ? <Image source={{ uri: p.media_url }} style={s.gridImg} resizeMode="cover" />
                   : <View style={[s.gridImg, s.gridText]}>
@@ -457,6 +496,9 @@ const s = StyleSheet.create({
   handle: { fontSize: 13, color: colors.muted, marginTop: 1 },
   bio: { fontSize: 13, color: colors.text, marginTop: 4, lineHeight: 18 },
   followsYouBadge: { fontSize: 11, color: colors.muted, fontWeight: '600', marginTop: 4, backgroundColor: 'rgba(255,255,255,0.07)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20, alignSelf: 'flex-start' },
+  mutualText: { fontSize: 11, color: colors.dim, marginTop: 4 },
+  momentsBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, marginBottom: 10, paddingHorizontal: 14, paddingVertical: 10, borderRadius: radius.md, borderWidth: 1, backgroundColor: 'rgba(196,163,90,0.06)' },
+  momentsBtnText: { flex: 1, fontSize: 13, fontWeight: '600' },
   privateBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(124,58,237,0.15)', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(124,58,237,0.3)' },
   privateBadgeText: { fontSize: 10, color: '#a78bfa', fontWeight: '700' },
   actionRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingBottom: 14 },

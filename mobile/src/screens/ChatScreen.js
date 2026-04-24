@@ -9,6 +9,7 @@ import MessageBubble from '../components/MessageBubble';
 import GifPicker from '../components/GifPicker';
 import StickerPicker from '../components/StickerPicker';
 import AIAssistant from '../components/AIAssistant';
+import MediaComposer from '../components/MediaComposer';
 import { useTranslation } from '../i18n';
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -108,6 +109,7 @@ export default function ChatScreen({ route, navigation }) {
   const [showGifPicker, setShowGifPicker] = useState(false);
   const [showStickerPicker, setShowStickerPicker] = useState(false);
   const [showAI, setShowAI] = useState(false);
+  const [mediaComposer, setMediaComposer] = useState(null); // { uri, type }
   const [inputFocused, setInputFocused] = useState(false);
   const [showOptions, setShowOptions] = useState(false);
   const [showMuteOptions, setMuteOptions] = useState(false);
@@ -323,52 +325,32 @@ export default function ChatScreen({ route, navigation }) {
 
   const sendImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.7,
+      mediaTypes: ImagePicker.MediaTypeOptions.All,
+      quality: 0.85,
     });
     if (result.canceled) return;
-
     const asset = result.assets[0];
-    const tempId = `temp-${Date.now()}`;
-    const optimisticMsg = {
-      id: tempId,
-      media_url: asset.uri,
-      media_type: 'image',
-      sender_id: user?.id,
-      sender_name: user?.name,
-      created_at: new Date().toISOString(),
-      is_read: false,
-      sending: true,
-    };
-    setMessages(prev => [...prev, optimisticMsg]);
-    setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 50);
-
-    try {
-      const formData = new FormData();
-      formData.append("file", { uri: asset.uri, type: "image/jpeg", name: "photo.jpg" });
-      if (replyTo) formData.append("reply_to_id", replyTo.id);
-      const { data } = await api.post(`/messages/conversations/${convId}/messages`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      setMessages(prev => prev.map(m => m.id === tempId ? data.message : m));
-      setReplyTo(null);
-    } catch {
-      setMessages(prev => prev.filter(m => m.id === tempId));
-    }
+    setMediaComposer({ uri: asset.uri, type: asset.type === 'video' ? 'video' : 'image' });
   };
 
   const sendCamera = async () => {
     const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.75,
+      mediaTypes: ImagePicker.MediaTypeOptions.All,
+      quality: 0.85,
     });
     if (result.canceled) return;
     const asset = result.assets[0];
+    setMediaComposer({ uri: asset.uri, type: asset.type === 'video' ? 'video' : 'image' });
+  };
+
+  const sendMediaFromComposer = async ({ uri, type, caption, viewOnce }) => {
+    setMediaComposer(null);
     const tempId = `temp-${Date.now()}`;
     const optimisticMsg = {
       id: tempId,
-      media_url: asset.uri,
-      media_type: 'image',
+      media_url: uri,
+      media_type: type,
+      text: caption || null,
       sender_id: user?.id,
       sender_name: user?.name,
       created_at: new Date().toISOString(),
@@ -379,10 +361,14 @@ export default function ChatScreen({ route, navigation }) {
     setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 50);
     try {
       const formData = new FormData();
-      formData.append("file", { uri: asset.uri, type: "image/jpeg", name: "camera.jpg" });
-      if (replyTo) formData.append("reply_to_id", replyTo.id);
+      const ext = type === 'video' ? 'mp4' : 'jpg';
+      const mime = type === 'video' ? 'video/mp4' : 'image/jpeg';
+      formData.append('file', { uri, type: mime, name: `media.${ext}` });
+      if (caption) formData.append('text', caption);
+      if (viewOnce) formData.append('view_once', 'true');
+      if (replyTo) formData.append('reply_to_id', replyTo.id);
       const { data } = await api.post(`/messages/conversations/${convId}/messages`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
       setMessages(prev => prev.map(m => m.id === tempId ? data.message : m));
       setReplyTo(null);
@@ -628,6 +614,24 @@ export default function ChatScreen({ route, navigation }) {
     const isThreaded = item.reply_to_id;
     const threadReplies = messages.filter(m => m.reply_to_id === item.id);
 
+    // ── Call system messages ──────────────────────────────────
+    if (item.message_type === 'call_started' || item.message_type === 'call_ended') {
+      const isEnded = item.message_type === 'call_ended';
+      return (
+        <View style={cs.callEventRow}>
+          <View style={cs.callEventPill}>
+            <Ionicons
+              name={isEnded ? 'call' : 'videocam'}
+              size={12}
+              color={isEnded ? 'rgba(255,255,255,0.45)' : '#10b981'}
+              style={isEnded ? { transform: [{ rotate: '135deg' }] } : {}}
+            />
+            <AppText style={cs.callEventText}>{item.text}</AppText>
+          </View>
+        </View>
+      );
+    }
+
     const reactionGroups = {};
     (item.reactions || []).forEach(r => {
       reactionGroups[r.emoji] = (reactionGroups[r.emoji] || 0) + 1;
@@ -744,11 +748,49 @@ export default function ChatScreen({ route, navigation }) {
             }} style={{ padding: 4 }}>
               <Ionicons name="sparkles-outline" size={22} color="#f59e0b" />
             </TouchableOpacity>
-            <TouchableOpacity style={{ padding: 4 }} onPress={() => Alert.alert('Coming soon', 'Video call feature in development')}>
-              <Ionicons name="videocam-outline" size={22} color="#10b981" />
+            <TouchableOpacity
+              style={cs.headerIconBtn}
+              onPress={() => navigation.navigate('Call', {
+                callType: 'group',
+                callerName: 'Family Group',
+                callerAvatar: null,
+                isIncoming: false,
+                participants: [],
+                conversationId: convId,
+                myName: user?.name || 'Someone',
+              })}
+            >
+              <Ionicons name="videocam-outline" size={20} color="#10b981" />
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => setShowPollModal(true)} style={{ padding: 4 }}>
-              <Ionicons name="bar-chart-outline" size={22} color="#8b5cf6" />
+          </>
+        )}
+        {type === "private" && (
+          <>
+            <TouchableOpacity
+              style={cs.headerIconBtn}
+              onPress={() => navigation.navigate('Call', {
+                callType: 'voice',
+                callerName: title,
+                callerAvatar: avatar,
+                isIncoming: false,
+                conversationId: convId,
+                myName: user?.name || 'Someone',
+              })}
+            >
+              <Ionicons name="call-outline" size={19} color={colors.muted} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={cs.headerIconBtn}
+              onPress={() => navigation.navigate('Call', {
+                callType: 'video',
+                callerName: title,
+                callerAvatar: avatar,
+                isIncoming: false,
+                conversationId: convId,
+                myName: user?.name || 'Someone',
+              })}
+            >
+              <Ionicons name="videocam-outline" size={20} color={colors.muted} />
             </TouchableOpacity>
           </>
         )}
@@ -1027,9 +1069,6 @@ export default function ChatScreen({ route, navigation }) {
                 <Ionicons name="time-outline" size={22} color="#f59e0b" />
               </TouchableOpacity>
             )}
-            <TouchableOpacity onPress={() => setShowPollModal(true)} style={cs.inputAction}>
-              <Ionicons name="bar-chart-outline" size={22} color="#8b5cf6" />
-            </TouchableOpacity>
             <TouchableOpacity style={cs.inputAction} onPress={() => setShowAI(true)}>
               <Ionicons name="sparkles-outline" size={22} color="#8b5cf6" />
             </TouchableOpacity>
@@ -1267,6 +1306,14 @@ export default function ChatScreen({ route, navigation }) {
           </Pressable>
         </Pressable>
       </Modal>
+
+      <MediaComposer
+        visible={!!mediaComposer}
+        mediaUri={mediaComposer?.uri}
+        mediaType={mediaComposer?.type}
+        onClose={() => setMediaComposer(null)}
+        onSend={sendMediaFromComposer}
+      />
 
       <AIAssistant
         visible={showAI}
@@ -1583,6 +1630,14 @@ export default function ChatScreen({ route, navigation }) {
 }
 
 const cs = StyleSheet.create({
+  callEventRow: { alignItems: 'center', marginVertical: 8 },
+  callEventPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6,
+    borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.1)',
+  },
+  callEventText: { fontSize: 12, color: 'rgba(255,255,255,0.45)', fontWeight: '500' },
   container: { flex: 1, backgroundColor: colors.bg },
   header: { flexDirection: "row", alignItems: "center", paddingTop: 52, paddingBottom: 12, paddingHorizontal: 16, gap: 10, borderBottomWidth: 0.5, borderBottomColor: colors.border },
   backBtn: { padding: 6 },

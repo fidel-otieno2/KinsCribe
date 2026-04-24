@@ -314,14 +314,25 @@ class Message(db.Model):
 
     def to_dict(self, current_user_id=None):
         import json
+        from sqlalchemy import text as sqlt
         poll = self.polls[0].to_dict(current_user_id) if self.polls else None
         mentions_list = []
         if self.mentions:
             try: mentions_list = json.loads(self.mentions)
             except: pass
+        # message_type is a migration column — read via raw SQL
+        msg_type = "text"
+        try:
+            r = db.session.execute(
+                sqlt("SELECT message_type FROM messages WHERE id = :id"), {"id": self.id}
+            ).scalar()
+            if r: msg_type = r
+        except Exception:
+            pass
         return {
             "id": self.id, "text": self.text, "media_url": self.media_url,
             "media_type": self.media_type, "is_read": self.is_read,
+            "message_type": msg_type,
             "reply_to_id": self.reply_to_id,
             "reply_to_text": self.reply_to.text if self.reply_to else None,
             "reply_to_sender": self.reply_to.sender.name if self.reply_to and self.reply_to.sender else None,

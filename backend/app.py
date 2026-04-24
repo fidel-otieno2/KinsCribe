@@ -16,6 +16,7 @@ from routes.extras_routes import extras_bp
 from routes.notification_routes import notification_bp
 from routes.search_routes import search_bp
 from routes.subscription_routes import subscription_bp
+from routes.call_routes import call_bp
 
 
 def create_app():
@@ -47,6 +48,7 @@ def create_app():
     app.register_blueprint(notification_bp, url_prefix="/api/notifications")
     app.register_blueprint(search_bp, url_prefix="/api/search")
     app.register_blueprint(subscription_bp, url_prefix="/api/subscription")
+    app.register_blueprint(call_bp, url_prefix="/api/calls")
 
     with app.app_context():
         _safe_migrate()
@@ -182,6 +184,28 @@ def _run_migrations():
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_premium BOOLEAN DEFAULT FALSE",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS premium_plan VARCHAR(20)",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS premium_expires_at TIMESTAMP",
+        # Call system
+        "ALTER TABLE messages ADD COLUMN IF NOT EXISTS message_type VARCHAR(30) DEFAULT 'text'",
+        """
+        CREATE TABLE IF NOT EXISTS active_calls (
+            id SERIAL PRIMARY KEY,
+            channel VARCHAR(50) UNIQUE NOT NULL,
+            caller_id INTEGER NOT NULL,
+            callee_id INTEGER,
+            call_type VARCHAR(20) DEFAULT 'voice',
+            conversation_id INTEGER,
+            state VARCHAR(20) DEFAULT 'ringing',
+            created_at TIMESTAMP DEFAULT NOW()
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS incoming_call_queue (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            payload TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT NOW()
+        )
+        """,
     ]
 
     try:

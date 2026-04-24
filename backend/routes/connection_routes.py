@@ -277,6 +277,17 @@ def block_status(user_id):
     return jsonify({"blocked": is_blocked})
 
 
+@connection_bp.route("/<int:user_id>/mutual", methods=["GET"])
+@jwt_required()
+def mutual_connections(user_id):
+    """Count mutual connections between current user and target user."""
+    current_id = int(get_jwt_identity())
+    my_following = {c.following_id for c in Connection.query.filter_by(follower_id=current_id, status="accepted").all()}
+    their_following = {c.following_id for c in Connection.query.filter_by(follower_id=user_id, status="accepted").all()}
+    count = len(my_following & their_following)
+    return jsonify({"count": count})
+
+
 @connection_bp.route("/<int:user_id>/mute", methods=["POST"])
 @jwt_required()
 def mute_user(user_id):

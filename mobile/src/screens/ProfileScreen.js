@@ -49,6 +49,7 @@ export default function ProfileScreen({ navigation }) {
   const [stats, setStats] = useState({ posts: 0, connections: 0, interests: 0 });
   const [listModal, setListModal] = useState({ visible: false, type: null, data: [], loading: false });
   const [myStories, setMyStories] = useState([]);
+  const [family, setFamily] = useState(null);
   const [addHighlight, setAddHighlight] = useState({ visible: false, title: '', selected: [], saving: false });
   const [viewHighlight, setViewHighlight] = useState({ visible: false, highlight: null, index: 0 });
 
@@ -70,6 +71,9 @@ export default function ProfileScreen({ navigation }) {
       setLikedPosts(likedRes.data.posts || []);
       setHighlights(highlightsRes.data.highlights || []);
       setMyStories(storiesRes.data.stories || []);
+      if (user?.family_id) {
+        api.get('/family/my-family').then(r => setFamily(r.data.family)).catch(() => {});
+      }
       setStats({
         posts: allPosts.length,
         connections: user.connection_count || 0,
@@ -307,6 +311,32 @@ export default function ProfileScreen({ navigation }) {
           ) : null}
         </View>
         {user?.bio ? <AppText style={[s.bio, { color: theme.muted }]}>{user.bio}</AppText> : null}
+        {/* Location / joined */}
+        <View style={s.metaRow}>
+          {user?.created_at && (
+            <View style={s.metaItem}>
+              <Ionicons name="calendar-outline" size={12} color={theme.dim} />
+              <AppText style={[s.metaText, { color: theme.dim }]}>
+                Joined {new Date(user.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+              </AppText>
+            </View>
+          )}
+          <View style={s.metaItem}>
+            <Ionicons
+              name={user?.is_private ? 'lock-closed-outline' : 'earth-outline'}
+              size={12} color={theme.dim}
+            />
+            <AppText style={[s.metaText, { color: theme.dim }]}>
+              {user?.is_private ? 'Private' : 'Public'}
+            </AppText>
+          </View>
+          {user?.account_type && user.account_type !== 'personal' && (
+            <View style={s.metaItem}>
+              <Ionicons name="briefcase-outline" size={12} color={theme.gold} />
+              <AppText style={[s.metaText, { color: theme.gold, textTransform: 'capitalize' }]}>{user.account_type}</AppText>
+            </View>
+          )}
+        </View>
         {user?.website ? (
           <TouchableOpacity
             onPress={() => Linking.openURL(user.website.startsWith('http') ? user.website : `https://${user.website}`)}
@@ -373,6 +403,24 @@ export default function ProfileScreen({ navigation }) {
           <AppText style={[s.editBtnText, { color: theme.brown }]}>CRM</AppText>
         </TouchableOpacity>
       </View>
+
+      {/* Family card */}
+      {family && (
+        <TouchableOpacity
+          style={[s.familyCard, { backgroundColor: theme.bgCard, borderColor: theme.borderFamily }]}
+          onPress={() => navigation.navigate('Family')}
+          activeOpacity={0.85}
+        >
+          <LinearGradient colors={['#8B5E3C', '#C4A35A']} style={s.familyIconWrap}>
+            <Ionicons name="people" size={18} color="#fff" />
+          </LinearGradient>
+          <View style={s.familyCardInfo}>
+            <AppText style={[s.familyCardName, { color: theme.text }]}>{family.name}</AppText>
+            <AppText style={[s.familyCardSub, { color: theme.muted }]}>{family.member_count} members · Family</AppText>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={theme.dim} />
+        </TouchableOpacity>
+      )}
 
       {/* Story Highlights */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.highlightsRow}>
@@ -729,6 +777,14 @@ const s = StyleSheet.create({
   statNum: { fontSize: 20, fontWeight: '800', color: colors.text },
   statLabel: { fontSize: 12, color: colors.muted, marginTop: 2 },
   bioWrap: { paddingHorizontal: 16, paddingBottom: 12 },
+  metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 5, marginBottom: 2 },
+  metaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  metaText: { fontSize: 11, fontWeight: '500' },
+  familyCard: { marginHorizontal: 16, marginBottom: 10, borderRadius: radius.md, borderWidth: 1, flexDirection: 'row', alignItems: 'center', padding: 12, gap: 12 },
+  familyIconWrap: { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  familyCardInfo: { flex: 1 },
+  familyCardName: { fontSize: 14, fontWeight: '700' },
+  familyCardSub: { fontSize: 12, marginTop: 1 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
   name: { fontSize: 15, fontWeight: '700', color: colors.text },
   roleBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(124,58,237,0.15)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 20 },
