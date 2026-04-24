@@ -128,6 +128,61 @@ Return only the JSON object."""
         return jsonify({"tone": "neutral", "score": 5, "suggestion": ""})
 
 
+@ai_bp.route("/caption", methods=["POST"])
+@jwt_required()
+def generate_caption():
+    """Generate a caption for a post based on context."""
+    data = request.json or {}
+    context = data.get("context", "").strip()
+    tone = data.get("tone", "warm")  # warm | funny | inspiring | professional
+    if not context:
+        return jsonify({"caption": ""}), 400
+    prompt = f"""Write a compelling social media caption for this content: "{context}"
+Tone: {tone}. Keep it under 150 characters. Make it engaging and personal.
+Return only the caption text, no quotes, no explanation."""
+    try:
+        return jsonify({"caption": chat_completion(prompt).strip('"').strip()})
+    except Exception:
+        return jsonify({"caption": ""}), 500
+
+
+@ai_bp.route("/hashtags", methods=["POST"])
+@jwt_required()
+def generate_hashtags():
+    """Generate relevant hashtags for a post."""
+    caption = (request.json or {}).get("caption", "").strip()
+    if not caption:
+        return jsonify({"hashtags": []}), 400
+    prompt = f"""Generate 8-10 relevant hashtags for this social media post: "{caption}"
+Mix popular and niche tags. Return only a JSON array of strings like ["#family", "#memories"].
+No explanation, just the JSON array."""
+    try:
+        import json as _json
+        raw = chat_completion(prompt)
+        tags = _json.loads(raw)
+        if isinstance(tags, list):
+            return jsonify({"hashtags": tags[:10]})
+    except Exception:
+        pass
+    return jsonify({"hashtags": ["#family", "#memories", "#kinscribe"]})
+
+
+@ai_bp.route("/improve", methods=["POST"])
+@jwt_required()
+def improve_post():
+    """Rewrite/improve a caption to be more engaging."""
+    caption = (request.json or {}).get("caption", "").strip()
+    if not caption:
+        return jsonify({"improved": ""}), 400
+    prompt = f"""Improve this social media caption to be more engaging, emotional, and shareable:
+"{caption}"
+Keep the same meaning and tone. Return only the improved caption, no explanation."""
+    try:
+        return jsonify({"improved": chat_completion(prompt).strip('"').strip()})
+    except Exception:
+        return jsonify({"improved": caption}), 500
+
+
 @ai_bp.route("/family-summary", methods=["POST"])
 @jwt_required()
 def family_chat_summary():
