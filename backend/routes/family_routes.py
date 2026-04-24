@@ -36,7 +36,7 @@ def family_public(family_id):
         "name": family.name,
         "description": family.description,
         "member_count": len(FamilyMember.query.filter_by(family_id=family_id).all()) or len(family.members),
-        "created_at": family.created_at.isoformat(),
+        "created_at": family.created_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
 
     if not is_member:

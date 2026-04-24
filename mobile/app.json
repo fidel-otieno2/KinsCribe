@@ -36,10 +36,6 @@
         "android.permission.READ_MEDIA_AUDIO"
       ]
     },
-    "web": {
-      "bundler": "metro",
-      "output": "single"
-    },
     "updates": {
       "enabled": false
     },

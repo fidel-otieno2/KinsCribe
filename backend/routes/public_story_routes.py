@@ -194,7 +194,7 @@ def story_views(story_id):
         if u:
             result.append({
                 "user_id": u.id, "name": u.name, "username": u.username,
-                "avatar_url": u.avatar_url, "viewed_at": v.created_at.isoformat()
+                "avatar_url": u.avatar_url, "viewed_at": v.created_at.strftime("%Y-%m-%dT%H:%M:%SZ")
             })
     return jsonify({"views": result})
 

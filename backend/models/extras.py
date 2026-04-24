@@ -1,4 +1,4 @@
-from extensions import db
+from extensions import db, utc_iso
 from datetime import datetime
 
 
@@ -53,15 +53,15 @@ class FamilyTreeNode(db.Model):
             "user_id": self.user_id,
             "display_name": u.name if u else self.display_name,
             "display_avatar": u.avatar_url if u else self.display_avatar,
-            "birth_date": self.birth_date.isoformat() if self.birth_date else None,
-            "death_date": self.death_date.isoformat() if self.death_date else None,
+            "birth_date": utc_iso(self.birth_date) if self.birth_date else None,
+            "death_date": utc_iso(self.death_date) if self.death_date else None,
             "is_deceased": self.is_deceased,
             "relationship_label": self.relationship_label,
             "parent_node_id": self.parent_node_id,
             "partner_node_id": self.partner_node_id,
             "generation": self.generation,
             "child_ids": [c.id for c in self.children],
-            "created_at": self.created_at.isoformat()
+            "created_at": utc_iso(self.created_at)
         }
 
 
@@ -87,13 +87,13 @@ class FamilyEvent(db.Model):
         return {
             "id": self.id, "family_id": self.family_id,
             "title": self.title, "description": self.description,
-            "event_date": self.event_date.isoformat(),
-            "end_date": self.end_date.isoformat() if self.end_date else None,
+            "event_date": utc_iso(self.event_date),
+            "end_date": utc_iso(self.end_date) if self.end_date else None,
             "event_type": self.event_type, "color": self.color,
             "is_recurring": self.is_recurring, "recurrence": self.recurrence,
             "created_by": self.created_by,
             "creator_name": creator.name if creator else None,
-            "created_at": self.created_at.isoformat()
+            "created_at": utc_iso(self.created_at)
         }
 
 
@@ -130,7 +130,7 @@ class FamilyRecipe(db.Model):
             "servings": self.servings, "category": self.category, "tags": self.tags,
             "author_name": u.name if u else None,
             "author_avatar": u.avatar_url if u else None,
-            "created_at": self.created_at.isoformat()
+            "created_at": utc_iso(self.created_at)
         }
 
 
@@ -155,14 +155,14 @@ class FamilyTask(db.Model):
         return {
             "id": self.id, "family_id": self.family_id,
             "title": self.title, "description": self.description,
-            "due_date": self.due_date.isoformat() if self.due_date else None,
+            "due_date": utc_iso(self.due_date) if self.due_date else None,
             "is_done": self.is_done, "priority": self.priority,
             "created_by": self.created_by,
             "creator_name": creator.name if creator else None,
             "assigned_to": self.assigned_to,
             "assignee_name": assignee.name if assignee else None,
             "assignee_avatar": assignee.avatar_url if assignee else None,
-            "created_at": self.created_at.isoformat()
+            "created_at": utc_iso(self.created_at)
         }
 
 
@@ -187,10 +187,10 @@ class FamilyBudget(db.Model):
             "id": self.id, "family_id": self.family_id, "user_id": self.user_id,
             "title": self.title, "amount": self.amount, "category": self.category,
             "entry_type": self.entry_type,
-            "date": self.date.isoformat() if self.date else None,
+            "date": utc_iso(self.date) if self.date else None,
             "notes": self.notes,
             "author_name": u.name if u else None,
-            "created_at": self.created_at.isoformat()
+            "created_at": utc_iso(self.created_at)
         }
 
 
@@ -211,7 +211,7 @@ class PostInsight(db.Model):
         return {
             "post_id": self.post_id, "impressions": self.impressions,
             "reach": self.reach, "profile_visits": self.profile_visits,
-            "shares": self.shares, "date": self.date.isoformat()
+            "shares": self.shares, "date": utc_iso(self.date)
         }
 
 
@@ -245,9 +245,9 @@ class ScheduledPost(db.Model):
             "id": self.id, "user_id": self.user_id, "caption": self.caption,
             "media_url": self.media_url, "media_type": self.media_type,
             "privacy": self.privacy, "hashtags": self.hashtags, "location": self.location,
-            "scheduled_at": self.scheduled_at.isoformat(),
+            "scheduled_at": utc_iso(self.scheduled_at),
             "is_published": self.is_published,
-            "created_at": self.created_at.isoformat()
+            "created_at": utc_iso(self.created_at)
         }
 
 
@@ -281,5 +281,5 @@ class Storybook(db.Model):
             "story_ids": [int(i) for i in self.story_ids.split(",") if i],
             "pdf_url": self.pdf_url, "privacy": self.privacy,
             "user_id": self.user_id, "family_id": self.family_id,
-            "created_at": self.created_at.isoformat()
+            "created_at": utc_iso(self.created_at)
         }

@@ -1,4 +1,4 @@
-from extensions import db
+from extensions import db, utc_iso
 from datetime import datetime
 
 class Story(db.Model):
@@ -52,7 +52,7 @@ class Story(db.Model):
             "summary": self.summary,
             "tags": self.tags.split(",") if self.tags else [],
             "ai_processed": self.ai_processed,
-            "story_date": self.story_date.isoformat() if self.story_date else None,
+            "story_date": utc_iso(self.story_date) if self.story_date else None,
             "privacy": self.privacy,
             "user_id": self.user_id,
             "family_id": self.family_id,
@@ -62,7 +62,7 @@ class Story(db.Model):
             "is_announcement": self.is_announcement or False,
             "author_name": self.author.name if self.author else None,
             "author_avatar": self.author.avatar_url if self.author else None,
-            "created_at": self.created_at.isoformat()
+            "created_at": utc_iso(self.created_at)
         }
 
 
@@ -83,7 +83,7 @@ class Comment(db.Model):
             "user_id": self.user_id,
             "story_id": self.story_id,
             "author_name": self.commenter.name if self.commenter else None,
-            "created_at": self.created_at.isoformat()
+            "created_at": utc_iso(self.created_at)
         }
 
 

@@ -1,4 +1,4 @@
-from extensions import db
+from extensions import db, utc_iso
 from datetime import datetime
 
 
@@ -26,8 +26,8 @@ class UserSession(db.Model):
             "platform": self.platform or "unknown",
             "ip_address": self.ip_address,
             "location": self.location,
-            "last_active": self.last_active.isoformat(),
-            "created_at": self.created_at.isoformat(),
+            "last_active": utc_iso(self.last_active),
+            "created_at": utc_iso(self.created_at),
             "is_current": (current_token_hash is not None and self.token_hash == current_token_hash),
         }
 
@@ -70,7 +70,7 @@ class Notification(db.Model):
             "from_user_name": self.from_user.name if self.from_user else None,
             "from_user_avatar": self.from_user.avatar_url if self.from_user else None,
             "from_user_username": self.from_user.username if self.from_user else None,
-            "created_at": self.created_at.isoformat()
+            "created_at": utc_iso(self.created_at)
         }
 
 
@@ -139,6 +139,6 @@ class DeviceToken(db.Model):
             "platform": self.platform,
             "device_name": self.device_name,
             "is_active": self.is_active,
-            "created_at": self.created_at.isoformat(),
-            "last_used": self.last_used.isoformat()
+            "created_at": utc_iso(self.created_at),
+            "last_used": utc_iso(self.last_used)
         }

@@ -1,4 +1,4 @@
-from extensions import db
+from extensions import db, utc_iso
 from datetime import datetime
 import random
 import string
@@ -22,7 +22,7 @@ class FamilyMember(db.Model):
             "user_id": self.user_id,
             "family_id": self.family_id,
             "role": self.role,
-            "joined_at": self.joined_at.isoformat(),
+            "joined_at": utc_iso(self.joined_at),
         }
 
 
@@ -58,5 +58,5 @@ class Family(db.Model):
             "invite_code": self.invite_code,
             "cover_url": self.cover_url,
             "member_count": len(self.family_members),
-            "created_at": self.created_at.isoformat()
+            "created_at": utc_iso(self.created_at)
         }

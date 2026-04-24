@@ -40,7 +40,7 @@ def _get_all_notifications(user):
                     "story_title": story.title,
                     "story_media": story.media_url,
                     "story_media_type": story.media_type,
-                    "created_at": story.created_at.isoformat(),
+                    "created_at": story.created_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 })
         for comment in StoryComment.query.filter(StoryComment.story_id == story.id, StoryComment.user_id != user.id).all():
             actor = User.query.get(comment.user_id)
@@ -59,7 +59,7 @@ def _get_all_notifications(user):
                     "story_media": story.media_url,
                     "story_media_type": story.media_type,
                     "comment_text": comment.text,
-                    "created_at": comment.created_at.isoformat(),
+                    "created_at": comment.created_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 })
 
     # ── 2. New family stories from others ────────────────────
@@ -80,7 +80,7 @@ def _get_all_notifications(user):
                     "story_title": story.title,
                     "story_media": story.media_url,
                     "story_media_type": story.media_type,
-                    "created_at": story.created_at.isoformat(),
+                    "created_at": story.created_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 })
 
     # ── 3. Post likes & comments ──────────────────────────────
@@ -100,7 +100,7 @@ def _get_all_notifications(user):
                     "body": post.caption[:60] if post.caption else "",
                     "post_id": post.id,
                     "post_media": post.media_url,
-                    "created_at": post.created_at.isoformat(),
+                    "created_at": post.created_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 })
         for comment in PostComment.query.filter(PostComment.post_id == post.id, PostComment.user_id != user.id).all():
             actor = User.query.get(comment.user_id)
@@ -117,7 +117,7 @@ def _get_all_notifications(user):
                     "post_id": post.id,
                     "post_media": post.media_url,
                     "comment_text": comment.text,
-                    "created_at": comment.created_at.isoformat(),
+                    "created_at": comment.created_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 })
 
     # ── 4. New connections / follow requests ─────────────────
@@ -135,7 +135,7 @@ def _get_all_notifications(user):
                     "connection_id": conn.id,
                     "title": f"{actor.name} wants to follow you",
                     "body": f"@{actor.username}" if actor.username else "",
-                    "created_at": conn.created_at.isoformat(),
+                    "created_at": conn.created_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 })
             else:
                 notifs.append({
@@ -147,7 +147,7 @@ def _get_all_notifications(user):
                     "actor_id": actor.id,
                     "title": f"{actor.name} connected with you",
                     "body": f"@{actor.username}" if actor.username else "",
-                    "created_at": conn.created_at.isoformat(),
+                    "created_at": conn.created_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 })
 
     # ── 5. Birthday reminders ─────────────────────────────────
@@ -195,7 +195,7 @@ def _get_all_notifications(user):
                 "body": post.caption[:60] if post.caption else "",
                 "post_id": post.id,
                 "post_media": post.media_url,
-                "created_at": post.created_at.isoformat(),
+                "created_at": post.created_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
             })
 
     # ── 7. Mention notifications ──────────────────────────────

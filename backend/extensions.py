@@ -9,3 +9,10 @@ jwt = JWTManager()
 bcrypt = Bcrypt()
 mail = Mail()
 cors = CORS()
+
+
+def utc_iso(dt):
+    """Always return UTC timestamp with Z suffix so JavaScript parses it correctly."""
+    if dt is None:
+        return None
+    return dt.strftime('%Y-%m-%dT%H:%M:%SZ')

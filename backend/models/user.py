@@ -1,4 +1,4 @@
-from extensions import db
+from extensions import db, utc_iso
 from datetime import datetime
 
 class User(db.Model):
@@ -84,6 +84,6 @@ class User(db.Model):
             "interest_count": interest_count,
             "is_premium": self.is_premium or False,
             "premium_plan": self.premium_plan,
-            "premium_expires_at": self.premium_expires_at.isoformat() if self.premium_expires_at else None,
-            "created_at": self.created_at.isoformat()
+            "premium_expires_at": utc_iso(self.premium_expires_at) if self.premium_expires_at else None,
+            "created_at": utc_iso(self.created_at)
         }

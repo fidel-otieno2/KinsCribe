@@ -101,7 +101,7 @@ def get_follow_requests():
                     "avatar_url": requester.avatar_url,
                     "bio": requester.bio,
                 },
-                "created_at": conn.created_at.isoformat(),
+                "created_at": conn.created_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
             })
     return jsonify({"requests": result, "count": len(result)})
 

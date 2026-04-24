@@ -248,7 +248,7 @@ def get_notifications():
                     "story_title": story.title,
                     "story_media": story.media_url,
                     "story_media_type": story.media_type,
-                    "created_at": story.created_at.isoformat(),
+                    "created_at": story.created_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 })
 
         # Comments on this story (exclude own comments)
@@ -270,7 +270,7 @@ def get_notifications():
                     "story_media": story.media_url,
                     "story_media_type": story.media_type,
                     "comment_text": comment.text,
-                    "created_at": comment.created_at.isoformat(),
+                    "created_at": comment.created_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 })
 
     # Also notify about new family stories posted by others
@@ -292,7 +292,7 @@ def get_notifications():
                     "story_title": story.title,
                     "story_media": story.media_url,
                     "story_media_type": story.media_type,
-                    "created_at": story.created_at.isoformat(),
+                    "created_at": story.created_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 })
 
     # Sort by most recent
