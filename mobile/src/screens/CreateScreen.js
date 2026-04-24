@@ -68,6 +68,12 @@ export default function CreateScreen({ navigation }) {
   const [generatingCaption, setGeneratingCaption] = useState(false);
   const [hashtagSuggestions, setHashtagSuggestions] = useState([]);
   const [loadingHashtags, setLoadingHashtags] = useState(false);
+  // Caption panel
+  const [captionOptions, setCaptionOptions] = useState([]);
+  const [showCaptionPanel, setShowCaptionPanel] = useState(false);
+  const [selectedTone, setSelectedTone] = useState('warm');
+  const [captionLength, setCaptionLength] = useState('medium');
+  const [emojiLevel, setEmojiLevel] = useState('minimal');
 
   // Draft state
   const [draftSaved, setDraftSaved] = useState(false);
@@ -176,36 +182,45 @@ export default function CreateScreen({ navigation }) {
   }, []);
 
   // ─── AI: CAPTION GENERATOR ──────────────────────────────────────
+  const buildContext = () => {
+    const hour = new Date().getHours();
+    const timeOfDay = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : hour < 21 ? 'evening' : 'night';
+    let parts = [];
+    if (mediaFiles.length > 0) {
+      const hasVideo = mediaFiles.some(f => f.type === 'video');
+      const count = mediaFiles.length;
+      parts.push(count > 1 ? `${count} ${hasVideo ? 'media files' : 'photos'}` : hasVideo ? 'a video' : 'a photo');
+    }
+    if (location) parts.push(`at ${location}`);
+    parts.push(`posted in the ${timeOfDay}`);
+    if (mode === 'family') parts.push('for a family memory');
+    return parts.join(', ') || 'a social media post';
+  };
+
   const generateCaption = async () => {
     setGeneratingCaption(true);
+    setShowCaptionPanel(true);
+    setCaptionOptions([]);
     try {
-      // Build context from whatever the user has: image, location, mode
-      let context = '';
-      if (mediaFiles.length > 0) {
-        const types = mediaFiles.map(f => f.type);
-        const hasVideo = types.includes('video');
-        const count = mediaFiles.length;
-        context = count > 1
-          ? `${count} photos${hasVideo ? ' and videos' : ''}`
-          : hasVideo ? 'a video' : 'a photo';
-      }
-      if (location) context += ` at ${location}`;
-      if (mode === 'family') context += ' for a family memory';
-      if (!context) context = 'a social media post';
-
       const { data } = await api.post('/ai/caption', {
-        context,
-        tone: 'warm',
+        context: buildContext(),
+        tone: selectedTone,
+        length: captionLength,
+        emoji: emojiLevel,
+        count: 6,
       });
-      if (data.caption) {
-        setCaption(data.caption);
-        checkTone(data.caption);
-        // Auto-suggest hashtags right after caption is generated
-        suggestHashtagsForCaption(data.caption);
-      }
+      setCaptionOptions(data.captions || (data.caption ? [data.caption] : []));
     } catch {
       info('Caption generation unavailable');
+      setShowCaptionPanel(false);
     } finally { setGeneratingCaption(false); }
+  };
+
+  const pickCaption = (text) => {
+    setCaption(text);
+    setShowCaptionPanel(false);
+    checkTone(text);
+    suggestHashtagsForCaption(text);
   };
 
   // ─── AI: HASHTAG SUGGESTIONS ────────────────────────────────────
@@ -344,6 +359,8 @@ export default function CreateScreen({ navigation }) {
       setHashtagSuggestions([]);
     }
   };
+
+  const PickerColumn = ({ values, selected, onSelect, label }) => (
     <View style={s.pickerCol}>
       <AppText style={s.pickerColLabel}>{label}</AppText>
       <ScrollView style={s.pickerScroll} showsVerticalScrollIndicator={false}>
@@ -681,18 +698,145 @@ export default function CreateScreen({ navigation }) {
                 <AppText style={[s.charCount, { color: theme.muted }]}>{caption.length}/2200</AppText>
                 <TouchableOpacity
                   style={[s.aiCaptionBtn, generatingCaption && { opacity: 0.6 }]}
-                  onPress={generateCaption}
-                  disabled={generatingCaption}
+                  onPress={() => setShowCaptionPanel(p => !p)}
                 >
-                  {generatingCaption
-                    ? <ActivityIndicator size="small" color="#a78bfa" />
-                    : <Ionicons name="sparkles" size={14} color="#a78bfa" />}
-                  <AppText style={s.aiCaptionBtnText}>
-                    {generatingCaption ? 'Generating...' : 'Suggest caption'}
-                  </AppText>
+                  <Ionicons name="sparkles" size={14} color="#a78bfa" />
+                  <AppText style={s.aiCaptionBtnText}>AI Suggest</AppText>
                 </TouchableOpacity>
               </View>
             </View>
+
+            {/* AI Caption Studio Panel */}
+            {showCaptionPanel && (
+              <View style={[s.cpPanel, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]}>
+                <View style={s.cpHeader}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Ionicons name="sparkles" size={15} color="#a78bfa" />
+                    <AppText style={s.cpTitle}>AI Caption Studio</AppText>
+                  </View>
+                  <TouchableOpacity onPress={() => setShowCaptionPanel(false)}>
+                    <Ionicons name="close" size={18} color={theme.muted} />
+                  </TouchableOpacity>
+                </View>
+
+                <AppText style={[s.cpLabel, { color: theme.muted }]}>TONE</AppText>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+                  {[
+                    { key: 'warm',         label: 'Warm',        emoji: '🤗' },
+                    { key: 'funny',        label: 'Funny',       emoji: '😂' },
+                    { key: 'deep',         label: 'Deep',        emoji: '🧠' },
+                    { key: 'romantic',     label: 'Romantic',    emoji: '❤️' },
+                    { key: 'savage',       label: 'Savage',      emoji: '😈' },
+                    { key: 'professional', label: 'Pro',         emoji: '💼' },
+                    { key: 'inspiring',    label: 'Inspiring',   emoji: '🚀' },
+                    { key: 'nostalgic',    label: 'Nostalgic',   emoji: '🌌' },
+                    { key: 'aesthetic',    label: 'Aesthetic',   emoji: '🧘' },
+                    { key: 'humble',       label: 'Humble',      emoji: '🙏' },
+                    { key: 'bold',         label: 'Bold',        emoji: '🔥' },
+                    { key: 'mysterious',   label: 'Mysterious',  emoji: '🌙' },
+                    { key: 'grateful',     label: 'Grateful',    emoji: '🙌' },
+                    { key: 'sarcastic',    label: 'Sarcastic',   emoji: '🙄' },
+                    { key: 'motivational', label: 'Motivational',emoji: '💪' },
+                    { key: 'chill',        label: 'Chill',       emoji: '😎' },
+                    { key: 'dramatic',     label: 'Dramatic',    emoji: '🎭' },
+                    { key: 'poetic',       label: 'Poetic',      emoji: '🌹' },
+                    { key: 'family',       label: 'Family',      emoji: '👨‍👩‍👧' },
+                    { key: 'travel',       label: 'Travel',      emoji: '✈️' },
+                    { key: 'foodie',       label: 'Foodie',      emoji: '🍽️' },
+                  ].map(t => (
+                    <TouchableOpacity
+                      key={t.key}
+                      style={[s.cpChip, { borderColor: theme.border2 }, selectedTone === t.key && s.cpChipActive]}
+                      onPress={() => setSelectedTone(t.key)}
+                    >
+                      <AppText style={s.cpChipEmoji}>{t.emoji}</AppText>
+                      <AppText style={[s.cpChipText, { color: selectedTone === t.key ? '#a78bfa' : theme.muted }]}>{t.label}</AppText>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+
+                <View style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
+                  <View style={{ flex: 1 }}>
+                    <AppText style={[s.cpLabel, { color: theme.muted }]}>LENGTH</AppText>
+                    <View style={{ flexDirection: 'row', gap: 6 }}>
+                      {[{ k: 'short', l: 'Short' }, { k: 'medium', l: 'Medium' }, { k: 'long', l: 'Long' }].map(o => (
+                        <TouchableOpacity
+                          key={o.k}
+                          style={[s.cpToggle, { borderColor: theme.border2 }, captionLength === o.k && s.cpToggleActive]}
+                          onPress={() => setCaptionLength(o.k)}
+                        >
+                          <AppText style={[s.cpToggleText, { color: captionLength === o.k ? '#a78bfa' : theme.muted }]}>{o.l}</AppText>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <AppText style={[s.cpLabel, { color: theme.muted }]}>EMOJIS</AppText>
+                    <View style={{ flexDirection: 'row', gap: 6 }}>
+                      {[{ k: 'none', l: 'None' }, { k: 'minimal', l: 'Few' }, { k: 'heavy', l: '🔥🔥' }].map(o => (
+                        <TouchableOpacity
+                          key={o.k}
+                          style={[s.cpToggle, { borderColor: theme.border2 }, emojiLevel === o.k && s.cpToggleActive]}
+                          onPress={() => setEmojiLevel(o.k)}
+                        >
+                          <AppText style={[s.cpToggleText, { color: emojiLevel === o.k ? '#a78bfa' : theme.muted }]}>{o.l}</AppText>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                </View>
+
+                <TouchableOpacity
+                  style={[s.cpGenerateBtn, generatingCaption && { opacity: 0.6 }]}
+                  onPress={generateCaption}
+                  disabled={generatingCaption}
+                >
+                  <LinearGradient colors={['#7c3aed', '#3b82f6']} style={s.cpGenerateGrad}>
+                    {generatingCaption
+                      ? <ActivityIndicator color="#fff" size="small" />
+                      : <Ionicons name="sparkles" size={16} color="#fff" />}
+                    <AppText style={s.cpGenerateText}>
+                      {generatingCaption ? 'Writing 6 captions...' : 'Generate 6 Captions'}
+                    </AppText>
+                  </LinearGradient>
+                </TouchableOpacity>
+
+                {generatingCaption && captionOptions.length === 0 && (
+                  <View style={{ gap: 8, marginTop: 12 }}>
+                    {[180, 220, 160].map((w, i) => (
+                      <View key={i} style={[s.cpSkeleton, { width: w, backgroundColor: theme.bgSecondary }]} />
+                    ))}
+                  </View>
+                )}
+
+                {captionOptions.length > 0 && (
+                  <>
+                    <AppText style={[s.cpLabel, { color: theme.muted, marginTop: 12 }]}>TAP TO USE · SWIPE FOR MORE</AppText>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                      {captionOptions.map((opt, i) => (
+                        <TouchableOpacity
+                          key={i}
+                          style={[s.cpCard, { backgroundColor: theme.bgSecondary, borderColor: theme.border2 }]}
+                          onPress={() => pickCaption(opt)}
+                          activeOpacity={0.8}
+                        >
+                          <View style={s.cpCardNum}>
+                            <AppText style={s.cpCardNumText}>{i + 1}</AppText>
+                          </View>
+                          <AppText style={[s.cpCardText, { color: theme.text }]}>{opt}</AppText>
+                          <View style={s.cpCardFooter}>
+                            <AppText style={[s.cpCardLen, { color: theme.muted }]}>{opt.length} chars</AppText>
+                            <View style={s.cpUseBtn}>
+                              <AppText style={s.cpUseBtnText}>Use →</AppText>
+                            </View>
+                          </View>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </>
+                )}
+              </View>
+            )}
 
             {/* Tone result */}
             {(toneResult || checkingTone) && (
@@ -1032,13 +1176,38 @@ const s = StyleSheet.create({
   mediaBtnGrad: { alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 28 },
   mediaBtnLabel: { color: '#fff', fontWeight: '700', fontSize: 14 },
 
-  // Caption
+  // Caption input box
   captionContainer: { borderRadius: radius.md, padding: 14, marginBottom: 10, borderWidth: 1 },
   captionInput: { fontSize: 15, minHeight: 70, textAlignVertical: 'top' },
   captionFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 },
   charCount: { fontSize: 11 },
   aiCaptionBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(124,58,237,0.15)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.full },
   aiCaptionBtnText: { color: '#a78bfa', fontSize: 12, fontWeight: '600' },
+
+  // Caption AI panel
+  cpPanel: { borderRadius: radius.md, borderWidth: 1, padding: 14, marginBottom: 12 },
+  cpHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  cpTitle: { fontSize: 14, fontWeight: '700', color: '#a78bfa' },
+  cpLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.8, marginBottom: 6, textTransform: 'uppercase' },
+  cpChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: radius.full, borderWidth: 1, marginRight: 8, backgroundColor: 'rgba(124,58,237,0.06)' },
+  cpChipActive: { backgroundColor: 'rgba(124,58,237,0.2)', borderColor: '#7c3aed' },
+  cpChipEmoji: { fontSize: 14 },
+  cpChipText: { fontSize: 12, fontWeight: '600' },
+  cpToggle: { flex: 1, paddingVertical: 7, borderRadius: radius.md, borderWidth: 1, alignItems: 'center' },
+  cpToggleActive: { backgroundColor: 'rgba(124,58,237,0.15)', borderColor: '#7c3aed' },
+  cpToggleText: { fontSize: 11, fontWeight: '600' },
+  cpGenerateBtn: { borderRadius: radius.md, overflow: 'hidden', marginBottom: 4 },
+  cpGenerateGrad: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12 },
+  cpGenerateText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  cpSkeleton: { height: 14, borderRadius: 7 },
+  cpCard: { width: 220, borderRadius: radius.md, borderWidth: 1, marginRight: 10, padding: 12, justifyContent: 'space-between' },
+  cpCardNum: { width: 20, height: 20, borderRadius: 10, backgroundColor: 'rgba(124,58,237,0.2)', alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+  cpCardNumText: { fontSize: 10, fontWeight: '800', color: '#a78bfa' },
+  cpCardText: { fontSize: 13, lineHeight: 19, flex: 1 },
+  cpCardFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 },
+  cpCardLen: { fontSize: 10 },
+  cpUseBtn: { backgroundColor: 'rgba(124,58,237,0.2)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.full },
+  cpUseBtnText: { fontSize: 11, fontWeight: '700', color: '#a78bfa' },
 
   // Tone
   toneRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, borderRadius: radius.md, borderWidth: 1, padding: 10, marginBottom: 12 },

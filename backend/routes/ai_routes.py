@@ -131,24 +131,65 @@ Return only the JSON object."""
 @ai_bp.route("/caption", methods=["POST"])
 @jwt_required()
 def generate_caption():
-    """Generate a caption for a post based on context."""
     data = request.json or {}
     context = data.get("context", "").strip()
-    tone = data.get("tone", "warm")  # warm | funny | inspiring | professional
+    tone = data.get("tone", "warm")
+    length = data.get("length", "medium")  # short | medium | long
+    emoji = data.get("emoji", "minimal")   # none | minimal | heavy
+    count = int(data.get("count", 1))
     if not context:
-        return jsonify({"caption": ""}), 400
+        return jsonify({"captions": [], "caption": ""}), 400
+
+    length_guide = {"short": "1 line, under 80 chars", "medium": "2-3 lines, under 150 chars", "long": "3-5 lines, storytelling style"}.get(length, "under 150 chars")
+    emoji_guide = {"none": "no emojis at all", "minimal": "1-2 emojis max", "heavy": "lots of emojis, expressive"}.get(emoji, "1-2 emojis")
+    tone_guide = {
+        "warm": "warm, loving, heartfelt",
+        "funny": "funny, witty, makes people laugh",
+        "deep": "deep, thoughtful, philosophical",
+        "romantic": "romantic, soft, loving",
+        "savage": "savage, bold, no filter",
+        "professional": "professional, clean, polished",
+        "inspiring": "inspiring, uplifting, motivating",
+        "nostalgic": "nostalgic, throwback, sentimental",
+        "aesthetic": "aesthetic, dreamy, artsy vibes",
+        "humble": "humble, grateful, down to earth",
+        "bold": "bold, confident, powerful",
+        "mysterious": "mysterious, cryptic, intriguing",
+        "grateful": "grateful, appreciative, blessed",
+        "sarcastic": "sarcastic, dry humor, ironic",
+        "motivational": "motivational, hustle, push harder",
+        "chill": "chill, relaxed, laid back",
+        "dramatic": "dramatic, over the top, theatrical",
+        "poetic": "poetic, lyrical, beautiful language",
+        "family": "family-focused, warm, inclusive",
+        "travel": "travel, adventure, wanderlust",
+        "foodie": "foodie, delicious, mouth-watering",
+    }.get(tone, tone)
+
     prompt = f"""You are a creative social media caption writer.
-The user is posting: {context}
-Write a compelling, engaging caption. Tone: {tone}.
-Rules:
-- Under 150 characters
-- No hashtags (those come separately)
-- Make it feel personal and real, not generic
-- Return ONLY the caption text, no quotes, no explanation"""
+Content: {context}
+Tone: {tone_guide}
+Length: {length_guide}
+Emoji style: {emoji_guide}
+
+Write exactly {count} different caption options. Each must feel unique — vary the angle, energy, and style.
+Return ONLY a JSON array of {count} strings. No explanation, no numbering, just the array.
+Example format: ["caption 1", "caption 2"]"""
     try:
-        return jsonify({"caption": chat_completion(prompt).strip('"').strip()})
+        import json as _json
+        raw = chat_completion(prompt)
+        # Try to parse as JSON array
+        captions = _json.loads(raw)
+        if isinstance(captions, list):
+            captions = [c.strip().strip('"') for c in captions if c][:count]
+        else:
+            captions = [str(captions).strip()]
+        return jsonify({"captions": captions, "caption": captions[0] if captions else ""})
     except Exception:
-        return jsonify({"caption": ""}), 500
+        # Fallback: split by newlines
+        lines = [l.strip().lstrip('0123456789.-) ') for l in raw.split('\n') if l.strip()]
+        captions = [l for l in lines if len(l) > 10][:count]
+        return jsonify({"captions": captions, "caption": captions[0] if captions else ""})
 
 
 @ai_bp.route("/hashtags", methods=["POST"])
