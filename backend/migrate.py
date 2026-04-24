@@ -60,6 +60,19 @@ def run_migrations():
             # Conversations table migrations
             "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS name VARCHAR(100)",
             "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS pinned_message_id INTEGER",
+
+            # Post collaborators table
+            """
+            CREATE TABLE IF NOT EXISTS post_collaborators (
+                id SERIAL PRIMARY KEY,
+                post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                role VARCHAR(20) DEFAULT 'creator',
+                status VARCHAR(20) DEFAULT 'pending',
+                created_at TIMESTAMP DEFAULT NOW(),
+                UNIQUE(post_id, user_id)
+            )
+            """,
         ]
         
         print(f"🚀 Running {len(migrations)} migrations...")

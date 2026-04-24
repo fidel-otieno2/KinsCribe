@@ -60,7 +60,12 @@ export default function CreateScreen({ navigation }) {
   const [privacy, setPrivacy] = useState('public');
   const [loading, setLoading] = useState(false);
   const [altText, setAltText] = useState('');
-  const [collabUser, setCollabUser] = useState('');
+  const [collaborators, setCollaborators] = useState([]); // [{ id, name, username, avatar, role }]
+  const [collabSearch, setCollabSearch] = useState('');
+  const [collabResults, setCollabResults] = useState([]);
+  const [searchingCollab, setSearchingCollab] = useState(false);
+  const [showCollabSearch, setShowCollabSearch] = useState(false);
+  const collabSearchTimer = useRef(null);
 
   // AI state
   const [toneResult, setToneResult] = useState(null);
@@ -137,7 +142,6 @@ export default function CreateScreen({ navigation }) {
       if (draft.location) setLocation(draft.location);
       if (draft.privacy) setPrivacy(draft.privacy);
       if (draft.altText) setAltText(draft.altText);
-      if (draft.collabUser) setCollabUser(draft.collabUser);
       if (draft.mode) setMode(draft.mode);
       setShowDraftBanner(false);
       setHasDraft(false);
@@ -164,10 +168,10 @@ export default function CreateScreen({ navigation }) {
     if (!caption && !hashtags && !location) return;
     clearTimeout(draftTimer.current);
     draftTimer.current = setTimeout(() => {
-      saveDraft({ caption, hashtags, location, privacy, altText, collabUser, mode });
+      saveDraft({ caption, hashtags, location, privacy, altText, mode });
     }, 2000);
     return () => clearTimeout(draftTimer.current);
-  }, [caption, hashtags, location, privacy, altText, collabUser, mode]);
+  }, [caption, hashtags, location, privacy, altText, mode]);
 
   // ─── AI: TONE CHECK ─────────────────────────────────────────────
   const toneTimer = useRef(null);
@@ -292,6 +296,31 @@ export default function CreateScreen({ navigation }) {
     setShowHashtagPanel(false);
     info('Hashtags added!');
   };
+
+  // ─── COLLABORATORS ───────────────────────────────────────────────
+  const searchCollaborators = (q) => {
+    setCollabSearch(q);
+    clearTimeout(collabSearchTimer.current);
+    if (!q.trim() || q.length < 2) { setCollabResults([]); return; }
+    collabSearchTimer.current = setTimeout(async () => {
+      setSearchingCollab(true);
+      try {
+        const { data } = await api.get(`/posts/collab/search?q=${encodeURIComponent(q)}`);
+        setCollabResults(data.users || []);
+      } catch {} finally { setSearchingCollab(false); }
+    }, 400);
+  };
+
+  const addCollaborator = (u, role = 'creator') => {
+    if (collaborators.find(c => c.id === u.id)) return;
+    setCollaborators(prev => [...prev, { ...u, role }]);
+    setCollabSearch('');
+    setCollabResults([]);
+  };
+
+  const removeCollaborator = (id) => setCollaborators(prev => prev.filter(c => c.id !== id));
+
+  const updateCollabRole = (id, role) => setCollaborators(prev => prev.map(c => c.id === id ? { ...c, role } : c));
 
   // ─── MEDIA PICKER ───────────────────────────────────────────────
   const pickMedia = useCallback(async (allowMultiple = false) => {
@@ -530,7 +559,7 @@ export default function CreateScreen({ navigation }) {
       if (location) formData.append('location', location);
       if (hashtags) formData.append('hashtags', hashtags);
       if (altText) formData.append('alt_text', altText);
-      if (collabUser) formData.append('collab_user', collabUser);
+      if (collaborators.length) formData.append('collaborators', JSON.stringify(collaborators.map(c => ({ id: c.id, role: c.role }))));
       if (selectedMusic) formData.append('music_id', selectedMusic.id);
       if (scheduledDate) formData.append('scheduled_for', scheduledDate.toISOString());
       if (mediaFiles.length === 1) {
@@ -544,7 +573,7 @@ export default function CreateScreen({ navigation }) {
       await AsyncStorage.removeItem(DRAFT_KEY);
       setCaption(''); setMediaFiles([]); setLocation(''); setHashtags('');
       setSelectedMusic(null); setScheduledDate(null); setToneResult(null);
-      setHashtagSuggestions([]);
+      setHashtagSuggestions([]); setCollaborators([]);
       success(scheduledDate ? `Post scheduled for ${formatSchedule(scheduledDate)}` : 'Post shared!');
       navigation.navigate('Feed');
     } catch (err) {
@@ -1057,9 +1086,107 @@ export default function CreateScreen({ navigation }) {
               <TextInput style={[s.fieldInput, { color: theme.text }]} placeholder="Add location" placeholderTextColor={theme.dim} value={location} onChangeText={setLocation} />
             </View>
 
-            <View style={[s.fieldRow, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]}>
-              <Ionicons name="person-add-outline" size={18} color={theme.muted} />
-              <TextInput style={[s.fieldInput, { color: theme.text }]} placeholder="Tag a co-creator @username" placeholderTextColor={theme.dim} value={collabUser} onChangeText={setCollabUser} autoCapitalize="none" />
+            {/* Co-Creator / Collaborators */}
+            <View style={[s.collabSection, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]}>
+              <View style={s.collabHeader}>
+                <Ionicons name="people-outline" size={16} color={theme.muted} />
+                <AppText style={[s.collabHeaderText, { color: theme.text }]}>Co-Creators</AppText>
+                <TouchableOpacity
+                  style={s.collabAddBtn}
+                  onPress={() => setShowCollabSearch(p => !p)}
+                >
+                  <Ionicons name={showCollabSearch ? 'chevron-up' : 'add'} size={16} color="#7c3aed" />
+                  {!showCollabSearch && <AppText style={s.collabAddBtnText}>Invite</AppText>}
+                </TouchableOpacity>
+              </View>
+
+              {/* Selected collaborators */}
+              {collaborators.length > 0 && (
+                <View style={s.collabChipsWrap}>
+                  {collaborators.map(c => (
+                    <View key={c.id} style={[s.collabChip, { borderColor: theme.border2 }]}>
+                      {c.avatar
+                        ? <Image source={{ uri: c.avatar }} style={s.collabAvatar} />
+                        : <View style={[s.collabAvatarFallback, { backgroundColor: '#7c3aed' }]}>
+                            <AppText style={s.collabAvatarLetter}>{c.name?.[0]?.toUpperCase()}</AppText>
+                          </View>}
+                      <View style={{ flex: 1 }}>
+                        <AppText style={[s.collabChipName, { color: theme.text }]}>{c.name}</AppText>
+                        <AppText style={[s.collabChipRole, { color: theme.muted }]}>{c.role}</AppText>
+                      </View>
+                      {/* Role picker */}
+                      <View style={s.collabRoleRow}>
+                        {['creator', 'editor', 'contributor'].map(r => (
+                          <TouchableOpacity
+                            key={r}
+                            style={[s.collabRoleBtn, c.role === r && s.collabRoleBtnActive]}
+                            onPress={() => updateCollabRole(c.id, r)}
+                          >
+                            <AppText style={[s.collabRoleBtnText, { color: c.role === r ? '#a78bfa' : theme.muted }]}>
+                              {r === 'creator' ? '👑' : r === 'editor' ? '✏️' : '🤝'}
+                            </AppText>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                      <TouchableOpacity onPress={() => removeCollaborator(c.id)} style={{ padding: 4 }}>
+                        <Ionicons name="close-circle" size={16} color={theme.muted} />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {collaborators.length === 0 && !showCollabSearch && (
+                <AppText style={[s.collabEmptyText, { color: theme.dim }]}>Invite co-creators — post appears on both profiles</AppText>
+              )}
+
+              {/* Search input */}
+              {showCollabSearch && (
+                <>
+                  <View style={[s.collabSearchRow, { backgroundColor: theme.bgSecondary, borderColor: theme.border2 }]}>
+                    <Ionicons name="search" size={15} color={theme.muted} />
+                    <TextInput
+                      style={[s.collabSearchInput, { color: theme.text }]}
+                      placeholder="Search by name or @username..."
+                      placeholderTextColor={theme.dim}
+                      value={collabSearch}
+                      onChangeText={searchCollaborators}
+                      autoFocus
+                      autoCapitalize="none"
+                    />
+                    {searchingCollab && <ActivityIndicator size="small" color="#7c3aed" />}
+                  </View>
+
+                  {collabResults.length > 0 && (
+                    <View style={[s.collabDropdown, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]}>
+                      {collabResults.map(u => (
+                        <TouchableOpacity
+                          key={u.id}
+                          style={[s.collabResultRow, { borderBottomColor: theme.border }]}
+                          onPress={() => { addCollaborator(u); setShowCollabSearch(false); }}
+                        >
+                          {u.avatar
+                            ? <Image source={{ uri: u.avatar }} style={s.collabResultAvatar} />
+                            : <View style={[s.collabResultAvatar, { backgroundColor: '#7c3aed', alignItems: 'center', justifyContent: 'center' }]}>
+                                <AppText style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>{u.name?.[0]}</AppText>
+                              </View>}
+                          <View style={{ flex: 1 }}>
+                            <AppText style={[s.collabResultName, { color: theme.text }]}>{u.name}</AppText>
+                            <AppText style={[s.collabResultUsername, { color: theme.muted }]}>@{u.username}</AppText>
+                          </View>
+                          <View style={s.collabInviteBtn}>
+                            <AppText style={s.collabInviteBtnText}>+ Invite</AppText>
+                          </View>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+
+                  {collabSearch.length >= 2 && !searchingCollab && collabResults.length === 0 && (
+                    <AppText style={[s.collabEmptyText, { color: theme.dim, marginTop: 8 }]}>No users found</AppText>
+                  )}
+                </>
+              )}
             </View>
 
             <View style={[s.fieldRow, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]}>
@@ -1437,7 +1564,33 @@ const s = StyleSheet.create({
   input: { borderWidth: 1, borderRadius: radius.md, padding: 14, fontSize: 14, marginBottom: 14 },
   textarea: { height: 120, textAlignVertical: 'top' },
 
-  // Music modal
+  // Collaborators
+  collabSection: { borderRadius: radius.md, borderWidth: 1, padding: 14, marginBottom: 10 },
+  collabHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  collabHeaderText: { flex: 1, fontSize: 14, fontWeight: '600' },
+  collabAddBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(124,58,237,0.12)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.full },
+  collabAddBtnText: { color: '#7c3aed', fontSize: 12, fontWeight: '700' },
+  collabEmptyText: { fontSize: 12, fontStyle: 'italic' },
+  collabChipsWrap: { gap: 8, marginBottom: 8 },
+  collabChip: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: radius.md, padding: 8 },
+  collabAvatar: { width: 32, height: 32, borderRadius: 16 },
+  collabAvatarFallback: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  collabAvatarLetter: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  collabChipName: { fontSize: 13, fontWeight: '600' },
+  collabChipRole: { fontSize: 11, marginTop: 1 },
+  collabRoleRow: { flexDirection: 'row', gap: 4 },
+  collabRoleBtn: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(100,116,139,0.1)' },
+  collabRoleBtnActive: { backgroundColor: 'rgba(124,58,237,0.2)' },
+  collabRoleBtnText: { fontSize: 13 },
+  collabSearchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: radius.md, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 4 },
+  collabSearchInput: { flex: 1, fontSize: 14 },
+  collabDropdown: { borderRadius: radius.md, borderWidth: 1, overflow: 'hidden', marginTop: 4 },
+  collabResultRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderBottomWidth: 0.5 },
+  collabResultAvatar: { width: 36, height: 36, borderRadius: 18 },
+  collabResultName: { fontSize: 14, fontWeight: '600' },
+  collabResultUsername: { fontSize: 12, marginTop: 1 },
+  collabInviteBtn: { backgroundColor: 'rgba(124,58,237,0.15)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.full },
+  collabInviteBtnText: { color: '#7c3aed', fontSize: 12, fontWeight: '700' },
   modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
   modalSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 12, paddingBottom: 36, maxHeight: '70%' },
   modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(100,116,139,0.4)', alignSelf: 'center', marginBottom: 16 },

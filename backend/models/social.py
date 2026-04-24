@@ -81,6 +81,7 @@ class Post(db.Model):
     likes = db.relationship("PostLike", backref="post", lazy=True, cascade="all, delete")
     comments = db.relationship("PostComment", backref="post", lazy=True, cascade="all, delete")
     saves = db.relationship("PostSave", backref="post", lazy=True, cascade="all, delete")
+    collaborators = db.relationship("PostCollaborator", back_populates="post", lazy=True, cascade="all, delete")
 
     def to_dict(self, current_user_id=None):
         import json
@@ -122,7 +123,33 @@ class Post(db.Model):
             "author_username": self.author.username if self.author else None,
             "author_avatar": self.author.avatar_url if self.author else None,
             "author_verified_badge": self.author.to_dict().get("verified_badge") if self.author else None,
+            "collaborators": [c.to_dict() for c in self.collaborators if c.status == "accepted"],
+            "pending_collaborators": [c.to_dict() for c in self.collaborators if c.status == "pending"],
             "created_at": _iso(self.created_at)
+        }
+
+
+class PostCollaborator(db.Model):
+    """Co-creator/collaborator on a post."""
+    __tablename__ = "post_collaborators"
+    id = db.Column(db.Integer, primary_key=True)
+    post_id = db.Column(db.Integer, db.ForeignKey("posts.id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    role = db.Column(db.String(20), default="creator")  # creator | editor | contributor
+    status = db.Column(db.String(20), default="pending")  # pending | accepted | rejected
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    __table_args__ = (db.UniqueConstraint("post_id", "user_id"),)
+    user = db.relationship("User", foreign_keys=[user_id])
+    post = db.relationship("Post", foreign_keys=[post_id], back_populates="collaborators")
+
+    def to_dict(self):
+        return {
+            "id": self.id, "post_id": self.post_id,
+            "user_id": self.user_id, "role": self.role, "status": self.status,
+            "name": self.user.name if self.user else None,
+            "username": self.user.username if self.user else None,
+            "avatar": self.user.avatar_url if self.user else None,
+            "created_at": _iso(self.created_at),
         }
 
 

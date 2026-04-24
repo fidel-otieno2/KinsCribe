@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from extensions import db
 from models.user import User
-from models.social import Post, PostLike, PostComment, PostSave, Connection
+from models.social import Post, PostLike, PostComment, PostSave, Connection, PostCollaborator
 import cloudinary, cloudinary.uploader, os, json
 
 post_bp = Blueprint("posts", __name__)
@@ -83,6 +83,22 @@ def create_post():
         user_id=user.id
     )
     db.session.add(post)
+    db.session.flush()  # get post.id before commit
+
+    # Handle collaborators
+    collab_raw = data.get("collaborators", "[]")
+    try:
+        collab_ids = json.loads(collab_raw) if isinstance(collab_raw, str) else collab_raw
+    except Exception:
+        collab_ids = []
+    for c in collab_ids:
+        uid = c.get("id") if isinstance(c, dict) else int(c)
+        role = c.get("role", "creator") if isinstance(c, dict) else "creator"
+        if uid and uid != user.id:
+            db.session.add(PostCollaborator(
+                post_id=post.id, user_id=uid, role=role, status="pending"
+            ))
+
     db.session.commit()
     return jsonify({"post": post.to_dict(user.id)}), 201
 
@@ -314,3 +330,71 @@ def toggle_sponsor(post_id):
     post.sponsor_label = data.get("sponsor_label", post.sponsor_label)
     db.session.commit()
     return jsonify({"is_sponsored": post.is_sponsored})
+
+
+# ── COLLAB ROUTES ────────────────────────────────────────────────────
+
+@post_bp.route("/collab/pending", methods=["GET"])
+@jwt_required()
+def my_collab_requests():
+    """Get all pending collab invites for the current user."""
+    user = me()
+    pending = PostCollaborator.query.filter_by(user_id=user.id, status="pending").all()
+    result = []
+    for c in pending:
+        post = Post.query.get(c.post_id)
+        if not post:
+            continue
+        owner = User.query.get(post.user_id)
+        result.append({
+            "collab_id": c.id,
+            "post_id": post.id,
+            "post_caption": (post.caption or "")[:80],
+            "post_media": post.media_url,
+            "role": c.role,
+            "owner_name": owner.name if owner else None,
+            "owner_avatar": owner.avatar_url if owner else None,
+            "owner_username": owner.username if owner else None,
+        })
+    return jsonify({"requests": result})
+
+
+@post_bp.route("/collab/<int:collab_id>/respond", methods=["POST"])
+@jwt_required()
+def respond_collab(collab_id):
+    """Accept or reject a collab invite."""
+    user = me()
+    collab = PostCollaborator.query.get_or_404(collab_id)
+    if collab.user_id != user.id:
+        return jsonify({"error": "Not authorized"}), 403
+    data = request.get_json() or {}
+    action = data.get("action")  # accept | reject
+    if action == "accept":
+        collab.status = "accepted"
+    elif action == "reject":
+        collab.status = "rejected"
+    else:
+        return jsonify({"error": "action must be accept or reject"}), 400
+    db.session.commit()
+    return jsonify({"status": collab.status})
+
+
+@post_bp.route("/collab/search", methods=["GET"])
+@jwt_required()
+def search_collab_users():
+    """Search users to invite as collaborators."""
+    user = me()
+    q = request.args.get("q", "").strip()
+    if not q or len(q) < 2:
+        return jsonify({"users": []})
+    users = User.query.filter(
+        User.id != user.id,
+        db.or_(
+            User.name.ilike(f"%{q}%"),
+            User.username.ilike(f"%{q}%")
+        )
+    ).limit(10).all()
+    return jsonify({"users": [
+        {"id": u.id, "name": u.name, "username": u.username, "avatar": u.avatar_url}
+        for u in users
+    ]})
