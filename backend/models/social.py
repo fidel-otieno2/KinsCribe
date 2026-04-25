@@ -68,6 +68,13 @@ class Post(db.Model):
     is_scheduled = db.Column(db.Boolean, default=False)
     scheduled_at = db.Column(db.DateTime, nullable=True)
 
+    # Music
+    music_title = db.Column(db.String(200), nullable=True)
+    music_artist = db.Column(db.String(200), nullable=True)
+    music_artwork = db.Column(db.String(300), nullable=True)
+    music_stream_url = db.Column(db.String(500), nullable=True)
+    music_start_time = db.Column(db.Integer, default=0)
+
     # Sponsored / promoted
     is_sponsored = db.Column(db.Boolean, default=False)
     sponsor_label = db.Column(db.String(100), nullable=True)
@@ -125,6 +132,13 @@ class Post(db.Model):
             "author_verified_badge": self.author.to_dict().get("verified_badge") if self.author else None,
             "collaborators": [c.to_dict() for c in self.collaborators if c.status == "accepted"],
             "pending_collaborators": [c.to_dict() for c in self.collaborators if c.status == "pending"],
+            "music": {
+                "title": self.music_title,
+                "artist": self.music_artist,
+                "artwork": self.music_artwork,
+                "stream_url": self.music_stream_url,
+                "start_time": self.music_start_time or 0,
+            } if self.music_title else None,
             "created_at": _iso(self.created_at)
         }
 

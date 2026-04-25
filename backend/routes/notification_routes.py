@@ -202,6 +202,34 @@ def _get_all_notifications(user):
     for mention_notif in _mention_store.get(user.id, []):
         notifs.append(mention_notif)
 
+    # ── 8. Collab invite notifications ───────────────────────────────────────────────
+    try:
+        from models.social import PostCollaborator
+        pending_collabs = PostCollaborator.query.filter_by(user_id=user.id, status='pending').all()
+        for collab in pending_collabs:
+            post = Post.query.get(collab.post_id)
+            if not post:
+                continue
+            owner = User.query.get(post.user_id)
+            if owner:
+                notifs.append({
+                    "id": f"collab_invite-{collab.id}",
+                    "type": "collab_invite",
+                    "source": "collab",
+                    "actor_name": owner.name,
+                    "actor_avatar": owner.avatar_url,
+                    "actor_id": owner.id,
+                    "collab_id": collab.id,
+                    "post_id": post.id,
+                    "post_media": post.media_url,
+                    "role": collab.role,
+                    "title": f"{owner.name} invited you to co-create a post",
+                    "body": f"Role: {collab.role} · {(post.caption or '')[:50]}",
+                    "created_at": collab.created_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                })
+    except Exception:
+        pass
+
     notifs.sort(key=lambda x: x["created_at"], reverse=True)
     return notifs[:60]
 
@@ -226,6 +254,25 @@ def get_notification_count():
     read_ids = set(_read_store.get(user.id, []))
     unread_count = sum(1 for n in notifs if n["id"] not in read_ids)
     return jsonify({"unread_count": unread_count})
+
+
+@notification_bp.route("/collab/<int:collab_id>/respond", methods=["POST"])
+@jwt_required()
+def respond_collab_from_notif(collab_id):
+    from models.social import PostCollaborator
+    user_id = int(get_jwt_identity())
+    collab = PostCollaborator.query.get_or_404(collab_id)
+    if collab.user_id != user_id:
+        return jsonify({"error": "Not authorized"}), 403
+    action = (request.get_json() or {}).get("action")
+    if action == "accept":
+        collab.status = "accepted"
+    elif action == "reject":
+        collab.status = "rejected"
+    else:
+        return jsonify({"error": "action must be accept or reject"}), 400
+    db.session.commit()
+    return jsonify({"status": collab.status})
 
 
 @notification_bp.route("/mark-read", methods=["POST"])

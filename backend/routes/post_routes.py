@@ -82,6 +82,18 @@ def create_post():
         privacy=data.get("privacy", "public"),
         user_id=user.id
     )
+    # Save music metadata
+    music_id = data.get("music_id")
+    music_title = data.get("music_title", "").strip()
+    if music_id and music_title:
+        post.music_title = music_title
+        post.music_artist = data.get("music_artist", "")
+        post.music_artwork = data.get("music_artwork", "")
+        post.music_stream_url = data.get("music_stream_url", "")
+        try:
+            post.music_start_time = int(data.get("music_start_time", 0))
+        except Exception:
+            post.music_start_time = 0
     db.session.add(post)
     db.session.flush()  # get post.id before commit
 

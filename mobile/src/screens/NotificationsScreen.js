@@ -34,6 +34,7 @@ const TYPE_CONFIG = {
   follow_request:   { icon: 'person-add',       color: '#f59e0b', bg: 'rgba(245,158,11,0.18)',   label: 'wants to follow you',            source: 'Follow Request', sourceBg: '#78350f', sourceColor: '#fbbf24' },
   message:          { icon: 'chatbubbles',      color: '#f59e0b', bg: 'rgba(245,158,11,0.18)',   label: 'sent you a message',             source: 'Message',      sourceBg: '#78350f', sourceColor: '#fbbf24' },
   birthday:         { icon: 'gift',             color: '#f59e0b', bg: 'rgba(245,158,11,0.18)',   label: '',                               source: 'Birthday',     sourceBg: '#78350f', sourceColor: '#fbbf24' },
+  collab_invite:    { icon: 'people',           color: '#a78bfa', bg: 'rgba(124,58,237,0.18)',   label: 'invited you to co-create',       source: 'Collab',       sourceBg: '#3b0764', sourceColor: '#a78bfa' },
 };
 
 function Avatar({ url, name, size = 48 }) {
@@ -105,17 +106,36 @@ function NotifRow({ item, onPress, index, onAccept, onDecline }) {
           {/* Follow request inline actions */}
           {item.type === 'follow_request' ? (
             <View style={s.requestBtns}>
+              <TouchableOpacity style={s.acceptBtn} onPress={() => onAccept(item)}>
+                <AppText style={s.acceptBtnText}>{t('confirm')}</AppText>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.declineBtn} onPress={() => onDecline(item)}>
+                <AppText style={s.declineBtnText}>{t('delete')}</AppText>
+              </TouchableOpacity>
+            </View>
+          ) : item.type === 'collab_invite' ? (
+            <View style={s.requestBtns}>
               <TouchableOpacity
                 style={s.acceptBtn}
-                onPress={() => onAccept(item)}
+                onPress={async () => {
+                  try {
+                    await api.post(`/notifications/collab/${item.collab_id}/respond`, { action: 'accept' });
+                    onAccept(item);
+                  } catch {}
+                }}
               >
-              <AppText style={s.acceptBtnText}>{t('confirm')}</AppText>
+                <AppText style={s.acceptBtnText}>Accept 👑</AppText>
               </TouchableOpacity>
               <TouchableOpacity
                 style={s.declineBtn}
-                onPress={() => onDecline(item)}
+                onPress={async () => {
+                  try {
+                    await api.post(`/notifications/collab/${item.collab_id}/respond`, { action: 'reject' });
+                    onDecline(item);
+                  } catch {}
+                }}
               >
-              <AppText style={s.declineBtnText}>{t('delete')}</AppText>
+                <AppText style={s.declineBtnText}>Decline</AppText>
               </TouchableOpacity>
             </View>
           ) : (
@@ -218,7 +238,7 @@ export default function NotificationsScreen({ navigation }) {
 
   const filtered = notifications.filter(n => {
     if (tab === 'all') return true;
-    if (tab === 'requests') return n.type === 'follow_request';
+    if (tab === 'requests') return n.type === 'follow_request' || n.type === 'collab_invite';
     if (tab === 'family') return n.source === 'family_story' || n.source === 'family';
     if (tab === 'posts') return n.source === 'post';
     if (tab === 'connections') return n.type === 'connection';
@@ -228,7 +248,7 @@ export default function NotificationsScreen({ navigation }) {
 
   const tabCounts = {
     all: notifications.filter(n => !n.is_read).length,
-    requests: notifications.filter(n => n.type === 'follow_request').length,
+    requests: notifications.filter(n => n.type === 'follow_request' || n.type === 'collab_invite').length,
     family: notifications.filter(n => !n.is_read && (n.source === 'family_story' || n.source === 'family')).length,
     posts: notifications.filter(n => !n.is_read && n.source === 'post').length,
     connections: notifications.filter(n => !n.is_read && n.type === 'connection').length,

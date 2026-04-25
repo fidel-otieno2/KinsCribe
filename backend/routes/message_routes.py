@@ -536,6 +536,41 @@ def forward_message(msg_id):
     return jsonify({"forwarded_to": forwarded})
 
 
+# ── Quick Send (story reply / one-shot DM) ───────────────────
+
+@message_bp.route("/send", methods=["POST"])
+@jwt_required()
+def quick_send():
+    """Send a message to a user by user_id — creates DM if needed.
+    Used by story replies and reactions."""
+    user = me()
+    data = request.get_json(force=True, silent=True) or {}
+    to_user_id = data.get("to_user_id")
+    text = data.get("text", "").strip()
+    if not to_user_id:
+        return jsonify({"error": "to_user_id required"}), 400
+    if not text:
+        return jsonify({"error": "text required"}), 400
+    if user.id == to_user_id:
+        return jsonify({"error": "Cannot message yourself"}), 400
+    target = User.query.get(to_user_id)
+    if not target:
+        return jsonify({"error": "User not found"}), 404
+    try:
+        conv = _get_or_create_dm(user.id, to_user_id)
+        msg = Message(
+            text=text,
+            conversation_id=conv.id,
+            sender_id=user.id
+        )
+        db.session.add(msg)
+        db.session.commit()
+        return jsonify({"message": msg.to_dict(user.id), "conversation_id": conv.id}), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+
 # ── Message Requests ──────────────────────────────────────────
 
 @message_bp.route("/requests", methods=["GET"])

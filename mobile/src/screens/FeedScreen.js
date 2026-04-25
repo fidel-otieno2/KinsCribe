@@ -462,6 +462,16 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation, isVisible 
             <AppText style={pc.likeCount}>{likeCount.toLocaleString()} {likeCount === 1 ? "like" : "likes"}</AppText>
           )}
 
+          {/* Music sticker */}
+          {post.music?.title ? (
+            <View style={pc.musicSticker}>
+              <Ionicons name="musical-notes" size={12} color="#a78bfa" />
+              <AppText style={pc.musicStickerText} numberOfLines={1}>
+                {post.music.title} · {post.music.artist}
+              </AppText>
+            </View>
+          ) : null}
+
           {/* Caption */}
           {post.caption ? (
             <View style={pc.captionWrap}>
@@ -474,6 +484,15 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation, isVisible 
                   <AppText style={pc.moreText}>{showFullCaption ? 'less' : 'more'}</AppText>
                 </TouchableOpacity>
               )}
+            </View>
+          ) : null}
+
+          {/* Hashtags */}
+          {post.hashtags ? (
+            <View style={pc.hashtagsWrap}>
+              {post.hashtags.split(/\s+/).filter(Boolean).map((tag, i) => (
+                <AppText key={i} style={pc.hashtagChip}>{tag.startsWith('#') ? tag : `#${tag}`}</AppText>
+              ))}
             </View>
           ) : null}
 
@@ -600,6 +619,10 @@ const pc = StyleSheet.create({
   dot: { width: 6, height: 6, borderRadius: 3 },
   mediaViewerOverlay: { flex: 1, backgroundColor: '#000', justifyContent: 'center' },
   mediaViewerClose: { position: 'absolute', top: 52, right: 16, zIndex: 10, padding: 8, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 20 },
+  musicSticker: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 5, marginBottom: 4 },
+  musicStickerText: { fontSize: 12, color: '#a78bfa', fontWeight: '600', flex: 1 },
+  hashtagsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingHorizontal: 14, marginBottom: 6 },
+  hashtagChip: { fontSize: 13, color: '#3b82f6', fontWeight: '600' },
   viewComments: { paddingHorizontal: 14, color: colors.muted, fontSize: 13, marginBottom: 4 },
   timestamp: { paddingHorizontal: 14, paddingBottom: 10, fontSize: 10, color: colors.dim, letterSpacing: 0.5 },
   commentsOverlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.5)" },

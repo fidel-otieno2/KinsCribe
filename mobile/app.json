@@ -30,6 +30,9 @@
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_CONNECT",
         "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
         "android.permission.READ_MEDIA_IMAGES",
         "android.permission.READ_MEDIA_VIDEO",
@@ -43,6 +46,7 @@
       "expo-image-picker",
       "expo-media-library",
       "expo-local-authentication",
+      "./plugins/withAgora",
       [
         "expo-notifications",
         {
@@ -51,19 +55,6 @@
           "sounds": [],
           "androidMode": "default",
           "androidCollapsedTitle": "KinsCribe"
-        }
-      ],
-      [
-        "react-native-agora",
-        {
-          "permissionsAndroid": [
-            "android.permission.CAMERA",
-            "android.permission.RECORD_AUDIO",
-            "android.permission.MODIFY_AUDIO_SETTINGS",
-            "android.permission.BLUETOOTH",
-            "android.permission.BLUETOOTH_CONNECT"
-          ],
-          "permissionsIOS": ["NSCameraUsageDescription", "NSMicrophoneUsageDescription"]
         }
       ]
     ],

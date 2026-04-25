@@ -3,7 +3,7 @@ import {
   View, StyleSheet, Image, TouchableOpacity,
   Dimensions, StatusBar, Animated, TextInput,
   KeyboardAvoidingView, Platform, PanResponder,
-  Modal, ScrollView,
+  Modal, ScrollView, ActivityIndicator,
 } from 'react-native';
 import { Video } from 'expo-av';
 import Svg, { Defs, ClipPath, Polygon, Image as SvgImage } from 'react-native-svg';
@@ -40,7 +40,9 @@ export default function StoryViewerScreen({ route, navigation }) {
   const [showViews, setShowViews] = useState(false);
   const [views, setViews] = useState([]);
   const [sending, setSending] = useState(false);
+  const [replySent, setReplySent] = useState(false);
   const [reactionSent, setReactionSent] = useState(null);
+  const replyInputRef = useRef(null);
 
   const progress = useRef(new Animated.Value(0)).current;
   const animRef = useRef(null);
@@ -151,21 +153,31 @@ export default function StoryViewerScreen({ route, navigation }) {
     try {
       await api.post('/messages/send', {
         to_user_id: story.user_id,
-        text: `Replied to your story: ${text}`,
+        text: `💬 Replied to your story: ${text}`,
       });
       setReplyText('');
-    } catch {} finally { setSending(false); }
+      setReplySent(true);
+      replyInputRef.current?.blur();
+      setTimeout(() => setReplySent(false), 2500);
+      resumeProgress();
+    } catch {}
+    finally { setSending(false); }
   };
 
   const sendReaction = async (emoji) => {
+    if (sending) return;
     setReactionSent(emoji);
-    setTimeout(() => setReactionSent(null), 1500);
+    setSending(true);
     try {
       await api.post('/messages/send', {
         to_user_id: story.user_id,
-        text: `Reacted ${emoji} to your story`,
+        text: `${emoji} Reacted to your story`,
       });
     } catch {}
+    finally {
+      setSending(false);
+      setTimeout(() => setReactionSent(null), 1500);
+    }
   };
 
   if (!story) return null;
@@ -236,17 +248,16 @@ export default function StoryViewerScreen({ route, navigation }) {
           <HexAvatar uri={group.author_avatar} name={group.author_name} size={38} />
           <View>
             <AppText style={s.authorName}>{group.author_name}</AppText>
-            <AppText style={s.storyTime}>
-              {new Date(story.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-            </AppText>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <AppText style={s.storyTime}>{timeAgo(story.created_at)}</AppText>
+              <AppText style={s.storyDot}>·</AppText>
+              <AppText style={s.storyTime}>
+                {storyIndex + 1}/{group.stories.length}
+              </AppText>
+            </View>
           </View>
         </View>
         <View style={s.headerRight}>
-          {isOwn && (
-            <TouchableOpacity onPress={handleDelete} style={s.headerBtn}>
-              <Ionicons name="trash-outline" size={20} color="#fff" />
-            </TouchableOpacity>
-          )}
           <TouchableOpacity onPress={() => navigation.goBack()} style={s.headerBtn}>
             <Ionicons name="close" size={24} color="#fff" />
           </TouchableOpacity>
@@ -303,29 +314,54 @@ export default function StoryViewerScreen({ route, navigation }) {
           style={s.replyWrap}
         >
           <BlurView intensity={25} tint="dark" style={s.replyBar}>
-            <TextInput
-              style={s.replyInput}
-              placeholder={`Reply to ${group.author_name}...`}
-              placeholderTextColor="rgba(255,255,255,0.45)"
-              value={replyText}
-              onChangeText={setReplyText}
-              onFocus={pauseProgress}
-              onBlur={() => { if (!replyText.trim()) resumeProgress(); }}
-              returnKeyType="send"
-              onSubmitEditing={() => sendReply(replyText)}
-            />
-            {replyText.trim() ? (
-              <TouchableOpacity onPress={() => sendReply(replyText)} disabled={sending}>
-                <Ionicons name="send" size={22} color={colors.primary} />
-              </TouchableOpacity>
-            ) : (
-              <View style={s.replyEmojis}>
-                {QUICK_REACTIONS.map(e => (
-                  <TouchableOpacity key={e} onPress={() => sendReaction(e)}>
-                    <AppText style={{ fontSize: 22 }}>{e}</AppText>
-                  </TouchableOpacity>
-                ))}
+            {replySent ? (
+              // ── Sent confirmation ──
+              <View style={s.replySentRow}>
+                <Ionicons name="checkmark-circle" size={18} color="#10b981" />
+                <AppText style={s.replySentText}>Message sent!</AppText>
               </View>
+            ) : (
+              <>
+                <TextInput
+                  ref={replyInputRef}
+                  style={s.replyInput}
+                  placeholder={`Reply to ${group.author_name}...`}
+                  placeholderTextColor="rgba(255,255,255,0.45)"
+                  value={replyText}
+                  onChangeText={setReplyText}
+                  onFocus={pauseProgress}
+                  onBlur={() => { if (!replyText.trim()) resumeProgress(); }}
+                  returnKeyType="send"
+                  onSubmitEditing={() => sendReply(replyText)}
+                  editable={!sending}
+                />
+                {replyText.trim() ? (
+                  // ── Send button ──
+                  <TouchableOpacity
+                    onPress={() => sendReply(replyText)}
+                    disabled={sending}
+                    style={s.sendBtn}
+                  >
+                    {sending
+                      ? <ActivityIndicator size="small" color="#fff" />
+                      : <Ionicons name="send" size={18} color="#fff" />}
+                  </TouchableOpacity>
+                ) : (
+                  // ── Quick reactions ──
+                  <View style={s.replyEmojis}>
+                    {QUICK_REACTIONS.map(e => (
+                      <TouchableOpacity
+                        key={e}
+                        onPress={() => sendReaction(e)}
+                        disabled={sending}
+                        style={s.reactionBtn}
+                      >
+                        <AppText style={s.reactionEmoji}>{e}</AppText>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </>
             )}
           </BlurView>
         </KeyboardAvoidingView>
@@ -465,6 +501,7 @@ const s = StyleSheet.create({
   authorRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   authorName: { color: '#fff', fontWeight: '700', fontSize: 14 },
   storyTime: { color: 'rgba(255,255,255,0.65)', fontSize: 11, marginTop: 1 },
+  storyDot: { color: 'rgba(255,255,255,0.4)', fontSize: 11 },
   headerRight: { flexDirection: 'row', gap: 6 },
   headerBtn: { padding: 6 },
 
@@ -495,14 +532,28 @@ const s = StyleSheet.create({
   replyWrap: { position: 'absolute', bottom: 0, left: 0, right: 0 },
   replyBar: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
-    paddingHorizontal: 14, paddingVertical: 10, paddingBottom: Platform.OS === 'ios' ? 30 : 14,
+    paddingHorizontal: 14, paddingVertical: 10,
+    paddingBottom: Platform.OS === 'ios' ? 30 : 14,
+    minHeight: 64,
   },
   replyInput: {
     flex: 1, color: '#fff', fontSize: 14,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)',
     borderRadius: 24, paddingHorizontal: 16, paddingVertical: 10,
   },
-  replyEmojis: { flexDirection: 'row', gap: 8 },
+  sendBtn: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: colors.primary,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  replyEmojis: { flexDirection: 'row', gap: 6 },
+  reactionBtn: { padding: 2 },
+  reactionEmoji: { fontSize: 22 },
+  replySentRow: {
+    flex: 1, flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'center', gap: 8, paddingVertical: 6,
+  },
+  replySentText: { color: '#10b981', fontSize: 14, fontWeight: '600' },
 
   viewsOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.6)' },
   viewsSheet: {

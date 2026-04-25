@@ -64,9 +64,6 @@ const QUICK_SEARCHES = [
   { label: 'Workout', query: 'workout gym', icon: '💪' },
 ];
 
-// ─── AUDIUS HOST RESOLVER ──────────────────────────────────────────
-
-
 export default function CreateScreen({ navigation }) {
   const { user } = useAuth();
   const { theme, isDark } = useTheme();
@@ -155,7 +152,6 @@ export default function CreateScreen({ navigation }) {
   // ─── ON MOUNT ───────────────────────────────────────────────────
   useEffect(() => {
     checkExistingDraft();
-    resolveAudiusHost();
     Audio.setAudioModeAsync({ playsInSilentModeIOS: true, allowsRecordingIOS: false });
     return () => { stopAllAudio(); };
   }, []);
@@ -473,7 +469,7 @@ export default function CreateScreen({ navigation }) {
     } catch { info('Could not process image'); }
   };
 
-  // ─── AUDIUS MUSIC (FIXED & ENHANCED) ────────────────────────────
+  // ─── DEEZER MUSIC ────────────────────────────────────────────────
   const stopAllAudio = async () => {
     clearTimeout(snippetTimer.current);
     try {
@@ -488,8 +484,8 @@ export default function CreateScreen({ navigation }) {
   };
 
   // Build Audius stream URL safely
-  const getStreamUrl = (trackId) =>
-    `${resolvedAudiusHost}/v1/tracks/${trackId}/stream?app_name=${APP_NAME}`;
+  // Deezer preview URL is stored directly on the track object
+  const getStreamUrl = (track) => track.preview || '';
 
   // Preview a track (30-sec snippet from snippetStart)
   const togglePreview = async (track) => {
@@ -499,7 +495,7 @@ export default function CreateScreen({ navigation }) {
     }
     await stopAllAudio();
 
-    const url = getStreamUrl(track.id);
+    const url = getStreamUrl(track);
     try {
       const { sound, status } = await Audio.Sound.createAsync(
         { uri: url },
@@ -521,8 +517,7 @@ export default function CreateScreen({ navigation }) {
     } catch (e) {
       console.warn('Preview error:', e);
       // Try next host on failure
-      await resolveAudiusHost();
-      info('Could not play preview — trying again');
+      info('Could not play preview');
     }
   };
 
@@ -551,11 +546,11 @@ export default function CreateScreen({ navigation }) {
     setSelectedMusic({
       id: track.id,
       title: track.title,
-      artist: track.user?.name || track.user?.handle || 'Unknown',
-      artwork: track.artwork?.['150x150'] || track.artwork?.['480x480'] || null,
-      stream_url: getStreamUrl(track.id),
+      artist: track.artist?.name || 'Unknown',
+      artwork: track.album?.cover_medium || track.album?.cover || null,
+      stream_url: track.preview || '',
       start_time: startSec,
-      duration: Math.min(30, trackDuration > 0 ? trackDuration - startSec : 30),
+      duration: 30,
     });
     setSnippetTrack(null);
     setShowMusicModal(false);
@@ -564,8 +559,7 @@ export default function CreateScreen({ navigation }) {
   const fetchTrending = async () => {
     setMusicLoading(true);
     try {
-      const host = await resolveAudiusHost();
-      const res = await fetch(`${host}/v1/tracks/trending?app_name=${APP_NAME}&limit=20`);
+      const res = await fetch(`${DEEZER_API}/chart/0/tracks?limit=25`);
       if (!res.ok) throw new Error('Network error');
       const data = await res.json();
       setMusicTracks(data.data || []);
@@ -579,10 +573,7 @@ export default function CreateScreen({ navigation }) {
     if (!query.trim()) { fetchTrending(); return; }
     setMusicLoading(true);
     try {
-      const host = await resolveAudiusHost();
-      const res = await fetch(
-        `${host}/v1/tracks/search?query=${encodeURIComponent(query)}&app_name=${APP_NAME}&limit=20`
-      );
+      const res = await fetch(`${DEEZER_API}/search?q=${encodeURIComponent(query)}&limit=25`);
       if (!res.ok) throw new Error('Search failed');
       const data = await res.json();
       setMusicTracks(data.data || []);
@@ -613,7 +604,7 @@ export default function CreateScreen({ navigation }) {
     await stopAllAudio();
     try {
       const { sound } = await Audio.Sound.createAsync(
-        { uri: selectedMusic.stream_url },
+        { uri: selectedMusic.stream_url || '' },
         { shouldPlay: true, positionMillis: (selectedMusic.start_time || 0) * 1000 }
       );
       musicSoundRef.current = sound;
@@ -742,7 +733,11 @@ export default function CreateScreen({ navigation }) {
       if (altText) formData.append('alt_text', altText);
       if (collaborators.length) formData.append('collaborators', JSON.stringify(collaborators.map(c => ({ id: c.id, role: c.role }))));
       if (selectedMusic) {
-        formData.append('music_id', selectedMusic.id);
+        formData.append('music_id', String(selectedMusic.id));
+        formData.append('music_title', selectedMusic.title || '');
+        formData.append('music_artist', selectedMusic.artist || '');
+        formData.append('music_artwork', selectedMusic.artwork || '');
+        formData.append('music_stream_url', selectedMusic.stream_url || '');
         formData.append('music_start_time', String(selectedMusic.start_time || 0));
       }
       if (scheduledDate) formData.append('scheduled_for', scheduledDate.toISOString());
@@ -759,7 +754,7 @@ export default function CreateScreen({ navigation }) {
       setSelectedMusic(null); setScheduledDate(null); setToneResult(null);
       setHashtagSuggestions([]); setCollaborators([]);
       setSelectedLocation(null); setLocationQuery('');
-      success(scheduledDate ? `Post scheduled for ${formatSchedule(scheduledDate)}` : 'Post shared!');
+      success(scheduledDate ? `Post scheduled for ${formatSchedule(scheduledDate)}` : collaborators.length > 0 ? 'Post shared! Co-creator invitations sent.' : 'Post shared!');
       navigation.navigate('Feed');
     } catch (err) {
       error(err.response?.data?.error || 'Failed to post. Try again.');
@@ -901,8 +896,8 @@ export default function CreateScreen({ navigation }) {
                 return (
                   <View style={[s.musicRow, { borderBottomColor: theme.border }, isSelected && { backgroundColor: 'rgba(124,58,237,0.08)' }]}>
                     {/* Artwork */}
-                    {item.artwork?.['150x150']
-                      ? <Image source={{ uri: item.artwork['150x150'] }} style={s.musicCover} />
+                    {item.album?.cover_medium
+                      ? <Image source={{ uri: item.album.cover_medium }} style={s.musicCover} />
                       : <View style={[s.musicCover, { backgroundColor: 'rgba(124,58,237,0.2)', alignItems: 'center', justifyContent: 'center' }]}>
                           <Ionicons name="musical-notes" size={18} color="#7c3aed" />
                         </View>}
@@ -911,7 +906,7 @@ export default function CreateScreen({ navigation }) {
                     <View style={{ flex: 1 }}>
                       <AppText style={[s.musicTitle, { color: theme.text }]} numberOfLines={1}>{item.title}</AppText>
                       <AppText style={[s.musicArtist, { color: theme.muted }]} numberOfLines={1}>
-                        {item.user?.name || item.user?.handle}
+                        {item.artist?.name || 'Unknown'}
                       </AppText>
                     </View>
 
@@ -960,14 +955,14 @@ export default function CreateScreen({ navigation }) {
 
             {/* Track info */}
             <View style={s.snippetTrackRow}>
-              {snippetTrack.artwork?.['150x150']
-                ? <Image source={{ uri: snippetTrack.artwork['150x150'] }} style={s.snippetArt} />
+              {snippetTrack.album?.cover_medium
+                ? <Image source={{ uri: snippetTrack.album.cover_medium }} style={s.snippetArt} />
                 : <View style={[s.snippetArt, { backgroundColor: 'rgba(124,58,237,0.25)', alignItems: 'center', justifyContent: 'center' }]}>
                     <Ionicons name="musical-notes" size={22} color="#7c3aed" />
                   </View>}
               <View style={{ flex: 1 }}>
                 <AppText style={[s.snippetTitle, { color: theme.text }]} numberOfLines={1}>{snippetTrack.title}</AppText>
-                <AppText style={[s.snippetArtist, { color: theme.muted }]} numberOfLines={1}>{snippetTrack.user?.name || snippetTrack.user?.handle}</AppText>
+                <AppText style={[s.snippetArtist, { color: theme.muted }]} numberOfLines={1}>{snippetTrack.artist?.name || 'Unknown'}</AppText>
               </View>
               <TouchableOpacity
                 style={[s.snippetPlayBtn, { backgroundColor: playingTrackId === snippetTrack.id ? '#7c3aed' : 'rgba(124,58,237,0.2)' }]}
