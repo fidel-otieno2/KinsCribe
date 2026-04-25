@@ -4,6 +4,7 @@ import {
   ActivityIndicator, Image, RefreshControl,
   Modal, TextInput, Alert, Dimensions, ScrollView,
 } from "react-native";
+import { HexAvatar } from './StoryViewerScreen';
 import AppText from '../components/AppText';
 import { StatusBar } from "expo-status-bar";
 import { useFocusEffect } from "@react-navigation/native";
@@ -733,42 +734,69 @@ export default function FeedScreen({ navigation }) {
   const ListHeader = () => (
     <View>
       {/* Stories Row */}
-      {storyGroups.length > 0 && (
+      {storyGroups.length >= 0 && (
         <View style={s.storiesWrap}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.storiesRow}>
-            {/* Add story button */}
-            <TouchableOpacity style={s.storyItem} onPress={() => navigation.navigate('Create')} activeOpacity={0.8}>
-              <View style={[s.storyAddRing, { borderColor: theme.border2 }]}>
-                <View style={[s.storyAddCircle, { backgroundColor: theme.bgSecondary }]}>
-                  <Ionicons name="add" size={22} color={theme.text} />
-                </View>
-              </View>
-              <AppText style={[s.storyLabel, { color: theme.text }]}>{t('your_story')}</AppText>
-            </TouchableOpacity>
-            {storyGroups.map((group, idx) => (
-              <TouchableOpacity
-                key={group.user_id}
-                style={s.storyItem}
-                activeOpacity={0.8}
-                onPress={() => navigation.navigate('StoryViewer', { storyGroups, initialGroupIndex: idx })}
-              >
-                <LinearGradient
-                  colors={group.has_unseen ? ['#2D5A27', '#7FB069', '#C4A35A'] : ['#4A4035', '#4A4035']}
-                  style={s.storyRing}
+            {/* ── YOUR STORY (always first) ── */}
+            {(() => {
+              const myGroup = storyGroups.find(g => g.is_self);
+              const hasMyStory = myGroup && myGroup.stories.length > 0;
+              return (
+                <TouchableOpacity
+                  style={s.storyItem}
+                  activeOpacity={0.85}
+                  onPress={() => {
+                    if (hasMyStory) {
+                      const idx = storyGroups.indexOf(myGroup);
+                      navigation.navigate('StoryViewer', { storyGroups, initialGroupIndex: idx });
+                    } else {
+                      navigation.navigate('Create');
+                    }
+                  }}
                 >
-                  <View style={[s.storyAvatarWrap, { borderColor: theme.bg }]}>
-                    {group.author_avatar
-                      ? <Image source={{ uri: group.author_avatar }} style={s.storyAvatar} />
-                      : <View style={[s.storyAvatarFallback, { backgroundColor: theme.primary }]}>
-                          <AppText style={s.storyAvatarLetter}>{group.author_name?.[0]?.toUpperCase()}</AppText>
-                        </View>}
+                  <View style={s.hexWrap}>
+                    <HexAvatar
+                      uri={user?.avatar_url}
+                      name={user?.name}
+                      size={54}
+                      hasStory={hasMyStory}
+                      hasSeen={false}
+                    />
+                    {/* Plus badge */}
+                    <View style={[s.plusBadge, { backgroundColor: theme.primary }]}>
+                      <Ionicons name="add" size={12} color="#fff" />
+                    </View>
                   </View>
-                </LinearGradient>
-                <AppText style={[s.storyLabel, { color: theme.text }]} numberOfLines={1}>
-                  {group.author_name?.split(' ')[0] || 'User'}
-                </AppText>
-              </TouchableOpacity>
-            ))}
+                  <AppText style={[s.storyLabel, { color: theme.text }]}>Your Story</AppText>
+                </TouchableOpacity>
+              );
+            })()}
+
+            {/* ── CONNECTED USERS' STORIES ── */}
+            {storyGroups.filter(g => !g.is_self).map((group, idx) => {
+              const realIdx = storyGroups.indexOf(group);
+              return (
+                <TouchableOpacity
+                  key={group.user_id}
+                  style={s.storyItem}
+                  activeOpacity={0.85}
+                  onPress={() => navigation.navigate('StoryViewer', { storyGroups, initialGroupIndex: realIdx })}
+                >
+                  <View style={s.hexWrap}>
+                    <HexAvatar
+                      uri={group.author_avatar}
+                      name={group.author_name}
+                      size={54}
+                      hasStory={group.stories.length > 0}
+                      hasSeen={!group.has_unseen}
+                    />
+                  </View>
+                  <AppText style={[s.storyLabel, { color: theme.text }]} numberOfLines={1}>
+                    {group.author_name?.split(' ')[0] || 'User'}
+                  </AppText>
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
         </View>
       )}
@@ -959,16 +987,16 @@ const s = StyleSheet.create({
   loadingWrap: { flex: 1, alignItems: "center", justifyContent: "center" },
 
   storiesWrap: { borderBottomWidth: 0.5, borderBottomColor: colors.border },
-  storiesRow: { paddingHorizontal: 12, paddingVertical: 10, gap: 14 },
-  storyItem: { alignItems: 'center', width: 64 },
-  storyAddRing: { width: 64, height: 64, borderRadius: 32, borderWidth: 1.5, borderColor: colors.border2, alignItems: 'center', justifyContent: 'center' },
-  storyAddCircle: { width: 58, height: 58, borderRadius: 29, backgroundColor: colors.bgSecondary, alignItems: 'center', justifyContent: 'center' },
-  storyRing: { width: 64, height: 64, borderRadius: 32, padding: 2.5, alignItems: 'center', justifyContent: 'center' },
-  storyAvatarWrap: { width: 57, height: 57, borderRadius: 28.5, overflow: 'hidden', borderWidth: 2, borderColor: colors.bg },
-  storyAvatar: { width: '100%', height: '100%' },
-  storyAvatarFallback: { width: '100%', height: '100%', backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
-  storyAvatarLetter: { color: '#fff', fontWeight: '700', fontSize: 20 },
-  storyLabel: { fontSize: 11, color: colors.text, textAlign: 'center', maxWidth: 64, marginTop: 4 },
+  storiesRow: { paddingHorizontal: 12, paddingVertical: 12, gap: 16 },
+  storyItem: { alignItems: 'center', width: 66 },
+  hexWrap: { position: 'relative', width: 62, height: 62, alignItems: 'center', justifyContent: 'center' },
+  plusBadge: {
+    position: 'absolute', bottom: 0, right: 0,
+    width: 20, height: 20, borderRadius: 10,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: colors.bg,
+  },
+  storyLabel: { fontSize: 11, color: colors.text, textAlign: 'center', maxWidth: 66, marginTop: 5 },
 
   familyBanner: { marginHorizontal: 14, marginTop: 14, marginBottom: 6, borderRadius: 16, overflow: "hidden" },
   familyBannerGrad: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 14 },

@@ -1221,6 +1221,29 @@ def public_profile(username):
     return Response(html, status=200, mimetype='text/html')
 
 
+@auth_bp.route("/push-token", methods=["POST"])
+@jwt_required()
+def save_push_token():
+    """Store Expo push token for this user."""
+    from sqlalchemy import text
+    user_id = int(get_jwt_identity())
+    data = request.get_json(force=True, silent=True) or {}
+    token = data.get("token", "").strip()
+    if not token:
+        return jsonify({"error": "token required"}), 400
+    try:
+        db.session.execute(text("""
+            INSERT INTO user_push_tokens (user_id, push_token, updated_at)
+            VALUES (:uid, :tok, NOW())
+            ON CONFLICT (user_id) DO UPDATE SET push_token = :tok, updated_at = NOW()
+        """), {"uid": user_id, "tok": token})
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+    return jsonify({"ok": True})
+
+
 @auth_bp.route("/refresh", methods=["POST"])
 @jwt_required(refresh=True)
 def refresh():

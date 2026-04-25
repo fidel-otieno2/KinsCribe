@@ -55,8 +55,10 @@ def create_story():
 def story_feed():
     user = me()
     current_id = user.id
-    interests = {c.following_id for c in Connection.query.filter_by(follower_id=current_id).all()}
-    candidate_ids = list(interests | {current_id})
+    # Only show stories from users YOU follow (mutual or one-way accepted)
+    following_ids = {c.following_id for c in Connection.query.filter_by(
+        follower_id=current_id, status="accepted").all()}
+    candidate_ids = list(following_ids | {current_id})
     now = datetime.utcnow()
     stories = PublicStory.query.filter(
         PublicStory.user_id.in_(candidate_ids),
@@ -71,18 +73,34 @@ def story_feed():
         by_user[uid].append(s.to_dict(current_id))
 
     result = []
+    # Always put current user first (even if they have no stories)
+    my_stories = by_user.pop(current_id, [])
+    result.append({
+        "user_id": current_id,
+        "author_name": user.name,
+        "author_avatar": user.avatar_url,
+        "author_username": user.username,
+        "has_unseen": False,
+        "is_self": True,
+        "stories": my_stories
+    })
+
+    others = []
     for uid, user_stories in by_user.items():
         u = User.query.get(uid)
         has_unseen = any(not s["viewed_by_me"] for s in user_stories)
-        result.append({
+        others.append({
             "user_id": uid,
             "author_name": u.name if u else None,
             "author_avatar": u.avatar_url if u else None,
             "author_username": u.username if u else None,
             "has_unseen": has_unseen,
+            "is_self": False,
             "stories": user_stories
         })
-    result.sort(key=lambda x: (not x["has_unseen"]))
+    # Unseen first, then seen
+    others.sort(key=lambda x: (not x["has_unseen"]))
+    result.extend(others)
     return jsonify({"story_groups": result})
 
 

@@ -1,577 +1,749 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   View, StyleSheet, TouchableOpacity, Animated,
-  Dimensions, StatusBar, Image, Vibration, PanResponder, Alert,
+  Dimensions, StatusBar, Image, Vibration, PanResponder, Alert, Text,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import AppText from '../components/AppText';
 import api from '../api/axios';
 
-// ── Try to import Agora — gracefully degrade if not in dev build ──
-let RtcEngine, RtcSurfaceView, ChannelProfileType, ClientRoleType, IRtcEngine;
+// ── Agora SDK (graceful fallback for Expo Go) ──────────────────
+let createAgoraRtcEngine = null;
+let RtcSurfaceView = null;
+let VideoSourceType = null;
 try {
   const Agora = require('react-native-agora');
-  RtcEngine = Agora.createAgoraRtcEngine;
+  createAgoraRtcEngine = Agora.createAgoraRtcEngine;
   RtcSurfaceView = Agora.RtcSurfaceView;
-  ChannelProfileType = Agora.ChannelProfileType;
-  ClientRoleType = Agora.ClientRoleType;
-} catch {
-  RtcEngine = null;
-}
+  VideoSourceType = Agora.VideoSourceType;
+} catch {}
 
 const AGORA_APP_ID = '339b4c69704b45298cc7e2a441aa4aa9';
 const { width: W, height: H } = Dimensions.get('window');
 
-function formatDuration(secs) {
+// ── Floating draggable self-preview ───────────────────────────
+function FloatingSelf({ uid, cameraOff, callerAvatar }) {
+  const pan = useRef(new Animated.ValueXY({ x: W - 120, y: 60 })).current;
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        pan.setOffset({ x: pan.x._value, y: pan.y._value });
+        pan.setValue({ x: 0, y: 0 });
+      },
+      onPanResponderMove: Animated.event(
+        [null, { dx: pan.x, dy: pan.y }],
+        { useNativeDriver: false }
+      ),
+      onPanResponderRelease: () => pan.flattenOffset(),
+    })
+  ).current;
+
+  return (
+    <Animated.View
+      style={[s.selfPreview, { transform: pan.getTranslateTransform() }]}
+      {...panResponder.panHandlers}
+    >
+      {RtcSurfaceView && !cameraOff ? (
+        <RtcSurfaceView
+          style={{ width: 100, height: 140 }}
+          canvas={{ uid: 0, sourceType: VideoSourceType?.VideoSourceCamera }}
+        />
+      ) : (
+        <View style={s.selfPreviewOff}>
+          {callerAvatar
+            ? <Image source={{ uri: callerAvatar }} style={s.selfPreviewAvatar} />
+            : <Ionicons name="person" size={28} color="rgba(255,255,255,0.5)" />}
+        </View>
+      )}
+    </Animated.View>
+  );
+}
+
+// ── Control button ─────────────────────────────────────────────
+function CtrlBtn({ icon, label, onPress, active, danger, color }) {
+  return (
+    <TouchableOpacity style={s.ctrlWrap} onPress={onPress} activeOpacity={0.75}>
+      <View style={[
+        s.ctrlBtn,
+        active && s.ctrlBtnActive,
+        danger && s.ctrlBtnDanger,
+      ]}>
+        <Ionicons name={icon} size={24} color={danger ? '#fff' : active ? '#fff' : (color || '#fff')} />
+      </View>
+      {label ? <AppText style={s.ctrlLabel}>{label}</AppText> : null}
+    </TouchableOpacity>
+  );
+}
+
+// ── Group call grid tile ──────────────────────────────────────
+function GroupTile({ uid, isActive, name, avatar }) {
+  return (
+    <View style={[s.gridTile, isActive && s.gridTileActive]}>
+      {RtcSurfaceView && uid !== 0 ? (
+        <RtcSurfaceView
+          style={StyleSheet.absoluteFill}
+          canvas={{ uid, sourceType: VideoSourceType?.VideoSourceRemote }}
+        />
+      ) : (
+        <View style={s.gridTileOff}>
+          {avatar
+            ? <Image source={{ uri: avatar }} style={s.gridTileAvatar} />
+            : <View style={s.gridTileInitial}>
+                <AppText style={s.gridTileInitialText}>{(name || 'U')[0].toUpperCase()}</AppText>
+              </View>}
+        </View>
+      )}
+      <View style={s.gridTileLabel}>
+        <AppText style={s.gridTileName} numberOfLines={1}>{name || `User ${uid}`}</AppText>
+        {isActive && <View style={s.gridTileActiveDot} />}
+      </View>
+    </View>
+  );
+}
+
+// ── Format duration ────────────────────────────────────────────
+function fmtDuration(secs) {
   const m = Math.floor(secs / 60).toString().padStart(2, '0');
   const s = (secs % 60).toString().padStart(2, '0');
   return `${m}:${s}`;
 }
 
-function CallerAvatar({ uri, name, size = 110 }) {
-  if (uri) return <Image source={{ uri }} style={{ width: size, height: size, borderRadius: size / 2 }} />;
-  return (
-    <LinearGradient
-      colors={['#2D5A27', '#4A7C3F']}
-      style={{ width: size, height: size, borderRadius: size / 2, alignItems: 'center', justifyContent: 'center' }}
-    >
-      <AppText style={{ color: '#fff', fontSize: size * 0.4, fontWeight: '800' }}>
-        {name?.[0]?.toUpperCase() || '?'}
-      </AppText>
-    </LinearGradient>
-  );
-}
-
-function PulseRing({ size, color, delay = 0 }) {
-  const scale = useRef(new Animated.Value(1)).current;
-  const opacity = useRef(new Animated.Value(0.7)).current;
-  useEffect(() => {
-    const loop = Animated.loop(Animated.parallel([
-      Animated.sequence([
-        Animated.delay(delay),
-        Animated.timing(scale, { toValue: 1.6, duration: 1400, useNativeDriver: true }),
-        Animated.timing(scale, { toValue: 1, duration: 0, useNativeDriver: true }),
-      ]),
-      Animated.sequence([
-        Animated.delay(delay),
-        Animated.timing(opacity, { toValue: 0, duration: 1400, useNativeDriver: true }),
-        Animated.timing(opacity, { toValue: 0.7, duration: 0, useNativeDriver: true }),
-      ]),
-    ]));
-    loop.start();
-    return () => loop.stop();
-  }, []);
-  return (
-    <Animated.View pointerEvents="none" style={{
-      position: 'absolute', width: size, height: size, borderRadius: size / 2,
-      borderWidth: 2, borderColor: color, transform: [{ scale }], opacity,
-    }} />
-  );
-}
-
-function CtrlBtn({ icon, onPress, active, danger, size = 58 }) {
-  const bg = danger ? 'rgba(192,57,43,0.22)' : active ? 'rgba(74,124,63,0.3)' : 'rgba(255,255,255,0.12)';
-  const iconColor = danger ? '#e74c3c' : active ? '#7FB069' : '#fff';
-  return (
-    <TouchableOpacity
-      style={[s.ctrlBtn, { width: size, height: size, borderRadius: size / 2, backgroundColor: bg }]}
-      onPress={onPress} activeOpacity={0.75}
-    >
-      <Ionicons name={icon} size={size * 0.4} color={iconColor} />
-    </TouchableOpacity>
-  );
-}
-
-function ConnectingDot({ delay }) {
-  const anim = useRef(new Animated.Value(0.25)).current;
-  useEffect(() => {
-    const loop = Animated.loop(Animated.sequence([
-      Animated.delay(delay),
-      Animated.timing(anim, { toValue: 1, duration: 500, useNativeDriver: true }),
-      Animated.timing(anim, { toValue: 0.25, duration: 500, useNativeDriver: true }),
-    ]));
-    loop.start();
-    return () => loop.stop();
-  }, []);
-  return <Animated.View style={[s.connectDot, { opacity: anim }]} />;
-}
-
-// ─────────────────────────────────────────────────────────────
-
+// ══════════════════════════════════════════════════════════════
 export default function CallScreen({ route, navigation }) {
   const {
     callType = 'voice',
+    isIncoming = false,
     callerName = 'Unknown',
     callerAvatar = null,
-    isIncoming = false,
-    participants = [],
-    conversationId = null,
-    myName = 'Someone',
-    // Passed when receiving an incoming call
-    incomingChannel = null,
-    incomingToken = null,
-    incomingCallerId = null,
+    conversationId,
+    calleeId,
+    incomingChannel,
+    incomingToken,
   } = route.params || {};
 
   const [callState, setCallState] = useState(isIncoming ? 'ringing' : 'calling');
-  const [duration, setDuration] = useState(0);
-  const [muted, setMuted] = useState(false);
-  const [speakerOn, setSpeakerOn] = useState(callType !== 'voice');
+  const [muted, setMuted]         = useState(false);
   const [cameraOff, setCameraOff] = useState(false);
-  const [facing, setFacing] = useState('front'); // 'front' | 'back'
-  const [onHold, setOnHold] = useState(false);
-  const [remoteUid, setRemoteUid] = useState(null);
-  const [agoraReady, setAgoraReady] = useState(false);
-  const [networkQuality, setNetworkQuality] = useState(null); // 'poor' | null
+  const [speakerOn, setSpeakerOn] = useState(callType === 'video');
+  const [frontCam, setFrontCam]   = useState(true);
+  const [duration, setDuration]   = useState(0);
+  const [remoteUsers, setRemoteUsers] = useState([]);
+  const [networkQuality, setNetworkQuality] = useState(null); // null | 'poor'
+  const [activeSpeaker, setActiveSpeaker] = useState(null);
 
-  const engineRef = useRef(null);
+  const engineRef  = useRef(null);
   const channelRef = useRef(incomingChannel || null);
-  const tokenRef = useRef(incomingToken || null);
-  const timerRef = useRef(null);
-  const slideAnim = useRef(new Animated.Value(H)).current;
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const timerRef   = useRef(null);
+  const startedRef = useRef(false); // prevent double-init
 
-  // PiP drag
-  const pipPos = useRef({ x: W - 114, y: 108 });
-  const pipX = useRef(new Animated.Value(W - 114)).current;
-  const pipY = useRef(new Animated.Value(108)).current;
-  const panResponder = useRef(PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onPanResponderMove: (_, { dx, dy }) => {
-      pipX.setValue(pipPos.current.x + dx);
-      pipY.setValue(pipPos.current.y + dy);
-    },
-    onPanResponderRelease: (_, { dx, dy }) => {
-      const nx = Math.max(18, Math.min(pipPos.current.x + dx, W - 114));
-      const ny = Math.max(108, Math.min(pipPos.current.y + dy, H - 200));
-      pipPos.current = { x: nx, y: ny };
-      Animated.spring(pipX, { toValue: nx, useNativeDriver: false }).start();
-      Animated.spring(pipY, { toValue: ny, useNativeDriver: false }).start();
-    },
-  })).current;
-
-  // ── Agora engine setup ─────────────────────────────────────
+  // ── Init Agora ───────────────────────────────────────────────
   const initAgora = async (channel, token) => {
-    if (!RtcEngine) return; // Expo Go fallback
-    try {
-      const engine = RtcEngine();
-      engineRef.current = engine;
+    if (!createAgoraRtcEngine || startedRef.current) return;
+    startedRef.current = true;
 
-      await engine.initialize({
-        appId: AGORA_APP_ID,
-        channelProfile: ChannelProfileType.ChannelProfileCommunication,
+    const engine = createAgoraRtcEngine();
+    engineRef.current = engine;
+
+    await engine.initialize({ appId: AGORA_APP_ID });
+    await engine.setChannelProfile(1); // live broadcasting
+    await engine.setClientRole(1);     // broadcaster
+
+    await engine.enableAudio();
+    await engine.setAudioProfile(4, 1); // music high quality + full band
+
+    if (callType === 'video' || callType === 'group') {
+      await engine.enableVideo();
+      await engine.setVideoEncoderConfiguration({
+        dimensions: { width: 640, height: 360 },
+        frameRate: 15,
+        bitrate: 800,
+        orientationMode: 0,
       });
+      await engine.startPreview();
+    }
 
-      engine.addListener('onUserJoined', (connection, uid) => {
-        setRemoteUid(uid);
-        setCallState('active');
-        startTimer();
-      });
+    await engine.setEnableSpeakerphone(speakerOn);
 
-      engine.addListener('onUserOffline', () => {
-        setRemoteUid(null);
-        endCall(false);
-      });
+    // ── Listeners ──────────────────────────────────────────────
+    engine.addListener('onActiveSpeaker', (connection, uid) => {
+      setActiveSpeaker(uid);
+    });
 
-      engine.addListener('onNetworkQuality', (conn, uid, txQuality, rxQuality) => {
-        const worst = Math.max(txQuality, rxQuality);
-        setNetworkQuality(worst >= 4 ? 'poor' : null);
-      });
+    engine.addListener('onUserJoined', (connection, uid) => {
+      setRemoteUsers(prev => prev.includes(uid) ? prev : [...prev, uid]);
+      setCallState('active');
+      startTimer();
+    });
 
-      if (callType === 'video') {
-        await engine.enableVideo();
-        await engine.startPreview();
+    engine.addListener('onUserOffline', (connection, uid) => {
+      setRemoteUsers(prev => prev.filter(id => id !== uid));
+    });
+
+    engine.addListener('onConnectionStateChanged', (connection, state) => {
+      // state 4 = reconnecting, state 5 = failed
+      if (state === 4) setCallState('reconnecting');
+      if (state === 5) setCallState('failed');
+      if (state === 3) setCallState('active'); // connected
+    });
+
+    engine.addListener('onNetworkQuality', (connection, uid, txQuality, rxQuality) => {
+      const worst = Math.max(txQuality, rxQuality);
+      if (worst >= 4) {
+        setNetworkQuality('poor');
+        // Auto-downgrade video → audio on poor network
+        if ((callType === 'video' || callType === 'group') && !cameraOff) {
+          engine.muteLocalVideoStream(true);
+          setCameraOff(true);
+        }
       } else {
-        await engine.enableAudio();
+        setNetworkQuality(null);
       }
+    });
 
-      await engine.joinChannel(token || '', channel, 0, {
-        clientRoleType: ClientRoleType.ClientRoleBroadcaster,
-      });
+    engine.addListener('onTokenPrivilegeWillExpire', async () => {
+      try {
+        const { data } = await api.post('/calls/token', { channel_name: channel });
+        engine.renewToken(data.token);
+      } catch {}
+    });
 
-      setAgoraReady(true);
-    } catch (e) {
-      console.warn('Agora init error:', e);
-    }
+    await engine.joinChannel(token, channel, 0, {
+      clientRoleType: 1,
+      publishMicrophoneTrack: true,
+      publishCameraTrack: callType === 'video' || callType === 'group',
+      autoSubscribeAudio: true,
+      autoSubscribeVideo: true,
+    });
   };
 
-  const leaveAgora = async () => {
-    if (!engineRef.current) return;
-    try {
-      await engineRef.current.leaveChannel();
-      engineRef.current.release();
-      engineRef.current = null;
-    } catch {}
-  };
-
-  // ── Mount ──────────────────────────────────────────────────
-  useEffect(() => {
-    Animated.parallel([
-      Animated.spring(slideAnim, { toValue: 0, friction: 8, tension: 55, useNativeDriver: true }),
-      Animated.timing(fadeAnim, { toValue: 1, duration: 350, useNativeDriver: true }),
-    ]).start();
-
-    if (isIncoming) {
-      Vibration.vibrate([0, 600, 400, 600, 400, 600], true);
-    } else {
-      // Outgoing — start call on backend, get channel + token
-      startOutgoingCall();
-    }
-
-    return () => {
-      Vibration.cancel();
-      clearInterval(timerRef.current);
-      leaveAgora();
-    };
-  }, []);
-
-  const startOutgoingCall = async () => {
+  // ── Start outgoing call ──────────────────────────────────────
+  const startCall = async () => {
     try {
       const { data } = await api.post('/calls/start', {
+        callee_id: calleeId,
         call_type: callType,
-        callee_id: route.params?.calleeId || null,
         conversation_id: conversationId,
       });
       channelRef.current = data.channel;
-      tokenRef.current = data.token;
-
-      // Post "started" system message to chat
-      if (conversationId) {
-        const typeLabel = callType === 'video' ? 'video call' : callType === 'group' ? 'group call' : 'voice call';
-        await api.post(`/messages/conversations/${conversationId}/messages`, {
-          text: `${myName} started a ${typeLabel}`,
-          message_type: 'call_started',
-        }).catch(() => {});
-      }
-
       await initAgora(data.channel, data.token);
-    } catch (e) {
-      Alert.alert('Call failed', 'Could not connect. Please try again.');
+    } catch {
+      Alert.alert('Error', 'Could not start call');
       navigation.goBack();
     }
   };
 
-  // ── Helpers ────────────────────────────────────────────────
-  const startTimer = () => {
-    timerRef.current = setInterval(() => setDuration(d => d + 1), 1000);
-  };
-
+  // ── Accept incoming call ─────────────────────────────────────
   const acceptCall = async () => {
     Vibration.cancel();
+    setCallState('connecting');
     try {
       const { data } = await api.post('/calls/answer', { channel: incomingChannel });
       channelRef.current = data.channel;
-      tokenRef.current = data.token;
-      setCallState('connecting');
       await initAgora(data.channel, data.token);
-      setCallState('active');
-      startTimer();
     } catch {
-      Alert.alert('Error', 'Could not join call.');
+      Alert.alert('Error', 'Could not join call');
       navigation.goBack();
     }
   };
 
-  const endCall = async (postEvent = true) => {
-    Vibration.cancel();
-    clearInterval(timerRef.current);
-
-    if (postEvent && callState === 'active' && conversationId) {
-      const typeLabel = callType === 'video' ? 'Video call' : callType === 'group' ? 'Group call' : 'Voice call';
-      await api.post(`/messages/conversations/${conversationId}/messages`, {
-        text: `${typeLabel} ended · ${formatDuration(duration)}`,
-        message_type: 'call_ended',
-      }).catch(() => {});
-    }
-
-    if (channelRef.current) {
-      await api.post('/calls/end', { channel: channelRef.current }).catch(() => {});
-    }
-
-    await leaveAgora();
-    setCallState('ended');
-
-    Animated.parallel([
-      Animated.timing(slideAnim, { toValue: H, duration: 320, useNativeDriver: true }),
-      Animated.timing(fadeAnim, { toValue: 0, duration: 280, useNativeDriver: true }),
-    ]).start(() => navigation.goBack());
-  };
-
+  // ── Decline incoming call ────────────────────────────────────
   const declineCall = async () => {
     Vibration.cancel();
-    if (incomingChannel) {
-      await api.post('/calls/decline', { channel: incomingChannel }).catch(() => {});
-    }
+    try {
+      await api.post('/calls/decline', { channel: incomingChannel });
+    } catch {}
     navigation.goBack();
   };
 
-  // ── Agora controls ─────────────────────────────────────────
-  const toggleMute = async () => {
-    if (engineRef.current) await engineRef.current.muteLocalAudioStream(!muted);
-    setMuted(m => !m);
+  // ── End call ─────────────────────────────────────────────────
+  const endCall = async () => {
+    Vibration.cancel();
+    clearInterval(timerRef.current);
+    try {
+      if (channelRef.current) {
+        await api.post('/calls/end', {
+          channel: channelRef.current,
+          duration_secs: duration,
+        });
+      }
+    } catch {}
+    try {
+      await engineRef.current?.leaveChannel();
+      engineRef.current?.release();
+    } catch {}
+    setCallState('ended');
+    navigation.goBack();
   };
 
-  const toggleSpeaker = async () => {
-    if (engineRef.current) await engineRef.current.setEnableSpeakerphone(!speakerOn);
-    setSpeakerOn(v => !v);
+  // ── Timer ────────────────────────────────────────────────────
+  const startTimer = () => {
+    clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => setDuration(d => d + 1), 1000);
+  };
+
+  // ── Controls ─────────────────────────────────────────────────
+  const toggleMute = async () => {
+    await engineRef.current?.muteLocalAudioStream(!muted);
+    setMuted(v => !v);
   };
 
   const toggleCamera = async () => {
-    if (engineRef.current) await engineRef.current.muteLocalVideoStream(!cameraOff);
+    await engineRef.current?.muteLocalVideoStream(!cameraOff);
     setCameraOff(v => !v);
   };
 
-  const flipCamera = async () => {
-    if (engineRef.current) await engineRef.current.switchCamera();
-    setFacing(f => f === 'front' ? 'back' : 'front');
+  const toggleSpeaker = async () => {
+    await engineRef.current?.setEnableSpeakerphone(!speakerOn);
+    setSpeakerOn(v => !v);
   };
 
-  // ── Status label ───────────────────────────────────────────
+  const switchCamera = async () => {
+    await engineRef.current?.switchCamera();
+    setFrontCam(v => !v);
+  };
+
+  // ── Lifecycle ────────────────────────────────────────────────
+  useEffect(() => {
+    if (isIncoming) {
+      Vibration.vibrate([0, 500, 300, 500], true);
+    } else {
+      startCall();
+    }
+
+    // Auto-timeout unanswered outgoing call after 30s
+    const timeout = setTimeout(() => {
+      if (!startedRef.current || callState === 'calling') {
+        api.post('/calls/missed', { channel: channelRef.current }).catch(() => {});
+        endCall();
+      }
+    }, 30000);
+
+    return () => {
+      clearTimeout(timeout);
+      clearInterval(timerRef.current);
+      Vibration.cancel();
+      try { engineRef.current?.leaveChannel(); engineRef.current?.release(); } catch {}
+    };
+  }, []);
+
+  // ── Status label ─────────────────────────────────────────────
   const statusLabel = () => {
-    if (callState === 'ringing') return 'Incoming call...';
-    if (callState === 'calling') return 'Calling...';
-    if (callState === 'connecting') return 'Connecting...';
-    if (callState === 'ended') return 'Call ended';
-    if (onHold) return 'On hold';
-    if (networkQuality === 'poor') return '⚠️ Poor connection';
-    return formatDuration(duration);
+    if (callState === 'calling')      return 'Calling…';
+    if (callState === 'ringing')      return 'Incoming call…';
+    if (callState === 'connecting')   return 'Connecting…';
+    if (callState === 'reconnecting') return 'Reconnecting…';
+    if (callState === 'failed')       return 'Call failed';
+    if (networkQuality === 'poor')    return '⚠️ Poor network';
+    if (callState === 'active')       return fmtDuration(duration);
+    return '';
   };
 
-  const isVideo = callType === 'video';
-  const isGroup = callType === 'group';
-  const isActive = callState === 'active';
-  const isWaiting = callState === 'ringing' || callState === 'calling' || callState === 'connecting';
+  const isVideo  = callType === 'video' || callType === 'group';
+  const isActive = callState === 'active' || callState === 'reconnecting';
 
-  // ── Render ─────────────────────────────────────────────────
+  // ── Remote video (first remote user) ─────────────────────────
+  const firstRemote = remoteUsers[0];
+
+  // ══════════════════════════════════════════════════════════════
+  // RENDER
+  // ══════════════════════════════════════════════════════════════
   return (
-    <Animated.View style={[s.root, { transform: [{ translateY: slideAnim }], opacity: fadeAnim }]}>
-      <StatusBar barStyle="light-content" />
+    <View style={s.root}>
+      <StatusBar barStyle="light-content" backgroundColor="#000" />
 
-      <LinearGradient
-        colors={isVideo ? ['#050a05', '#0d1a0d', '#050a05'] : ['#0a1408', '#1C3A18', '#0a1408']}
-        style={StyleSheet.absoluteFill}
-      />
-      <View style={[s.blob, s.blob1]} />
-      <View style={[s.blob, s.blob2]} />
-
-      {/* ── Video: waiting — your camera full screen ── */}
-      {isVideo && isWaiting && agoraReady && !cameraOff && RtcSurfaceView && (
-        <View style={s.fullVideoWrap}>
-          <RtcSurfaceView style={StyleSheet.absoluteFill} canvas={{ uid: 0 }} />
+      {/* ── BACKGROUND: group grid OR remote video OR gradient ── */}
+      {callType === 'group' && isActive ? (
+        <View style={s.groupGrid}>
+          <ScrollView contentContainerStyle={s.groupGridContent} showsVerticalScrollIndicator={false}>
+            {/* Self tile */}
+            <GroupTile uid={0} isActive={activeSpeaker === 0} name="You" avatar={callerAvatar} />
+            {/* Remote tiles */}
+            {remoteUsers.map(uid => (
+              <GroupTile key={uid} uid={uid} isActive={activeSpeaker === uid} name={`User ${uid}`} />
+            ))}
+          </ScrollView>
         </View>
+      ) : isVideo && isActive && firstRemote && RtcSurfaceView ? (
+        <RtcSurfaceView
+          style={StyleSheet.absoluteFill}
+          canvas={{ uid: firstRemote, sourceType: VideoSourceType?.VideoSourceRemote }}
+        />
+      ) : (
+        <LinearGradient
+          colors={isVideo ? ['#0f0c29', '#302b63', '#24243e'] : ['#0f172a', '#1a0a2e', '#0f172a']}
+          style={StyleSheet.absoluteFill}
+        />
       )}
 
-      {/* ── Video: active — remote full screen ── */}
-      {isVideo && isActive && remoteUid && RtcSurfaceView && (
-        <View style={s.fullVideoWrap}>
-          <RtcSurfaceView style={StyleSheet.absoluteFill} canvas={{ uid: remoteUid }} />
-        </View>
-      )}
-      {isVideo && isActive && !remoteUid && (
-        <View style={[s.fullVideoWrap, { alignItems: 'center', justifyContent: 'center' }]}>
-          <LinearGradient colors={['#0d1a0d', '#050a05']} style={StyleSheet.absoluteFill} />
-          <Ionicons name="person" size={80} color="rgba(255,255,255,0.08)" />
-          <AppText style={s.remoteLabel}>Waiting for video...</AppText>
-        </View>
+      {/* ── DARK OVERLAY when video active (for controls readability) ── */}
+      {isVideo && isActive && (
+        <View style={s.videoOverlay} pointerEvents="none" />
       )}
 
-      {/* ── Video: active — your PiP (draggable) ── */}
-      {isVideo && isActive && agoraReady && !cameraOff && RtcSurfaceView && (
-        <Animated.View {...panResponder.panHandlers} style={[s.pipWrap, { left: pipX, top: pipY }]}>
-          <RtcSurfaceView style={StyleSheet.absoluteFill} canvas={{ uid: 0 }} />
-        </Animated.View>
-      )}
-      {isVideo && isActive && cameraOff && (
-        <Animated.View style={[s.pipWrap, s.pipOff, { left: pipX, top: pipY }]}>
-          <Ionicons name="videocam-off" size={22} color="rgba(255,255,255,0.35)" />
-        </Animated.View>
+      {/* ── FLOATING SELF PREVIEW (video only, active) ── */}
+      {isVideo && isActive && (
+        <FloatingSelf uid={0} cameraOff={cameraOff} callerAvatar={callerAvatar} />
       )}
 
-      {/* ── Main UI overlay ── */}
-      <View style={[s.content, isVideo && s.contentVideo]}>
-
-        {/* Top bar */}
-        <View style={s.topBar}>
-          <TouchableOpacity style={s.topBtn} onPress={() => endCall()}>
-            <Ionicons name="chevron-down" size={24} color="rgba(255,255,255,0.65)" />
-          </TouchableOpacity>
-          <AppText style={s.topTitle}>
-            {isVideo ? 'Video Call' : isGroup ? 'Group Call' : 'Voice Call'}
-          </AppText>
-          <View style={s.topBtn} />
-        </View>
-
-        {/* Avatar + name (voice calls or waiting) */}
-        {!isGroup && !(isVideo && isActive) && (
-          <View style={s.avatarSection}>
-            <View style={s.avatarWrap}>
-              {isWaiting && (
-                <>
-                  <PulseRing size={150} color="rgba(74,124,63,0.55)" delay={0} />
-                  <PulseRing size={190} color="rgba(74,124,63,0.25)" delay={400} />
-                </>
-              )}
-              <CallerAvatar uri={callerAvatar} name={callerName} size={110} />
-            </View>
-            <AppText style={s.callerName}>{callerName}</AppText>
-            <View style={s.statusRow}>
-              {isActive && !onHold && <View style={s.activeDot} />}
-              <AppText style={[s.statusText, isActive && !onHold && s.statusActive]}>
-                {statusLabel()}
-              </AppText>
-            </View>
-            {callState === 'calling' && (
-              <View style={s.connectingDots}>
-                {[0, 200, 400].map((d, i) => <ConnectingDot key={i} delay={d} />)}
-              </View>
-            )}
+      {/* ── TOP STATUS BAR ── */}
+      <View style={s.topBar}>
+        {networkQuality === 'poor' && (
+          <View style={s.networkBadge}>
+            <Ionicons name="wifi" size={12} color="#f59e0b" />
+            <AppText style={s.networkText}>Poor network</AppText>
           </View>
         )}
-
-        {/* Video active — just show name + status at bottom */}
-        {isVideo && isActive && (
-          <View style={s.videoNameRow}>
-            <AppText style={s.videoCallerName}>{callerName}</AppText>
-            <AppText style={s.videoStatus}>{statusLabel()}</AppText>
+        {callState === 'reconnecting' && (
+          <View style={[s.networkBadge, { backgroundColor: 'rgba(239,68,68,0.25)' }]}>
+            <Ionicons name="reload" size={12} color="#ef4444" />
+            <AppText style={[s.networkText, { color: '#ef4444' }]}>Reconnecting…</AppText>
           </View>
         )}
-
-        {/* Group grid */}
-        {isGroup && (
-          <View style={s.groupGrid}>
-            {(participants.length > 0 ? participants : [{ id: 'you', name: callerName, avatar: callerAvatar }])
-              .slice(0, 6).map((p, i) => (
-                <View key={p.id || i} style={s.groupTile}>
-                  <CallerAvatar uri={p.avatar} name={p.name} size={72} />
-                  <AppText style={s.groupTileName} numberOfLines={1}>{p.name}</AppText>
-                </View>
-              ))}
-          </View>
-        )}
-        {isGroup && (
-          <View style={s.groupStatusRow}>
-            <AppText style={s.callerName}>Family Group Call</AppText>
-            <AppText style={[s.statusText, isActive && s.statusActive]}>{statusLabel()}</AppText>
-          </View>
-        )}
-
-        {/* Controls */}
-        <View style={s.controls}>
-          {isActive && (
-            <View style={s.ctrlRow}>
-              <View style={s.ctrlItem}>
-                <CtrlBtn icon={muted ? 'mic-off' : 'mic'} onPress={toggleMute} active={muted} danger={muted} />
-                <AppText style={s.ctrlLabel}>{muted ? 'Unmute' : 'Mute'}</AppText>
-              </View>
-              <View style={s.ctrlItem}>
-                <CtrlBtn icon={speakerOn ? 'volume-high' : 'volume-medium-outline'} onPress={toggleSpeaker} active={speakerOn} />
-                <AppText style={s.ctrlLabel}>{speakerOn ? 'Speaker' : 'Earpiece'}</AppText>
-              </View>
-              {isVideo ? (
-                <>
-                  <View style={s.ctrlItem}>
-                    <CtrlBtn icon={cameraOff ? 'videocam-off' : 'videocam'} onPress={toggleCamera} active={cameraOff} danger={cameraOff} />
-                    <AppText style={s.ctrlLabel}>{cameraOff ? 'Camera off' : 'Camera'}</AppText>
-                  </View>
-                  <View style={s.ctrlItem}>
-                    <CtrlBtn icon="camera-reverse-outline" onPress={flipCamera} />
-                    <AppText style={s.ctrlLabel}>Flip</AppText>
-                  </View>
-                </>
-              ) : (
-                <View style={s.ctrlItem}>
-                  <CtrlBtn icon={onHold ? 'play' : 'pause'} onPress={() => setOnHold(v => !v)} active={onHold} />
-                  <AppText style={s.ctrlLabel}>{onHold ? 'Resume' : 'Hold'}</AppText>
-                </View>
-              )}
-            </View>
-          )}
-
-          {/* Incoming: accept + decline */}
-          {callState === 'ringing' && isIncoming && (
-            <View style={s.incomingRow}>
-              <View style={s.ctrlItem}>
-                <TouchableOpacity style={s.declineBtn} onPress={declineCall}>
-                  <Ionicons name="call" size={30} color="#fff" style={{ transform: [{ rotate: '135deg' }] }} />
-                </TouchableOpacity>
-                <AppText style={s.ctrlLabel}>Decline</AppText>
-              </View>
-              <View style={s.ctrlItem}>
-                <TouchableOpacity style={s.acceptBtn} onPress={acceptCall}>
-                  <Ionicons name="call" size={30} color="#fff" />
-                </TouchableOpacity>
-                <AppText style={s.ctrlLabel}>Accept</AppText>
-              </View>
-            </View>
-          )}
-
-          {/* Outgoing / active: end button */}
-          {(callState === 'calling' || callState === 'connecting' || isActive) && (
-            <View style={s.endRow}>
-              <TouchableOpacity style={s.endBtn} onPress={() => endCall()}>
-                <Ionicons name="call" size={30} color="#fff" style={{ transform: [{ rotate: '135deg' }] }} />
-              </TouchableOpacity>
-              <AppText style={s.ctrlLabel}>End</AppText>
-            </View>
-          )}
-        </View>
       </View>
-    </Animated.View>
+
+      {/* ── CALLER INFO (voice call or pre-connect) ── */}
+      {(!isVideo || !isActive) && (
+        <View style={s.callerInfo}>
+          {callerAvatar ? (
+            <Image source={{ uri: callerAvatar }} style={s.avatar} />
+          ) : (
+            <LinearGradient colors={['#7c3aed', '#3b82f6']} style={s.avatarFallback}>
+              <AppText style={s.avatarInitial}>
+                {(callerName || 'U')[0].toUpperCase()}
+              </AppText>
+            </LinearGradient>
+          )}
+          <AppText style={s.callerName}>{callerName}</AppText>
+          <AppText style={s.callStatus}>{statusLabel()}</AppText>
+          {isVideo && (
+            <View style={s.callTypeBadge}>
+              <Ionicons name="videocam" size={13} color="#a78bfa" />
+              <AppText style={s.callTypeBadgeText}>Video call</AppText>
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* ── ACTIVE CALL TIMER (video, shown top-center) ── */}
+      {isVideo && isActive && (
+        <View style={s.videoTimer}>
+          <AppText style={s.videoTimerText}>{statusLabel()}</AppText>
+        </View>
+      )}
+
+      {/* ── INCOMING CALL SCREEN ── */}
+      {callState === 'ringing' && (
+        <View style={s.incomingRow}>
+          {/* Decline */}
+          <TouchableOpacity style={s.declineBtn} onPress={declineCall} activeOpacity={0.8}>
+            <View style={s.declineBtnInner}>
+              <Ionicons name="call" size={28} color="#fff" style={{ transform: [{ rotate: '135deg' }] }} />
+            </View>
+            <AppText style={s.incomingBtnLabel}>Decline</AppText>
+          </TouchableOpacity>
+
+          {/* Accept */}
+          <TouchableOpacity style={s.acceptBtn} onPress={acceptCall} activeOpacity={0.8}>
+            <LinearGradient colors={['#22c55e', '#16a34a']} style={s.acceptBtnInner}>
+              <Ionicons name="call" size={28} color="#fff" />
+            </LinearGradient>
+            <AppText style={s.incomingBtnLabel}>Accept</AppText>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* ── IN-CALL CONTROLS ── */}
+      {callState !== 'ringing' && (
+        <View style={s.controls}>
+          <CtrlBtn
+            icon={muted ? 'mic-off' : 'mic'}
+            label={muted ? 'Unmute' : 'Mute'}
+            onPress={toggleMute}
+            active={muted}
+          />
+
+          <CtrlBtn
+            icon={speakerOn ? 'volume-high' : 'volume-mute'}
+            label="Speaker"
+            onPress={toggleSpeaker}
+            active={speakerOn}
+          />
+
+          {isVideo && (
+            <CtrlBtn
+              icon={cameraOff ? 'videocam-off' : 'videocam'}
+              label={cameraOff ? 'Cam off' : 'Camera'}
+              onPress={toggleCamera}
+              active={cameraOff}
+            />
+          )}
+
+          {isVideo && (
+            <CtrlBtn
+              icon="camera-reverse-outline"
+              label="Flip"
+              onPress={switchCamera}
+            />
+          )}
+
+          {/* End call — always last */}
+          <CtrlBtn
+            icon="call"
+            label="End"
+            onPress={endCall}
+            danger
+          />
+        </View>
+      )}
+    </View>
   );
 }
 
+// ══════════════════════════════════════════════════════════════
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#0a1408' },
-  blob: { position: 'absolute', borderRadius: 999, opacity: 0.1 },
-  blob1: { width: 320, height: 320, backgroundColor: '#4A7C3F', top: -100, left: -100 },
-  blob2: { width: 260, height: 260, backgroundColor: '#2D5A27', bottom: 80, right: -80 },
+  root: { flex: 1, backgroundColor: '#000' },
 
-  fullVideoWrap: { ...StyleSheet.absoluteFillObject, zIndex: 1 },
-  remoteLabel: { color: 'rgba(255,255,255,0.18)', fontSize: 13, marginTop: 12 },
-
-  pipWrap: {
-    position: 'absolute', width: 96, height: 140,
-    borderRadius: 16, overflow: 'hidden',
-    borderWidth: 2, borderColor: 'rgba(255,255,255,0.25)', zIndex: 20,
+  // Group call grid
+  groupGrid: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#0a0a14',
   },
-  pipOff: { backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
+  groupGridContent: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    padding: 4,
+    paddingTop: 80,
+    paddingBottom: 160,
+  },
+  gridTile: {
+    width: (W - 12) / 2,
+    height: (W - 12) / 2 * 1.2,
+    margin: 2,
+    borderRadius: 14,
+    overflow: 'hidden',
+    backgroundColor: '#1a1a2e',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  gridTileActive: {
+    borderColor: '#22c55e',
+  },
+  gridTileOff: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1a1a2e',
+  },
+  gridTileAvatar: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+  },
+  gridTileInitial: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#7c3aed',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  gridTileInitialText: { fontSize: 26, fontWeight: '800', color: '#fff' },
+  gridTileLabel: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  gridTileName: { flex: 1, fontSize: 12, fontWeight: '600', color: '#fff' },
+  gridTileActiveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#22c55e',
+  },
 
-  content: { flex: 1, paddingTop: 54, paddingBottom: 44, paddingHorizontal: 24, zIndex: 10 },
-  contentVideo: { backgroundColor: 'transparent' },
+  // Overlays
+  videoOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.25)',
+  },
 
-  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
-  topBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' },
-  topTitle: { fontSize: 15, fontWeight: '600', color: 'rgba(255,255,255,0.65)', letterSpacing: 0.3 },
+  // Top bar
+  topBar: {
+    position: 'absolute',
+    top: 52,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 20,
+  },
+  networkBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(245,158,11,0.2)',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: 'rgba(245,158,11,0.4)',
+  },
+  networkText: { fontSize: 12, color: '#f59e0b', fontWeight: '600' },
 
-  avatarSection: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14 },
-  avatarWrap: { width: 150, height: 150, alignItems: 'center', justifyContent: 'center' },
-  callerName: { fontSize: 28, fontWeight: '800', color: '#fff', letterSpacing: -0.5, textAlign: 'center' },
-  statusRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  activeDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#7FB069' },
-  statusText: { fontSize: 15, color: 'rgba(255,255,255,0.5)', fontWeight: '500' },
-  statusActive: { color: '#7FB069', fontWeight: '700' },
-  connectingDots: { flexDirection: 'row', gap: 8, marginTop: 8 },
-  connectDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#7FB069' },
+  // Caller info (voice / pre-connect)
+  callerInfo: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 60,
+  },
+  avatar: {
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    borderWidth: 3,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  avatarFallback: {
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarInitial: { fontSize: 44, fontWeight: '800', color: '#fff' },
+  callerName: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#fff',
+    marginTop: 18,
+    letterSpacing: -0.5,
+  },
+  callStatus: {
+    fontSize: 15,
+    color: 'rgba(255,255,255,0.6)',
+    marginTop: 8,
+    fontWeight: '500',
+  },
+  callTypeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 10,
+    backgroundColor: 'rgba(124,58,237,0.2)',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: 'rgba(124,58,237,0.4)',
+  },
+  callTypeBadgeText: { fontSize: 12, color: '#a78bfa', fontWeight: '600' },
 
-  videoNameRow: { flex: 1, justifyContent: 'flex-end', paddingBottom: 12, alignItems: 'center' },
-  videoCallerName: { fontSize: 22, fontWeight: '800', color: '#fff', textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
-  videoStatus: { fontSize: 13, color: 'rgba(255,255,255,0.6)', marginTop: 4 },
+  // Video timer (shown top-center when video active)
+  videoTimer: {
+    position: 'absolute',
+    top: 52,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 5,
+    zIndex: 20,
+  },
+  videoTimerText: { fontSize: 14, color: '#fff', fontWeight: '700', letterSpacing: 1 },
 
-  groupGrid: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', alignContent: 'center', gap: 20, paddingVertical: 16 },
-  groupTile: { alignItems: 'center', gap: 6, width: (W - 96) / 3 },
-  groupTileName: { fontSize: 12, color: 'rgba(255,255,255,0.7)', fontWeight: '600', textAlign: 'center' },
-  groupStatusRow: { alignItems: 'center', gap: 6, paddingBottom: 12 },
+  // Floating self-preview
+  selfPreview: {
+    position: 'absolute',
+    width: 100,
+    height: 140,
+    borderRadius: 14,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.3)',
+    zIndex: 30,
+    shadowColor: '#000',
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  selfPreviewOff: {
+    flex: 1,
+    backgroundColor: '#1a1a2e',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selfPreviewAvatar: { width: 60, height: 60, borderRadius: 30 },
 
-  controls: { gap: 20, paddingBottom: 4 },
-  ctrlRow: { flexDirection: 'row', justifyContent: 'space-around', flexWrap: 'wrap', gap: 12 },
-  ctrlItem: { alignItems: 'center', gap: 7, minWidth: 60 },
-  ctrlBtn: { alignItems: 'center', justifyContent: 'center', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.1)' },
-  ctrlLabel: { fontSize: 11, color: 'rgba(255,255,255,0.5)', fontWeight: '500', textAlign: 'center' },
+  // Incoming call buttons
+  incomingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    paddingHorizontal: 60,
+    paddingBottom: 60,
+  },
+  declineBtn: { alignItems: 'center', gap: 10 },
+  declineBtnInner: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: '#e11d48',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  acceptBtn: { alignItems: 'center', gap: 10 },
+  acceptBtnInner: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  incomingBtnLabel: { fontSize: 13, color: 'rgba(255,255,255,0.7)', fontWeight: '600' },
 
-  endRow: { alignItems: 'center', gap: 8 },
-  endBtn: { width: 72, height: 72, borderRadius: 36, backgroundColor: '#c0392b', alignItems: 'center', justifyContent: 'center', shadowColor: '#c0392b', shadowOpacity: 0.55, shadowRadius: 18, elevation: 10 },
-  incomingRow: { flexDirection: 'row', justifyContent: 'space-around' },
-  declineBtn: { width: 72, height: 72, borderRadius: 36, backgroundColor: '#c0392b', alignItems: 'center', justifyContent: 'center', shadowColor: '#c0392b', shadowOpacity: 0.45, shadowRadius: 14, elevation: 7 },
-  acceptBtn: { width: 72, height: 72, borderRadius: 36, backgroundColor: '#2D5A27', alignItems: 'center', justifyContent: 'center', shadowColor: '#4A7C3F', shadowOpacity: 0.55, shadowRadius: 18, elevation: 10 },
+  // In-call controls bar
+  controls: {
+    flexDirection: 'row',
+    justifyContent: 'space-evenly',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingBottom: 50,
+    paddingTop: 20,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  ctrlWrap: { alignItems: 'center', gap: 8, minWidth: 60 },
+  ctrlBtn: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  ctrlBtnActive: {
+    backgroundColor: 'rgba(124,58,237,0.5)',
+    borderColor: '#7c3aed',
+  },
+  ctrlBtnDanger: {
+    backgroundColor: '#e11d48',
+    borderColor: '#e11d48',
+  },
+  ctrlLabel: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.65)',
+    fontWeight: '600',
+    textAlign: 'center',
+  },
 });

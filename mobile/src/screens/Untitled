@@ -1,0 +1,302 @@
+import { useState, useEffect, useRef } from 'react';
+import {
+  View, StyleSheet, TouchableOpacity, Animated,
+  Dimensions, StatusBar, Image, Vibration, PanResponder, Alert,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import AppText from '../components/AppText';
+import api from '../api/axios';
+
+// Agora
+let createAgoraRtcEngine, RtcSurfaceView;
+try {
+  const Agora = require('react-native-agora');
+  createAgoraRtcEngine = Agora.createAgoraRtcEngine;
+  RtcSurfaceView = Agora.RtcSurfaceView;
+} catch {
+  createAgoraRtcEngine = null;
+}
+
+const { width: W, height: H } = Dimensions.get('window');
+
+export default function CallScreen({ route, navigation }) {
+  const {
+    callType = 'voice',
+    isIncoming = false,
+    callerName = 'Unknown',
+    callerAvatar = null,
+    conversationId,
+    calleeId,
+    incomingChannel,
+    incomingToken,
+  } = route.params || {};
+
+  const [callState, setCallState] = useState(isIncoming ? 'ringing' : 'calling');
+  const [muted, setMuted] = useState(false);
+  const [cameraOff, setCameraOff] = useState(false);
+  const [speakerOn, setSpeakerOn] = useState(callType === 'video');
+  const [duration, setDuration] = useState(0);
+  const [remoteUsers, setRemoteUsers] = useState([]);
+  const [networkQuality, setNetworkQuality] = useState(null);
+
+  const engineRef = useRef(null);
+  const channelRef = useRef(incomingChannel || null);
+  const tokenRef = useRef(incomingToken || null);
+  const timerRef = useRef(null);
+
+  // ─────────────────────────────────────────
+  // INIT AGORA
+  // ─────────────────────────────────────────
+  const initAgora = async (channel, token) => {
+    if (!createAgoraRtcEngine) return;
+
+    const engine = createAgoraRtcEngine();
+    engineRef.current = engine;
+
+    await engine.initialize({ appId: 'YOUR_APP_ID' });
+
+    await engine.enableAudio();
+    if (callType === 'video') {
+      await engine.enableVideo();
+    }
+
+    // 🔥 AUDIO QUALITY
+    await engine.setAudioProfile(4, 1);
+
+    // 🔥 VIDEO QUALITY
+    if (callType === 'video') {
+      await engine.setVideoEncoderConfiguration({
+        dimensions: { width: 640, height: 360 },
+        frameRate: 15,
+        bitrate: 800,
+      });
+    }
+
+    // ───────── LISTENERS ─────────
+    engine.addListener('onUserJoined', (_, uid) => {
+      setRemoteUsers(prev => [...prev, uid]);
+      setCallState('active');
+      startTimer();
+    });
+
+    engine.addListener('onUserOffline', (_, uid) => {
+      setRemoteUsers(prev => prev.filter(id => id !== uid));
+    });
+
+    engine.addListener('onConnectionStateChanged', (state) => {
+      if (state === 5) setCallState('reconnecting');
+      if (state === 1) setCallState('failed');
+    });
+
+    engine.addListener('onNetworkQuality', (_, uid, tx, rx) => {
+      const worst = Math.max(tx, rx);
+
+      if (worst >= 4) {
+        setNetworkQuality('poor');
+
+        if (callType === 'video') {
+          engine.disableVideo();
+          setCameraOff(true);
+        }
+      } else {
+        setNetworkQuality(null);
+
+        if (callType === 'video' && cameraOff) {
+          engine.enableVideo();
+          setCameraOff(false);
+        }
+      }
+    });
+
+    engine.addListener('onTokenPrivilegeWillExpire', async () => {
+      try {
+        const { data } = await api.get('/calls/refresh-token');
+        engine.renewToken(data.token);
+      } catch {}
+    });
+
+    await engine.joinChannel(token, channel, null, 0);
+  };
+
+  // ─────────────────────────────────────────
+  // CALL START
+  // ─────────────────────────────────────────
+  const startCall = async () => {
+    try {
+      const { data } = await api.post('/calls/start', {
+        callee_id: calleeId,
+        call_type: callType,
+      });
+
+      channelRef.current = data.channel;
+      tokenRef.current = data.token;
+
+      await initAgora(data.channel, data.token);
+    } catch {
+      Alert.alert('Error', 'Call failed');
+      navigation.goBack();
+    }
+  };
+
+  // ─────────────────────────────────────────
+  // ACCEPT CALL
+  // ─────────────────────────────────────────
+  const acceptCall = async () => {
+    try {
+      const { data } = await api.post('/calls/answer', {
+        channel: incomingChannel,
+      });
+
+      await initAgora(data.channel, data.token);
+      setCallState('connecting');
+    } catch {
+      Alert.alert('Error joining call');
+    }
+  };
+
+  // ─────────────────────────────────────────
+  // END CALL
+  // ─────────────────────────────────────────
+  const endCall = async () => {
+    clearInterval(timerRef.current);
+
+    try {
+      if (channelRef.current) {
+        await api.post('/calls/end', { channel: channelRef.current });
+      }
+    } catch {}
+
+    if (engineRef.current) {
+      await engineRef.current.leaveChannel();
+      engineRef.current.release();
+    }
+
+    setCallState('ended');
+    navigation.goBack();
+  };
+
+  // ─────────────────────────────────────────
+  // TIMER
+  // ─────────────────────────────────────────
+  const startTimer = () => {
+    timerRef.current = setInterval(() => {
+      setDuration(d => d + 1);
+    }, 1000);
+  };
+
+  // ─────────────────────────────────────────
+  // CONTROLS
+  // ─────────────────────────────────────────
+  const toggleMute = async () => {
+    await engineRef.current?.muteLocalAudioStream(!muted);
+    setMuted(!muted);
+  };
+
+  const toggleCamera = async () => {
+    await engineRef.current?.muteLocalVideoStream(!cameraOff);
+    setCameraOff(!cameraOff);
+  };
+
+  const toggleSpeaker = async () => {
+    await engineRef.current?.setEnableSpeakerphone(!speakerOn);
+    setSpeakerOn(!speakerOn);
+  };
+
+  // ─────────────────────────────────────────
+  // LIFECYCLE
+  // ─────────────────────────────────────────
+  useEffect(() => {
+    if (isIncoming) {
+      Vibration.vibrate([0, 500, 300], true);
+    } else {
+      startCall();
+    }
+
+    const timeout = setTimeout(() => {
+      if (callState === 'calling') endCall();
+    }, 30000);
+
+    return () => {
+      clearTimeout(timeout);
+      clearInterval(timerRef.current);
+      engineRef.current?.release();
+    };
+  }, []);
+
+  // ─────────────────────────────────────────
+  // UI
+  // ─────────────────────────────────────────
+  const statusText = () => {
+    if (callState === 'calling') return 'Calling...';
+    if (callState === 'ringing') return 'Incoming call...';
+    if (callState === 'connecting') return 'Connecting...';
+    if (callState === 'reconnecting') return 'Reconnecting...';
+    if (callState === 'failed') return 'Call failed';
+    if (networkQuality === 'poor') return 'Poor network';
+    return `${duration}s`;
+  };
+
+  return (
+    <View style={s.container}>
+      <StatusBar barStyle="light-content" />
+
+      <View style={s.center}>
+        <Image source={{ uri: callerAvatar }} style={s.avatar} />
+        <AppText style={s.name}>{callerName}</AppText>
+        <AppText style={s.status}>{statusText()}</AppText>
+      </View>
+
+      <View style={s.controls}>
+        <TouchableOpacity onPress={toggleMute}>
+          <Ionicons name={muted ? 'mic-off' : 'mic'} size={28} color="#fff" />
+        </TouchableOpacity>
+
+        {callType === 'video' && (
+          <TouchableOpacity onPress={toggleCamera}>
+            <Ionicons name={cameraOff ? 'videocam-off' : 'videocam'} size={28} color="#fff" />
+          </TouchableOpacity>
+        )}
+
+        <TouchableOpacity onPress={toggleSpeaker}>
+          <Ionicons name="volume-high" size={28} color="#fff" />
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={endCall}>
+          <Ionicons name="call" size={32} color="red" />
+        </TouchableOpacity>
+      </View>
+
+      {isIncoming && callState === 'ringing' && (
+        <View style={s.incoming}>
+          <TouchableOpacity onPress={endCall}>
+            <AppText>Decline</AppText>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={acceptCall}>
+            <AppText>Accept</AppText>
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  );
+}
+
+const s = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#000', justifyContent: 'center' },
+  center: { alignItems: 'center' },
+  avatar: { width: 120, height: 120, borderRadius: 60 },
+  name: { color: '#fff', fontSize: 22, marginTop: 10 },
+  status: { color: '#aaa', marginTop: 5 },
+
+  controls: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: 40,
+  },
+
+  incoming: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: 30,
+  },
+});

@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { Audio } from 'expo-av';
 import {
   View, TextInput, TouchableOpacity, StyleSheet,
   ScrollView, ActivityIndicator, KeyboardAvoidingView,
@@ -16,6 +17,7 @@ import { useTranslation } from '../i18n';
 import api from '../api/axios';
 import { colors, radius } from '../theme';
 import Toast from '../components/Toast';
+import * as Location from 'expo-location';
 import useToast from '../hooks/useToast';
 
 const { width } = Dimensions.get('window');
@@ -36,28 +38,49 @@ const PRIVACY_OPTS = [
 
 const BG_COLORS = ['#7c3aed', '#3b82f6', '#ec4899', '#10b981', '#f59e0b', '#e11d48', '#0f172a'];
 
-const MUSIC_LIBRARY = [
-  { id: '1',  title: 'Lofi Study',       artist: 'Chill Beats',   mood: 'chill',     preview_url: 'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=lofi-study-112191.mp3',                duration: '2:30' },
-  { id: '2',  title: 'Summer Walk',      artist: 'Olexy',         mood: 'chill',     preview_url: 'https://cdn.pixabay.com/download/audio/2021/08/04/audio_0625c1539c.mp3?filename=summer-walk-152722.mp3',                duration: '2:47' },
-  { id: '3',  title: 'Inspiring',        artist: 'Mixaund',       mood: 'hype',      preview_url: 'https://cdn.pixabay.com/download/audio/2022/01/18/audio_d0c6ff1c23.mp3?filename=inspiring-cinematic-116199.mp3',         duration: '2:08' },
-  { id: '4',  title: 'Upbeat Vibes',     artist: 'Muzaproduction',mood: 'hype',      preview_url: 'https://cdn.pixabay.com/download/audio/2022/03/15/audio_8cb749d5d4.mp3?filename=upbeat-fun-kids-112169.mp3',             duration: '2:15' },
-  { id: '5',  title: 'Happy Day',        artist: 'Lesfm',         mood: 'hype',      preview_url: 'https://cdn.pixabay.com/download/audio/2022/06/07/audio_5bb7b2e3e4.mp3?filename=happy-day-113985.mp3',                  duration: '2:22' },
-  { id: '6',  title: 'Romantic Piano',   artist: 'Lesfm',         mood: 'romantic',  preview_url: 'https://cdn.pixabay.com/download/audio/2022/10/25/audio_946b0939c8.mp3?filename=romantic-piano-116191.mp3',             duration: '3:10' },
-  { id: '7',  title: 'Soft Piano',       artist: 'Lesfm',         mood: 'romantic',  preview_url: 'https://cdn.pixabay.com/download/audio/2021/11/25/audio_5bfb8a4d2e.mp3?filename=soft-piano-100-bpm-121529.mp3',         duration: '2:55' },
-  { id: '8',  title: 'Sad Piano',        artist: 'Lesfm',         mood: 'sad',       preview_url: 'https://cdn.pixabay.com/download/audio/2022/04/27/audio_67f8b9a3c2.mp3?filename=sad-piano-112191.mp3',                  duration: '2:40' },
-  { id: '9',  title: 'Emotional',        artist: 'Lesfm',         mood: 'sad',       preview_url: 'https://cdn.pixabay.com/download/audio/2022/08/02/audio_884fe92c21.mp3?filename=emotional-piano-112191.mp3',             duration: '3:05' },
-  { id: '10', title: 'Old Memories',     artist: 'Lesfm',         mood: 'nostalgic', preview_url: 'https://cdn.pixabay.com/download/audio/2022/03/10/audio_270f49b53e.mp3?filename=old-memories-112191.mp3',              duration: '2:50' },
-  { id: '11', title: 'Nostalgia',        artist: 'Lesfm',         mood: 'nostalgic', preview_url: 'https://cdn.pixabay.com/download/audio/2022/09/14/audio_946b0939c8.mp3?filename=nostalgia-112191.mp3',                 duration: '3:20' },
+// Multiple Audius hosts for fallback
+const AUDIUS_HOSTS = [
+  'https://discoveryprovider.audius.co',
+  'https://discoveryprovider2.audius.co',
+  'https://discoveryprovider3.audius.co',
+];
+const APP_NAME = 'kinscribe';
+
+const QUICK_SEARCHES = [
+  { label: 'Trending', query: 'trending', icon: '🔥' },
+  { label: 'Afrobeats', query: 'afrobeats', icon: '🌍' },
+  { label: 'Amapiano', query: 'amapiano', icon: '🎹' },
+  { label: 'Hip Hop', query: 'hip hop', icon: '🎤' },
+  { label: 'EDM', query: 'edm', icon: '🎚️' },
+  { label: 'Gospel', query: 'gospel', icon: '🙏' },
+  { label: 'Drill', query: 'drill', icon: '⚡' },
+  { label: 'R&B', query: 'rnb', icon: '❤️' },
+  { label: 'Jazz', query: 'jazz', icon: '🎺' },
+  { label: 'Lofi', query: 'lofi', icon: '🎧' },
+  { label: 'Reggae', query: 'reggae', icon: '🌴' },
+  { label: 'Rock', query: 'rock', icon: '🤘' },
+  { label: 'Classical', query: 'classical', icon: '🎻' },
+  { label: 'Trap', query: 'trap', icon: '🔥' },
+  { label: 'Dancehall', query: 'dancehall', icon: '💃' },
+  { label: 'Soul', query: 'soul', icon: '💋' },
+  { label: 'Chill', query: 'chill vibes', icon: '🌿' },
+  { label: 'Party', query: 'party', icon: '🎉' },
+  { label: 'Sad', query: 'sad emotional', icon: '💔' },
+  { label: 'Workout', query: 'workout gym', icon: '💪' },
 ];
 
-const MOODS = [
-  { key: 'all',       label: 'All',       emoji: '🎵' },
-  { key: 'chill',     label: 'Chill',     emoji: '🌿' },
-  { key: 'hype',      label: 'Hype',      emoji: '🔥' },
-  { key: 'romantic',  label: 'Romantic',  emoji: '❤️' },
-  { key: 'sad',       label: 'Sad',       emoji: '💔' },
-  { key: 'nostalgic', label: 'Nostalgic', emoji: '🌌' },
-];
+// ─── AUDIUS HOST RESOLVER ──────────────────────────────────────────
+let resolvedAudiusHost = AUDIUS_HOSTS[0];
+
+const resolveAudiusHost = async () => {
+  for (const host of AUDIUS_HOSTS) {
+    try {
+      const res = await fetch(`${host}/health_check`, { signal: AbortSignal.timeout(3000) });
+      if (res.ok) { resolvedAudiusHost = host; return host; }
+    } catch {}
+  }
+  return resolvedAudiusHost;
+};
 
 export default function CreateScreen({ navigation }) {
   const { user } = useAuth();
@@ -70,11 +93,17 @@ export default function CreateScreen({ navigation }) {
   const [mediaFiles, setMediaFiles] = useState([]);
   const [caption, setCaption] = useState('');
   const [location, setLocation] = useState('');
+  const [locationQuery, setLocationQuery] = useState('');
+  const [locationResults, setLocationResults] = useState([]);
+  const [selectedLocation, setSelectedLocation] = useState(null);
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [detectingLocation, setDetectingLocation] = useState(false);
+  const locationTimer = useRef(null);
   const [hashtags, setHashtags] = useState('');
   const [privacy, setPrivacy] = useState('public');
   const [loading, setLoading] = useState(false);
   const [altText, setAltText] = useState('');
-  const [collaborators, setCollaborators] = useState([]); // [{ id, name, username, avatar, role }]
+  const [collaborators, setCollaborators] = useState([]);
   const [collabSearch, setCollabSearch] = useState('');
   const [collabResults, setCollabResults] = useState([]);
   const [searchingCollab, setSearchingCollab] = useState(false);
@@ -85,11 +114,10 @@ export default function CreateScreen({ navigation }) {
   const [toneResult, setToneResult] = useState(null);
   const [checkingTone, setCheckingTone] = useState(false);
   const [generatingCaption, setGeneratingCaption] = useState(false);
-  const [hashtagSuggestions, setHashtagSuggestions] = useState([]); // [{ tag, category, level }]
+  const [hashtagSuggestions, setHashtagSuggestions] = useState([]);
   const [loadingHashtags, setLoadingHashtags] = useState(false);
-  const [hashtagCount, setHashtagCount] = useState('balanced'); // minimal|balanced|maximum
+  const [hashtagCount, setHashtagCount] = useState('balanced');
   const [showHashtagPanel, setShowHashtagPanel] = useState(false);
-  // Caption panel
   const [captionOptions, setCaptionOptions] = useState([]);
   const [showCaptionPanel, setShowCaptionPanel] = useState(false);
   const [selectedTone, setSelectedTone] = useState('warm');
@@ -102,18 +130,25 @@ export default function CreateScreen({ navigation }) {
   const [showDraftBanner, setShowDraftBanner] = useState(false);
   const draftTimer = useRef(null);
 
-  // Music state
+  // ─── MUSIC STATE ─────────────────────────────────────────────────
   const [showMusicModal, setShowMusicModal] = useState(false);
   const [selectedMusic, setSelectedMusic] = useState(null);
   const [musicSearch, setMusicSearch] = useState('');
-  const [musicMoodFilter, setMusicMoodFilter] = useState('all');
-  const [playingPreview, setPlayingPreview] = useState(null); // track id
+  const [musicTracks, setMusicTracks] = useState([]);
+  const [musicLoading, setMusicLoading] = useState(false);
+  const [playingTrackId, setPlayingTrackId] = useState(null);   // track being previewed
   const [suggestingMusic, setSuggestingMusic] = useState(false);
-  const [aiMusicSuggestions, setAiMusicSuggestions] = useState([]);
+  const [activeQuick, setActiveQuick] = useState('Trending');
+  // Snippet / trim state
+  const [snippetTrack, setSnippetTrack] = useState(null);       // track open in snippet selector
+  const [snippetStart, setSnippetStart] = useState(0);          // seconds
+  const [trackDuration, setTrackDuration] = useState(0);        // seconds
+  const [snippetPlaying, setSnippetPlaying] = useState(false);
   const musicSoundRef = useRef(null);
-  const [startTime, setStartTime] = useState(0);
+  const musicSearchTimer = useRef(null);
+  const snippetTimer = useRef(null);
 
-  // Schedule state — custom picker, no native module needed
+  // Schedule state
   const [showSchedulePicker, setShowSchedulePicker] = useState(false);
   const [scheduledDate, setScheduledDate] = useState(null);
   const [pickerDay, setPickerDay] = useState(new Date().getDate());
@@ -132,14 +167,15 @@ export default function CreateScreen({ navigation }) {
   const [storyDate, setStoryDate] = useState('');
   const [familyPrivacy, setFamilyPrivacy] = useState('family');
 
-  // Media reorder state
-  const [dragging, setDragging] = useState(null);
-
-  // ─── DRAFT SYSTEM ───────────────────────────────────────────────
+  // ─── ON MOUNT ───────────────────────────────────────────────────
   useEffect(() => {
     checkExistingDraft();
+    resolveAudiusHost();
+    Audio.setAudioModeAsync({ playsInSilentModeIOS: true, allowsRecordingIOS: false });
+    return () => { stopAllAudio(); };
   }, []);
 
+  // ─── DRAFT SYSTEM ───────────────────────────────────────────────
   const checkExistingDraft = async () => {
     try {
       const raw = await AsyncStorage.getItem(DRAFT_KEY);
@@ -184,7 +220,6 @@ export default function CreateScreen({ navigation }) {
     } catch {}
   }, []);
 
-  // Auto-save draft on any content change
   useEffect(() => {
     if (!caption && !hashtags && !location) return;
     clearTimeout(draftTimer.current);
@@ -207,6 +242,67 @@ export default function CreateScreen({ navigation }) {
       } catch {} finally { setCheckingTone(false); }
     }, 800);
   }, []);
+
+  // ─── LOCATION ───────────────────────────────────────────────────
+  const searchLocation = (text) => {
+    setLocationQuery(text);
+    if (!text.trim()) { setSelectedLocation(null); setLocation(''); setLocationResults([]); return; }
+    clearTimeout(locationTimer.current);
+    if (text.length < 2) { setLocationResults([]); return; }
+    locationTimer.current = setTimeout(async () => {
+      setLocationLoading(true);
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(text)}&format=json&limit=6&addressdetails=1`,
+          { headers: { 'Accept-Language': 'en', 'User-Agent': 'KinsCribeApp/1.0' } }
+        );
+        const data = await res.json();
+        setLocationResults(data.map(p => ({
+          id: p.place_id,
+          name: p.display_name.split(',').slice(0, 2).join(', '),
+          full: p.display_name,
+          lat: parseFloat(p.lat),
+          lng: parseFloat(p.lon),
+          type: p.type,
+        })));
+      } catch {} finally { setLocationLoading(false); }
+    }, 500);
+  };
+
+  const selectLocation = (place) => {
+    setSelectedLocation(place);
+    setLocation(place.name);
+    setLocationQuery(place.name);
+    setLocationResults([]);
+  };
+
+  const clearLocation = () => {
+    setSelectedLocation(null);
+    setLocation('');
+    setLocationQuery('');
+    setLocationResults([]);
+  };
+
+  const detectCurrentLocation = async () => {
+    setDetectingLocation(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') { info('Allow location access in settings'); setDetectingLocation(false); return; }
+      const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      const { latitude, longitude } = pos.coords;
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`,
+        { headers: { 'Accept-Language': 'en', 'User-Agent': 'KinsCribeApp/1.0' } }
+      );
+      const data = await res.json();
+      const name = [
+        data.address?.suburb || data.address?.neighbourhood || data.address?.quarter,
+        data.address?.city || data.address?.town || data.address?.village,
+      ].filter(Boolean).join(', ') || data.display_name?.split(',').slice(0, 2).join(', ');
+      selectLocation({ id: data.place_id, name, full: data.display_name, lat: latitude, lng: longitude });
+    } catch { info('Could not detect location'); }
+    finally { setDetectingLocation(false); }
+  };
 
   // ─── AI: CAPTION GENERATOR ──────────────────────────────────────
   const buildContext = () => {
@@ -257,10 +353,7 @@ export default function CreateScreen({ navigation }) {
     try {
       const countMap = { minimal: 5, balanced: 10, maximum: 25 };
       const { data } = await api.post('/ai/hashtags', {
-        caption: text,
-        location,
-        tone: selectedTone,
-        count: countMap[hashtagCount] || 10,
+        caption: text, location, tone: selectedTone, count: countMap[hashtagCount] || 10,
       });
       setHashtagSuggestions(data.hashtags || []);
       if (data.hashtags?.length) setShowHashtagPanel(true);
@@ -281,10 +374,7 @@ export default function CreateScreen({ navigation }) {
     try {
       const countMap = { minimal: 5, balanced: 10, maximum: 25 };
       const { data } = await api.post('/ai/hashtags', {
-        caption: text || buildContext(),
-        location,
-        tone: selectedTone,
-        count: countMap[hashtagCount] || 10,
+        caption: text || buildContext(), location, tone: selectedTone, count: countMap[hashtagCount] || 10,
       });
       setHashtagSuggestions(data.hashtags || []);
     } catch {
@@ -310,14 +400,6 @@ export default function CreateScreen({ navigation }) {
     setShowHashtagPanel(false);
   };
 
-  const copyHashtags = () => {
-    const all = hashtagSuggestions.map(h => h.tag).join(' ');
-    // Clipboard not available without native module — insert directly
-    setHashtags(prev => prev.trim() ? `${prev.trim()} ${all}` : all);
-    setShowHashtagPanel(false);
-    info('Hashtags added!');
-  };
-
   // ─── COLLABORATORS ───────────────────────────────────────────────
   const searchCollaborators = (q) => {
     setCollabSearch(q);
@@ -340,7 +422,6 @@ export default function CreateScreen({ navigation }) {
   };
 
   const removeCollaborator = (id) => setCollaborators(prev => prev.filter(c => c.id !== id));
-
   const updateCollabRole = (id, role) => setCollaborators(prev => prev.map(c => c.id === id ? { ...c, role } : c));
 
   // ─── MEDIA PICKER ───────────────────────────────────────────────
@@ -361,7 +442,7 @@ export default function CreateScreen({ navigation }) {
       }));
       setMediaFiles(prev => allowMultiple ? [...prev, ...files].slice(0, 10) : files);
     }
-  }, [mediaFiles]);
+  }, []);
 
   const takePhoto = useCallback(async () => {
     const perm = await ImagePicker.requestCameraPermissionsAsync();
@@ -393,13 +474,11 @@ export default function CreateScreen({ navigation }) {
     });
   };
 
-  // ─── CROP / EDIT ────────────────────────────────────────────────
   const cropMedia = async (idx) => {
     try {
       const file = mediaFiles[idx];
       const result = await ImageManipulator.manipulateAsync(
-        file.uri,
-        [{ resize: { width: 1080 } }],
+        file.uri, [{ resize: { width: 1080 } }],
         { compress: 0.85, format: ImageManipulator.SaveFormat.JPEG }
       );
       const updated = [...mediaFiles];
@@ -407,6 +486,155 @@ export default function CreateScreen({ navigation }) {
       setMediaFiles(updated);
       info('Image optimised');
     } catch { info('Could not process image'); }
+  };
+
+  // ─── AUDIUS MUSIC (FIXED & ENHANCED) ────────────────────────────
+  const stopAllAudio = async () => {
+    clearTimeout(snippetTimer.current);
+    try {
+      if (musicSoundRef.current) {
+        await musicSoundRef.current.stopAsync();
+        await musicSoundRef.current.unloadAsync();
+        musicSoundRef.current = null;
+      }
+    } catch {}
+    setPlayingTrackId(null);
+    setSnippetPlaying(false);
+  };
+
+  // Build Audius stream URL safely
+  const getStreamUrl = (trackId) =>
+    `${resolvedAudiusHost}/v1/tracks/${trackId}/stream?app_name=${APP_NAME}`;
+
+  // Preview a track (30-sec snippet from snippetStart)
+  const togglePreview = async (track) => {
+    if (playingTrackId === track.id) {
+      await stopAllAudio();
+      return;
+    }
+    await stopAllAudio();
+
+    const url = getStreamUrl(track.id);
+    try {
+      const { sound, status } = await Audio.Sound.createAsync(
+        { uri: url },
+        { shouldPlay: true, positionMillis: (snippetTrack?.id === track.id ? snippetStart : 0) * 1000 },
+        (st) => {
+          if (st.isLoaded) {
+            if (st.didJustFinish) { setPlayingTrackId(null); setSnippetPlaying(false); }
+            if (st.durationMillis && st.durationMillis > 0) {
+              setTrackDuration(Math.floor(st.durationMillis / 1000));
+            }
+          }
+        }
+      );
+      musicSoundRef.current = sound;
+      setPlayingTrackId(track.id);
+
+      // Auto-stop after 30 seconds
+      snippetTimer.current = setTimeout(() => stopAllAudio(), 30000);
+    } catch (e) {
+      console.warn('Preview error:', e);
+      // Try next host on failure
+      await resolveAudiusHost();
+      info('Could not play preview — trying again');
+    }
+  };
+
+  // Seek to a new start time during snippet selection
+  const seekSnippet = async (newStart) => {
+    setSnippetStart(newStart);
+    if (musicSoundRef.current && playingTrackId === snippetTrack?.id) {
+      try {
+        await musicSoundRef.current.setPositionAsync(newStart * 1000);
+      } catch {}
+    }
+  };
+
+  // Open snippet selector for a track
+  const openSnippetSelector = async (track) => {
+    setSnippetTrack(track);
+    setSnippetStart(0);
+    setTrackDuration(0);
+    // Start playing so user hears the snippet
+    await togglePreview(track);
+  };
+
+  // Confirm track + snippet and add to post
+  const selectMusicWithSnippet = async (track, startSec = 0) => {
+    await stopAllAudio();
+    setSelectedMusic({
+      id: track.id,
+      title: track.title,
+      artist: track.user?.name || track.user?.handle || 'Unknown',
+      artwork: track.artwork?.['150x150'] || track.artwork?.['480x480'] || null,
+      stream_url: getStreamUrl(track.id),
+      start_time: startSec,
+      duration: Math.min(30, trackDuration > 0 ? trackDuration - startSec : 30),
+    });
+    setSnippetTrack(null);
+    setShowMusicModal(false);
+  };
+
+  const fetchTrending = async () => {
+    setMusicLoading(true);
+    try {
+      const host = await resolveAudiusHost();
+      const res = await fetch(`${host}/v1/tracks/trending?app_name=${APP_NAME}&limit=20`);
+      if (!res.ok) throw new Error('Network error');
+      const data = await res.json();
+      setMusicTracks(data.data || []);
+    } catch {
+      info('Could not load trending — check your connection');
+      setMusicTracks([]);
+    } finally { setMusicLoading(false); }
+  };
+
+  const searchAudius = async (query) => {
+    if (!query.trim()) { fetchTrending(); return; }
+    setMusicLoading(true);
+    try {
+      const host = await resolveAudiusHost();
+      const res = await fetch(
+        `${host}/v1/tracks/search?query=${encodeURIComponent(query)}&app_name=${APP_NAME}&limit=20`
+      );
+      if (!res.ok) throw new Error('Search failed');
+      const data = await res.json();
+      setMusicTracks(data.data || []);
+    } catch { info('Search failed'); }
+    finally { setMusicLoading(false); }
+  };
+
+  const handleMusicSearch = (text) => {
+    setMusicSearch(text);
+    clearTimeout(musicSearchTimer.current);
+    musicSearchTimer.current = setTimeout(() => searchAudius(text), 500);
+  };
+
+  const suggestMusicForCaption = async () => {
+    setSuggestingMusic(true);
+    const query = caption.trim() || selectedTone || 'chill vibes';
+    await searchAudius(query);
+    setSuggestingMusic(false);
+  };
+
+  // Preview selected music inline on main screen
+  const toggleSelectedMusicPreview = async () => {
+    if (!selectedMusic) return;
+    if (playingTrackId === selectedMusic.id) {
+      await stopAllAudio();
+      return;
+    }
+    await stopAllAudio();
+    try {
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: selectedMusic.stream_url },
+        { shouldPlay: true, positionMillis: (selectedMusic.start_time || 0) * 1000 }
+      );
+      musicSoundRef.current = sound;
+      setPlayingTrackId(selectedMusic.id);
+      snippetTimer.current = setTimeout(() => stopAllAudio(), 30000);
+    } catch { info('Could not play preview'); }
   };
 
   // ─── CUSTOM SCHEDULE PICKER ─────────────────────────────────────
@@ -418,14 +646,11 @@ export default function CreateScreen({ navigation }) {
     const days = getDaysInMonth(pickerMonth, pickerYear);
     const safeDay = Math.min(pickerDay, days);
     const d = new Date(pickerYear, pickerMonth, safeDay, pickerHour, pickerMinute);
-
-    // In family mode, just set the story date string (past dates OK)
     if (mode === 'family') {
       setStoryDate(`${pickerYear}-${String(pickerMonth + 1).padStart(2, '0')}-${String(safeDay).padStart(2, '0')}`);
       setShowSchedulePicker(false);
       return;
     }
-
     if (d <= new Date()) return info('Please pick a future date and time');
     setScheduledDate(d);
     setShowSchedulePicker(false);
@@ -440,7 +665,6 @@ export default function CreateScreen({ navigation }) {
   const handleCaptionChange = (v) => {
     setCaption(v);
     checkTone(v);
-    // Auto-suggest hashtags after user stops typing for 1.5s
     clearTimeout(captionDebounce.current);
     if (v.length > 15) {
       captionDebounce.current = setTimeout(() => suggestHashtagsForCaption(v), 1500);
@@ -449,6 +673,7 @@ export default function CreateScreen({ navigation }) {
     }
   };
 
+  // ─── PICKER COLUMN ──────────────────────────────────────────────
   const PickerColumn = ({ values, selected, onSelect, label }) => (
     <View style={s.pickerCol}>
       <AppText style={s.pickerColLabel}>{label}</AppText>
@@ -463,67 +688,6 @@ export default function CreateScreen({ navigation }) {
       </ScrollView>
     </View>
   );
-
-  const SchedulePickerModal = () => {
-    const now = new Date();
-    const years = [now.getFullYear(), now.getFullYear() + 1];
-    const days = Array.from({ length: getDaysInMonth(pickerMonth, pickerYear) }, (_, i) => i + 1);
-    const hours = Array.from({ length: 24 }, (_, i) => i);
-    const minutes = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
-
-    return (
-      <Modal visible={showSchedulePicker} animationType="slide" transparent>
-        <View style={s.modalOverlay}>
-          <View style={[s.modalSheet, { backgroundColor: theme.bgCard }]}>
-            <View style={s.modalHandle} />
-            <AppText style={[s.modalTitle, { color: theme.text }]}>Schedule Post</AppText>
-
-            <View style={s.pickerRow}>
-              <PickerColumn
-                label="Day"
-                values={days}
-                selected={pickerDay}
-                onSelect={setPickerDay}
-              />
-              <PickerColumn
-                label="Month"
-                values={MONTHS}
-                selected={MONTHS[pickerMonth]}
-                onSelect={(v) => setPickerMonth(MONTHS.indexOf(v))}
-              />
-              <PickerColumn
-                label="Year"
-                values={years}
-                selected={pickerYear}
-                onSelect={setPickerYear}
-              />
-              <PickerColumn
-                label="Hour"
-                values={hours}
-                selected={pickerHour}
-                onSelect={setPickerHour}
-              />
-              <PickerColumn
-                label="Min"
-                values={minutes}
-                selected={pickerMinute}
-                onSelect={setPickerMinute}
-              />
-            </View>
-
-            <View style={s.pickerActions}>
-              <TouchableOpacity style={[s.pickerCancelBtn, { borderColor: theme.border2 }]} onPress={() => setShowSchedulePicker(false)}>
-                <AppText style={{ color: theme.muted, fontWeight: '600' }}>Cancel</AppText>
-              </TouchableOpacity>
-              <TouchableOpacity style={s.pickerConfirmBtn} onPress={confirmSchedule}>
-                <AppText style={{ color: '#fff', fontWeight: '700' }}>Confirm</AppText>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-    );
-  };
 
   // ─── POST SUBMIT ────────────────────────────────────────────────
   const handlePost = async () => {
@@ -557,8 +721,16 @@ export default function CreateScreen({ navigation }) {
         formData.append('privacy', privacy);
         formData.append('bg_color', bgColor);
         if (textContent) formData.append('text_content', textContent);
-      if (selectedMusic) formData.append('music', JSON.stringify({ title: selectedMusic.title, artist: selectedMusic.artist, cover: selectedMusic.cover || '', preview_url: selectedMusic.preview_url || '', start_time: selectedMusic.start_time || 0 }));
-        if (selectedMusic) formData.append('music_id', selectedMusic.id);
+        if (selectedMusic) {
+          formData.append('music', JSON.stringify({
+            title: selectedMusic.title,
+            artist: selectedMusic.artist,
+            cover: selectedMusic.artwork || '',
+            stream_url: selectedMusic.stream_url || '',
+            start_time: selectedMusic.start_time || 0,
+          }));
+          formData.append('music_id', selectedMusic.id);
+        }
         if (mediaFiles[0]) {
           formData.append('file', { uri: mediaFiles[0].uri, type: mediaFiles[0].type === 'video' ? 'video/mp4' : 'image/jpeg', name: 'story_media.jpg' });
         }
@@ -579,10 +751,15 @@ export default function CreateScreen({ navigation }) {
       formData.append('caption', caption);
       formData.append('privacy', privacy);
       if (location) formData.append('location', location);
+      if (selectedLocation?.lat) formData.append('location_lat', selectedLocation.lat);
+      if (selectedLocation?.lng) formData.append('location_lng', selectedLocation.lng);
       if (hashtags) formData.append('hashtags', hashtags);
       if (altText) formData.append('alt_text', altText);
       if (collaborators.length) formData.append('collaborators', JSON.stringify(collaborators.map(c => ({ id: c.id, role: c.role }))));
-      if (selectedMusic) formData.append('music_id', selectedMusic.id);
+      if (selectedMusic) {
+        formData.append('music_id', selectedMusic.id);
+        formData.append('music_start_time', String(selectedMusic.start_time || 0));
+      }
       if (scheduledDate) formData.append('scheduled_for', scheduledDate.toISOString());
       if (mediaFiles.length === 1) {
         formData.append('file', { uri: mediaFiles[0].uri, type: mediaFiles[0].type === 'video' ? 'video/mp4' : 'image/jpeg', name: 'media.jpg' });
@@ -596,6 +773,7 @@ export default function CreateScreen({ navigation }) {
       setCaption(''); setMediaFiles([]); setLocation(''); setHashtags('');
       setSelectedMusic(null); setScheduledDate(null); setToneResult(null);
       setHashtagSuggestions([]); setCollaborators([]);
+      setSelectedLocation(null); setLocationQuery('');
       success(scheduledDate ? `Post scheduled for ${formatSchedule(scheduledDate)}` : 'Post shared!');
       navigation.navigate('Feed');
     } catch (err) {
@@ -603,69 +781,56 @@ export default function CreateScreen({ navigation }) {
     } finally { setLoading(false); }
   };
 
-  // ─── MUSIC PLAYBACK ─────────────────────────────────────────────
-  const stopPreview = async () => {
-    try {
-      if (musicSoundRef.current) {
-        await musicSoundRef.current.stopAsync();
-        await musicSoundRef.current.unloadAsync();
-        musicSoundRef.current = null;
-      }
-    } catch {}
-    setPlayingPreview(null);
+  // ─── SCHEDULE PICKER MODAL ──────────────────────────────────────
+  const SchedulePickerModal = () => {
+    const now = new Date();
+    const years = [now.getFullYear(), now.getFullYear() + 1];
+    const days = Array.from({ length: getDaysInMonth(pickerMonth, pickerYear) }, (_, i) => i + 1);
+    const hours = Array.from({ length: 24 }, (_, i) => i);
+    const minutes = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
+
+    return (
+      <Modal visible={showSchedulePicker} animationType="slide" transparent>
+        <View style={s.modalOverlay}>
+          <View style={[s.modalSheet, { backgroundColor: theme.bgCard }]}>
+            <View style={s.modalHandle} />
+            <AppText style={[s.modalTitle, { color: theme.text }]}>Schedule Post</AppText>
+            <View style={s.pickerRow}>
+              <PickerColumn label="Day" values={days} selected={pickerDay} onSelect={setPickerDay} />
+              <PickerColumn label="Month" values={MONTHS} selected={MONTHS[pickerMonth]} onSelect={(v) => setPickerMonth(MONTHS.indexOf(v))} />
+              <PickerColumn label="Year" values={years} selected={pickerYear} onSelect={setPickerYear} />
+              <PickerColumn label="Hour" values={hours} selected={pickerHour} onSelect={setPickerHour} />
+              <PickerColumn label="Min" values={minutes} selected={pickerMinute} onSelect={setPickerMinute} />
+            </View>
+            <View style={s.pickerActions}>
+              <TouchableOpacity style={[s.pickerCancelBtn, { borderColor: theme.border2 }]} onPress={() => setShowSchedulePicker(false)}>
+                <AppText style={{ color: theme.muted, fontWeight: '600' }}>Cancel</AppText>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.pickerConfirmBtn} onPress={confirmSchedule}>
+                <AppText style={{ color: '#fff', fontWeight: '700' }}>Confirm</AppText>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    );
   };
 
-  const togglePreview = async (track) => {
-    if (playingPreview === track.id) { await stopPreview(); return; }
-    await stopPreview();
-    if (!track.preview_url) { info('No preview for this track'); return; }
-    try {
-      await Audio.setAudioModeAsync({ playsInSilentModeIOS: true, allowsRecordingIOS: false });
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: track.preview_url },
-        { shouldPlay: true, progressUpdateIntervalMillis: 500 },
-        (st) => { if (st.isLoaded && st.didJustFinish) setPlayingPreview(null); }
-      );
-      musicSoundRef.current = sound;
-      setPlayingPreview(track.id);
-    } catch (e) {
-      console.log('Preview error:', e);
-      setPlayingPreview(null);
-      info('Preview unavailable — tap track name to select it');
-    }
-  };
+  // ════════════════════════════════════════════════════════════════
+  // RENDER
+  // ════════════════════════════════════════════════════════════════
+  return (
+    <KeyboardAvoidingView style={s.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <Toast visible={toast.visible} message={toast.message} type={toast.type} onHide={hide} />
 
-  const selectMusic = async (track) => {
-    await stopPreview();
-    setSelectedMusic({ ...track, start_time: startTime });
-    setShowMusicModal(false);
-  };
-
-  const suggestMusicForCaption = async () => {
-    setSuggestingMusic(true);
-    const moodMap = {
-      warm: 'chill', funny: 'hype', deep: 'sad', romantic: 'romantic',
-      savage: 'hype', inspiring: 'hype', nostalgic: 'nostalgic',
-      chill: 'chill', sad: 'sad', bold: 'hype', poetic: 'nostalgic',
-    };
-    const mood = moodMap[selectedTone] || 'chill';
-    const suggestions = MUSIC_LIBRARY.filter(t => t.mood === mood).slice(0, 4);
-    setAiMusicSuggestions(suggestions);
-    setMusicMoodFilter(mood);
-    setSuggestingMusic(false);
-  };
-
-  const filteredMusic = MUSIC_LIBRARY.filter(t => {
-    const matchesMood = musicMoodFilter === 'all' || t.mood === musicMoodFilter;
-    const matchesSearch = !musicSearch ||
-      t.title.toLowerCase().includes(musicSearch.toLowerCase()) ||
-      t.artist.toLowerCase().includes(musicSearch.toLowerCase());
-    return matchesMood && matchesSearch;
-  });
-
-  // ─── MUSIC MODAL ─────────────────────────────────────────────────
-  const MusicModal = () => (
-    <Modal visible={showMusicModal} animationType="slide" transparent onRequestClose={() => { stopPreview(); setShowMusicModal(false); }}>
+      {/* Modals — rendered at root level so they work correctly */}
+    <Modal
+      visible={showMusicModal}
+      animationType="slide"
+      transparent
+      onRequestClose={() => { stopAllAudio(); setShowMusicModal(false); }}
+      onShow={() => { if (musicTracks.length === 0) fetchTrending(); }}
+    >
       <View style={s.modalOverlay}>
         <View style={[s.musicSheet, { backgroundColor: theme.bgCard }]}>
           <View style={s.modalHandle} />
@@ -688,122 +853,218 @@ export default function CreateScreen({ navigation }) {
             </TouchableOpacity>
           </View>
 
-          {/* AI suggestions */}
-          {aiMusicSuggestions.length > 0 && (
-            <>
-              <AppText style={[s.cpLabel, { color: theme.muted, paddingHorizontal: 16, marginBottom: 8 }]}>AI SUGGESTED FOR YOUR VIBE</AppText>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.musicAiRow}>
-                {aiMusicSuggestions.map(t => (
-                  <TouchableOpacity
-                    key={t.id}
-                    style={[s.musicAiCard, { borderColor: selectedMusic?.id === t.id ? '#7c3aed' : theme.border2 }]}
-                    onPress={() => selectMusic(t)}
-                  >
-                    {t.cover
-                      ? <Image source={{ uri: t.cover }} style={s.musicAiCover} />
-                      : <View style={[s.musicAiCover, { backgroundColor: '#7c3aed22', alignItems: 'center', justifyContent: 'center' }]}>
-                          <Ionicons name="musical-notes" size={16} color="#7c3aed" />
-                        </View>}
-                    <AppText style={[s.musicAiTitle, { color: theme.text }]} numberOfLines={1}>{t.title}</AppText>
-                    <AppText style={[s.musicAiArtist, { color: theme.muted }]} numberOfLines={1}>{t.artist}</AppText>
-                    <TouchableOpacity style={s.musicAiPlay} onPress={() => togglePreview(t)}>
-                      <Ionicons name={playingPreview === t.id ? 'pause' : 'play'} size={12} color="#fff" style={playingPreview !== t.id && { marginLeft: 1 }} />
-                    </TouchableOpacity>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </>
-          )}
-
-          {/* Search */}
-          <View style={[s.musicSearchRow, { backgroundColor: theme.bgSecondary, borderColor: theme.border2 }]}>
-            <Ionicons name="search" size={15} color={theme.muted} />
+          {/* Search bar */}
+          <View style={[s.musicSearchRow, { backgroundColor: theme.bgSecondary, borderColor: musicSearch ? '#7c3aed' : theme.border2 }]}>
+            <Ionicons name="search" size={15} color={musicSearch ? '#7c3aed' : theme.muted} />
             <TextInput
               style={[s.musicSearchInput, { color: theme.text }]}
-              placeholder="Search songs, artists..."
+              placeholder="Search any song, artist, genre..."
               placeholderTextColor={theme.dim}
               value={musicSearch}
-              onChangeText={setMusicSearch}
+              onChangeText={handleMusicSearch}
+              returnKeyType="search"
+              onSubmitEditing={() => searchAudius(musicSearch)}
             />
-            {musicSearch ? <TouchableOpacity onPress={() => setMusicSearch('')}><Ionicons name="close-circle" size={15} color={theme.muted} /></TouchableOpacity> : null}
+            {musicSearch
+              ? <TouchableOpacity onPress={() => { setMusicSearch(''); fetchTrending(); }}>
+                  <Ionicons name="close-circle" size={15} color={theme.muted} />
+                </TouchableOpacity>
+              : null}
           </View>
 
-          {/* Mood filter */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.musicMoodRow}>
-            {MOODS.map(m => (
+          {/* Quick search chips */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.musicQuickRow} contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}>
+            {QUICK_SEARCHES.map(q => (
               <TouchableOpacity
-                key={m.key}
-                style={[s.musicMoodChip, { borderColor: theme.border2 }, musicMoodFilter === m.key && s.musicMoodChipActive]}
-                onPress={() => setMusicMoodFilter(m.key)}
+                key={q.label}
+                style={[s.musicQuickChip, {
+                  borderColor: activeQuick === q.label ? '#7c3aed' : theme.border2,
+                  backgroundColor: activeQuick === q.label ? 'rgba(124,58,237,0.15)' : 'rgba(30,41,59,0.4)',
+                }]}
+                onPress={() => { setActiveQuick(q.label); setMusicSearch(q.query); searchAudius(q.query); }}
               >
-                <AppText style={s.musicMoodEmoji}>{m.emoji}</AppText>
-                <AppText style={[s.musicMoodLabel, { color: musicMoodFilter === m.key ? '#a78bfa' : theme.muted }]}>{m.label}</AppText>
+                <AppText style={s.musicQuickIcon}>{q.icon}</AppText>
+                <AppText style={[s.musicQuickLabel, { color: activeQuick === q.label ? '#a78bfa' : theme.muted }]}>{q.label}</AppText>
               </TouchableOpacity>
             ))}
           </ScrollView>
 
           {/* Track list */}
-          <FlatList
-            data={filteredMusic}
-            keyExtractor={i => i.id}
-            style={{ flex: 1 }}
-            showsVerticalScrollIndicator={false}
-            ListEmptyComponent={
-              <View style={{ alignItems: 'center', paddingTop: 30 }}>
-                <Ionicons name="musical-notes-outline" size={36} color={theme.dim} />
-                <AppText style={{ color: theme.muted, marginTop: 8 }}>No tracks found</AppText>
-              </View>
-            }
-            renderItem={({ item }) => {
-              const isSelected = selectedMusic?.id === item.id;
-              const isPlaying = playingPreview === item.id;
-              const moodColor = item.mood === 'hype' ? '#f59e0b' : item.mood === 'romantic' ? '#ec4899' : item.mood === 'sad' ? '#3b82f6' : item.mood === 'nostalgic' ? '#8b5cf6' : '#10b981';
-              return (
-                <TouchableOpacity
-                  style={[s.musicRow, { borderBottomColor: theme.border }, isSelected && { backgroundColor: 'rgba(124,58,237,0.08)' }]}
-                  onPress={() => selectMusic(item)}
-                >
-                  {item.cover
-                    ? <Image source={{ uri: item.cover }} style={s.musicCover} />
-                    : <View style={[s.musicCover, { backgroundColor: 'rgba(124,58,237,0.15)', alignItems: 'center', justifyContent: 'center' }]}>
-                        <Ionicons name="musical-notes" size={18} color="#7c3aed" />
-                      </View>}
-                  <View style={{ flex: 1 }}>
-                    <AppText style={[s.musicTitle, { color: theme.text }]} numberOfLines={1}>{item.title}</AppText>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
-                      <AppText style={[s.musicArtist, { color: theme.muted }]}>{item.artist}</AppText>
-                      <View style={[s.musicMoodTag, { backgroundColor: moodColor + '22' }]}>
-                        <AppText style={[s.musicMoodTagText, { color: moodColor }]}>
-                          {MOODS.find(m => m.key === item.mood)?.emoji} {item.mood}
-                        </AppText>
-                      </View>
-                    </View>
-                  </View>
-                  <AppText style={[s.musicDuration, { color: theme.muted }]}>{item.duration}</AppText>
-                  <TouchableOpacity
-                    style={[s.musicPlayBtn, { backgroundColor: isPlaying ? '#7c3aed' : 'rgba(124,58,237,0.15)' }]}
-                    onPress={() => togglePreview(item)}
-                  >
-                    <Ionicons name={isPlaying ? 'pause' : 'play'} size={13} color={isPlaying ? '#fff' : '#7c3aed'} style={!isPlaying && { marginLeft: 1 }} />
+          {musicLoading ? (
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+              <ActivityIndicator size="large" color="#7c3aed" />
+              <AppText style={{ color: theme.muted, fontSize: 13 }}>Loading tracks...</AppText>
+            </View>
+          ) : (
+            <FlatList
+              data={musicTracks}
+              keyExtractor={item => item.id}
+              style={{ flex: 1 }}
+              showsVerticalScrollIndicator={false}
+              ListEmptyComponent={
+                <View style={{ alignItems: 'center', paddingTop: 40 }}>
+                  <Ionicons name="musical-notes-outline" size={40} color={theme.dim} />
+                  <AppText style={{ color: theme.muted, marginTop: 10, fontSize: 14 }}>No tracks found</AppText>
+                  <TouchableOpacity style={{ marginTop: 12 }} onPress={fetchTrending}>
+                    <AppText style={{ color: '#a78bfa', fontWeight: '700' }}>Load Trending</AppText>
                   </TouchableOpacity>
-                  {isSelected && <Ionicons name="checkmark-circle" size={18} color="#7c3aed" style={{ marginLeft: 6 }} />}
-                </TouchableOpacity>
-              );
-            }}
-          />
+                </View>
+              }
+              renderItem={({ item }) => {
+                const isSelected = selectedMusic?.id === item.id;
+                const isPlaying = playingTrackId === item.id;
+                return (
+                  <View style={[s.musicRow, { borderBottomColor: theme.border }, isSelected && { backgroundColor: 'rgba(124,58,237,0.08)' }]}>
+                    {/* Artwork */}
+                    {item.artwork?.['150x150']
+                      ? <Image source={{ uri: item.artwork['150x150'] }} style={s.musicCover} />
+                      : <View style={[s.musicCover, { backgroundColor: 'rgba(124,58,237,0.2)', alignItems: 'center', justifyContent: 'center' }]}>
+                          <Ionicons name="musical-notes" size={18} color="#7c3aed" />
+                        </View>}
 
-          <TouchableOpacity style={[s.modalClose, { borderColor: theme.border2 }]} onPress={() => { stopPreview(); setShowMusicModal(false); }}>
+                    {/* Info */}
+                    <View style={{ flex: 1 }}>
+                      <AppText style={[s.musicTitle, { color: theme.text }]} numberOfLines={1}>{item.title}</AppText>
+                      <AppText style={[s.musicArtist, { color: theme.muted }]} numberOfLines={1}>
+                        {item.user?.name || item.user?.handle}
+                      </AppText>
+                    </View>
+
+                    {/* Play preview */}
+                    <TouchableOpacity
+                      style={[s.musicPlayBtn, { backgroundColor: isPlaying ? '#7c3aed' : 'rgba(124,58,237,0.15)' }]}
+                      onPress={() => togglePreview(item)}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
+                      <Ionicons name={isPlaying ? 'pause' : 'play'} size={14} color={isPlaying ? '#fff' : '#7c3aed'} style={!isPlaying ? { marginLeft: 2 } : {}} />
+                    </TouchableOpacity>
+
+                    {/* Snippet / Use button */}
+                    <TouchableOpacity
+                      style={[s.musicUseBtn, { backgroundColor: isSelected ? '#10b981' : 'rgba(124,58,237,0.15)' }]}
+                      onPress={() => openSnippetSelector(item)}
+                    >
+                      <AppText style={[s.musicUseBtnText, { color: isSelected ? '#fff' : '#a78bfa' }]}>
+                        {isSelected ? '✓ Used' : 'Use'}
+                      </AppText>
+                    </TouchableOpacity>
+                  </View>
+                );
+              }}
+            />
+          )}
+
+          <TouchableOpacity
+            style={[s.modalClose, { borderColor: theme.border2 }]}
+            onPress={() => { stopAllAudio(); setShowMusicModal(false); }}
+          >
             <AppText style={{ color: theme.text, fontWeight: '600' }}>Cancel</AppText>
           </TouchableOpacity>
         </View>
       </View>
     </Modal>
-  );
+      {snippetTrack && (() => {
+        const maxStart = Math.max(0, trackDuration - 30);
+        const barCount = 40;
+        return (
+      <Modal visible={!!snippetTrack} animationType="slide" transparent>
+        <View style={s.modalOverlay}>
+          <View style={[s.modalSheet, { backgroundColor: theme.bgCard, maxHeight: '55%' }]}>
+            <View style={s.modalHandle} />
+            <AppText style={[s.modalTitle, { color: theme.text }]}>Choose Snippet</AppText>
 
-  return (
-    <KeyboardAvoidingView style={[s.container, { backgroundColor: theme.bg }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <Toast visible={toast.visible} type={toast.type} message={toast.message} onHide={hide} />
-      <MusicModal />
+            {/* Track info */}
+            <View style={s.snippetTrackRow}>
+              {snippetTrack.artwork?.['150x150']
+                ? <Image source={{ uri: snippetTrack.artwork['150x150'] }} style={s.snippetArt} />
+                : <View style={[s.snippetArt, { backgroundColor: 'rgba(124,58,237,0.25)', alignItems: 'center', justifyContent: 'center' }]}>
+                    <Ionicons name="musical-notes" size={22} color="#7c3aed" />
+                  </View>}
+              <View style={{ flex: 1 }}>
+                <AppText style={[s.snippetTitle, { color: theme.text }]} numberOfLines={1}>{snippetTrack.title}</AppText>
+                <AppText style={[s.snippetArtist, { color: theme.muted }]} numberOfLines={1}>{snippetTrack.user?.name || snippetTrack.user?.handle}</AppText>
+              </View>
+              <TouchableOpacity
+                style={[s.snippetPlayBtn, { backgroundColor: playingTrackId === snippetTrack.id ? '#7c3aed' : 'rgba(124,58,237,0.2)' }]}
+                onPress={() => togglePreview(snippetTrack)}
+              >
+                <Ionicons name={playingTrackId === snippetTrack.id ? 'pause' : 'play'} size={18} color={playingTrackId === snippetTrack.id ? '#fff' : '#7c3aed'} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Waveform bars (decorative + touch) */}
+            <AppText style={[s.cpLabel, { color: theme.muted, paddingHorizontal: 16, marginTop: 8 }]}>DRAG TO PICK START (30-SEC CLIP)</AppText>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ paddingHorizontal: 16, marginBottom: 8 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, height: 56 }}>
+                {Array.from({ length: barCount }, (_, i) => {
+                  const sec = Math.floor((i / barCount) * (trackDuration || 180));
+                  const inSnippet = sec >= snippetStart && sec < snippetStart + 30;
+                  const barH = 8 + Math.abs(Math.sin(i * 0.47 + 1.2) * 30);
+                  return (
+                    <TouchableOpacity
+                      key={i}
+                      onPress={() => seekSnippet(Math.min(sec, maxStart || 0))}
+                      hitSlop={{ top: 10, bottom: 10, left: 1, right: 1 }}
+                    >
+                      <View style={[s.waveBar, {
+                        height: barH,
+                        backgroundColor: inSnippet ? '#7c3aed' : 'rgba(124,58,237,0.25)',
+                        opacity: inSnippet ? 1 : 0.5,
+                      }]} />
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </ScrollView>
+
+            {/* Time display */}
+            <View style={s.snippetTimeRow}>
+              <AppText style={[s.snippetTimeText, { color: theme.muted }]}>
+                Start: {Math.floor(snippetStart / 60)}:{String(snippetStart % 60).padStart(2, '0')}
+              </AppText>
+              <AppText style={[s.snippetTimeText, { color: '#7c3aed', fontWeight: '700' }]}>30 sec clip</AppText>
+              {trackDuration > 0 && (
+                <AppText style={[s.snippetTimeText, { color: theme.muted }]}>
+                  / {Math.floor(trackDuration / 60)}:{String(trackDuration % 60).padStart(2, '0')}
+                </AppText>
+              )}
+            </View>
+
+            {/* Seek buttons */}
+            <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginBottom: 12 }}>
+              {[-10, -5, 5, 10].map(delta => (
+                <TouchableOpacity
+                  key={delta}
+                  style={[s.seekBtn, { borderColor: theme.border2 }]}
+                  onPress={() => seekSnippet(Math.max(0, Math.min(snippetStart + delta, maxStart || 0)))}
+                >
+                  <AppText style={{ color: theme.muted, fontSize: 12, fontWeight: '600' }}>
+                    {delta > 0 ? `+${delta}s` : `${delta}s`}
+                  </AppText>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Confirm + Cancel */}
+            <View style={s.pickerActions}>
+              <TouchableOpacity
+                style={[s.pickerCancelBtn, { borderColor: theme.border2 }]}
+                onPress={() => { stopAllAudio(); setSnippetTrack(null); }}
+              >
+                <AppText style={{ color: theme.muted, fontWeight: '600' }}>Cancel</AppText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={s.pickerConfirmBtn}
+                onPress={() => selectMusicWithSnippet(snippetTrack, snippetStart)}
+              >
+                <AppText style={{ color: '#fff', fontWeight: '700' }}>Use This Clip ✓</AppText>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+        );
+      })()}
       <SchedulePickerModal />
 
       <LinearGradient
@@ -818,9 +1079,7 @@ export default function CreateScreen({ navigation }) {
         </TouchableOpacity>
         <AppText style={[s.headerTitle, { color: theme.text }]}>Create</AppText>
         <View style={s.headerRight}>
-          {draftSaved && (
-            <AppText style={s.draftSavedText}>Saved</AppText>
-          )}
+          {draftSaved && <AppText style={s.draftSavedText}>Saved</AppText>}
           <TouchableOpacity
             style={[s.postBtn, loading && { opacity: 0.5 }]}
             onPress={handlePost}
@@ -866,25 +1125,18 @@ export default function CreateScreen({ navigation }) {
         {/* ══════════ POST MODE ══════════ */}
         {mode === 'post' && (
           <>
-            {/* Media preview with reorder */}
+            {/* Media preview */}
             {mediaFiles.length > 0 ? (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.mediaPreviewRow}>
                 {mediaFiles.map((f, i) => (
                   <View key={i} style={s.mediaThumb}>
                     <Image source={{ uri: f.uri }} style={s.mediaThumbImg} resizeMode="cover" />
-                    {/* Cover badge */}
                     {i === 0 && mediaFiles.length > 1 && (
-                      <View style={s.coverBadge}>
-                        <AppText style={s.coverBadgeText}>Cover</AppText>
-                      </View>
+                      <View style={s.coverBadge}><AppText style={s.coverBadgeText}>Cover</AppText></View>
                     )}
-                    {/* Counter */}
                     {mediaFiles.length > 1 && (
-                      <View style={s.mediaCounter}>
-                        <AppText style={s.mediaCounterText}>{i + 1}/{mediaFiles.length}</AppText>
-                      </View>
+                      <View style={s.mediaCounter}><AppText style={s.mediaCounterText}>{i + 1}/{mediaFiles.length}</AppText></View>
                     )}
-                    {/* Actions row */}
                     <View style={s.mediaActions}>
                       {i > 0 && (
                         <TouchableOpacity style={s.mediaActionBtn} onPress={() => moveMediaLeft(i)}>
@@ -974,35 +1226,35 @@ export default function CreateScreen({ navigation }) {
                 <AppText style={[s.cpLabel, { color: theme.muted }]}>TONE</AppText>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
                   {[
-                    { key: 'warm',         label: 'Warm',        emoji: '🤗' },
-                    { key: 'funny',        label: 'Funny',       emoji: '😂' },
-                    { key: 'deep',         label: 'Deep',        emoji: '🧠' },
-                    { key: 'romantic',     label: 'Romantic',    emoji: '❤️' },
-                    { key: 'savage',       label: 'Savage',      emoji: '😈' },
-                    { key: 'professional', label: 'Pro',         emoji: '💼' },
-                    { key: 'inspiring',    label: 'Inspiring',   emoji: '🚀' },
-                    { key: 'nostalgic',    label: 'Nostalgic',   emoji: '🌌' },
-                    { key: 'aesthetic',    label: 'Aesthetic',   emoji: '🧘' },
-                    { key: 'humble',       label: 'Humble',      emoji: '🙏' },
-                    { key: 'bold',         label: 'Bold',        emoji: '🔥' },
-                    { key: 'mysterious',   label: 'Mysterious',  emoji: '🌙' },
-                    { key: 'grateful',     label: 'Grateful',    emoji: '🙌' },
-                    { key: 'sarcastic',    label: 'Sarcastic',   emoji: '🙄' },
-                    { key: 'motivational', label: 'Motivational',emoji: '💪' },
-                    { key: 'chill',        label: 'Chill',       emoji: '😎' },
-                    { key: 'dramatic',     label: 'Dramatic',    emoji: '🎭' },
-                    { key: 'poetic',       label: 'Poetic',      emoji: '🌹' },
-                    { key: 'family',       label: 'Family',      emoji: '👨‍👩‍👧' },
-                    { key: 'travel',       label: 'Travel',      emoji: '✈️' },
-                    { key: 'foodie',       label: 'Foodie',      emoji: '🍽️' },
-                  ].map(t => (
+                    { key: 'warm', label: 'Warm', emoji: '🤗' },
+                    { key: 'funny', label: 'Funny', emoji: '😂' },
+                    { key: 'deep', label: 'Deep', emoji: '🧠' },
+                    { key: 'romantic', label: 'Romantic', emoji: '❤️' },
+                    { key: 'savage', label: 'Savage', emoji: '😈' },
+                    { key: 'professional', label: 'Pro', emoji: '💼' },
+                    { key: 'inspiring', label: 'Inspiring', emoji: '🚀' },
+                    { key: 'nostalgic', label: 'Nostalgic', emoji: '🌌' },
+                    { key: 'aesthetic', label: 'Aesthetic', emoji: '🧘' },
+                    { key: 'humble', label: 'Humble', emoji: '🙏' },
+                    { key: 'bold', label: 'Bold', emoji: '🔥' },
+                    { key: 'mysterious', label: 'Mysterious', emoji: '🌙' },
+                    { key: 'grateful', label: 'Grateful', emoji: '🙌' },
+                    { key: 'sarcastic', label: 'Sarcastic', emoji: '🙄' },
+                    { key: 'motivational', label: 'Motivational', emoji: '💪' },
+                    { key: 'chill', label: 'Chill', emoji: '😎' },
+                    { key: 'dramatic', label: 'Dramatic', emoji: '🎭' },
+                    { key: 'poetic', label: 'Poetic', emoji: '🌹' },
+                    { key: 'family', label: 'Family', emoji: '👨‍👩‍👧' },
+                    { key: 'travel', label: 'Travel', emoji: '✈️' },
+                    { key: 'foodie', label: 'Foodie', emoji: '🍽️' },
+                  ].map(toneOpt => (
                     <TouchableOpacity
-                      key={t.key}
-                      style={[s.cpChip, { borderColor: theme.border2 }, selectedTone === t.key && s.cpChipActive]}
-                      onPress={() => setSelectedTone(t.key)}
+                      key={toneOpt.key}
+                      style={[s.cpChip, { borderColor: theme.border2 }, selectedTone === toneOpt.key && s.cpChipActive]}
+                      onPress={() => setSelectedTone(toneOpt.key)}
                     >
-                      <AppText style={s.cpChipEmoji}>{t.emoji}</AppText>
-                      <AppText style={[s.cpChipText, { color: selectedTone === t.key ? '#a78bfa' : theme.muted }]}>{t.label}</AppText>
+                      <AppText style={s.cpChipEmoji}>{toneOpt.emoji}</AppText>
+                      <AppText style={[s.cpChipText, { color: selectedTone === toneOpt.key ? '#a78bfa' : theme.muted }]}>{toneOpt.label}</AppText>
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
@@ -1099,10 +1351,10 @@ export default function CreateScreen({ navigation }) {
                 {checkingTone
                   ? <ActivityIndicator size="small" color={theme.muted} />
                   : <Ionicons
-                    name={toneResult?.score >= 7 ? 'happy-outline' : toneResult?.score <= 3 ? 'sad-outline' : 'analytics-outline'}
-                    size={16}
-                    color={toneResult?.score >= 7 ? '#10b981' : toneResult?.score <= 3 ? '#f87171' : '#f59e0b'}
-                  />}
+                      name={toneResult?.score >= 7 ? 'happy-outline' : toneResult?.score <= 3 ? 'sad-outline' : 'analytics-outline'}
+                      size={16}
+                      color={toneResult?.score >= 7 ? '#10b981' : toneResult?.score <= 3 ? '#f87171' : '#f59e0b'}
+                    />}
                 {toneResult && (
                   <View style={{ flex: 1 }}>
                     <AppText style={[s.toneLabel, { color: toneResult.score >= 7 ? '#10b981' : toneResult.score <= 3 ? '#f87171' : '#f59e0b' }]}>
@@ -1125,23 +1377,16 @@ export default function CreateScreen({ navigation }) {
                 onChangeText={setHashtags}
                 autoCapitalize="none"
               />
-              <TouchableOpacity
-                style={s.htSparkleBtn}
-                onPress={suggestHashtags}
-              >
+              <TouchableOpacity style={s.htSparkleBtn} onPress={suggestHashtags}>
                 {loadingHashtags
                   ? <ActivityIndicator size="small" color="#a78bfa" />
-                  : <>
-                      <Ionicons name="sparkles" size={13} color="#a78bfa" />
-                      <AppText style={s.htSparkleTxt}>AI</AppText>
-                    </>}
+                  : <><Ionicons name="sparkles" size={13} color="#a78bfa" /><AppText style={s.htSparkleTxt}>AI</AppText></>}
               </TouchableOpacity>
             </View>
 
             {/* AI Hashtag Panel */}
             {showHashtagPanel && (
               <View style={[s.htPanel, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]}>
-                {/* Header */}
                 <View style={s.htPanelHeader}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     <Ionicons name="pricetag" size={14} color="#a78bfa" />
@@ -1152,7 +1397,6 @@ export default function CreateScreen({ navigation }) {
                   </TouchableOpacity>
                 </View>
 
-                {/* Count selector */}
                 <AppText style={[s.cpLabel, { color: theme.muted }]}>HOW MANY</AppText>
                 <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
                   {[
@@ -1171,7 +1415,6 @@ export default function CreateScreen({ navigation }) {
                   ))}
                 </View>
 
-                {/* Generate button */}
                 <TouchableOpacity
                   style={[s.cpGenerateBtn, loadingHashtags && { opacity: 0.6 }]}
                   onPress={suggestHashtags}
@@ -1187,7 +1430,6 @@ export default function CreateScreen({ navigation }) {
                   </LinearGradient>
                 </TouchableOpacity>
 
-                {/* Skeleton */}
                 {loadingHashtags && hashtagSuggestions.length === 0 && (
                   <View style={{ gap: 8, marginTop: 12 }}>
                     {[160, 200, 140, 180].map((w, i) => (
@@ -1196,10 +1438,8 @@ export default function CreateScreen({ navigation }) {
                   </View>
                 )}
 
-                {/* Results grouped by category */}
                 {hashtagSuggestions.length > 0 && (
                   <>
-                    {/* Add all + Regenerate row */}
                     <View style={s.htActionsRow}>
                       <TouchableOpacity style={s.htAddAllBtn} onPress={addAllHashtags}>
                         <Ionicons name="add-circle" size={14} color="#10b981" />
@@ -1211,7 +1451,6 @@ export default function CreateScreen({ navigation }) {
                       </TouchableOpacity>
                     </View>
 
-                    {/* Category groups */}
                     {['trending', 'location', 'niche', 'community', 'personal'].map(cat => {
                       const items = hashtagSuggestions.filter(h => h.category === cat);
                       if (!items.length) return null;
@@ -1250,7 +1489,6 @@ export default function CreateScreen({ navigation }) {
                       );
                     })}
 
-                    {/* Legend */}
                     <View style={s.htLegend}>
                       {[{ c: '#10b981', l: 'High reach' }, { c: '#f59e0b', l: 'Medium' }, { c: '#64748b', l: 'Niche' }].map(l => (
                         <View key={l.l} style={s.htLegendItem}>
@@ -1264,27 +1502,71 @@ export default function CreateScreen({ navigation }) {
               </View>
             )}
 
-            {/* Other fields */}
-            <View style={[s.fieldRow, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]}>
-              <Ionicons name="location-outline" size={18} color={theme.muted} />
-              <TextInput style={[s.fieldInput, { color: theme.text }]} placeholder="Add location" placeholderTextColor={theme.dim} value={location} onChangeText={setLocation} />
-            </View>
+            {/* Location */}
+            {selectedLocation ? (
+              <View style={[s.locationSelected, { backgroundColor: theme.bgCard, borderColor: '#10b981' }]}>
+                <View style={s.locationSelectedIcon}><Ionicons name="location" size={16} color="#10b981" /></View>
+                <View style={{ flex: 1 }}>
+                  <AppText style={[s.locationSelectedName, { color: theme.text }]} numberOfLines={1}>{selectedLocation.name}</AppText>
+                  <AppText style={[s.locationSelectedFull, { color: theme.muted }]} numberOfLines={1}>{selectedLocation.full}</AppText>
+                </View>
+                <TouchableOpacity onPress={clearLocation} style={{ padding: 4 }}>
+                  <Ionicons name="close-circle" size={18} color={theme.muted} />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={[s.fieldRow, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]}>
+                <Ionicons name="location-outline" size={18} color={theme.muted} />
+                <TextInput
+                  style={[s.fieldInput, { color: theme.text }]}
+                  placeholder="Search location..."
+                  placeholderTextColor={theme.dim}
+                  value={locationQuery}
+                  onChangeText={searchLocation}
+                />
+                <TouchableOpacity onPress={detectCurrentLocation} disabled={detectingLocation} style={{ padding: 4 }}>
+                  {detectingLocation
+                    ? <ActivityIndicator size="small" color="#10b981" />
+                    : <Ionicons name="navigate" size={16} color="#10b981" />}
+                </TouchableOpacity>
+              </View>
+            )}
 
-            {/* Co-Creator / Collaborators */}
+            {locationResults.length > 0 && (
+              <View style={[s.locationDropdown, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]}>
+                {locationLoading && (
+                  <View style={s.locationLoadingRow}>
+                    <ActivityIndicator size="small" color="#7c3aed" />
+                    <AppText style={[s.locationLoadingText, { color: theme.muted }]}>Searching...</AppText>
+                  </View>
+                )}
+                {locationResults.map((item, i) => (
+                  <TouchableOpacity
+                    key={item.id || i}
+                    style={[s.locationItem, { borderBottomColor: theme.border }, i === locationResults.length - 1 && { borderBottomWidth: 0 }]}
+                    onPress={() => selectLocation(item)}
+                  >
+                    <View style={s.locationItemIcon}><Ionicons name="location-sharp" size={14} color="#7c3aed" /></View>
+                    <View style={{ flex: 1 }}>
+                      <AppText style={[s.locationItemName, { color: theme.text }]} numberOfLines={1}>{item.name}</AppText>
+                      <AppText style={[s.locationItemFull, { color: theme.muted }]} numberOfLines={1}>{item.full}</AppText>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
+            {/* Collaborators */}
             <View style={[s.collabSection, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]}>
               <View style={s.collabHeader}>
                 <Ionicons name="people-outline" size={16} color={theme.muted} />
                 <AppText style={[s.collabHeaderText, { color: theme.text }]}>Co-Creators</AppText>
-                <TouchableOpacity
-                  style={s.collabAddBtn}
-                  onPress={() => setShowCollabSearch(p => !p)}
-                >
+                <TouchableOpacity style={s.collabAddBtn} onPress={() => setShowCollabSearch(p => !p)}>
                   <Ionicons name={showCollabSearch ? 'chevron-up' : 'add'} size={16} color="#7c3aed" />
                   {!showCollabSearch && <AppText style={s.collabAddBtnText}>Invite</AppText>}
                 </TouchableOpacity>
               </View>
 
-              {/* Selected collaborators */}
               {collaborators.length > 0 && (
                 <View style={s.collabChipsWrap}>
                   {collaborators.map(c => (
@@ -1298,14 +1580,9 @@ export default function CreateScreen({ navigation }) {
                         <AppText style={[s.collabChipName, { color: theme.text }]}>{c.name}</AppText>
                         <AppText style={[s.collabChipRole, { color: theme.muted }]}>{c.role}</AppText>
                       </View>
-                      {/* Role picker */}
                       <View style={s.collabRoleRow}>
                         {['creator', 'editor', 'contributor'].map(r => (
-                          <TouchableOpacity
-                            key={r}
-                            style={[s.collabRoleBtn, c.role === r && s.collabRoleBtnActive]}
-                            onPress={() => updateCollabRole(c.id, r)}
-                          >
+                          <TouchableOpacity key={r} style={[s.collabRoleBtn, c.role === r && s.collabRoleBtnActive]} onPress={() => updateCollabRole(c.id, r)}>
                             <AppText style={[s.collabRoleBtnText, { color: c.role === r ? '#a78bfa' : theme.muted }]}>
                               {r === 'creator' ? '👑' : r === 'editor' ? '✏️' : '🤝'}
                             </AppText>
@@ -1324,7 +1601,6 @@ export default function CreateScreen({ navigation }) {
                 <AppText style={[s.collabEmptyText, { color: theme.dim }]}>Invite co-creators — post appears on both profiles</AppText>
               )}
 
-              {/* Search input */}
               {showCollabSearch && (
                 <>
                   <View style={[s.collabSearchRow, { backgroundColor: theme.bgSecondary, borderColor: theme.border2 }]}>
@@ -1373,6 +1649,7 @@ export default function CreateScreen({ navigation }) {
               )}
             </View>
 
+            {/* Alt text */}
             <View style={[s.fieldRow, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]}>
               <Ionicons name="text-outline" size={18} color={theme.muted} />
               <TextInput style={[s.fieldInput, { color: theme.text }]} placeholder="Alt text for accessibility" placeholderTextColor={theme.dim} value={altText} onChangeText={setAltText} />
@@ -1381,15 +1658,23 @@ export default function CreateScreen({ navigation }) {
             {/* Music picker */}
             {selectedMusic ? (
               <View style={[s.musicCard, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]}>
-                <TouchableOpacity style={s.musicCardPlay} onPress={() => togglePreview(selectedMusic)}>
+                <TouchableOpacity style={s.musicCardPlay} onPress={toggleSelectedMusicPreview}>
                   <LinearGradient colors={['#7c3aed', '#3b82f6']} style={s.musicCardPlayGrad}>
-                    <Ionicons name={playingPreview === selectedMusic.id ? 'pause' : 'play'} size={16} color="#fff" style={playingPreview !== selectedMusic.id && { marginLeft: 2 }} />
+                    <Ionicons
+                      name={playingTrackId === selectedMusic.id ? 'pause' : 'play'}
+                      size={16} color="#fff"
+                      style={playingTrackId !== selectedMusic.id ? { marginLeft: 2 } : {}}
+                    />
                   </LinearGradient>
                 </TouchableOpacity>
                 <View style={{ flex: 1 }}>
                   <AppText style={[s.musicCardTitle, { color: theme.text }]} numberOfLines={1}>{selectedMusic.title}</AppText>
                   <AppText style={[s.musicCardArtist, { color: theme.muted }]} numberOfLines={1}>{selectedMusic.artist}</AppText>
-                  {playingPreview === selectedMusic.id && (
+                  {/* Clip info */}
+                  <AppText style={{ color: '#7c3aed', fontSize: 10, marginTop: 2 }}>
+                    ✂️ Clip from {Math.floor((selectedMusic.start_time || 0) / 60)}:{String((selectedMusic.start_time || 0) % 60).padStart(2, '0')} · 30s
+                  </AppText>
+                  {playingTrackId === selectedMusic.id && (
                     <View style={s.musicCardWave}>
                       {[...Array(16)].map((_, i) => (
                         <View key={i} style={[s.musicCardBar, { height: 4 + Math.abs(Math.sin(i * 0.8) * 10), backgroundColor: '#7c3aed' }]} />
@@ -1400,7 +1685,7 @@ export default function CreateScreen({ navigation }) {
                 <TouchableOpacity onPress={() => setShowMusicModal(true)} style={{ padding: 6 }}>
                   <Ionicons name="swap-horizontal" size={16} color={theme.muted} />
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => { stopPreview(); setSelectedMusic(null); }} style={{ padding: 6 }}>
+                <TouchableOpacity onPress={() => { stopAllAudio(); setSelectedMusic(null); }} style={{ padding: 6 }}>
                   <Ionicons name="close-circle" size={18} color={theme.muted} />
                 </TouchableOpacity>
               </View>
@@ -1479,7 +1764,6 @@ export default function CreateScreen({ navigation }) {
               </View>
             )}
 
-            {/* Text overlay input when media is present */}
             {mediaFiles[0] && (
               <View style={[s.fieldRow, { backgroundColor: theme.bgCard, borderColor: theme.border2, marginTop: 10 }]}>
                 <Ionicons name="text-outline" size={18} color={theme.muted} />
@@ -1493,6 +1777,17 @@ export default function CreateScreen({ navigation }) {
               </View>
             )}
 
+            {/* Music sticker badge on story preview */}
+            {selectedMusic && (
+              <View style={[s.storyMusicSticker, { backgroundColor: 'rgba(124,58,237,0.85)' }]}>
+                <Ionicons name="musical-notes" size={12} color="#fff" />
+                <AppText style={s.storyMusicStickerText} numberOfLines={1}>{selectedMusic.title} · {selectedMusic.artist}</AppText>
+                <TouchableOpacity onPress={() => { stopAllAudio(); setSelectedMusic(null); }}>
+                  <Ionicons name="close" size={12} color="rgba(255,255,255,0.7)" />
+                </TouchableOpacity>
+              </View>
+            )}
+
             <View style={s.storyActions}>
               <TouchableOpacity style={[s.storyActionBtn, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]} onPress={takePhoto}>
                 <Ionicons name="camera-outline" size={22} color={theme.text} />
@@ -1503,7 +1798,7 @@ export default function CreateScreen({ navigation }) {
                 <AppText style={[s.storyActionText, { color: theme.text }]}>{t('gallery')}</AppText>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[s.storyActionBtn, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]}
+                style={[s.storyActionBtn, { backgroundColor: theme.bgCard, borderColor: selectedMusic ? '#7c3aed' : theme.border2 }]}
                 onPress={() => setShowMusicModal(true)}
               >
                 <Ionicons name="musical-notes-outline" size={22} color={selectedMusic ? '#7c3aed' : theme.text} />
@@ -1618,12 +1913,14 @@ export default function CreateScreen({ navigation }) {
             </View>
           </>
         )}
-
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
+// ════════════════════════════════════════════════════════════════
+// STYLES
+// ════════════════════════════════════════════════════════════════
 const s = StyleSheet.create({
   container: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 52, paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: 0.5 },
@@ -1666,7 +1963,7 @@ const s = StyleSheet.create({
   mediaBtnGrad: { alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 28 },
   mediaBtnLabel: { color: '#fff', fontWeight: '700', fontSize: 14 },
 
-  // Caption input box
+  // Caption
   captionContainer: { borderRadius: radius.md, padding: 14, marginBottom: 10, borderWidth: 1 },
   captionInput: { fontSize: 15, minHeight: 70, textAlignVertical: 'top' },
   captionFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 },
@@ -1734,40 +2031,49 @@ const s = StyleSheet.create({
   htLegendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   htLegendText: { fontSize: 10 },
 
-  // Music
-  selectedMusicRow: { flex: 1, flexDirection: 'row', alignItems: 'center', paddingVertical: 12 },
-  selectedMusicTitle: { fontSize: 14, fontWeight: '600' },
-  selectedMusicArtist: { fontSize: 13 },
+  // Music card (selected)
   musicCard: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: radius.md, borderWidth: 1, padding: 10, marginBottom: 10 },
   musicCardPlay: { width: 38, height: 38, borderRadius: 19, overflow: 'hidden' },
   musicCardPlayGrad: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   musicCardTitle: { fontSize: 14, fontWeight: '700' },
   musicCardArtist: { fontSize: 12, marginTop: 1 },
   musicCardWave: { flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 4, height: 14 },
-  musicCardBar: { width: 2.5, borderRadius: 2, backgroundColor: '#7c3aed' },
+  musicCardBar: { width: 2.5, borderRadius: 2 },
   musicAddBadge: { backgroundColor: 'rgba(124,58,237,0.15)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: radius.full },
   musicAddBadgeText: { color: '#7c3aed', fontSize: 11, fontWeight: '700' },
-  musicSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 12, paddingBottom: 36, maxHeight: '88%', flex: 1 },
+
+  // Music modal
+  musicSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 12, paddingBottom: 36, height: '88%' },
   musicSheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, marginBottom: 12 },
   musicAiBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(124,58,237,0.15)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.full },
   musicAiBtnText: { color: '#a78bfa', fontSize: 12, fontWeight: '700' },
-  musicAiRow: { paddingHorizontal: 16, marginBottom: 12 },
-  musicAiCard: { width: 110, borderRadius: radius.md, borderWidth: 1, padding: 8, marginRight: 10, alignItems: 'center' },
-  musicAiCover: { width: 60, height: 60, borderRadius: 10, marginBottom: 6 },
-  musicAiTitle: { fontSize: 11, fontWeight: '700', textAlign: 'center' },
-  musicAiArtist: { fontSize: 10, textAlign: 'center', marginTop: 2 },
-  musicAiPlay: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#7c3aed', alignItems: 'center', justifyContent: 'center', marginTop: 6 },
-  musicSearchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: radius.md, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8, marginHorizontal: 16, marginBottom: 10 },
+  musicSearchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: radius.md, borderWidth: 1.5, paddingHorizontal: 12, paddingVertical: 10, marginHorizontal: 16, marginBottom: 8 },
   musicSearchInput: { flex: 1, fontSize: 14 },
-  musicMoodRow: { paddingHorizontal: 16, marginBottom: 8 },
-  musicMoodChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.full, borderWidth: 1, marginRight: 8, backgroundColor: 'rgba(124,58,237,0.05)' },
-  musicMoodChipActive: { backgroundColor: 'rgba(124,58,237,0.18)', borderColor: '#7c3aed' },
-  musicMoodEmoji: { fontSize: 13 },
-  musicMoodLabel: { fontSize: 12, fontWeight: '600' },
+  // Quick chips
+  musicQuickRow: { marginBottom: 8 },
+  musicQuickChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.full, borderWidth: 1 },
+  musicQuickIcon: { fontSize: 13 },
+  musicQuickLabel: { fontSize: 12, fontWeight: '600' },
+  // Track row
+  musicRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 0.5 },
   musicCover: { width: 44, height: 44, borderRadius: 8 },
-  musicMoodTag: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
-  musicMoodTagText: { fontSize: 10, fontWeight: '600' },
-  musicPlayBtn: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginLeft: 6 },
+  musicTitle: { fontSize: 14, fontWeight: '600' },
+  musicArtist: { fontSize: 12, marginTop: 2 },
+  musicPlayBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginLeft: 4 },
+  musicUseBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.full, marginLeft: 4 },
+  musicUseBtnText: { fontSize: 12, fontWeight: '700' },
+  modalClose: { margin: 16, padding: 14, borderRadius: radius.md, borderWidth: 1, alignItems: 'center' },
+
+  // Snippet selector
+  snippetTrackRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, marginBottom: 12 },
+  snippetArt: { width: 48, height: 48, borderRadius: 10 },
+  snippetTitle: { fontSize: 15, fontWeight: '700' },
+  snippetArtist: { fontSize: 13, marginTop: 2 },
+  snippetPlayBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  waveBar: { width: 5, borderRadius: 3 },
+  snippetTimeRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, marginBottom: 10 },
+  snippetTimeText: { fontSize: 12 },
+  seekBtn: { flex: 1, paddingVertical: 8, borderRadius: radius.md, borderWidth: 1, alignItems: 'center' },
 
   // Privacy
   label: { fontSize: 11, fontWeight: '600', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 8 },
@@ -1789,12 +2095,27 @@ const s = StyleSheet.create({
   bgColorRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
   bgColorDot: { width: 32, height: 32, borderRadius: 16 },
   bgColorDotActive: { borderWidth: 3, borderColor: '#fff' },
+  storyMusicSticker: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.full, marginBottom: 10 },
+  storyMusicStickerText: { color: '#fff', fontSize: 12, fontWeight: '600', maxWidth: 160 },
 
   // Family
   mediaThumbLarge: { width: '100%', height: 200, borderRadius: radius.lg, overflow: 'hidden', marginBottom: 16, position: 'relative' },
   mediaThumbLargeImg: { width: '100%', height: '100%' },
   input: { borderWidth: 1, borderRadius: radius.md, padding: 14, fontSize: 14, marginBottom: 14 },
   textarea: { height: 120, textAlignVertical: 'top' },
+
+  // Location
+  locationSelected: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: radius.md, borderWidth: 1.5, padding: 10, marginBottom: 10 },
+  locationSelectedIcon: { width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(16,185,129,0.15)', alignItems: 'center', justifyContent: 'center' },
+  locationSelectedName: { fontSize: 14, fontWeight: '700' },
+  locationSelectedFull: { fontSize: 11, marginTop: 1 },
+  locationDropdown: { borderRadius: radius.md, borderWidth: 1, marginBottom: 10, overflow: 'hidden' },
+  locationLoadingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12 },
+  locationLoadingText: { fontSize: 13 },
+  locationItem: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderBottomWidth: 0.5 },
+  locationItemIcon: { width: 26, height: 26, borderRadius: 13, backgroundColor: 'rgba(124,58,237,0.12)', alignItems: 'center', justifyContent: 'center' },
+  locationItemName: { fontSize: 13, fontWeight: '600' },
+  locationItemFull: { fontSize: 11, marginTop: 1 },
 
   // Collaborators
   collabSection: { borderRadius: radius.md, borderWidth: 1, padding: 14, marginBottom: 10 },
@@ -1823,17 +2144,14 @@ const s = StyleSheet.create({
   collabResultUsername: { fontSize: 12, marginTop: 1 },
   collabInviteBtn: { backgroundColor: 'rgba(124,58,237,0.15)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.full },
   collabInviteBtnText: { color: '#7c3aed', fontSize: 12, fontWeight: '700' },
-  modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
+
+  // Modals
+  modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.55)' },
   modalSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 12, paddingBottom: 36, maxHeight: '70%' },
   modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(100,116,139,0.4)', alignSelf: 'center', marginBottom: 16 },
   modalTitle: { fontSize: 18, fontWeight: '700', paddingHorizontal: 20, marginBottom: 12 },
-  musicRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 0.5 },
-  musicTitle: { fontSize: 14, fontWeight: '600' },
-  musicArtist: { fontSize: 12, marginTop: 2 },
-  musicDuration: { fontSize: 12 },
-  modalClose: { margin: 16, padding: 14, borderRadius: radius.md, borderWidth: 1, alignItems: 'center' },
 
-  // Custom schedule picker
+  // Schedule picker
   pickerRow: { flexDirection: 'row', paddingHorizontal: 16, gap: 6, marginBottom: 20 },
   pickerCol: { flex: 1, alignItems: 'center' },
   pickerColLabel: { fontSize: 9, fontWeight: '700', color: '#7c3aed', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 8 },

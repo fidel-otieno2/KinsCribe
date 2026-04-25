@@ -224,6 +224,51 @@ def _run_migrations():
         WHERE family_id IS NOT NULL
         ON CONFLICT (user_id, family_id) DO NOTHING
         """,
+        # Call logs table
+        """
+        CREATE TABLE IF NOT EXISTS call_logs (
+            id SERIAL PRIMARY KEY,
+            channel VARCHAR(50),
+            caller_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            callee_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            call_type VARCHAR(20) DEFAULT 'voice',
+            conversation_id INTEGER,
+            status VARCHAR(20) DEFAULT 'completed',
+            duration_secs INTEGER DEFAULT 0,
+            seen BOOLEAN DEFAULT FALSE,
+            created_at TIMESTAMP DEFAULT NOW()
+        )
+        """,
+        # Push tokens table
+        """
+        CREATE TABLE IF NOT EXISTS user_push_tokens (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            push_token VARCHAR(200) NOT NULL,
+            updated_at TIMESTAMP DEFAULT NOW(),
+            UNIQUE(user_id)
+        )
+        """,
+        # Call privacy settings
+        """
+        CREATE TABLE IF NOT EXISTS user_call_settings (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            call_privacy VARCHAR(20) DEFAULT 'connections',
+            updated_at TIMESTAMP DEFAULT NOW(),
+            UNIQUE(user_id)
+        )
+        """,
+        # In-call messages table
+        """
+        CREATE TABLE IF NOT EXISTS call_messages (
+            id SERIAL PRIMARY KEY,
+            channel VARCHAR(50) NOT NULL,
+            sender_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            text TEXT,
+            created_at TIMESTAMP DEFAULT NOW()
+        )
+        """,
     ]
 
     try:

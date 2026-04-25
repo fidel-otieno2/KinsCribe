@@ -787,7 +787,7 @@ export default function ChatScreen({ route, navigation }) {
                 callerAvatar: avatar,
                 isIncoming: false,
                 conversationId: convId,
-                myName: user?.name || 'Someone',
+                calleeId: otherUserId,
               })}
             >
               <Ionicons name="call-outline" size={19} color={colors.muted} />
@@ -800,7 +800,7 @@ export default function ChatScreen({ route, navigation }) {
                 callerAvatar: avatar,
                 isIncoming: false,
                 conversationId: convId,
-                myName: user?.name || 'Someone',
+                calleeId: otherUserId,
               })}
             >
               <Ionicons name="videocam-outline" size={20} color={colors.muted} />

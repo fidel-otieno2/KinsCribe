@@ -42,7 +42,30 @@
     "plugins": [
       "expo-image-picker",
       "expo-media-library",
-      "expo-local-authentication"
+      "expo-local-authentication",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#7c3aed",
+          "sounds": [],
+          "androidMode": "default",
+          "androidCollapsedTitle": "KinsCribe"
+        }
+      ],
+      [
+        "react-native-agora",
+        {
+          "permissionsAndroid": [
+            "android.permission.CAMERA",
+            "android.permission.RECORD_AUDIO",
+            "android.permission.MODIFY_AUDIO_SETTINGS",
+            "android.permission.BLUETOOTH",
+            "android.permission.BLUETOOTH_CONNECT"
+          ],
+          "permissionsIOS": ["NSCameraUsageDescription", "NSMicrophoneUsageDescription"]
+        }
+      ]
     ],
     "extra": {
       "apiUrl": "https://kinscribe-1.onrender.com/api",

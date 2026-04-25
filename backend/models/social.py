@@ -209,6 +209,7 @@ class PublicStory(db.Model):
     expires_at = db.Column(db.DateTime, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    author = db.relationship("User", foreign_keys=[user_id], lazy=True)
     views = db.relationship("PublicStoryView", backref="story", lazy=True, cascade="all, delete")
 
     def to_dict(self, current_user_id=None):

@@ -223,6 +223,12 @@ export default function MessagesScreen({ navigation }) {
         <View style={ms.headerActions}>
           <TouchableOpacity
             style={[ms.headerBtn, { backgroundColor: theme.bgSecondary }]}
+            onPress={() => navigation.navigate('CallLogs')}
+          >
+            <Ionicons name="call-outline" size={20} color={theme.text} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[ms.headerBtn, { backgroundColor: theme.bgSecondary }]}
             onPress={() => navigation.navigate('MessageRequests')}
           >
             <Ionicons name="mail-outline" size={20} color={theme.text} />
