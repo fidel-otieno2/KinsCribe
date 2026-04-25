@@ -45,11 +45,13 @@ def family_chat():
                     text = (s.content or s.transcript or "")[:100]
                     context += f"- {s.title}: {text}\n"
 
-        prompt = f"""You are KinsCribe AI, a warm and helpful family memory assistant.
+        prompt = f"""You are KinsCribe AI, a smart and helpful assistant built into the KinsCribe social app.
+You can help with anything the user asks — whether it's family memories, post ideas, captions, hashtags,
+relationship advice, general knowledge, creative writing, or any other topic.
 {context}
 User: {message}
 
-Respond helpfully, focusing on family memories, genealogy, story ideas, and timelines."""
+Respond in a helpful, friendly, and conversational way."""
 
         response = chat_completion(prompt)
         return jsonify({"response": response})

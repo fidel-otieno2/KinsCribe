@@ -11,10 +11,12 @@ import api from '../api/axios';
 import { useTranslation } from '../i18n';
 
 const QUICK_PROMPTS = [
-  { label: '💡 Story Idea', message: 'Give me a family story idea I can record today' },
-  { label: '📅 Timeline', message: 'Help me create a family timeline structure' },
+  { label: '💡 Post Idea', message: 'Give me a creative post idea for today' },
+  { label: '✍️ Caption', message: 'Write me a catchy caption for a photo post' },
   { label: '🎙️ Interview', message: 'Give me 5 questions to ask an elderly family member' },
-  { label: '✍️ Enhance', message: 'How can I make my family stories more engaging?' },
+  { label: '📅 Timeline', message: 'Help me create a family timeline structure' },
+  { label: '🔥 Hashtags', message: 'Suggest trending hashtags for a lifestyle post' },
+  { label: '🌍 Story Idea', message: 'Give me a family story idea I can record today' },
 ];
 
 export default function FeedAI({ navigation }) {
@@ -22,7 +24,7 @@ export default function FeedAI({ navigation }) {
   const [messages, setMessages] = useState([
     {
       id: '1', role: 'ai',
-      text: "Hi! I'm KinsCribe AI 👋\n\nI can help you:\n• Generate story ideas\n• Enhance your writing\n• Create interview questions\n• Build family timelines\n• Summarize memories\n\nWhat would you like to explore?",
+      text: "Hi! I'm KinsCribe AI 👋\n\nI can help you with anything:\n• Post & caption ideas\n• Hashtag suggestions\n• Family stories & timelines\n• General questions\n• Creative writing\n• And much more...\n\nWhat would you like to explore?",
     },
   ]);
   const [input, setInput] = useState('');
@@ -85,7 +87,7 @@ export default function FeedAI({ navigation }) {
           </LinearGradient>
           <View>
             <AppText style={s.headerTitle}>KinsCribe AI</AppText>
-            <AppText style={s.headerSub}>Family memory assistant</AppText>
+            <AppText style={s.headerSub}>Your AI assistant</AppText>
           </View>
         </View>
       </View>
@@ -120,7 +122,7 @@ export default function FeedAI({ navigation }) {
 
       {/* Input */}
       <View style={s.inputRow}>
-        <TextInput style={s.input} placeholder="Ask about family stories..."
+        <TextInput style={s.input} placeholder="Ask me anything..."
           placeholderTextColor={colors.muted} value={input}
           onChangeText={setInput} multiline maxLength={1000}
           onSubmitEditing={() => sendMessage()} />
