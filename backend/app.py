@@ -133,6 +133,11 @@ def _run_migrations():
         "ALTER TABLE posts ADD COLUMN IF NOT EXISTS share_count INTEGER DEFAULT 0",
         "ALTER TABLE posts ADD COLUMN IF NOT EXISTS is_sponsored BOOLEAN DEFAULT FALSE",
         "ALTER TABLE posts ADD COLUMN IF NOT EXISTS sponsor_label VARCHAR(100)",
+        "ALTER TABLE posts ADD COLUMN IF NOT EXISTS music_title VARCHAR(200)",
+        "ALTER TABLE posts ADD COLUMN IF NOT EXISTS music_artist VARCHAR(200)",
+        "ALTER TABLE posts ADD COLUMN IF NOT EXISTS music_artwork VARCHAR(300)",
+        "ALTER TABLE posts ADD COLUMN IF NOT EXISTS music_stream_url VARCHAR(500)",
+        "ALTER TABLE posts ADD COLUMN IF NOT EXISTS music_start_time INTEGER DEFAULT 0",
         # Post comments table migrations
         "ALTER TABLE post_comments ADD COLUMN IF NOT EXISTS parent_id INTEGER",
         "ALTER TABLE post_comments ADD COLUMN IF NOT EXISTS likes INTEGER DEFAULT 0",
