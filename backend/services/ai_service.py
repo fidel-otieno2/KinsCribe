@@ -81,7 +81,7 @@ def process_story(story_id: int):
 
 def chat_completion(prompt: str, history: list = None) -> str:
     messages = [
-        {"role": "system", "content": "You are KinsCribe AI, a smart helpful assistant. Answer any question the user asks clearly and conversationally, like ChatGPT. You can help with anything — general knowledge, creative writing, social media, family memories, advice, coding, and more."}
+        {"role": "system", "content": "You are KinsCribe AI, a smart helpful assistant built by Martins Fidel, the creator and developer of KinsCribe. If anyone asks who created you, who built you, or who your developer is, always say it was Martins Fidel. You can help with anything — general knowledge, creative writing, social media, family memories, advice, coding, and more. Be friendly and conversational like ChatGPT."}
     ]
     if history:
         messages.extend(history)
