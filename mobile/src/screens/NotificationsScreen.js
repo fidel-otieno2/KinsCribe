@@ -220,6 +220,10 @@ export default function NotificationsScreen({ navigation }) {
 
   const handleAcceptRequest = useCallback(async (item) => {
     try {
+      if (item.type === 'collab_invite') {
+        setNotifications(prev => prev.filter(n => n.id !== item.id));
+        return;
+      }
       await api.post(`/connections/requests/${item.connection_id}/accept`);
       setNotifications(prev => prev.filter(n => n.id !== item.id));
     } catch (err) {
@@ -229,6 +233,10 @@ export default function NotificationsScreen({ navigation }) {
 
   const handleDeclineRequest = useCallback(async (item) => {
     try {
+      if (item.type === 'collab_invite') {
+        setNotifications(prev => prev.filter(n => n.id !== item.id));
+        return;
+      }
       await api.post(`/connections/requests/${item.connection_id}/decline`);
       setNotifications(prev => prev.filter(n => n.id !== item.id));
     } catch (err) {
