@@ -42,7 +42,12 @@ export default function FeedAI({ navigation }) {
     setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
 
     try {
-      const { data } = await api.post('/ai/chat', { message: msg });
+      // Build history from previous messages (exclude the welcome message)
+      const history = messages
+        .filter(m => m.id !== '1')
+        .map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text }));
+
+      const { data } = await api.post('/ai/chat', { message: msg, history });
       setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'ai', text: data.response }]);
     } catch {
       setMessages(prev => [...prev, {

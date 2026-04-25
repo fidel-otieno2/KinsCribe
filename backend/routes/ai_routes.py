@@ -28,34 +28,15 @@ def family_chat():
     if not user:
         return jsonify({"response": "User not found."}), 404
 
-    message = (request.json or {}).get("message", "").strip()
+    data = request.json or {}
+    message = data.get("message", "").strip()
+    history = data.get("history", [])  # [{role, content}, ...]
     if not message:
-        return jsonify({"response": "Please ask a question about your family!"}), 400
+        return jsonify({"response": "Please type a message!"}), 400
 
     try:
-        context = ""
-        if user.family_id:
-            recent_stories = Story.query.filter_by(
-                family_id=user.family_id
-            ).order_by(Story.created_at.desc()).limit(5).all()
-
-            if recent_stories:
-                context = "Recent family stories:\n"
-                for s in recent_stories:
-                    text = (s.content or s.transcript or "")[:100]
-                    context += f"- {s.title}: {text}\n"
-
-        prompt = f"""You are KinsCribe AI, a smart and helpful assistant built into the KinsCribe social app.
-You can help with anything the user asks — whether it's family memories, post ideas, captions, hashtags,
-relationship advice, general knowledge, creative writing, or any other topic.
-{context}
-User: {message}
-
-Respond in a helpful, friendly, and conversational way."""
-
-        response = chat_completion(prompt)
+        response = chat_completion(message, history=history)
         return jsonify({"response": response})
-
     except Exception as e:
         print(f"AI chat error: {e}")
         return jsonify({"response": "Sorry, I had trouble processing that. Please try again!"}), 500

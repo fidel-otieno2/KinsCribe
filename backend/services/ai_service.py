@@ -79,8 +79,20 @@ def process_story(story_id: int):
         print(f"AI processing failed for story {story_id}: {e}")
 
 
-def chat_completion(prompt: str) -> str:
-    return _complete(prompt)
+def chat_completion(prompt: str, history: list = None) -> str:
+    messages = [
+        {"role": "system", "content": "You are KinsCribe AI, a smart helpful assistant. Answer any question the user asks clearly and conversationally, like ChatGPT. You can help with anything — general knowledge, creative writing, social media, family memories, advice, coding, and more."}
+    ]
+    if history:
+        messages.extend(history)
+    messages.append({"role": "user", "content": prompt})
+    response = _get_client().chat.completions.create(
+        model=MODEL,
+        messages=messages,
+        max_tokens=1000,
+        temperature=0.7
+    )
+    return response.choices[0].message.content.strip()
 
 
 # Celery task wrapper
