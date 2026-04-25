@@ -204,20 +204,17 @@ export default function FeedAI({ navigation }) {
     try {
       const raw = await AsyncStorage.getItem(HISTORY_KEY);
       const saved = raw ? JSON.parse(raw) : [];
-      // Fix any sessions with duplicate message ids
-      const cleaned = saved.map(sess => {
-        const seen = new Set();
-        const msgs = sess.messages.filter(m => {
-          if (seen.has(m.id)) return false;
-          seen.add(m.id);
-          return true;
-        });
-        return { ...sess, messages: msgs };
-      });
-      if (cleaned.length > 0) {
-        setSessions(cleaned);
-        setCurrentSessionId(cleaned[0].id);
+      // Validate: only keep sessions where all message ids are unique and prefixed
+      const valid = saved.filter(sess =>
+        sess.id?.startsWith('sess_') &&
+        sess.messages?.every(m => m.id && (m.id.startsWith('user_') || m.id.startsWith('ai_') || m.id.startsWith('welcome_')))
+      );
+      if (valid.length > 0) {
+        setSessions(valid);
+        setCurrentSessionId(valid[0].id);
       } else {
+        // Wipe old incompatible data
+        await AsyncStorage.removeItem(HISTORY_KEY);
         const fresh = newSession();
         setSessions([fresh]);
         setCurrentSessionId(fresh.id);
