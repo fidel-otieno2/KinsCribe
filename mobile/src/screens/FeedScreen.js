@@ -1035,6 +1035,18 @@ export default function FeedScreen({ navigation }) {
         onJoined={() => fetchFeed(true)}
       />
 
+      {/* Floating KinsCribe AI button */}
+      <TouchableOpacity
+        style={fs.aiFloatBtn}
+        onPress={() => navigation.navigate('FeedAI')}
+        activeOpacity={0.85}
+      >
+        <LinearGradient colors={['#7c3aed', '#3b82f6', '#06b6d4']} style={fs.aiFloatGrad}>
+          <Ionicons name="sparkles" size={22} color="#fff" />
+        </LinearGradient>
+        <View style={fs.aiFloatGlow} />
+      </TouchableOpacity>
+
       {/* Biometric Enable Prompt */}
       <Modal visible={showBiometricPrompt} transparent animationType="fade">
         <View style={bm.overlay}>
@@ -1130,6 +1142,12 @@ const s = StyleSheet.create({
   discoverBtn: { borderRadius: radius.full, overflow: "hidden", marginTop: 8 },
   discoverBtnGrad: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 24, paddingVertical: 12 },
   discoverBtnText: { color: "#fff", fontWeight: "700", fontSize: 15 },
+});
+
+const fs = StyleSheet.create({
+  aiFloatBtn: { position: 'absolute', bottom: 100, right: 18, width: 56, height: 56, borderRadius: 28, zIndex: 99 },
+  aiFloatGrad: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', shadowColor: '#7c3aed', shadowOpacity: 0.6, shadowRadius: 16, shadowOffset: { width: 0, height: 4 }, elevation: 12 },
+  aiFloatGlow: { position: 'absolute', width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(124,58,237,0.3)', transform: [{ scale: 1.4 }] },
 });
 
 const bm = StyleSheet.create({
