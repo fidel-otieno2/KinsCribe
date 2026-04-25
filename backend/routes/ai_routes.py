@@ -30,12 +30,12 @@ def family_chat():
 
     data = request.json or {}
     message = data.get("message", "").strip()
-    history = data.get("history", [])  # [{role, content}, ...]
+    history = data.get("history", [])
     if not message:
         return jsonify({"response": "Please type a message!"}), 400
 
     try:
-        response = chat_completion(message, history=history)
+        response = chat_completion(message, history=history, user_name=user.name)
         return jsonify({"response": response})
     except Exception as e:
         print(f"AI chat error: {e}")
