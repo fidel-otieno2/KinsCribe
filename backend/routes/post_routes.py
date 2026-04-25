@@ -131,16 +131,14 @@ def post_feed():
         author = User.query.get(p.user_id)
         if not author:
             continue
-        # Always show own posts regardless of privacy
-        if p.user_id == current_id:
-            result.append(p.to_dict(current_id))
-            continue
-        # If author is private and we're not connected, skip
-        if author.is_private and not _is_connected(current_id, p.user_id):
+        # If author is private and we're not connected, skip (except own posts)
+        if p.user_id != current_id and author.is_private and not _is_connected(current_id, p.user_id):
             continue
         if p.privacy == "public":
             result.append(p.to_dict(current_id))
-        elif p.privacy == "connections" and _is_connected(current_id, p.user_id):
+        elif p.privacy == "connections" and (p.user_id == current_id or _is_connected(current_id, p.user_id)):
+            result.append(p.to_dict(current_id))
+        elif p.user_id == current_id:
             result.append(p.to_dict(current_id))
     return jsonify({"posts": result})
 
