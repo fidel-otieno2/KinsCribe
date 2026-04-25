@@ -61,6 +61,24 @@ def run_migrations():
             "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS name VARCHAR(100)",
             "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS pinned_message_id INTEGER",
 
+            # Posts table music columns
+            "ALTER TABLE posts ADD COLUMN IF NOT EXISTS music_title VARCHAR(200)",
+            "ALTER TABLE posts ADD COLUMN IF NOT EXISTS music_artist VARCHAR(200)",
+            "ALTER TABLE posts ADD COLUMN IF NOT EXISTS music_artwork VARCHAR(300)",
+            "ALTER TABLE posts ADD COLUMN IF NOT EXISTS music_stream_url VARCHAR(500)",
+            "ALTER TABLE posts ADD COLUMN IF NOT EXISTS music_start_time INTEGER DEFAULT 0",
+            "ALTER TABLE posts ADD COLUMN IF NOT EXISTS alt_text TEXT",
+            "ALTER TABLE posts ADD COLUMN IF NOT EXISTS is_collab BOOLEAN DEFAULT FALSE",
+            "ALTER TABLE posts ADD COLUMN IF NOT EXISTS collab_users TEXT",
+            "ALTER TABLE posts ADD COLUMN IF NOT EXISTS is_scheduled BOOLEAN DEFAULT FALSE",
+            "ALTER TABLE posts ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMP",
+            "ALTER TABLE posts ADD COLUMN IF NOT EXISTS is_sponsored BOOLEAN DEFAULT FALSE",
+            "ALTER TABLE posts ADD COLUMN IF NOT EXISTS sponsor_label VARCHAR(100)",
+            "ALTER TABLE posts ADD COLUMN IF NOT EXISTS view_count INTEGER DEFAULT 0",
+            "ALTER TABLE posts ADD COLUMN IF NOT EXISTS share_count INTEGER DEFAULT 0",
+            "ALTER TABLE posts ADD COLUMN IF NOT EXISTS media_urls TEXT",
+            "ALTER TABLE posts ADD COLUMN IF NOT EXISTS hashtags VARCHAR(500)",
+
             # Post collaborators table
             """
             CREATE TABLE IF NOT EXISTS post_collaborators (
