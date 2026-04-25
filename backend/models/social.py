@@ -89,6 +89,7 @@ class Post(db.Model):
     comments = db.relationship("PostComment", backref="post", lazy=True, cascade="all, delete")
     saves = db.relationship("PostSave", backref="post", lazy=True, cascade="all, delete")
     collaborators = db.relationship("PostCollaborator", back_populates="post", lazy=True, cascade="all, delete")
+    author = db.relationship("User", foreign_keys=[user_id], lazy=True)
 
     def to_dict(self, current_user_id=None):
         import json
@@ -195,6 +196,7 @@ class PostComment(db.Model):
     post_id = db.Column(db.Integer, db.ForeignKey("posts.id"), nullable=False)
     likes = db.Column(db.Integer, default=0)
     replies = db.relationship("PostComment", backref=db.backref("parent", remote_side=[id]), lazy=True)
+    commenter = db.relationship("User", foreign_keys=[user_id], lazy=True)
 
     def to_dict(self):
         return {
