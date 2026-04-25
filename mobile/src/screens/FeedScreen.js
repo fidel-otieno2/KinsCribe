@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef, memo } from "react";
+import { Audio } from 'expo-av';
 import {
   View, FlatList, TouchableOpacity, StyleSheet,
   ActivityIndicator, Image, RefreshControl,
@@ -229,6 +230,29 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation, isVisible 
   const [showShare, setShowShare] = useState(false);
   const lastTap = useRef(0);
   const scrollViewRef = useRef(null);
+  const musicSoundRef = useRef(null);
+
+  // Play/stop music when post becomes visible
+  useEffect(() => {
+    if (!post.music?.stream_url) return;
+    if (isVisible) {
+      Audio.Sound.createAsync(
+        { uri: post.music.stream_url },
+        { shouldPlay: true, positionMillis: (post.music.start_time || 0) * 1000, isLooping: true, volume: 0.6 }
+      ).then(({ sound }) => {
+        musicSoundRef.current = sound;
+      }).catch(() => {});
+    } else {
+      musicSoundRef.current?.stopAsync().catch(() => {});
+      musicSoundRef.current?.unloadAsync().catch(() => {});
+      musicSoundRef.current = null;
+    }
+    return () => {
+      musicSoundRef.current?.stopAsync().catch(() => {});
+      musicSoundRef.current?.unloadAsync().catch(() => {});
+      musicSoundRef.current = null;
+    };
+  }, [isVisible, post.music?.stream_url]);
 
   // Fix: Re-sync liked state when post or user changes (account switch)
   useEffect(() => {
@@ -419,6 +443,20 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation, isVisible 
                 </TouchableOpacity>
               ))}
             </ScrollView>
+            {/* Music sticker overlaid on image */}
+            {post.music?.title ? (
+              <View style={pc.musicOverlay}>
+                <Ionicons name="musical-notes" size={12} color="#fff" />
+                <AppText style={pc.musicOverlayText} numberOfLines={1}>
+                  {post.music.title} · {post.music.artist}
+                </AppText>
+                <View style={pc.musicEqualizer}>
+                  {[...Array(4)].map((_, i) => (
+                    <View key={i} style={[pc.musicBar, { height: 4 + (i % 3) * 4, opacity: isVisible ? 1 : 0.4 }]} />
+                  ))}
+                </View>
+              </View>
+            ) : null}
             {mediaList.length > 1 && (
               <View style={pc.carouselDots}>
                 {mediaList.map((_, idx) => (
@@ -461,16 +499,6 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation, isVisible 
           {likeCount > 0 && (
             <AppText style={pc.likeCount}>{likeCount.toLocaleString()} {likeCount === 1 ? "like" : "likes"}</AppText>
           )}
-
-          {/* Music sticker */}
-          {post.music?.title ? (
-            <View style={pc.musicSticker}>
-              <Ionicons name="musical-notes" size={12} color="#a78bfa" />
-              <AppText style={pc.musicStickerText} numberOfLines={1}>
-                {post.music.title} · {post.music.artist}
-              </AppText>
-            </View>
-          ) : null}
 
           {/* Caption */}
           {post.caption ? (
@@ -619,6 +647,10 @@ const pc = StyleSheet.create({
   dot: { width: 6, height: 6, borderRadius: 3 },
   mediaViewerOverlay: { flex: 1, backgroundColor: '#000', justifyContent: 'center' },
   mediaViewerClose: { position: 'absolute', top: 52, right: 16, zIndex: 10, padding: 8, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 20 },
+  musicOverlay: { position: 'absolute', bottom: 12, left: 12, right: 12, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 6 },
+  musicOverlayText: { flex: 1, fontSize: 12, color: '#fff', fontWeight: '600' },
+  musicEqualizer: { flexDirection: 'row', alignItems: 'flex-end', gap: 2 },
+  musicBar: { width: 3, borderRadius: 2, backgroundColor: '#a78bfa' },
   musicSticker: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 5, marginBottom: 4 },
   musicStickerText: { fontSize: 12, color: '#a78bfa', fontWeight: '600', flex: 1 },
   hashtagsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingHorizontal: 14, marginBottom: 6 },
