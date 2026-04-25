@@ -269,11 +269,10 @@ export default function FeedAI({ navigation }) {
     setInput('');
 
     const userMsg = { id: Date.now().toString(), role: 'user', text: msg };
-
-    // Auto-title the session from first user message
     const isFirstUserMsg = messages.filter(m => m.role === 'user').length === 0;
     const sessionTitle = isFirstUserMsg ? msg.slice(0, 40) : currentSession?.title;
 
+    // Add user message once
     updateCurrentSession(s => ({
       ...s,
       title: sessionTitle,
@@ -291,10 +290,11 @@ export default function FeedAI({ navigation }) {
       const { data } = await api.post('/ai/chat', { message: msg, history });
       const aiMsg = { id: (Date.now() + 1).toString(), role: 'ai', text: data.response };
 
-      updateCurrentSession(s => ({ ...s, messages: [...s.messages, userMsg, aiMsg] }));
+      // Add only AI message (userMsg already added above)
+      updateCurrentSession(s => ({ ...s, messages: [...s.messages, aiMsg] }));
     } catch {
       const errMsg = { id: (Date.now() + 1).toString(), role: 'ai', text: "Sorry, I'm having trouble connecting. Please try again." };
-      updateCurrentSession(s => ({ ...s, messages: [...s.messages, userMsg, errMsg] }));
+      updateCurrentSession(s => ({ ...s, messages: [...s.messages, errMsg] }));
     } finally {
       setIsTyping(false);
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
