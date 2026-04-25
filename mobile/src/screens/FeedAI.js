@@ -27,7 +27,12 @@ const QUICK_PROMPTS = [
 
 const WELCOME = "Hi! I'm KinsCribe AI ✨\n\nI can help you with anything:\n• Post & caption ideas\n• Hashtag suggestions\n• Family stories & timelines\n• General knowledge\n• Creative writing\n• And much more...\n\nWhat would you like to explore?";
 
-const newSession = () => ({ id: Date.now().toString(), title: 'New Chat', messages: [{ id: '1', role: 'ai', text: WELCOME }], createdAt: Date.now() });
+const newSession = () => ({
+  id: `sess_${Date.now()}`,
+  title: 'New Chat',
+  messages: [{ id: `welcome_${Date.now()}`, role: 'ai', text: WELCOME }],
+  createdAt: Date.now(),
+});
 
 // ── Typing dots ───────────────────────────────────────────────
 function TypingDots() {
@@ -199,9 +204,19 @@ export default function FeedAI({ navigation }) {
     try {
       const raw = await AsyncStorage.getItem(HISTORY_KEY);
       const saved = raw ? JSON.parse(raw) : [];
-      if (saved.length > 0) {
-        setSessions(saved);
-        setCurrentSessionId(saved[0].id);
+      // Fix any sessions with duplicate message ids
+      const cleaned = saved.map(sess => {
+        const seen = new Set();
+        const msgs = sess.messages.filter(m => {
+          if (seen.has(m.id)) return false;
+          seen.add(m.id);
+          return true;
+        });
+        return { ...sess, messages: msgs };
+      });
+      if (cleaned.length > 0) {
+        setSessions(cleaned);
+        setCurrentSessionId(cleaned[0].id);
       } else {
         const fresh = newSession();
         setSessions([fresh]);
@@ -267,34 +282,45 @@ export default function FeedAI({ navigation }) {
     const msg = text || input.trim();
     if (!msg || isTyping) return;
     setInput('');
-
-    const userMsg = { id: Date.now().toString(), role: 'user', text: msg };
-    const isFirstUserMsg = messages.filter(m => m.role === 'user').length === 0;
-    const sessionTitle = isFirstUserMsg ? msg.slice(0, 40) : currentSession?.title;
-
-    // Add user message once
-    updateCurrentSession(s => ({
-      ...s,
-      title: sessionTitle,
-      messages: [...s.messages, userMsg],
-    }));
-
     setIsTyping(true);
+
+    const userMsg = { id: `user_${Date.now()}`, role: 'user', text: msg };
+    const aiMsgId = `ai_${Date.now() + 1}`;
+
+    // Capture current messages snapshot BEFORE any state update
+    const prevMessages = currentSession?.messages || [];
+    const isFirstUserMsg = prevMessages.filter(m => m.role === 'user').length === 0;
+    const sessionTitle = isFirstUserMsg ? msg.slice(0, 40) : (currentSession?.title || 'New Chat');
+    const withUser = [...prevMessages, userMsg];
+
+    // Single update: add user message
+    setSessions(prev => {
+      const next = prev.map(s => s.id === currentSessionId ? { ...s, title: sessionTitle, messages: withUser } : s);
+      saveHistory(next);
+      return next;
+    });
+
     setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
 
     try {
-      const history = messages
-        .filter(m => m.id !== '1')
+      const history = prevMessages
+        .filter(m => m.role !== 'ai' || prevMessages.indexOf(m) > 0)
+        .filter((_, i) => i > 0)
         .map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text }));
-
       const { data } = await api.post('/ai/chat', { message: msg, history });
-      const aiMsg = { id: (Date.now() + 1).toString(), role: 'ai', text: data.response };
-
-      // Add only AI message (userMsg already added above)
-      updateCurrentSession(s => ({ ...s, messages: [...s.messages, aiMsg] }));
+      const aiMsg = { id: aiMsgId, role: 'ai', text: data.response };
+      setSessions(prev => {
+        const next = prev.map(s => s.id === currentSessionId ? { ...s, messages: [...withUser, aiMsg] } : s);
+        saveHistory(next);
+        return next;
+      });
     } catch {
-      const errMsg = { id: (Date.now() + 1).toString(), role: 'ai', text: "Sorry, I'm having trouble connecting. Please try again." };
-      updateCurrentSession(s => ({ ...s, messages: [...s.messages, errMsg] }));
+      const errMsg = { id: aiMsgId, role: 'ai', text: "Sorry, I'm having trouble connecting. Please try again." };
+      setSessions(prev => {
+        const next = prev.map(s => s.id === currentSessionId ? { ...s, messages: [...withUser, errMsg] } : s);
+        saveHistory(next);
+        return next;
+      });
     } finally {
       setIsTyping(false);
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
@@ -354,7 +380,7 @@ export default function FeedAI({ navigation }) {
         <FlatList
           ref={flatListRef}
           data={messages}
-          keyExtractor={i => i.id}
+          keyExtractor={i => String(i.id)}
           renderItem={({ item }) => <MessageBubble item={item} user={user} />}
           style={s.messages}
           contentContainerStyle={{ padding: 16, paddingBottom: 12 }}
