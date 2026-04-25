@@ -228,6 +228,7 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation, isVisible 
   const [posting, setPosting] = useState(false);
   const [loadingComments, setLoadingComments] = useState(false);
   const [showShare, setShowShare] = useState(false);
+  const [showCollabs, setShowCollabs] = useState(false);
   const lastTap = useRef(0);
   const scrollViewRef = useRef(null);
   const musicSoundRef = useRef(null);
@@ -334,24 +335,45 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation, isVisible 
     <View style={pc.card}>
       {/* Header — hidden for video posts (overlaid inside VideoPlayer) */}
       {!isVideoPost && (
-      <TouchableOpacity
-        style={pc.header}
-        onPress={() => navigation.navigate("UserProfile", { userId: post.user_id, userName: post.author_name, userAvatar: post.author_avatar })}
-        activeOpacity={0.8}
-      >
-        <LinearGradient colors={["#7c3aed", "#3b82f6", "#ec4899"]} style={pc.avatarRing}>
-          <View style={[pc.avatarInner, { backgroundColor: theme.primary, borderColor: theme.bg }]}>
-            {post.author_avatar
-              ? <Image source={{ uri: post.author_avatar }} style={pc.avatarImg} />
-              : <AppText style={pc.avatarLetter}>{post.author_name?.[0]?.toUpperCase() || "?"}</AppText>}
-          </View>
-        </LinearGradient>
+      <View style={pc.header}>
+        <TouchableOpacity
+          onPress={() => navigation.navigate("UserProfile", { userId: post.user_id, userName: post.author_name, userAvatar: post.author_avatar })}
+          activeOpacity={0.8}
+        >
+          <LinearGradient colors={["#7c3aed", "#3b82f6", "#ec4899"]} style={pc.avatarRing}>
+            <View style={[pc.avatarInner, { backgroundColor: theme.primary, borderColor: theme.bg }]}>
+              {post.author_avatar
+                ? <Image source={{ uri: post.author_avatar }} style={pc.avatarImg} />
+                : <AppText style={pc.avatarLetter}>{post.author_name?.[0]?.toUpperCase() || "?"}</AppText>}
+            </View>
+          </LinearGradient>
+        </TouchableOpacity>
         <View style={{ flex: 1 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-            <AppText style={[pc.authorName, { color: theme.text }]}>{post.author_name}</AppText>
-            {post.author_verified_badge && (
-              <Ionicons name="checkmark-circle" size={14} color="#3b82f6" />
-            )}
+          {/* Author + collaborators line */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+            <TouchableOpacity onPress={() => navigation.navigate("UserProfile", { userId: post.user_id, userName: post.author_name, userAvatar: post.author_avatar })}>
+              <AppText style={[pc.authorName, { color: theme.text }]}>{post.author_name}</AppText>
+            </TouchableOpacity>
+            {post.author_verified_badge && <Ionicons name="checkmark-circle" size={14} color="#3b82f6" />}
+            {(() => {
+              const collabs = post.collaborators || [];
+              if (collabs.length === 0) return null;
+              const first = collabs[0];
+              const rest = collabs.length - 1;
+              return (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                  <AppText style={{ color: theme.muted, fontSize: 12 }}> and </AppText>
+                  <TouchableOpacity onPress={() => navigation.navigate("UserProfile", { userId: first.user_id, userName: first.name, userAvatar: first.avatar })}>
+                    <AppText style={[pc.authorName, { color: theme.text }]}>{first.name}</AppText>
+                  </TouchableOpacity>
+                  {rest > 0 && (
+                    <TouchableOpacity onPress={() => setShowCollabs(true)}>
+                      <AppText style={{ color: colors.primary, fontSize: 12, fontWeight: '700' }}> and {rest} other{rest > 1 ? 's' : ''}</AppText>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              );
+            })()}
           </View>
           <View style={pc.metaRow}>
             {post.location ? (
@@ -380,8 +402,40 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation, isVisible 
             <Ionicons name="ellipsis-horizontal" size={20} color={theme.muted} />
           </TouchableOpacity>
         )}
-      </TouchableOpacity>
+      </View>
       )}{/* end !isVideoPost header */}
+
+      {/* Collaborators bottom sheet */}
+      <Modal visible={showCollabs} transparent animationType="slide" onRequestClose={() => setShowCollabs(false)}>
+        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <View style={[pc.collabSheet, { backgroundColor: theme.bgCard }]}>
+            <View style={pc.collabHandle} />
+            <AppText style={[pc.collabSheetTitle, { color: theme.text }]}>Co-Creators</AppText>
+            {[{ user_id: post.user_id, name: post.author_name, avatar: post.author_avatar }, ...(post.collaborators || [])].map((c, i) => (
+              <TouchableOpacity
+                key={i}
+                style={pc.collabRow}
+                onPress={() => { setShowCollabs(false); navigation.navigate("UserProfile", { userId: c.user_id, userName: c.name, userAvatar: c.avatar }); }}
+              >
+                <View style={[pc.collabAvatar, { backgroundColor: colors.primary }]}>
+                  {c.avatar
+                    ? <Image source={{ uri: c.avatar }} style={{ width: 44, height: 44, borderRadius: 22 }} />
+                    : <AppText style={{ color: '#fff', fontWeight: '700', fontSize: 16 }}>{c.name?.[0]?.toUpperCase()}</AppText>}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <AppText style={[{ fontSize: 14, fontWeight: '700' }, { color: theme.text }]}>{c.name}</AppText>
+                  {i === 0 && <AppText style={{ fontSize: 11, color: theme.muted }}>Original creator</AppText>}
+                  {i > 0 && <AppText style={{ fontSize: 11, color: theme.muted }}>{c.role || 'Co-creator'}</AppText>}
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={theme.muted} />
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity style={[pc.collabCloseBtn, { borderColor: theme.border2 }]} onPress={() => setShowCollabs(false)}>
+              <AppText style={{ color: theme.text, fontWeight: '600' }}>Close</AppText>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* Media - Video gets its own full card layout, images use carousel */}
       {mediaList.length > 0 && (() => {
@@ -653,6 +707,12 @@ const pc = StyleSheet.create({
   musicBar: { width: 3, borderRadius: 2, backgroundColor: '#a78bfa' },
   musicSticker: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 5, marginBottom: 4 },
   musicStickerText: { fontSize: 12, color: '#a78bfa', fontWeight: '600', flex: 1 },
+  collabSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 12, paddingBottom: 36 },
+  collabHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(100,116,139,0.4)', alignSelf: 'center', marginBottom: 12 },
+  collabSheetTitle: { fontSize: 16, fontWeight: '700', paddingHorizontal: 16, marginBottom: 12 },
+  collabRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 10 },
+  collabAvatar: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  collabCloseBtn: { margin: 16, padding: 14, borderRadius: 12, borderWidth: 1, alignItems: 'center' },
   hashtagsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingHorizontal: 14, marginBottom: 6 },
   hashtagChip: { fontSize: 13, color: '#3b82f6', fontWeight: '600' },
   viewComments: { paddingHorizontal: 14, color: colors.muted, fontSize: 13, marginBottom: 4 },
