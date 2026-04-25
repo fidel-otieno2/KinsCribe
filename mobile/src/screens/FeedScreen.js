@@ -411,7 +411,7 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation, isVisible 
           <View style={[pc.collabSheet, { backgroundColor: theme.bgCard }]}>
             <View style={pc.collabHandle} />
             <AppText style={[pc.collabSheetTitle, { color: theme.text }]}>Co-Creators</AppText>
-            {[{ user_id: post.user_id, name: post.author_name, avatar: post.author_avatar }, ...(post.collaborators || [])].map((c, i) => (
+            {[{ user_id: post.user_id, name: post.author_name, avatar: post.author_avatar, role: 'creator' }, ...(post.collaborators || [])].map((c, i) => (
               <TouchableOpacity
                 key={i}
                 style={pc.collabRow}

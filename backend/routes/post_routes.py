@@ -161,19 +161,29 @@ def user_posts(user_id):
 
     can_view = _can_view_profile(current_id, target)
     if not can_view:
-        # Private account — return empty posts with a flag
         return jsonify({"posts": [], "is_private": True, "locked": True})
 
     is_connected = _is_connected(current_id, user_id)
     is_same = current_id == user_id
-    posts = Post.query.filter_by(user_id=user_id).order_by(Post.created_at.desc()).all()
+
+    # Own posts + accepted collab posts
+    own_posts = Post.query.filter_by(user_id=user_id).all()
+    collab_post_ids = [
+        c.post_id for c in PostCollaborator.query.filter_by(user_id=user_id, status="accepted").all()
+    ]
+    collab_posts = Post.query.filter(Post.id.in_(collab_post_ids)).all() if collab_post_ids else []
+
+    seen = set()
     result = []
-    for p in posts:
+    for p in sorted(own_posts + collab_posts, key=lambda x: x.created_at, reverse=True):
+        if p.id in seen:
+            continue
+        seen.add(p.id)
         if p.privacy == "public":
             result.append(p.to_dict(current_id))
         elif p.privacy == "connections" and (is_same or is_connected):
             result.append(p.to_dict(current_id))
-        elif is_same:
+        elif is_same or p.user_id == current_id:
             result.append(p.to_dict(current_id))
     return jsonify({"posts": result, "is_private": target.is_private})
 
