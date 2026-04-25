@@ -39,12 +39,7 @@ const PRIVACY_OPTS = [
 const BG_COLORS = ['#7c3aed', '#3b82f6', '#ec4899', '#10b981', '#f59e0b', '#e11d48', '#0f172a'];
 
 // Multiple Audius hosts for fallback
-const AUDIUS_HOSTS = [
-  'https://discoveryprovider.audius.co',
-  'https://discoveryprovider2.audius.co',
-  'https://discoveryprovider3.audius.co',
-];
-const APP_NAME = 'kinscribe';
+const DEEZER_API = 'https://api.deezer.com';
 
 const QUICK_SEARCHES = [
   { label: 'Trending', query: 'trending', icon: '🔥' },
@@ -70,17 +65,7 @@ const QUICK_SEARCHES = [
 ];
 
 // ─── AUDIUS HOST RESOLVER ──────────────────────────────────────────
-let resolvedAudiusHost = AUDIUS_HOSTS[0];
 
-const resolveAudiusHost = async () => {
-  for (const host of AUDIUS_HOSTS) {
-    try {
-      const res = await fetch(`${host}/health_check`, { signal: AbortSignal.timeout(3000) });
-      if (res.ok) { resolvedAudiusHost = host; return host; }
-    } catch {}
-  }
-  return resolvedAudiusHost;
-};
 
 export default function CreateScreen({ navigation }) {
   const { user } = useAuth();

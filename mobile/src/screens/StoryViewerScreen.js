@@ -17,7 +17,17 @@ import { colors } from '../theme';
 
 const { width, height } = Dimensions.get('window');
 const IMAGE_DURATION = 5000;
-const QUICK_REACTIONS = ['❤️', '🔥', '😂', '😮', '👏'];
+const QUICK_REACTIONS = ['❤️', '🔥', '😂', '😮', '😢', '👏'];
+
+function timeAgo(dateStr) {
+  if (!dateStr) return '';
+  const utc = dateStr.endsWith('Z') ? dateStr : dateStr + 'Z';
+  const diff = (Date.now() - new Date(utc)) / 1000;
+  if (diff < 60) return 'just now';
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+}
 
 export default function StoryViewerScreen({ route, navigation }) {
   const { storyGroups, initialGroupIndex = 0 } = route.params;
