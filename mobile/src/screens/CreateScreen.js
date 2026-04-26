@@ -702,7 +702,7 @@ export default function CreateScreen({ navigation }) {
             title: selectedMusic.title,
             artist: selectedMusic.artist,
             cover: selectedMusic.artwork || '',
-            stream_url: selectedMusic.stream_url || '',
+            music_id: String(selectedMusic.id),
             start_time: selectedMusic.start_time || 0,
           }));
           formData.append('music_id', selectedMusic.id);
@@ -739,6 +739,7 @@ export default function CreateScreen({ navigation }) {
         formData.append('music_artwork', selectedMusic.artwork || '');
         formData.append('music_stream_url', selectedMusic.stream_url || '');
         formData.append('music_start_time', String(selectedMusic.start_time || 0));
+        // Backend will upload this to Cloudinary for permanent storage
       }
       if (scheduledDate) formData.append('scheduled_for', scheduledDate.toISOString());
       if (mediaFiles.length === 1) {

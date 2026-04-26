@@ -82,18 +82,40 @@ def create_post():
         privacy=data.get("privacy", "public"),
         user_id=user.id
     )
-    # Save music metadata
+    # Save music — upload Deezer preview to Cloudinary for permanent storage
     music_id = data.get("music_id")
     music_title = data.get("music_title", "").strip()
+    music_preview_url = data.get("music_stream_url", "").strip()
     if music_id and music_title:
         post.music_title = music_title
         post.music_artist = data.get("music_artist", "")
         post.music_artwork = data.get("music_artwork", "")
-        post.music_stream_url = data.get("music_stream_url", "")
         try:
             post.music_start_time = int(data.get("music_start_time", 0))
         except Exception:
             post.music_start_time = 0
+        # Upload the 30s preview to Cloudinary so it never expires
+        if music_preview_url:
+            try:
+                import urllib.request as _req
+                import tempfile, os as _os
+                with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as tmp:
+                    tmp_path = tmp.name
+                _req.urlretrieve(music_preview_url, tmp_path)
+                upload_result = cloudinary.uploader.upload(
+                    tmp_path,
+                    resource_type='video',
+                    folder='kinscribe/music',
+                    public_id=f'music_{music_id}',
+                    overwrite=False,
+                )
+                post.music_stream_url = upload_result['secure_url']
+                _os.unlink(tmp_path)
+            except Exception as e:
+                # Fallback: store the Deezer URL directly (may expire)
+                post.music_stream_url = music_preview_url
+        else:
+            post.music_stream_url = ''
     db.session.add(post)
     db.session.flush()  # get post.id before commit
 
