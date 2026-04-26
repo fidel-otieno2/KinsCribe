@@ -2,9 +2,10 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View, TextInput, FlatList, TouchableOpacity,
   StyleSheet, KeyboardAvoidingView, Platform,
-  Animated, ScrollView, Dimensions, Image, Modal,
+  Animated, ScrollView, Dimensions, Image,
 } from 'react-native';
 import AppText from '../components/AppText';
+import MarkdownView from '../components/MarkdownView';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -93,7 +94,11 @@ function MessageBubble({ item, user }) {
       )}
       <View style={[s.bubble, isUser ? s.userBubble : s.aiBubble]}>
         {!isUser && <AppText style={s.aiBubbleLabel}>KinsCribe AI</AppText>}
-        <AppText style={[s.bubbleText, isUser ? s.userText : s.aiText]}>{item.text}</AppText>
+        {isUser ? (
+          <AppText style={[s.bubbleText, s.userText]}>{item.text}</AppText>
+        ) : (
+          <MarkdownView content={item.text} />
+        )}
       </View>
       {isUser && (
         <View style={s.userAvatar}>
@@ -490,7 +495,7 @@ const s = StyleSheet.create({
   glowOrb: { position: 'absolute', width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(124,58,237,0.3)' },
   aiAvatar: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center', zIndex: 1 },
   userAvatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(124,58,237,0.6)', alignItems: 'center', justifyContent: 'center', marginBottom: 2, overflow: 'hidden' },
-  bubble: { maxWidth: width * 0.72, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 10 },
+  bubble: { maxWidth: width * 0.85, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 10 },
   userBubble: { backgroundColor: '#7c3aed', borderBottomRightRadius: 4, shadowColor: '#7c3aed', shadowOpacity: 0.4, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 6 },
   aiBubble: { backgroundColor: 'rgba(15,23,42,0.95)', borderWidth: 1, borderColor: 'rgba(124,58,237,0.25)', borderBottomLeftRadius: 4 },
   aiBubbleLabel: { fontSize: 10, fontWeight: '700', color: '#a78bfa', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
