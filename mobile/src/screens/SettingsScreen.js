@@ -28,15 +28,15 @@ const th = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 5,
     paddingHorizontal: 10, paddingVertical: 6,
     borderRadius: radius.full, borderWidth: 1,
-    borderColor: 'rgba(196,163,90,0.2)',
-    backgroundColor: 'rgba(42,39,32,0.6)',
+    borderColor: 'rgba(124,58,237,0.25)',
+    backgroundColor: 'rgba(124,58,237,0.08)',
   },
   themeBtnActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    backgroundColor: '#7C3AED',
+    borderColor: '#7C3AED',
   },
   themeBtnText: { fontSize: 11, color: colors.muted, fontWeight: '600' },
-  themeBtnTextActive: { color: '#F5F0E8' },
+  themeBtnTextActive: { color: '#FFFFFF' },
 });
 
 function Row({ icon, iconColor = '#7c3aed', label, value, onPress, toggle, toggled, danger, chevron = true }) {
@@ -606,7 +606,7 @@ export default function SettingsScreen({ navigation }) {
   return (
     <View style={[s.container, { backgroundColor: theme.bg }]}>
       <Toast visible={toast.visible} type={toast.type} message={toast.message} onHide={hide} />
-      <LinearGradient colors={isDark ? ['#1C1A14', '#2A2720', '#1C1A14'] : ['#F5F0E8', '#EDE6D6', '#F5F0E8']} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={isDark ? ['#0F172A', '#1E1040', '#0F172A'] : ['#F8FAFC', '#F1F5F9', '#F8FAFC']} style={StyleSheet.absoluteFill} />
 
       <View style={s.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
@@ -881,7 +881,7 @@ export default function SettingsScreen({ navigation }) {
                   style={[th.themeBtn, mode === opt.key && th.themeBtnActive]}
                   onPress={() => setThemeMode(opt.key)}
                 >
-                  <Ionicons name={opt.icon} size={16} color={mode === opt.key ? '#F5F0E8' : colors.muted} />
+                  <Ionicons name={opt.icon} size={16} color={mode === opt.key ? '#FFFFFF' : colors.muted} />
                   <AppText style={[th.themeBtnText, mode === opt.key && th.themeBtnTextActive]}>{opt.label}</AppText>
                 </TouchableOpacity>
               ))}
