@@ -72,6 +72,14 @@ export default function CreateScreen({ navigation, route }) {
 
   // Core state
   const [mode, setMode] = useState(route?.params?.initialMode || 'post');
+
+  // Handle media captured from StoryCameraScreen
+  useEffect(() => {
+    if (route?.params?.capturedMedia) {
+      const { uri, type } = route.params.capturedMedia;
+      setMediaFiles([{ uri, type: type === 'video' ? 'video/mp4' : 'image/jpeg', mediaType: type }]);
+    }
+  }, [route?.params?.capturedMedia]);
   const [mediaFiles, setMediaFiles] = useState([]);
   const [caption, setCaption] = useState('');
   const [location, setLocation] = useState('');
@@ -1794,7 +1802,7 @@ export default function CreateScreen({ navigation, route }) {
             {/* ── TOOL STRIP ── */}
             <View style={s.storyToolStrip}>
               {/* Camera */}
-              <TouchableOpacity style={s.storyTool} onPress={takePhoto}>
+              <TouchableOpacity style={s.storyTool} onPress={() => navigation.navigate('StoryCamera', { selectedMusic })}>
                 <View style={s.storyToolIcon}>
                   <Ionicons name="camera" size={20} color="#fff" />
                 </View>

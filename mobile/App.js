@@ -46,6 +46,7 @@ import ChatScreen from "./src/screens/ChatScreen";
 import FamilyScreen from "./src/screens/FamilyScreen";
 import TimelineScreen from "./src/screens/TimelineScreen";
 import StoryViewerScreen from "./src/screens/StoryViewerScreen";
+import StoryCameraScreen from "./src/screens/StoryCameraScreen";
 import FamilyTreeScreen from "./src/screens/FamilyTreeScreen";
 import FamilyCalendarScreen from "./src/screens/FamilyCalendarScreen";
 import FamilyRecipesScreen from "./src/screens/FamilyRecipesScreen";
@@ -436,6 +437,7 @@ function RootNavigator({ navigationRef }) {
           <Stack.Screen name="Main" component={MainTabs} />
           <Stack.Screen name="Chat" component={ChatScreen} options={{ animation: "slide_from_right" }} />
           <Stack.Screen name="StoryViewer" component={StoryViewerScreen} options={{ animation: "fade", presentation: "fullScreenModal" }} />
+          <Stack.Screen name="StoryCamera" component={StoryCameraScreen} options={{ animation: "slide_from_bottom", presentation: "fullScreenModal", headerShown: false }} />
           <Stack.Screen name="UserProfile" component={UserProfileScreen} options={{ animation: "slide_from_right" }} />
           <Stack.Screen name="Family" component={FamilyScreen} options={{ animation: "slide_from_right" }} />
           <Stack.Screen name="Timeline" component={TimelineScreen} options={{ animation: "slide_from_right" }} />
