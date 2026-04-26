@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View, StyleSheet, TouchableOpacity, Dimensions,
-  StatusBar, Animated, PanResponder, Text,
+  StatusBar, Animated, ScrollView,
   Platform, ActivityIndicator,
 } from 'react-native';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
@@ -16,6 +16,21 @@ const FLASH_MODES = ['off', 'on', 'auto'];
 const FLASH_ICONS = { off: 'flash-off', on: 'flash', auto: 'flash-outline' };
 const DURATIONS = [15, 45, 60];
 const SPEEDS = [{ label: '0.5x', value: 0.5 }, { label: '1x', value: 1 }, { label: '2x', value: 2 }];
+
+const EFFECTS = [
+  { id: null,       label: 'Normal',   color: '#fff',    icon: '\u25cb' },
+  { id: 'vivid',    label: 'Vivid',    color: '#FF6B35', icon: '\u2600\ufe0f' },
+  { id: 'warm',     label: 'Warm',     color: '#F4A261', icon: '\ud83c\udf05' },
+  { id: 'cool',     label: 'Cool',     color: '#457B9D', icon: '\ud83d\udca7' },
+  { id: 'bw',       label: 'B&W',      color: '#888',    icon: '\u25d1' },
+  { id: 'fade',     label: 'Fade',     color: '#A8DADC', icon: '\ud83c\udf2b\ufe0f' },
+  { id: 'drama',    label: 'Drama',    color: '#6B2D8B', icon: '\u26a1' },
+  { id: 'golden',   label: 'Golden',   color: '#FFD700', icon: '\u2728' },
+  { id: 'neon',     label: 'Neon',     color: '#39FF14', icon: '\ud83d\udfe2' },
+  { id: 'vintage',  label: 'Vintage',  color: '#C9A96E', icon: '\ud83d\udcf7' },
+  { id: 'cinematic',label: 'Cinema',   color: '#1a1a2e', icon: '\ud83c\udfa5' },
+  { id: 'sunset',   label: 'Sunset',   color: '#FF4500', icon: '\ud83c\udf04' },
+];
 
 export default function StoryCameraScreen({ navigation, route }) {
   const { selectedMusic } = route?.params || {};
@@ -62,7 +77,7 @@ export default function StoryCameraScreen({ navigation, route }) {
       if (!camPerm?.granted) await requestCamPerm();
       if (!micPerm?.granted) await requestMicPerm();
     })();
-  }, []);
+  }, [camPerm?.granted, micPerm?.granted]);
 
   // ── Elapsed timer ────────────────────────────────────────────
   useEffect(() => {
@@ -128,7 +143,7 @@ export default function StoryCameraScreen({ navigation, route }) {
         if (photo?.uri) {
           navigation.navigate('Create', {
             initialMode: 'story',
-            capturedMedia: { uri: photo.uri, type: 'image' },
+            capturedMedia: { uri: photo.uri, type: 'image', effect: selectedEffect },
           });
         }
       } catch {}
@@ -138,27 +153,32 @@ export default function StoryCameraScreen({ navigation, route }) {
   // ── Start recording ──────────────────────────────────────────
   const startRecording = useCallback(async () => {
     if (recording) return;
+    if (!cameraRef.current) return;
     setElapsed(0);
     progressAnim.setValue(0);
     setRecording(true);
     setPaused(false);
     Animated.spring(recordBtnScale, { toValue: 0.75, useNativeDriver: true }).start();
     try {
-      const video = await cameraRef.current?.recordAsync({
+      const video = await cameraRef.current.recordAsync({
         maxDuration,
-        mute: false,
       });
       if (video?.uri) {
         navigation.navigate('Create', {
           initialMode: 'story',
-          capturedMedia: { uri: video.uri, type: 'video' },
+          capturedMedia: { uri: video.uri, type: 'video', effect: selectedEffect },
         });
       }
-    } catch {}
-    setRecording(false);
-    setPaused(false);
-    Animated.spring(recordBtnScale, { toValue: 1, useNativeDriver: true }).start();
-  }, [recording, maxDuration]);
+    } catch (e) {
+      console.log('Recording error:', e?.message || e);
+    } finally {
+      setRecording(false);
+      setPaused(false);
+      setElapsed(0);
+      progressAnim.setValue(0);
+      Animated.spring(recordBtnScale, { toValue: 1, useNativeDriver: true }).start();
+    }
+  }, [recording, maxDuration, selectedEffect]);
 
   // ── Stop recording ───────────────────────────────────────────
   const stopRecording = useCallback(() => {
@@ -179,13 +199,19 @@ export default function StoryCameraScreen({ navigation, route }) {
     if (recording) { stopRecording(); } else { startRecording(); }
   };
 
+  // keep a ref so pressIn/pressOut always get latest version
+  const startRecordingRef = useRef(startRecording);
+  const stopRecordingRef = useRef(stopRecording);
+  useEffect(() => { startRecordingRef.current = startRecording; }, [startRecording]);
+  useEffect(() => { stopRecordingRef.current = stopRecording; }, [stopRecording]);
+
   // ── Hold to record (TikTok style) ────────────────────────────
   const handleRecordPressIn = () => {
-    if (mode === 'video' && !recording) startRecording();
+    if (mode === 'video' && !recording) startRecordingRef.current();
   };
 
   const handleRecordPressOut = () => {
-    if (mode === 'video' && recording) stopRecording();
+    if (mode === 'video' && recording) stopRecordingRef.current();
   };
 
   // ── Format elapsed ───────────────────────────────────────────
@@ -206,6 +232,20 @@ export default function StoryCameraScreen({ navigation, route }) {
     );
   }
 
+  if (micPerm && !micPerm.granted) {
+    return (
+      <View style={[st.container, { alignItems: 'center', justifyContent: 'center' }]}>
+        <Ionicons name="mic-off-outline" size={48} color="#fff" />
+        <AppText style={{ color: '#fff', marginTop: 12, textAlign: 'center', paddingHorizontal: 32 }}>
+          Microphone permission is required for video recording.{'\n'}Enable it in your device settings.
+        </AppText>
+        <TouchableOpacity style={st.permBtn} onPress={requestMicPerm}>
+          <AppText style={{ color: '#fff', fontWeight: '700' }}>Grant Microphone Access</AppText>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <View style={st.container}>
       <StatusBar hidden />
@@ -217,7 +257,7 @@ export default function StoryCameraScreen({ navigation, route }) {
         facing={facing}
         flash={flashMode}
         zoom={zoom}
-        mode={mode === 'video' ? 'video' : 'picture'}
+        mode={mode}
       />
 
       {/* ── TOP GRADIENT ── */}
@@ -320,6 +360,21 @@ export default function StoryCameraScreen({ navigation, route }) {
             <AppText style={st.rightBtnLabel}>{maxDuration}s</AppText>
           </TouchableOpacity>
         )}
+
+        {/* Effects */}
+        <TouchableOpacity
+          style={st.rightBtn}
+          onPress={() => setShowEffects(p => !p)}
+        >
+          <Ionicons
+            name="color-wand-outline"
+            size={26}
+            color={selectedEffect ? '#FFD700' : '#fff'}
+          />
+          <AppText style={[st.rightBtnLabel, selectedEffect && { color: '#FFD700' }]}>
+            {selectedEffect ? EFFECTS.find(e => e.id === selectedEffect)?.label : 'Effects'}
+          </AppText>
+        </TouchableOpacity>
 
       </View>
       {timerCountdown !== null && (
@@ -448,9 +503,7 @@ export default function StoryCameraScreen({ navigation, route }) {
         <View style={st.zoomRow}>
           <AppText style={st.zoomLabel}>1x</AppText>
           <View style={st.zoomTrack}>
-            <View
-              style={[st.zoomFill, { width: `${zoom * 100}%` }]}
-            />
+            <View style={[st.zoomFill, { width: `${zoom * 100}%` }]} />
             <TouchableOpacity
               style={[st.zoomThumb, { left: `${zoom * 100}%` }]}
               onPress={() => {}}
@@ -458,6 +511,69 @@ export default function StoryCameraScreen({ navigation, route }) {
           </View>
           <AppText style={st.zoomLabel}>5x</AppText>
         </View>
+
+        {/* ── EFFECTS PANEL ── */}
+        {showEffects && (
+          <View style={st.effectsPanel}>
+            <View style={st.effectsHeader}>
+              <AppText style={st.effectsTitle}>Effects</AppText>
+              <TouchableOpacity onPress={() => setShowEffects(false)}>
+                <Ionicons name="close" size={18} color="rgba(255,255,255,0.7)" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={st.effectsRow}
+            >
+              {EFFECTS.map(effect => (
+                <TouchableOpacity
+                  key={String(effect.id)}
+                  style={[
+                    st.effectItem,
+                    selectedEffect === effect.id && st.effectItemActive,
+                  ]}
+                  onPress={() => {
+                    setSelectedEffect(effect.id);
+                    setShowEffects(false);
+                  }}
+                >
+                  <View style={[st.effectCircle, { backgroundColor: effect.color }]}>
+                    <AppText style={st.effectIcon}>{effect.icon}</AppText>
+                  </View>
+                  <AppText style={[
+                    st.effectLabel,
+                    selectedEffect === effect.id && { color: '#FFD700', fontWeight: '800' },
+                  ]}>
+                    {effect.label}
+                  </AppText>
+                  {selectedEffect === effect.id && (
+                    <View style={st.effectCheck}>
+                      <Ionicons name="checkmark" size={10} color="#fff" />
+                    </View>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        {/* Active effect overlay label */}
+        {selectedEffect && !showEffects && (
+          <TouchableOpacity
+            style={st.activeEffectPill}
+            onPress={() => setShowEffects(true)}
+          >
+            <Ionicons name="color-wand" size={12} color="#FFD700" />
+            <AppText style={st.activeEffectPillText}>
+              {EFFECTS.find(e => e.id === selectedEffect)?.label}
+            </AppText>
+            <TouchableOpacity onPress={() => setSelectedEffect(null)}>
+              <Ionicons name="close" size={12} color="rgba(255,255,255,0.6)" />
+            </TouchableOpacity>
+          </TouchableOpacity>
+        )}
+
       </LinearGradient>
     </View>
   );
@@ -623,5 +739,82 @@ const st = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.8)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
+  },
+
+  effectsPanel: {
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 8,
+  },
+  effectsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  effectsTitle: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  effectsRow: {
+    gap: 14,
+    paddingHorizontal: 4,
+  },
+  effectItem: {
+    alignItems: 'center',
+    gap: 5,
+    position: 'relative',
+  },
+  effectItemActive: {
+    transform: [{ scale: 1.1 }],
+  },
+  effectCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  effectIcon: {
+    fontSize: 22,
+  },
+  effectLabel: {
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  effectCheck: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#FFD700',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activeEffectPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,215,0,0.4)',
+    marginBottom: 6,
+  },
+  activeEffectPillText: {
+    color: '#FFD700',
+    fontSize: 12,
+    fontWeight: '700',
   },
 });

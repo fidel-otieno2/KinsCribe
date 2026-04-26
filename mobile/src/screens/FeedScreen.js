@@ -1035,7 +1035,7 @@ export default function FeedScreen({ navigation }) {
         activeOpacity={0.88}
       >
         <LinearGradient
-          colors={user?.family_id ? ['#1A3A16', '#2D5A27', '#3D6B32'] : ['#2A2318', '#3A3020', '#4A3D28']}
+          colors={user?.family_id ? ['#3b0764', '#7C3AED', '#3b82f6'] : ['#1e1b4b', '#312e81', '#4338ca']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={s.familyBannerGrad}
@@ -1048,7 +1048,7 @@ export default function FeedScreen({ navigation }) {
             {/* Icon block */}
             <View style={s.familyIconWrap}>
               <LinearGradient
-                colors={user?.family_id ? ['#4A7C3F', '#2D5A27'] : ['#C4A35A', '#8B5E3C']}
+                colors={user?.family_id ? ['#7C3AED', '#3b82f6'] : ['#6366f1', '#8b5cf6']}
                 style={s.familyIconGrad}
               >
                 <Ionicons
@@ -1149,7 +1149,7 @@ export default function FeedScreen({ navigation }) {
               style={s.aiBtn}
             >
               <LinearGradient
-                colors={['#4A7C3F', '#2D5A27']}
+                colors={['#7C3AED', '#3b82f6']}
                 style={s.aiBtnGrad}
               >
                 <Ionicons name="sparkles" size={16} color="#fff" />
@@ -1306,7 +1306,7 @@ const s = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1.5,
     borderColor: 'rgba(196,163,90,0.3)',
-    shadowColor: '#2D5A27',
+    shadowColor: '#7C3AED',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 6,
@@ -1361,7 +1361,7 @@ const s = StyleSheet.create({
   aiBtn: {
     borderRadius: 20,
     overflow: 'hidden',
-    shadowColor: '#2D5A27',
+    shadowColor: '#7C3AED',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.4,
     shadowRadius: 6,
@@ -1430,7 +1430,7 @@ const s = StyleSheet.create({
   storiesUnseenText: {
     fontSize: 10,
     fontWeight: '700',
-    color: colors.primaryLight || '#7FB069',
+    color: colors.primaryLight || '#8B5CF6',
   },
   storiesRow: {
     paddingHorizontal: 12,
@@ -1486,7 +1486,7 @@ const s = StyleSheet.create({
     marginBottom: 6,
     borderRadius: 20,
     overflow: 'hidden',
-    shadowColor: '#2D5A27',
+    shadowColor: '#7C3AED',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 12,
@@ -1570,12 +1570,12 @@ const s = StyleSheet.create({
     width: 5,
     height: 5,
     borderRadius: 3,
-    backgroundColor: '#7FB069',
+    backgroundColor: '#8B5CF6',
   },
   familyLiveText: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#7FB069',
+    color: '#8B5CF6',
   },
   familyBannerSub: {
     fontSize: 12,

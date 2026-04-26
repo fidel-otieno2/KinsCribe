@@ -243,7 +243,7 @@ export default function ProfileScreen({ navigation }) {
     <View>
       {/* Greenish cover gradient - like stories section */}
       <LinearGradient
-        colors={['#1a3a1a', '#2D5A27', '#4A7C3F', '#3a6b35']}
+        colors={['#1e1040', '#7C3AED', '#3B82F6', '#3b82f6']}
         style={s.coverBg}
       />
 
@@ -422,7 +422,7 @@ export default function ProfileScreen({ navigation }) {
           onPress={() => navigation.navigate('FamilyPublic', { familyId: family.id })}
           activeOpacity={0.85}
         >
-          <LinearGradient colors={['#8B5E3C', '#C4A35A']} style={s.familyIconWrap}>
+          <LinearGradient colors={['#7C3AED', '#F59E0B']} style={s.familyIconWrap}>
             <Ionicons name="people" size={18} color="#fff" />
           </LinearGradient>
           <View style={s.familyCardInfo}>
@@ -450,7 +450,7 @@ export default function ProfileScreen({ navigation }) {
             onPress={() => setViewHighlight({ visible: true, highlight: h, index: 0 })}
             onLongPress={() => deleteHighlight(h)}
           >
-            <LinearGradient colors={['#C4A35A', '#4A7C3F']} style={s.highlightRing}>
+            <LinearGradient colors={['#F59E0B', '#3B82F6']} style={s.highlightRing}>
               <View style={[s.highlightCircle, { borderColor: theme.bg }]}>
                 {h.cover_url
                   ? <Image source={{ uri: h.cover_url }} style={s.highlightImg} />
@@ -780,7 +780,7 @@ const s = StyleSheet.create({
   topBarLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   username: { fontSize: 22, fontWeight: '900', letterSpacing: -0.5, color: colors.text },
   premiumBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(196,163,90,0.18)', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(196,163,90,0.35)' },
-  premiumText: { color: '#C4A35A', fontSize: 9, fontWeight: '800', letterSpacing: 0.5 },
+  premiumText: { color: '#F59E0B', fontSize: 9, fontWeight: '800', letterSpacing: 0.5 },
   topBarRight: { flexDirection: 'row', gap: 8 },
   iconBtn: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(196,163,90,0.15)' },
   profileRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 14, gap: 20 },

@@ -1819,7 +1819,7 @@ export default function CreateScreen({ navigation, route }) {
 
               {/* Text */}
               <TouchableOpacity style={s.storyTool} onPress={() => {}}>
-                <View style={[s.storyToolIcon, textContent && { backgroundColor: 'rgba(74,124,63,0.6)', borderColor: '#4A7C3F' }]}>
+                <View style={[s.storyToolIcon, textContent && { backgroundColor: 'rgba(74,124,63,0.6)', borderColor: '#3B82F6' }]}>
                   <Ionicons name="text" size={20} color="#fff" />
                 </View>
                 <AppText style={s.storyToolLabel}>Text</AppText>
@@ -1827,20 +1827,20 @@ export default function CreateScreen({ navigation, route }) {
 
               {/* Music */}
               <TouchableOpacity style={s.storyTool} onPress={() => setShowMusicModal(true)}>
-                <View style={[s.storyToolIcon, selectedMusic && { backgroundColor: 'rgba(74,124,63,0.6)', borderColor: '#4A7C3F' }]}>
-                  <Ionicons name="musical-notes" size={20} color={selectedMusic ? '#7FB069' : '#fff'} />
+                <View style={[s.storyToolIcon, selectedMusic && { backgroundColor: 'rgba(74,124,63,0.6)', borderColor: '#3B82F6' }]}>
+                  <Ionicons name="musical-notes" size={20} color={selectedMusic ? '#8B5CF6' : '#fff'} />
                 </View>
-                <AppText style={[s.storyToolLabel, selectedMusic && { color: '#7FB069' }]}>
+                <AppText style={[s.storyToolLabel, selectedMusic && { color: '#8B5CF6' }]}>
                   {selectedMusic ? 'Music ✓' : 'Music'}
                 </AppText>
               </TouchableOpacity>
 
               {/* Location */}
               <TouchableOpacity style={s.storyTool} onPress={detectCurrentLocation}>
-                <View style={[s.storyToolIcon, selectedLocation && { backgroundColor: 'rgba(74,124,63,0.6)', borderColor: '#4A7C3F' }]}>
-                  <Ionicons name="location" size={20} color={selectedLocation ? '#7FB069' : '#fff'} />
+                <View style={[s.storyToolIcon, selectedLocation && { backgroundColor: 'rgba(74,124,63,0.6)', borderColor: '#3B82F6' }]}>
+                  <Ionicons name="location" size={20} color={selectedLocation ? '#8B5CF6' : '#fff'} />
                 </View>
-                <AppText style={[s.storyToolLabel, selectedLocation && { color: '#7FB069' }]}>
+                <AppText style={[s.storyToolLabel, selectedLocation && { color: '#8B5CF6' }]}>
                   {selectedLocation ? 'Added' : 'Location'}
                 </AppText>
               </TouchableOpacity>

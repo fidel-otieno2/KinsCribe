@@ -24,9 +24,9 @@ function timeAgo(dateStr) {
 }
 
 const TYPE_CONFIG = {
-  story_like:       { icon: 'heart',           color: '#e11d48', bg: 'rgba(225,29,72,0.18)',    label: 'liked your family story',        source: 'Family Story', sourceBg: '#166534', sourceColor: '#4ade80' },
-  story_comment:    { icon: 'chatbubble',       color: '#3b82f6', bg: 'rgba(59,130,246,0.18)',   label: 'commented on your family story', source: 'Family Story', sourceBg: '#166534', sourceColor: '#4ade80' },
-  new_family_story: { icon: 'library',          color: '#a78bfa', bg: 'rgba(167,139,250,0.18)',  label: 'shared a family story',          source: 'Family Story', sourceBg: '#166534', sourceColor: '#4ade80' },
+  story_like:       { icon: 'heart',           color: '#e11d48', bg: 'rgba(225,29,72,0.18)',    label: 'liked your family story',        source: 'Family Story', sourceBg: '#3b0764', sourceColor: '#a78bfa' },
+  story_comment:    { icon: 'chatbubble',       color: '#3b82f6', bg: 'rgba(59,130,246,0.18)',   label: 'commented on your family story', source: 'Family Story', sourceBg: '#3b0764', sourceColor: '#a78bfa' },
+  new_family_story: { icon: 'library',          color: '#a78bfa', bg: 'rgba(167,139,250,0.18)',  label: 'shared a family story',          source: 'Family Story', sourceBg: '#3b0764', sourceColor: '#a78bfa' },
   post_like:        { icon: 'heart',            color: '#e11d48', bg: 'rgba(225,29,72,0.18)',    label: 'liked your post',                source: 'Post',         sourceBg: '#1e3a8a', sourceColor: '#60a5fa' },
   post_comment:     { icon: 'chatbubble',       color: '#3b82f6', bg: 'rgba(59,130,246,0.18)',   label: 'commented on your post',         source: 'Post',         sourceBg: '#1e3a8a', sourceColor: '#60a5fa' },
   post_share:       { icon: 'paper-plane',      color: '#06b6d4', bg: 'rgba(6,182,212,0.18)',    label: 'shared your post',               source: 'Post',         sourceBg: '#1e3a8a', sourceColor: '#60a5fa' },
