@@ -5,7 +5,7 @@ import {
   KeyboardAvoidingView, Platform, PanResponder,
   Modal, ScrollView, ActivityIndicator, Easing,
 } from 'react-native';
-import { Video } from 'expo-av';
+import { Video, Audio } from 'expo-av';
 import Svg, { Defs, ClipPath, Polygon, Image as SvgImage } from 'react-native-svg';
 import AppText from '../components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -16,7 +16,7 @@ import { useAuth } from '../context/AuthContext';
 import { colors } from '../theme';
 
 const { width, height } = Dimensions.get('window');
-const IMAGE_DURATION = 5000;
+const IMAGE_DURATION = 10000;
 const QUICK_REACTIONS = ['❤️', '🔥', '😂', '😮', '😢', '👏'];
 
 function timeAgo(dateStr) {
@@ -50,6 +50,80 @@ export default function StoryViewerScreen({ route, navigation }) {
   const opacity = useRef(new Animated.Value(1)).current;
   const discSpin = useRef(new Animated.Value(0)).current;
   const discSpinAnim = useRef(null);
+  const musicSound = useRef(null);
+
+  const group = storyGroups[groupIndex];
+  const story = group?.stories[storyIndex];
+  const isOwn = story?.user_id === user?.id;
+  const isVideo = story?.media_type === 'video' && !!story?.media_url;
+
+  // ── Music playback — load/play when story changes ───────────
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadAndPlay = async () => {
+      try {
+        if (musicSound.current) {
+          await musicSound.current.stopAsync();
+          await musicSound.current.unloadAsync();
+          musicSound.current = null;
+        }
+      } catch {}
+
+      if (!story?.music_url || cancelled) return;
+
+      try {
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: false,
+          playsInSilentModeIOS: true,
+          staysActiveInBackground: false,
+          shouldDuckAndroid: true,
+        });
+        const { sound } = await Audio.Sound.createAsync(
+          { uri: story.music_url },
+          { shouldPlay: !paused, isLooping: true, volume: 1.0 }
+        );
+        if (cancelled) { await sound.unloadAsync(); return; }
+        musicSound.current = sound;
+      } catch {}
+    };
+
+    loadAndPlay();
+
+    return () => {
+      cancelled = true;
+      try {
+        if (musicSound.current) {
+          musicSound.current.stopAsync();
+          musicSound.current.unloadAsync();
+          musicSound.current = null;
+        }
+      } catch {}
+    };
+  }, [story?.id]);
+
+  // ── Pause / resume music when paused state changes ───────────
+  useEffect(() => {
+    if (!musicSound.current) return;
+    if (paused) {
+      musicSound.current.pauseAsync().catch(() => {});
+    } else {
+      musicSound.current.playAsync().catch(() => {});
+    }
+  }, [paused]);
+
+  // Stop music when screen unmounts
+  useEffect(() => {
+    return () => {
+      try {
+        if (musicSound.current) {
+          musicSound.current.stopAsync();
+          musicSound.current.unloadAsync();
+          musicSound.current = null;
+        }
+      } catch {}
+    };
+  }, []);
 
   // Spin the music disc continuously while story is playing
   useEffect(() => {
@@ -68,11 +142,6 @@ export default function StoryViewerScreen({ route, navigation }) {
     }
     return () => discSpinAnim.current?.stop();
   }, [story?.id, paused]);
-
-  const group = storyGroups[groupIndex];
-  const story = group?.stories[storyIndex];
-  const isOwn = story?.user_id === user?.id;
-  const isVideo = story?.media_type === 'video' && !!story?.media_url;
 
   // ── Swipe-down to close ──────────────────────────────────────
   const panResponder = useRef(PanResponder.create({
@@ -257,13 +326,7 @@ export default function StoryViewerScreen({ route, navigation }) {
         </View>
       ) : null}
 
-      {/* ── LOCATION STICKER ── */}
-      {story.location ? (
-        <View style={s.locationSticker} pointerEvents="none">
-          <Ionicons name="location-sharp" size={13} color="#fff" />
-          <AppText style={s.locationStickerText} numberOfLines={1}>{story.location}</AppText>
-        </View>
-      ) : null}
+
 
       {/* ── MUSIC DISC ── */}
       {story.music_name ? (
@@ -315,6 +378,12 @@ export default function StoryViewerScreen({ route, navigation }) {
           <View style={{ gap: 2 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <AppText style={s.authorName}>{group.author_name}</AppText>
+              {story.location ? (
+                <View style={s.locationInline}>
+                  <Ionicons name="location-sharp" size={10} color="#fff" />
+                  <AppText style={s.locationInlineText} numberOfLines={1}>{story.location}</AppText>
+                </View>
+              ) : null}
               {/* Privacy badge — creator only */}
               {isOwn && story.privacy && (
                 <View style={[
@@ -608,26 +677,14 @@ const s = StyleSheet.create({
     lineHeight: 30,
   },
 
-  // Location sticker
-  locationSticker: {
-    position: 'absolute',
-    bottom: 160,
-    alignSelf: 'center',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-    maxWidth: width * 0.7,
+  locationInline: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    paddingHorizontal: 7, paddingVertical: 3,
+    borderRadius: 12,
+    maxWidth: width * 0.45,
   },
-  locationStickerText: {
-    color: '#fff', fontSize: 13, fontWeight: '700',
-    textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
-  },
+  locationInlineText: { color: '#fff', fontSize: 10, fontWeight: '600' },
 
   // Music disc sticker
   musicSticker: {

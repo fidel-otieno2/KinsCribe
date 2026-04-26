@@ -209,6 +209,7 @@ export default function ReelsScreen({ navigation, route }) {
 
   useFocusEffect(useCallback(() => {
     fetchReels();
+    setVisibleIndex(0);
     return () => setVisibleIndex(-1);
   }, []));
 

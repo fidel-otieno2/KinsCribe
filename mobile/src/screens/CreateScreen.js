@@ -1103,9 +1103,12 @@ export default function CreateScreen({ navigation, route }) {
         </View>
       </View>
     </Modal>
-        const maxStart = Math.max(0, trackDuration - 30);
-        const barCount = 40;
-        return (
+
+    {/* ── SNIPPET SELECTOR MODAL ── */}
+    {(() => {
+      const maxStart = Math.max(0, trackDuration - 30);
+      const barCount = 40;
+      return (
       <Modal visible={!!snippetTrack} animationType="slide" transparent>
         <View style={s.modalOverlay}>
           <View style={[s.modalSheet, { backgroundColor: theme.bgCard, maxHeight: '55%' }]}>
@@ -1115,19 +1118,19 @@ export default function CreateScreen({ navigation, route }) {
             {/* Track info */}
             <View style={s.snippetTrackRow}>
               {snippetTrack?.album?.cover_medium
-                ? <Image source={{ uri: snippetTrack.album.cover_medium }} style={s.snippetArt} />
+                ? <Image source={{ uri: snippetTrack?.album?.cover_medium }} style={s.snippetArt} />
                 : <View style={[s.snippetArt, { backgroundColor: 'rgba(124,58,237,0.25)', alignItems: 'center', justifyContent: 'center' }]}>
                     <Ionicons name="musical-notes" size={22} color="#7c3aed" />
                   </View>}
               <View style={{ flex: 1 }}>
-                <AppText style={[s.snippetTitle, { color: theme.text }]} numberOfLines={1}>{snippetTrack.title}</AppText>
-                <AppText style={[s.snippetArtist, { color: theme.muted }]} numberOfLines={1}>{snippetTrack.artist?.name || 'Unknown'}</AppText>
+                <AppText style={[s.snippetTitle, { color: theme.text }]} numberOfLines={1}>{snippetTrack?.title}</AppText>
+                <AppText style={[s.snippetArtist, { color: theme.muted }]} numberOfLines={1}>{snippetTrack?.artist?.name || 'Unknown'}</AppText>
               </View>
               <TouchableOpacity
-                style={[s.snippetPlayBtn, { backgroundColor: playingTrackId === snippetTrack.id ? '#7c3aed' : 'rgba(124,58,237,0.2)' }]}
+                style={[s.snippetPlayBtn, { backgroundColor: playingTrackId === snippetTrack?.id ? '#7c3aed' : 'rgba(124,58,237,0.2)' }]}
                 onPress={() => togglePreview(snippetTrack)}
               >
-                <Ionicons name={playingTrackId === snippetTrack.id ? 'pause' : 'play'} size={18} color={playingTrackId === snippetTrack.id ? '#fff' : '#7c3aed'} />
+                <Ionicons name={playingTrackId === snippetTrack?.id ? 'pause' : 'play'} size={18} color={playingTrackId === snippetTrack?.id ? '#fff' : '#7c3aed'} />
               </TouchableOpacity>
             </View>
 

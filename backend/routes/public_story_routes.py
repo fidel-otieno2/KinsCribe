@@ -39,6 +39,7 @@ def create_story():
     music_name = None
     music_artist = None
     music_artwork = None
+    music_url = None
     music_raw = data.get("music")
     if music_raw:
         try:
@@ -47,6 +48,7 @@ def create_story():
             music_name = m.get("title") or m.get("music_name")
             music_artist = m.get("artist") or m.get("music_artist")
             music_artwork = m.get("cover") or m.get("artwork")
+            music_url = m.get("stream_url") or m.get("music_url") or m.get("url")
         except Exception:
             music_name = str(music_raw)
 
@@ -56,7 +58,7 @@ def create_story():
         text_content=data.get("text_content"),
         bg_color=data.get("bg_color", "#7c3aed"),
         location=data.get("location"),
-        music_url=data.get("music_url"),
+        music_url=music_url,
         music_name=music_name,
         music_artist=music_artist,
         music_artwork=music_artwork,
