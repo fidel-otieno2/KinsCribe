@@ -1,52 +1,61 @@
-// ── Kinscribe Brand Theme ─────────────────────────────────────
-// Bold & energetic · Earth tones · Family heritage
+// ── KinsCribe Premium Theme ───────────────────────────────────
+// Deep navy · Purple-blue accents · Glassmorphism · AI-powered feel
 
-// ── DARK THEME (default) ─────────────────────────────────────
+// ── DARK THEME ────────────────────────────────────────────────
 export const darkTheme = {
   mode: 'dark',
 
   // Backgrounds
-  bg: '#1C1A14',
-  bgSecondary: '#2A2720',
-  bgCard: '#3A3527',
-  bgElevated: '#443E30',
+  bg:            '#0F172A',
+  bgSecondary:   '#0B0F1A',
+  bgCard:        '#1E293B',
+  bgElevated:    '#111827',
 
   // Surfaces
-  surface: 'rgba(42,39,32,0.95)',
-  surfaceLight: 'rgba(58,53,39,0.8)',
+  surface:       'rgba(30,41,59,0.95)',
+  surfaceLight:  'rgba(255,255,255,0.05)',
 
   // Text
-  text: '#F5F0E8',
-  textSecondary: '#E8E0CC',
-  muted: '#A89070',
-  dim: '#6B5D4A',
+  text:          '#FFFFFF',
+  textSecondary: '#E2E8F0',
+  muted:         '#94A3B8',
+  dim:           '#64748B',
 
   // Borders
-  border: 'rgba(196,163,90,0.12)',
-  border2: 'rgba(196,163,90,0.22)',
-  borderFamily: 'rgba(139,94,60,0.4)',
+  border:        'rgba(255,255,255,0.08)',
+  border2:       'rgba(255,255,255,0.12)',
+  borderFamily:  'rgba(124,58,237,0.3)',
 
-  // Brand colors (same in both modes)
-  primary: '#4A7C3F',
-  primaryDark: '#2D5A27',
-  primaryLight: '#7FB069',
-  gold: '#C4A35A',
-  brown: '#8B5E3C',
-  bark: '#5C3D2E',
+  // Brand — Purple primary
+  primary:       '#7C3AED',
+  primaryDark:   '#5B21B6',
+  primaryLight:  '#8B5CF6',
+
+  // Secondary — Blue
+  secondary:     '#3B82F6',
+  secondaryLight:'#60A5FA',
+  cyan:          '#06B6D4',
+
+  // Legacy aliases so existing screens don't break
+  gold:          '#F59E0B',
+  brown:         '#7C3AED',
+  bark:          '#5B21B6',
 
   // Semantic
-  red: '#C0392B',
-  green: '#7FB069',
-  error: '#E74C3C',
+  red:           '#EF4444',
+  green:         '#10B981',
+  error:         '#EF4444',
+  warning:       '#F59E0B',
+  info:          '#38BDF8',
 
   // Story rings
-  storyActive: ['#2D5A27', '#7FB069', '#C4A35A'],
-  storyFamily: ['#8B5E3C', '#C4A35A', '#5C3D2E'],
-  storySeen: ['#4A4035', '#4A4035'],
+  storyActive:   ['#7C3AED', '#3B82F6', '#06B6D4'],
+  storyFamily:   ['#9333EA', '#3B82F6'],
+  storySeen:     ['#1E293B', '#1E293B'],
 
   // Tab bar
-  tabBar: 'rgba(28,26,20,0.97)',
-  tabBarBorder: 'rgba(196,163,90,0.1)',
+  tabBar:        'rgba(11,15,26,0.97)',
+  tabBarBorder:  'rgba(124,58,237,0.15)',
 };
 
 // ── LIGHT THEME ───────────────────────────────────────────────
@@ -54,90 +63,98 @@ export const lightTheme = {
   mode: 'light',
 
   // Backgrounds
-  bg: '#F5F0E8',
-  bgSecondary: '#EDE6D6',
-  bgCard: '#E8E0CC',
-  bgElevated: '#FFFFFF',
+  bg:            '#F8FAFC',
+  bgSecondary:   '#F1F5F9',
+  bgCard:        '#FFFFFF',
+  bgElevated:    '#FFFFFF',
 
   // Surfaces
-  surface: 'rgba(245,240,232,0.97)',
-  surfaceLight: 'rgba(232,224,204,0.9)',
+  surface:       'rgba(248,250,252,0.97)',
+  surfaceLight:  'rgba(124,58,237,0.05)',
 
   // Text
-  text: '#1C1A14',
-  textSecondary: '#3A3527',
-  muted: '#6B5D4A',
-  dim: '#A89070',
+  text:          '#0F172A',
+  textSecondary: '#1E293B',
+  muted:         '#64748B',
+  dim:           '#94A3B8',
 
   // Borders
-  border: 'rgba(45,90,39,0.1)',
-  border2: 'rgba(45,90,39,0.18)',
-  borderFamily: 'rgba(139,94,60,0.3)',
+  border:        'rgba(15,23,42,0.08)',
+  border2:       'rgba(15,23,42,0.12)',
+  borderFamily:  'rgba(124,58,237,0.2)',
 
-  // Brand colors (same in both modes)
-  primary: '#2D5A27',
-  primaryDark: '#1A3A16',
-  primaryLight: '#4A7C3F',
-  gold: '#8B5E3C',
-  brown: '#5C3D2E',
-  bark: '#3D2A1E',
+  // Brand
+  primary:       '#7C3AED',
+  primaryDark:   '#5B21B6',
+  primaryLight:  '#8B5CF6',
+
+  // Secondary
+  secondary:     '#3B82F6',
+  secondaryLight:'#60A5FA',
+  cyan:          '#06B6D4',
+
+  // Legacy aliases
+  gold:          '#F59E0B',
+  brown:         '#7C3AED',
+  bark:          '#5B21B6',
 
   // Semantic
-  red: '#C0392B',
-  green: '#2D5A27',
-  error: '#E74C3C',
+  red:           '#EF4444',
+  green:         '#10B981',
+  error:         '#EF4444',
+  warning:       '#F59E0B',
+  info:          '#38BDF8',
 
   // Story rings
-  storyActive: ['#2D5A27', '#7FB069', '#C4A35A'],
-  storyFamily: ['#8B5E3C', '#C4A35A', '#5C3D2E'],
-  storySeen: ['#C4B99A', '#C4B99A'],
+  storyActive:   ['#7C3AED', '#3B82F6', '#06B6D4'],
+  storyFamily:   ['#9333EA', '#3B82F6'],
+  storySeen:     ['#CBD5E1', '#CBD5E1'],
 
   // Tab bar
-  tabBar: 'rgba(245,240,232,0.97)',
-  tabBarBorder: 'rgba(45,90,39,0.1)',
+  tabBar:        'rgba(248,250,252,0.97)',
+  tabBarBorder:  'rgba(124,58,237,0.1)',
 };
 
 export const gradients = {
-  primary: ['#2D5A27', '#4A7C3F'],
-  primaryBold: ['#2D5A27', '#7FB069'],
-  gold: ['#C4A35A', '#8B5E3C'],
-  family: ['#8B5E3C', '#5C3D2E'],
-  warm: ['#C4A35A', '#2D5A27'],
-  darkBg: ['#1C1A14', '#2A2720'],
-  lightBg: ['#F5F0E8', '#EDE6D6'],
-  card: ['rgba(58,53,39,0.9)', 'rgba(28,26,20,0.95)'],
-  hero: ['rgba(28,26,20,0.1)', 'rgba(28,26,20,0.6)', '#1C1A14'],
+  primary:     ['#7C3AED', '#3B82F6'],
+  primaryBold: ['#9333EA', '#06B6D4'],
+  purple:      ['#7C3AED', '#5B21B6'],
+  blue:        ['#3B82F6', '#06B6D4'],
+  darkBg:      ['#0F172A', '#1E1040', '#0F172A'],
+  card:        ['rgba(30,41,59,0.9)', 'rgba(15,23,42,0.95)'],
+  hero:        ['rgba(15,23,42,0.1)', 'rgba(15,23,42,0.6)', '#0F172A'],
+  glow:        ['rgba(124,58,237,0.4)', 'rgba(59,130,246,0.2)', 'transparent'],
 };
 
 export const radius = {
-  xs: 6,
-  sm: 10,
-  md: 14,
-  lg: 18,
-  xl: 24,
-  xxl: 32,
+  xs:   6,
+  sm:   10,
+  md:   14,
+  lg:   18,
+  xl:   24,
+  xxl:  32,
   full: 999,
 };
 
 export const shadows = {
   sm: {
-    shadowColor: '#2D5A27',
+    shadowColor: '#7C3AED',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.25,
     shadowRadius: 8,
     elevation: 4,
   },
   md: {
-    shadowColor: '#C4A35A',
+    shadowColor: '#7C3AED',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.3,
     shadowRadius: 16,
     elevation: 8,
   },
   lg: {
-    shadowColor: '#2D5A27',
+    shadowColor: '#3B82F6',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.35,
     shadowRadius: 24,
     elevation: 12,
   },
@@ -145,6 +162,6 @@ export const shadows = {
 
 // Legacy export so existing imports don't break
 export const colors = darkTheme;
-export const gradientColors = ['#2D5A27', '#4A7C3F'];
+export const gradientColors = ['#7C3AED', '#3B82F6'];
 export const gradientStart = { x: 0, y: 0 };
 export const gradientEnd = { x: 1, y: 1 };
