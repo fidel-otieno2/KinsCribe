@@ -232,26 +232,81 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation, isVisible 
   const lastTap = useRef(0);
   const scrollViewRef = useRef(null);
   const musicSoundRef = useRef(null);
+  const [musicPlaying, setMusicPlaying] = useState(false);
 
   // Play/stop music when post becomes visible
   useEffect(() => {
     if (!post.music?.stream_url) return;
+
+    let cancelled = false;
+
+    const startMusic = async () => {
+      // Always unload previous sound first
+      try {
+        if (musicSoundRef.current) {
+          await musicSoundRef.current.stopAsync();
+          await musicSoundRef.current.unloadAsync();
+          musicSoundRef.current = null;
+        }
+      } catch {}
+
+      if (cancelled) return;
+
+      try {
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: false,
+          playsInSilentModeIOS: true,
+          staysActiveInBackground: false,
+          shouldDuckAndroid: true,
+        });
+        const { sound } = await Audio.Sound.createAsync(
+          { uri: post.music.stream_url },
+          {
+            shouldPlay: true,
+            positionMillis: (post.music.start_time || 0) * 1000,
+            isLooping: false,
+            volume: 0.7,
+          },
+          (status) => {
+            if (status.isLoaded) {
+              setMusicPlaying(status.isPlaying);
+              if (status.didJustFinish) {
+                setMusicPlaying(false);
+              }
+            }
+          }
+        );
+        if (!cancelled) {
+          musicSoundRef.current = sound;
+          setMusicPlaying(true);
+        } else {
+          await sound.unloadAsync();
+        }
+      } catch (e) {
+        console.log('Music play error:', e?.message);
+      }
+    };
+
+    const stopMusic = async () => {
+      try {
+        if (musicSoundRef.current) {
+          await musicSoundRef.current.stopAsync();
+          await musicSoundRef.current.unloadAsync();
+          musicSoundRef.current = null;
+        }
+      } catch {}
+      setMusicPlaying(false);
+    };
+
     if (isVisible) {
-      Audio.Sound.createAsync(
-        { uri: post.music.stream_url },
-        { shouldPlay: true, positionMillis: (post.music.start_time || 0) * 1000, isLooping: true, volume: 0.6 }
-      ).then(({ sound }) => {
-        musicSoundRef.current = sound;
-      }).catch(() => {});
+      startMusic();
     } else {
-      musicSoundRef.current?.stopAsync().catch(() => {});
-      musicSoundRef.current?.unloadAsync().catch(() => {});
-      musicSoundRef.current = null;
+      stopMusic();
     }
+
     return () => {
-      musicSoundRef.current?.stopAsync().catch(() => {});
-      musicSoundRef.current?.unloadAsync().catch(() => {});
-      musicSoundRef.current = null;
+      cancelled = true;
+      stopMusic();
     };
   }, [isVisible, post.music?.stream_url]);
 
@@ -499,17 +554,49 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation, isVisible 
             </ScrollView>
             {/* Music sticker overlaid on image */}
             {post.music?.title ? (
-              <View style={pc.musicOverlay}>
-                <Ionicons name="musical-notes" size={12} color="#fff" />
+              <TouchableOpacity
+                style={[
+                  pc.musicOverlay,
+                  !musicPlaying && { opacity: 0.7 },
+                ]}
+                onPress={async () => {
+                  if (!musicSoundRef.current) return;
+                  try {
+                    if (musicPlaying) {
+                      await musicSoundRef.current.pauseAsync();
+                      setMusicPlaying(false);
+                    } else {
+                      await musicSoundRef.current.playAsync();
+                      setMusicPlaying(true);
+                    }
+                  } catch {}
+                }}
+                activeOpacity={0.85}
+              >
+                <Ionicons
+                  name={musicPlaying ? 'musical-notes' : 'musical-notes-outline'}
+                  size={13}
+                  color="#fff"
+                />
                 <AppText style={pc.musicOverlayText} numberOfLines={1}>
                   {post.music.title} · {post.music.artist}
                 </AppText>
                 <View style={pc.musicEqualizer}>
                   {[...Array(4)].map((_, i) => (
-                    <View key={i} style={[pc.musicBar, { height: 4 + (i % 3) * 4, opacity: isVisible ? 1 : 0.4 }]} />
+                    <View
+                      key={i}
+                      style={[
+                        pc.musicBar,
+                        {
+                          height: musicPlaying ? 4 + (i % 3) * 5 : 3,
+                          opacity: musicPlaying ? 1 : 0.4,
+                          backgroundColor: musicPlaying ? '#a78bfa' : '#fff',
+                        },
+                      ]}
+                    />
                   ))}
                 </View>
-              </View>
+              </TouchableOpacity>
             ) : null}
             {mediaList.length > 1 && (
               <View style={pc.carouselDots}>
@@ -851,6 +938,28 @@ export default function FeedScreen({ navigation }) {
       {/* Stories Row */}
       {storyGroups.length >= 0 && (
         <View style={s.storiesWrap}>
+          <LinearGradient
+            colors={['rgba(45,90,39,0.18)', 'rgba(28,26,20,0)']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
+            style={s.storiesBgGrad}
+          />
+
+          {/* Section header */}
+          <View style={s.storiesHeader}>
+            <View style={s.storiesHeaderLeft}>
+              <View style={s.storiesHeaderDot} />
+              <AppText style={[s.storiesHeaderTitle, { color: theme.text }]}>Stories</AppText>
+            </View>
+            {storyGroups.filter(g => !g.is_self && g.has_unseen).length > 0 && (
+              <View style={s.storiesUnseenBadge}>
+                <AppText style={s.storiesUnseenText}>
+                  {storyGroups.filter(g => !g.is_self && g.has_unseen).length} new
+                </AppText>
+              </View>
+            )}
+          </View>
+
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.storiesRow}>
             {/* ── YOUR STORY (always first) ── */}
             {(() => {
@@ -865,10 +974,11 @@ export default function FeedScreen({ navigation }) {
                       const idx = storyGroups.indexOf(myGroup);
                       navigation.navigate('StoryViewer', { storyGroups, initialGroupIndex: idx });
                     } else {
-                      navigation.navigate('Create');
+                      navigation.navigate('Create', { initialMode: 'story' });
                     }
                   }}
                 >
+                  <View style={[s.storyGlow, { backgroundColor: hasMyStory ? 'rgba(74,124,63,0.3)' : 'rgba(196,163,90,0.12)' }]} />
                   <View style={s.hexWrap}>
                     <HexAvatar
                       uri={user?.avatar_url}
@@ -890,6 +1000,7 @@ export default function FeedScreen({ navigation }) {
             {/* ── CONNECTED USERS' STORIES ── */}
             {storyGroups.filter(g => !g.is_self).map((group, idx) => {
               const realIdx = storyGroups.indexOf(group);
+              const unseen = group.has_unseen;
               return (
                 <TouchableOpacity
                   key={group.user_id}
@@ -897,16 +1008,17 @@ export default function FeedScreen({ navigation }) {
                   activeOpacity={0.85}
                   onPress={() => navigation.navigate('StoryViewer', { storyGroups, initialGroupIndex: realIdx })}
                 >
+                  <View style={[s.storyGlow, { backgroundColor: unseen ? 'rgba(74,124,63,0.3)' : 'transparent' }]} />
                   <View style={s.hexWrap}>
                     <HexAvatar
                       uri={group.author_avatar}
                       name={group.author_name}
                       size={54}
                       hasStory={group.stories.length > 0}
-                      hasSeen={!group.has_unseen}
+                      hasSeen={!unseen}
                     />
                   </View>
-                  <AppText style={[s.storyLabel, { color: theme.text }]} numberOfLines={1}>
+                  <AppText style={[s.storyLabel, { color: unseen ? theme.text : theme.muted }]} numberOfLines={1}>
                     {group.author_name?.split(' ')[0] || 'User'}
                   </AppText>
                 </TouchableOpacity>
@@ -920,29 +1032,70 @@ export default function FeedScreen({ navigation }) {
       <TouchableOpacity
         style={s.familyBanner}
         onPress={() => user?.family_id ? navigation.navigate('Family') : setShowJoinFamily(true)}
-        activeOpacity={0.85}
+        activeOpacity={0.88}
       >
-        <LinearGradient colors={["#2D5A27", "#4A7C3F", "#C4A35A"]} style={s.familyBannerGrad}>
+        <LinearGradient
+          colors={user?.family_id ? ['#1A3A16', '#2D5A27', '#3D6B32'] : ['#2A2318', '#3A3020', '#4A3D28']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={s.familyBannerGrad}
+        >
+          {/* Decorative circle top-right */}
+          <View style={s.familyDecorCircle} />
+          <View style={s.familyDecorCircle2} />
+
           <View style={s.familyBannerLeft}>
+            {/* Icon block */}
             <View style={s.familyIconWrap}>
-              <Ionicons name="people" size={22} color="#fff" />
+              <LinearGradient
+                colors={user?.family_id ? ['#4A7C3F', '#2D5A27'] : ['#C4A35A', '#8B5E3C']}
+                style={s.familyIconGrad}
+              >
+                <Ionicons
+                  name={user?.family_id ? 'people' : 'people-outline'}
+                  size={24}
+                  color="#fff"
+                />
+              </LinearGradient>
             </View>
-            <View>
-              <AppText style={s.familyBannerTitle}>
-                {user?.family_id ? t('your_family') : t('join_family')}
-              </AppText>
+
+            {/* Text block */}
+            <View style={s.familyTextBlock}>
+              <View style={s.familyTitleRow}>
+                <AppText style={s.familyBannerTitle}>
+                  {user?.family_id ? 'Your Family' : 'Join a Family'}
+                </AppText>
+                {user?.family_id && (
+                  <View style={s.familyLiveBadge}>
+                    <View style={s.familyLiveDot} />
+                    <AppText style={s.familyLiveText}>Active</AppText>
+                  </View>
+                )}
+              </View>
               <AppText style={s.familyBannerSub}>
-                {user?.family_id ? t('your_family_sub') : t('join_family_sub')}}
+                {user?.family_id
+                  ? 'Stories, memories & moments'
+                  : 'Connect with your loved ones'}
               </AppText>
             </View>
           </View>
-          <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.8)" />
+
+          {/* Right side */}
+          <View style={s.familyBannerRight}>
+            <View style={s.familyChevronWrap}>
+              <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.9)" />
+            </View>
+          </View>
         </LinearGradient>
       </TouchableOpacity>
 
       {posts.length > 0 && (
         <View style={s.feedLabel}>
-          <AppText style={s.feedLabelText}>{t('your_feed')}</AppText>
+          <View style={s.feedLabelLeft}>
+            <View style={s.feedLabelAccent} />
+            <AppText style={s.feedLabelText}>Your Feed</AppText>
+          </View>
+          <View style={s.feedLabelLine} />
         </View>
       )}
     </View>
@@ -953,29 +1106,60 @@ export default function FeedScreen({ navigation }) {
       <StatusBar style={isDark ? 'light' : 'dark'} />
 
       {/* Header */}
-      <View style={[s.header, { borderBottomColor: theme.border }]}>
-        <View style={s.logoWrap}>
-          <Image
-            source={require("../../assets/kinscribe-logo.png")}
-            style={s.logoIcon}
-            resizeMode="cover"
-          />
-          <AppText style={[s.logo, { color: theme.text }]}>KinsCribe</AppText>
+      <LinearGradient
+        colors={[theme.mode === 'dark' ? '#1C1A14' : '#F5F0E8', 'transparent']}
+        style={s.headerGrad}
+      >
+        <View style={[s.header, { borderBottomColor: theme.border }]}>
+
+          {/* LEFT — Logo */}
+          <View style={s.logoWrap}>
+            <View style={s.logoImgWrap}>
+              <Image
+                source={require("../../assets/kinscribe-logo.png")}
+                style={s.logoIcon}
+                resizeMode="cover"
+              />
+            </View>
+            <View>
+              <AppText style={[s.logo, { color: theme.text }]}>KinsCribe</AppText>
+              <AppText style={[s.logoSub, { color: theme.muted }]}>Family Network</AppText>
+            </View>
+          </View>
+
+          {/* RIGHT — Buttons */}
+          <View style={s.headerRight}>
+
+            {/* Notifications */}
+            <TouchableOpacity
+              onPress={() => navigation.navigate("Notifications")}
+              style={[s.headerBtn, { backgroundColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }]}
+            >
+              <Ionicons name="notifications-outline" size={20} color={theme.text} />
+              {unreadCount > 0 && (
+                <View style={s.badge}>
+                  <AppText style={s.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</AppText>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            {/* AI Button */}
+            <TouchableOpacity
+              onPress={() => navigation.navigate("FeedAI")}
+              style={s.aiBtn}
+            >
+              <LinearGradient
+                colors={['#4A7C3F', '#2D5A27']}
+                style={s.aiBtnGrad}
+              >
+                <Ionicons name="sparkles" size={16} color="#fff" />
+                <AppText style={s.aiBtnText}>AI</AppText>
+              </LinearGradient>
+            </TouchableOpacity>
+
+          </View>
         </View>
-        <View style={s.headerRight}>
-          <TouchableOpacity onPress={() => navigation.navigate("Notifications")} style={s.headerBtn}>
-            <Ionicons name="notifications-outline" size={25} color={theme.text} />
-            {unreadCount > 0 && (
-              <View style={s.badge}>
-                <AppText style={s.badgeText}>{unreadCount > 9 ? "9+" : unreadCount}</AppText>
-              </View>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => navigation.navigate("FeedAI")} style={s.headerBtn}>
-            <Ionicons name="sparkles" size={23} color={theme.primary} />
-          </TouchableOpacity>
-        </View>
-      </View>
+      </LinearGradient>
 
       {loading ? (
         <View style={s.loadingWrap}>
@@ -994,7 +1178,7 @@ export default function FeedScreen({ navigation }) {
             />
           )}
           ListHeaderComponent={<ListHeader />}
-          contentContainerStyle={{ paddingBottom: 90 }}
+          contentContainerStyle={{ paddingBottom: 110 }}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -1098,42 +1282,351 @@ export default function FeedScreen({ navigation }) {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
 
-  header: {
-    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
-    paddingHorizontal: 16, paddingTop: 52, paddingBottom: 10,
-    borderBottomWidth: 0.5, borderBottomColor: colors.border,
+  headerGrad: {
+    paddingTop: 0,
   },
-  logoWrap: { flexDirection: "row", alignItems: "center", gap: 9 },
-  logoIcon: { width: 36, height: 36, borderRadius: 10 },
-  logo: { fontSize: 22, fontWeight: "800", color: colors.text },
-  headerRight: { flexDirection: "row", gap: 6 },
-  headerBtn: { padding: 6 },
-  badge: { position: "absolute", top: 2, right: 2, backgroundColor: "#e11d48", borderRadius: 8, minWidth: 16, height: 16, alignItems: "center", justifyContent: "center" },
-  badgeText: { color: "#fff", fontSize: 9, fontWeight: "800" },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingTop: 52,
+    paddingBottom: 12,
+    borderBottomWidth: 0.5,
+  },
+  logoWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  logoImgWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1.5,
+    borderColor: 'rgba(196,163,90,0.3)',
+    shadowColor: '#2D5A27',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  logoIcon: {
+    width: '100%',
+    height: '100%',
+  },
+  logo: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: colors.text,
+    letterSpacing: 0.3,
+  },
+  logoSub: {
+    fontSize: 10,
+    fontWeight: '500',
+    color: colors.muted,
+    letterSpacing: 0.5,
+    marginTop: -1,
+  },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badge: {
+    position: "absolute",
+    top: 2,
+    right: 2,
+    backgroundColor: "#C0392B",
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 3,
+  },
+  badgeText: {
+    color: "#fff",
+    fontSize: 9,
+    fontWeight: "800",
+  },
+  aiBtn: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    shadowColor: '#2D5A27',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  aiBtnGrad: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  aiBtnText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
 
   loadingWrap: { flex: 1, alignItems: "center", justifyContent: "center" },
 
-  storiesWrap: { borderBottomWidth: 0.5, borderBottomColor: colors.border },
-  storiesRow: { paddingHorizontal: 12, paddingVertical: 12, gap: 16 },
-  storyItem: { alignItems: 'center', width: 66 },
-  hexWrap: { position: 'relative', width: 62, height: 62, alignItems: 'center', justifyContent: 'center' },
-  plusBadge: {
-    position: 'absolute', bottom: 0, right: 0,
-    width: 20, height: 20, borderRadius: 10,
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: colors.bg,
+  storiesWrap: {
+    borderBottomWidth: 0.5,
+    borderBottomColor: colors.border,
+    overflow: 'hidden',
   },
-  storyLabel: { fontSize: 11, color: colors.text, textAlign: 'center', maxWidth: 66, marginTop: 5 },
+  storiesBgGrad: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+  },
+  storiesHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
+  storiesHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  storiesHeaderDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.primary,
+  },
+  storiesHeaderTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    color: colors.text,
+  },
+  storiesUnseenBadge: {
+    backgroundColor: 'rgba(74,124,63,0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(74,124,63,0.4)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 20,
+  },
+  storiesUnseenText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: colors.primaryLight || '#7FB069',
+  },
+  storiesRow: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    paddingBottom: 14,
+    gap: 16,
+  },
+  storyItem: {
+    alignItems: 'center',
+    width: 66,
+  },
+  storyGlow: {
+    position: 'absolute',
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    top: 0,
+    alignSelf: 'center',
+    transform: [{ scaleX: 1.1 }, { scaleY: 0.6 }],
+    opacity: 0.8,
+    marginTop: 8,
+  },
+  hexWrap: {
+    position: 'relative',
+    width: 62,
+    height: 62,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  plusBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colors.bg,
+  },
+  storyLabel: {
+    fontSize: 11,
+    textAlign: 'center',
+    maxWidth: 66,
+    marginTop: 5,
+    fontWeight: '500',
+  },
 
-  familyBanner: { marginHorizontal: 14, marginTop: 14, marginBottom: 6, borderRadius: 16, overflow: "hidden" },
-  familyBannerGrad: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 14 },
-  familyBannerLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
-  familyIconWrap: { width: 42, height: 42, borderRadius: 14, backgroundColor: "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center" },
-  familyBannerTitle: { fontSize: 15, fontWeight: "700", color: "#fff" },
-  familyBannerSub: { fontSize: 12, color: "rgba(255,255,255,0.75)", marginTop: 1 },
+  familyBanner: {
+    marginHorizontal: 14,
+    marginTop: 14,
+    marginBottom: 6,
+    borderRadius: 20,
+    overflow: 'hidden',
+    shadowColor: '#2D5A27',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  familyBannerGrad: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    overflow: 'hidden',
+  },
+  familyDecorCircle: {
+    position: 'absolute',
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    top: -30,
+    right: 40,
+  },
+  familyDecorCircle2: {
+    position: 'absolute',
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: 'rgba(196,163,90,0.08)',
+    bottom: -20,
+    right: 10,
+  },
+  familyBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    flex: 1,
+  },
+  familyIconWrap: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  familyIconGrad: {
+    width: 50,
+    height: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 16,
+  },
+  familyTextBlock: {
+    flex: 1,
+    gap: 3,
+  },
+  familyTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  familyBannerTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#fff',
+    letterSpacing: 0.2,
+  },
+  familyLiveBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(127,176,105,0.25)',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(127,176,105,0.4)',
+  },
+  familyLiveDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: '#7FB069',
+  },
+  familyLiveText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#7FB069',
+  },
+  familyBannerSub: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.6)',
+    fontWeight: '500',
+  },
+  familyBannerRight: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 8,
+  },
+  familyChevronWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 
-  feedLabel: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 6 },
-  feedLabelText: { fontSize: 13, fontWeight: "700", color: colors.dim, textTransform: "uppercase", letterSpacing: 0.8 },
+  feedLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 18,
+    paddingBottom: 10,
+    gap: 12,
+  },
+  feedLabelLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  feedLabelAccent: {
+    width: 4,
+    height: 18,
+    borderRadius: 2,
+    backgroundColor: colors.primary,
+  },
+  feedLabelText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: colors.text,
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+  },
+  feedLabelLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.border,
+  },
 
   emptyWrap: { padding: 20, paddingTop: 10 },
   emptyCard: { borderRadius: 20, padding: 32, alignItems: "center", gap: 10 },

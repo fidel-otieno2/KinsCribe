@@ -64,14 +64,14 @@ const QUICK_SEARCHES = [
   { label: 'Workout', query: 'workout gym', icon: '💪' },
 ];
 
-export default function CreateScreen({ navigation }) {
+export default function CreateScreen({ navigation, route }) {
   const { user } = useAuth();
   const { theme, isDark } = useTheme();
   const { t } = useTranslation();
   const { toast, hide, success, error, info } = useToast();
 
   // Core state
-  const [mode, setMode] = useState('post');
+  const [mode, setMode] = useState(route?.params?.initialMode || 'post');
   const [mediaFiles, setMediaFiles] = useState([]);
   const [caption, setCaption] = useState('');
   const [location, setLocation] = useState('');
@@ -1719,101 +1719,188 @@ export default function CreateScreen({ navigation }) {
         {/* ══════════ STORY MODE ══════════ */}
         {mode === 'story' && (
           <>
-            {mediaFiles[0] ? (
-              <View style={s.storyPreview}>
-                <Image source={{ uri: mediaFiles[0].uri }} style={s.storyPreviewImg} resizeMode="cover" />
-                {textContent ? (
-                  <View style={s.storyTextOverlay}>
-                    <AppText style={s.storyOverlayText}>{textContent}</AppText>
+            {/* ── CANVAS ── */}
+            <View style={s.storyStudio}>
+              {mediaFiles[0] ? (
+                <View style={s.storyCanvas}>
+                  <Image source={{ uri: mediaFiles[0].uri }} style={s.storyCanvasImg} resizeMode="cover" />
+                  {/* Dark gradient overlays */}
+                  <LinearGradient colors={['rgba(0,0,0,0.35)', 'transparent']} style={s.storyGradTop} />
+                  <LinearGradient colors={['transparent', 'rgba(0,0,0,0.5)']} style={s.storyGradBottom} />
+                  {/* Text overlay on media */}
+                  {textContent ? (
+                    <View style={s.storyTextOverlay}>
+                      <AppText style={s.storyOverlayText}>{textContent}</AppText>
+                    </View>
+                  ) : null}
+                  {/* Music sticker on canvas */}
+                  {selectedMusic && (
+                    <View style={s.storyMusicSticker}>
+                      <Ionicons name="musical-notes" size={11} color="#fff" />
+                      <AppText style={s.storyMusicStickerText} numberOfLines={1}>
+                        {selectedMusic.title} · {selectedMusic.artist}
+                      </AppText>
+                      <TouchableOpacity onPress={() => { stopAllAudio(); setSelectedMusic(null); }}>
+                        <Ionicons name="close" size={11} color="rgba(255,255,255,0.7)" />
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                  {/* Remove media */}
+                  <TouchableOpacity style={s.storyRemove} onPress={() => setMediaFiles([])}>
+                    <View style={s.storyRemoveBtn}>
+                      <Ionicons name="close" size={16} color="#fff" />
+                    </View>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                /* Text-only canvas */
+                <LinearGradient
+                  colors={[bgColor, bgColor + 'cc']}
+                  style={s.storyCanvas}
+                >
+                  <View style={s.storyCanvasInner}>
+                    <TextInput
+                      style={s.storyTextInput}
+                      placeholder="Tap to write..."
+                      placeholderTextColor="rgba(255,255,255,0.45)"
+                      multiline
+                      textAlign="center"
+                      value={textContent}
+                      onChangeText={setTextContent}
+                    />
+                    {!textContent && (
+                      <View style={s.storyCanvasHint}>
+                        <Ionicons name="create-outline" size={28} color="rgba(255,255,255,0.3)" />
+                        <AppText style={s.storyCanvasHintText}>Tap to add text</AppText>
+                      </View>
+                    )}
                   </View>
-                ) : null}
-                <TouchableOpacity style={s.storyRemove} onPress={() => setMediaFiles([])}>
-                  <Ionicons name="close-circle" size={28} color="#fff" />
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <View style={[s.storyCanvas, { backgroundColor: bgColor }]}>
-                <TextInput
-                  style={s.storyText}
-                  placeholder="Type something..."
-                  placeholderTextColor="rgba(255,255,255,0.5)"
-                  multiline
-                  textAlign="center"
-                  value={textContent}
-                  onChangeText={setTextContent}
-                />
-              </View>
-            )}
+                  {/* Music sticker on text canvas */}
+                  {selectedMusic && (
+                    <View style={s.storyMusicSticker}>
+                      <Ionicons name="musical-notes" size={11} color="#fff" />
+                      <AppText style={s.storyMusicStickerText} numberOfLines={1}>
+                        {selectedMusic.title} · {selectedMusic.artist}
+                      </AppText>
+                      <TouchableOpacity onPress={() => { stopAllAudio(); setSelectedMusic(null); }}>
+                        <Ionicons name="close" size={11} color="rgba(255,255,255,0.7)" />
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </LinearGradient>
+              )}
+            </View>
 
+            {/* ── TOOL STRIP ── */}
+            <View style={s.storyToolStrip}>
+              {/* Camera */}
+              <TouchableOpacity style={s.storyTool} onPress={takePhoto}>
+                <View style={s.storyToolIcon}>
+                  <Ionicons name="camera" size={20} color="#fff" />
+                </View>
+                <AppText style={s.storyToolLabel}>Camera</AppText>
+              </TouchableOpacity>
+
+              {/* Gallery */}
+              <TouchableOpacity style={s.storyTool} onPress={() => pickMedia(false)}>
+                <View style={s.storyToolIcon}>
+                  <Ionicons name="images" size={20} color="#fff" />
+                </View>
+                <AppText style={s.storyToolLabel}>Gallery</AppText>
+              </TouchableOpacity>
+
+              {/* Text */}
+              <TouchableOpacity style={s.storyTool} onPress={() => {}}>
+                <View style={[s.storyToolIcon, textContent && { backgroundColor: 'rgba(74,124,63,0.6)', borderColor: '#4A7C3F' }]}>
+                  <Ionicons name="text" size={20} color="#fff" />
+                </View>
+                <AppText style={s.storyToolLabel}>Text</AppText>
+              </TouchableOpacity>
+
+              {/* Music */}
+              <TouchableOpacity style={s.storyTool} onPress={() => setShowMusicModal(true)}>
+                <View style={[s.storyToolIcon, selectedMusic && { backgroundColor: 'rgba(74,124,63,0.6)', borderColor: '#4A7C3F' }]}>
+                  <Ionicons name="musical-notes" size={20} color={selectedMusic ? '#7FB069' : '#fff'} />
+                </View>
+                <AppText style={[s.storyToolLabel, selectedMusic && { color: '#7FB069' }]}>
+                  {selectedMusic ? 'Music ✓' : 'Music'}
+                </AppText>
+              </TouchableOpacity>
+
+              {/* Location */}
+              <TouchableOpacity style={s.storyTool} onPress={detectCurrentLocation}>
+                <View style={[s.storyToolIcon, selectedLocation && { backgroundColor: 'rgba(74,124,63,0.6)', borderColor: '#4A7C3F' }]}>
+                  <Ionicons name="location" size={20} color={selectedLocation ? '#7FB069' : '#fff'} />
+                </View>
+                <AppText style={[s.storyToolLabel, selectedLocation && { color: '#7FB069' }]}>
+                  {selectedLocation ? 'Added' : 'Location'}
+                </AppText>
+              </TouchableOpacity>
+            </View>
+
+            {/* ── TEXT INPUT (when media present) ── */}
             {mediaFiles[0] && (
-              <View style={[s.fieldRow, { backgroundColor: theme.bgCard, borderColor: theme.border2, marginTop: 10 }]}>
-                <Ionicons name="text-outline" size={18} color={theme.muted} />
+              <View style={[s.storyTextField, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]}>
+                <Ionicons name="text-outline" size={16} color={theme.muted} />
                 <TextInput
-                  style={[s.fieldInput, { color: theme.text }]}
+                  style={[s.storyTextFieldInput, { color: theme.text }]}
                   placeholder="Add text overlay..."
                   placeholderTextColor={theme.dim}
                   value={textContent}
                   onChangeText={setTextContent}
                 />
+                {textContent ? (
+                  <TouchableOpacity onPress={() => setTextContent('')}>
+                    <Ionicons name="close-circle" size={16} color={theme.dim} />
+                  </TouchableOpacity>
+                ) : null}
               </View>
             )}
 
-            {/* Music sticker badge on story preview */}
-            {selectedMusic && (
-              <View style={[s.storyMusicSticker, { backgroundColor: 'rgba(124,58,237,0.85)' }]}>
-                <Ionicons name="musical-notes" size={12} color="#fff" />
-                <AppText style={s.storyMusicStickerText} numberOfLines={1}>{selectedMusic.title} · {selectedMusic.artist}</AppText>
-                <TouchableOpacity onPress={() => { stopAllAudio(); setSelectedMusic(null); }}>
-                  <Ionicons name="close" size={12} color="rgba(255,255,255,0.7)" />
-                </TouchableOpacity>
-              </View>
-            )}
-
-            <View style={s.storyActions}>
-              <TouchableOpacity style={[s.storyActionBtn, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]} onPress={takePhoto}>
-                <Ionicons name="camera-outline" size={22} color={theme.text} />
-                <AppText style={[s.storyActionText, { color: theme.text }]}>{t('camera')}</AppText>
-              </TouchableOpacity>
-              <TouchableOpacity style={[s.storyActionBtn, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]} onPress={() => pickMedia(false)}>
-                <Ionicons name="images-outline" size={22} color={theme.text} />
-                <AppText style={[s.storyActionText, { color: theme.text }]}>{t('gallery')}</AppText>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[s.storyActionBtn, { backgroundColor: theme.bgCard, borderColor: selectedMusic ? '#7c3aed' : theme.border2 }]}
-                onPress={() => setShowMusicModal(true)}
-              >
-                <Ionicons name="musical-notes-outline" size={22} color={selectedMusic ? '#7c3aed' : theme.text} />
-                <AppText style={[s.storyActionText, { color: selectedMusic ? '#7c3aed' : theme.text }]}>
-                  {selectedMusic ? selectedMusic.title.slice(0, 8) + '…' : 'Music'}
-                </AppText>
-              </TouchableOpacity>
-            </View>
-
+            {/* ── BG COLORS (text-only canvas) ── */}
             {!mediaFiles[0] && (
-              <>
-                <AppText style={[s.label, { color: theme.muted }]}>Background Color</AppText>
+              <View style={s.storyBgSection}>
+                <AppText style={[s.storyBgLabel, { color: theme.muted }]}>Background</AppText>
                 <View style={s.bgColorRow}>
                   {BG_COLORS.map(c => (
                     <TouchableOpacity
                       key={c}
-                      style={[s.bgColorDot, { backgroundColor: c }, bgColor === c && s.bgColorDotActive]}
                       onPress={() => setBgColor(c)}
-                    />
+                      style={[
+                        s.bgColorDot,
+                        { backgroundColor: c },
+                        bgColor === c && s.bgColorDotActive,
+                      ]}
+                    >
+                      {bgColor === c && (
+                        <Ionicons name="checkmark" size={14} color="#fff" />
+                      )}
+                    </TouchableOpacity>
                   ))}
                 </View>
-              </>
+              </View>
             )}
 
-            <AppText style={[s.label, { color: theme.muted }]}>{t('audience')}</AppText>
-            <View style={s.privacyRow}>
+            {/* ── AUDIENCE ── */}
+            <View style={s.storyAudienceRow}>
+              <Ionicons name="people-outline" size={14} color={theme.muted} />
+              <AppText style={[s.storyAudienceLabel, { color: theme.muted }]}>Audience:</AppText>
               {PRIVACY_OPTS.slice(0, 2).map(opt => (
                 <TouchableOpacity
                   key={opt.key}
-                  style={[s.privacyBtn, { backgroundColor: theme.bgCard, borderColor: theme.border2 }, privacy === opt.key && { borderColor: opt.color, backgroundColor: `${opt.color}22` }]}
+                  style={[
+                    s.storyAudienceBtn,
+                    { borderColor: theme.border2 },
+                    privacy === opt.key && { borderColor: opt.color, backgroundColor: `${opt.color}22` },
+                  ]}
                   onPress={() => setPrivacy(opt.key)}
                 >
-                  <Ionicons name={opt.icon} size={14} color={privacy === opt.key ? opt.color : theme.muted} />
-                  <AppText style={[s.privacyText, { color: privacy === opt.key ? opt.color : theme.muted }]}>{opt.label}</AppText>
+                  <AppText style={[
+                    s.storyAudienceBtnText,
+                    { color: privacy === opt.key ? opt.color : theme.muted },
+                  ]}>
+                    {opt.label}
+                  </AppText>
                 </TouchableOpacity>
               ))}
             </View>
@@ -2063,21 +2150,36 @@ const s = StyleSheet.create({
   privacyText: { fontSize: 11, fontWeight: '600' },
 
   // Story
-  storyPreview: { width: '100%', height: 400, borderRadius: radius.lg, overflow: 'hidden', marginBottom: 12, position: 'relative' },
-  storyPreviewImg: { width: '100%', height: '100%' },
-  storyTextOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.45)', padding: 16 },
-  storyOverlayText: { color: '#fff', fontSize: 18, fontWeight: '700', textAlign: 'center' },
+  storyStudio: { width: '100%', marginBottom: 12 },
+  storyCanvas: { width: '100%', height: 420, borderRadius: 20, overflow: 'hidden', position: 'relative', alignItems: 'center', justifyContent: 'center' },
+  storyCanvasImg: { position: 'absolute', width: '100%', height: '100%' },
+  storyGradTop: { position: 'absolute', top: 0, left: 0, right: 0, height: 100 },
+  storyGradBottom: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 140 },
+  storyCanvasInner: { flex: 1, width: '100%', alignItems: 'center', justifyContent: 'center', padding: 28 },
+  storyTextInput: { color: '#fff', fontSize: 24, fontWeight: '700', textAlign: 'center', width: '100%', textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
+  storyCanvasHint: { position: 'absolute', alignItems: 'center', gap: 6 },
+  storyCanvasHintText: { color: 'rgba(255,255,255,0.3)', fontSize: 13 },
+  storyTextOverlay: { position: 'absolute', bottom: 60, left: 16, right: 16, alignItems: 'center' },
+  storyOverlayText: { color: '#fff', fontSize: 20, fontWeight: '700', textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
+  storyMusicSticker: { position: 'absolute', bottom: 16, left: 16, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, maxWidth: '70%' },
+  storyMusicStickerText: { color: '#fff', fontSize: 11, flex: 1 },
   storyRemove: { position: 'absolute', top: 12, right: 12 },
-  storyCanvas: { width: '100%', height: 300, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center', marginBottom: 16, padding: 24 },
-  storyText: { color: '#fff', fontSize: 22, fontWeight: '700', textAlign: 'center', width: '100%' },
-  storyActions: { flexDirection: 'row', gap: 8, marginBottom: 16 },
-  storyActionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: radius.md, borderWidth: 1 },
-  storyActionText: { fontWeight: '600', fontSize: 12 },
-  bgColorRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
-  bgColorDot: { width: 32, height: 32, borderRadius: 16 },
+  storyRemoveBtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
+  storyToolStrip: { flexDirection: 'row', justifyContent: 'space-around', paddingVertical: 14, paddingHorizontal: 8, marginBottom: 4 },
+  storyTool: { alignItems: 'center', gap: 5 },
+  storyToolIcon: { width: 46, height: 46, borderRadius: 23, backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
+  storyToolLabel: { fontSize: 10, color: 'rgba(255,255,255,0.6)', fontWeight: '600' },
+  storyTextField: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 14 },
+  storyTextFieldInput: { flex: 1, fontSize: 14 },
+  storyBgSection: { marginBottom: 14 },
+  storyBgLabel: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 },
+  bgColorRow: { flexDirection: 'row', gap: 10 },
+  bgColorDot: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   bgColorDotActive: { borderWidth: 3, borderColor: '#fff' },
-  storyMusicSticker: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.full, marginBottom: 10 },
-  storyMusicStickerText: { color: '#fff', fontSize: 12, fontWeight: '600', maxWidth: 160 },
+  storyAudienceRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16, flexWrap: 'wrap' },
+  storyAudienceLabel: { fontSize: 12, fontWeight: '600' },
+  storyAudienceBtn: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, borderWidth: 1 },
+  storyAudienceBtnText: { fontSize: 12, fontWeight: '600' },
 
   // Family
   mediaThumbLarge: { width: '100%', height: 200, borderRadius: radius.lg, overflow: 'hidden', marginBottom: 16, position: 'relative' },

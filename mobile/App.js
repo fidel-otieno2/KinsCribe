@@ -2,7 +2,7 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { StatusBar } from "expo-status-bar";
-import { ActivityIndicator, View, TouchableOpacity, StyleSheet, Animated, Platform } from "react-native";
+import { ActivityIndicator, View, TouchableOpacity, StyleSheet, Animated, Platform, Image } from "react-native";
 import AppText from "./src/components/AppText";
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useState, useRef } from "react";
@@ -82,7 +82,7 @@ const TAB_ITEMS = [
   { name: 'Profile',  icon: 'person-outline', iconFilled: 'person',   label: 'Profile' },
 ];
 
-function CustomTabBar({ state, navigation, msgUnread, notifUnread, theme }) {
+function CustomTabBar({ state, navigation, msgUnread, notifUnread, theme, user }) {
   const scales = useRef(TAB_ITEMS.map(() => new Animated.Value(1))).current;
 
   const handlePress = (name, index, isFocused) => {
@@ -90,18 +90,31 @@ function CustomTabBar({ state, navigation, msgUnread, notifUnread, theme }) {
       Animated.timing(scales[index], { toValue: 0.82, duration: 80, useNativeDriver: true }),
       Animated.spring(scales[index], { toValue: 1, useNativeDriver: true, speed: 20 }),
     ]).start();
-    if (!isFocused) navigation.navigate(name);
+    if (!isFocused) {
+      if (name === 'Create') {
+        navigation.navigate(name, { initialMode: 'story' });
+      } else {
+        navigation.navigate(name);
+      }
+    }
   };
+
+  const isDark = theme.mode === 'dark';
+  // Match exactly the FeedScreen background color
+  const barBg = isDark ? 'rgba(28,26,20,0.96)' : 'rgba(245,240,232,0.96)';
+  const borderCol = isDark ? 'rgba(196,163,90,0.15)' : 'rgba(45,90,39,0.12)';
 
   return (
     <View style={nb.wrapper} pointerEvents="box-none">
       <BlurView
-        intensity={Platform.OS === 'ios' ? 70 : 100}
-        tint={theme.mode === 'dark' ? 'dark' : 'light'}
-        style={nb.blur}
+        intensity={Platform.OS === 'ios' ? 60 : 100}
+        tint={isDark ? 'dark' : 'light'}
+        style={[nb.blur, { backgroundColor: barBg, borderColor: borderCol }]}
       >
-        {/* Gold top border line */}
-        <View style={[nb.topLine, { backgroundColor: theme.gold }]} />
+        {/* Gold/green top accent line */}
+        <View style={[nb.topLine, {
+          backgroundColor: isDark ? theme.gold : theme.primary,
+        }]} />
 
         <View style={nb.row}>
           {TAB_ITEMS.map((item, index) => {
@@ -126,7 +139,6 @@ function CustomTabBar({ state, navigation, msgUnread, notifUnread, theme }) {
                   ]}
                 >
                   {isCreate ? (
-                    // ── Elevated centre CREATE button ──
                     <LinearGradient
                       colors={['#4A7C3F', '#2D5A27']}
                       style={nb.createBtn}
@@ -135,25 +147,53 @@ function CustomTabBar({ state, navigation, msgUnread, notifUnread, theme }) {
                     </LinearGradient>
                   ) : (
                     <View style={nb.iconWrap}>
-                      {/* Active indicator dot */}
                       {isFocused && (
                         <View style={[nb.activeDot, { backgroundColor: theme.primary }]} />
                       )}
 
-                      <Ionicons
-                        name={isFocused ? item.iconFilled : item.icon}
-                        size={24}
-                        color={isFocused ? theme.primary : theme.dim}
-                      />
+                      {/* Active tab gets a subtle pill background */}
+                      {isFocused && (
+                        <View style={[nb.activePill, {
+                          backgroundColor: isDark
+                            ? 'rgba(74,124,63,0.15)'
+                            : 'rgba(45,90,39,0.1)',
+                        }]} />
+                      )}
 
-                      {/* Label — only when active */}
+                      {/* Profile tab — show user avatar instead of icon */}
+                      {item.name === 'Profile' ? (
+                        <View style={[
+                          nb.avatarWrap,
+                          isFocused && { borderColor: theme.primary, borderWidth: 2 },
+                          !isFocused && { borderColor: theme.dim, borderWidth: 1.5 },
+                        ]}>
+                          {user?.avatar_url ? (
+                            <Image
+                              source={{ uri: user.avatar_url }}
+                              style={nb.avatarImg}
+                            />
+                          ) : (
+                            <View style={[nb.avatarFallback, { backgroundColor: theme.primary }]}>
+                              <AppText style={nb.avatarLetter}>
+                                {user?.name?.[0]?.toUpperCase() || 'U'}
+                              </AppText>
+                            </View>
+                          )}
+                        </View>
+                      ) : (
+                        <Ionicons
+                          name={isFocused ? item.iconFilled : item.icon}
+                          size={24}
+                          color={isFocused ? theme.primary : theme.dim}
+                        />
+                      )}
+
                       {isFocused && (
                         <AppText style={[nb.label, { color: theme.primary }]}>
                           {item.label}
                         </AppText>
                       )}
 
-                      {/* Unread badge */}
                       {badge > 0 && (
                         <View style={nb.badge}>
                           <AppText style={nb.badgeText}>
@@ -185,16 +225,15 @@ const nb = StyleSheet.create({
     borderRadius: 28,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(196,163,90,0.18)',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.25,
     shadowRadius: 20,
     elevation: 20,
   },
   topLine: {
     height: 1,
-    opacity: 0.4,
+    opacity: 0.35,
   },
   row: {
     flexDirection: 'row',
@@ -217,6 +256,14 @@ const nb = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 2,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 14,
+  },
+  activePill: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    borderRadius: 14,
   },
   activeDot: {
     width: 4,
@@ -260,6 +307,27 @@ const nb = StyleSheet.create({
     fontSize: 9,
     fontWeight: '800',
   },
+  avatarWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  avatarImg: {
+    width: '100%',
+    height: '100%',
+  },
+  avatarFallback: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarLetter: {
+    color: '#fff',
+    fontWeight: '800',
+    fontSize: 12,
+  },
 });
 
 // ── Main Tabs ─────────────────────────────────────────────────
@@ -297,6 +365,7 @@ function MainTabs() {
           msgUnread={msgUnread}
           notifUnread={notifUnread}
           theme={theme}
+          user={user}
         />
       )}
     >
