@@ -14,7 +14,7 @@ const { width, height } = Dimensions.get('window');
 
 const FLASH_MODES = ['off', 'on', 'auto'];
 const FLASH_ICONS = { off: 'flash-off', on: 'flash', auto: 'flash-outline' };
-const DURATIONS = [15, 30, 60];
+const DURATIONS = [15, 45, 60];
 const SPEEDS = [{ label: '0.5x', value: 0.5 }, { label: '1x', value: 1 }, { label: '2x', value: 2 }];
 
 export default function StoryCameraScreen({ navigation, route }) {
@@ -41,10 +41,12 @@ export default function StoryCameraScreen({ navigation, route }) {
   const [recording, setRecording] = useState(false);
   const [paused, setPaused] = useState(false);
   const [elapsed, setElapsed] = useState(0);
-  const [maxDuration, setMaxDuration] = useState(15);
+  const [maxDuration, setMaxDuration] = useState(45);
   const [speed, setSpeed] = useState(1);
   const [showDurationPicker, setShowDurationPicker] = useState(false);
   const [showSpeedPicker, setShowSpeedPicker] = useState(false);
+  const [showEffects, setShowEffects] = useState(false);
+  const [selectedEffect, setSelectedEffect] = useState(null);
 
   const elapsedRef = useRef(null);
   const recordBtnScale = useRef(new Animated.Value(1)).current;
@@ -177,6 +179,15 @@ export default function StoryCameraScreen({ navigation, route }) {
     if (recording) { stopRecording(); } else { startRecording(); }
   };
 
+  // ── Hold to record (TikTok style) ────────────────────────────
+  const handleRecordPressIn = () => {
+    if (mode === 'video' && !recording) startRecording();
+  };
+
+  const handleRecordPressOut = () => {
+    if (mode === 'video' && recording) stopRecording();
+  };
+
   // ── Format elapsed ───────────────────────────────────────────
   const fmt = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
@@ -184,7 +195,7 @@ export default function StoryCameraScreen({ navigation, route }) {
   if (!camPerm.granted) {
     return (
       <View style={[st.container, { alignItems: 'center', justifyContent: 'center' }]}>
-        <Ionicons name="camera-off-outline" size={48} color="#fff" />
+        <Ionicons name="videocam-off-outline" size={48} color="#fff" />
         <AppText style={{ color: '#fff', marginTop: 12, textAlign: 'center', paddingHorizontal: 32 }}>
           Camera permission is required.{'\n'}Enable it in your device settings.
         </AppText>
@@ -238,10 +249,8 @@ export default function StoryCameraScreen({ navigation, route }) {
           )}
         </View>
 
-        {/* Flash */}
-        <TouchableOpacity style={st.iconBtn} onPress={cycleFlash}>
-          <Ionicons name={FLASH_ICONS[flashMode]} size={24} color="#fff" />
-        </TouchableOpacity>
+        {/* Flash moved to right strip */}
+        <View style={{ width: 40 }} />
       </LinearGradient>
 
       {/* ── PROGRESS BAR (video) ── */}
@@ -253,7 +262,66 @@ export default function StoryCameraScreen({ navigation, route }) {
         </View>
       )}
 
-      {/* ── TIMER COUNTDOWN OVERLAY ── */}
+      {/* ── RIGHT SIDE TOOL STRIP (TikTok style) ── */}
+      <View style={[st.rightStrip, { top: insets.top + 80 }]}>
+
+        {/* Flip */}
+        <TouchableOpacity style={st.rightBtn} onPress={flipCamera}>
+          <Ionicons name="camera-reverse-outline" size={26} color="#fff" />
+          <AppText style={st.rightBtnLabel}>Flip</AppText>
+        </TouchableOpacity>
+
+        {/* Flash */}
+        <TouchableOpacity style={st.rightBtn} onPress={cycleFlash}>
+          <Ionicons name={FLASH_ICONS[flashMode]} size={26} color={flashMode === 'on' ? '#FFD700' : '#fff'} />
+          <AppText style={st.rightBtnLabel}>
+            {flashMode === 'off' ? 'Off' : flashMode === 'on' ? 'On' : 'Auto'}
+          </AppText>
+        </TouchableOpacity>
+
+        {/* Timer */}
+        <TouchableOpacity
+          style={st.rightBtn}
+          onPress={() => {
+            const opts = [0, 3, 10];
+            setTimerSec(opts[(opts.indexOf(timerSec) + 1) % opts.length]);
+          }}
+        >
+          <Ionicons name="timer-outline" size={26} color={timerSec > 0 ? '#FFD700' : '#fff'} />
+          <AppText style={[st.rightBtnLabel, timerSec > 0 && { color: '#FFD700' }]}>
+            {timerSec === 0 ? 'Off' : `${timerSec}s`}
+          </AppText>
+        </TouchableOpacity>
+
+        {/* Speed */}
+        {mode === 'video' && (
+          <TouchableOpacity
+            style={st.rightBtn}
+            onPress={() => {
+              const opts = [0.5, 1, 2];
+              setSpeed(opts[(opts.indexOf(speed) + 1) % opts.length]);
+            }}
+          >
+            <Ionicons name="speedometer-outline" size={26} color={speed !== 1 ? '#FFD700' : '#fff'} />
+            <AppText style={[st.rightBtnLabel, speed !== 1 && { color: '#FFD700' }]}>{speed}x</AppText>
+          </TouchableOpacity>
+        )}
+
+        {/* Duration (video only) */}
+        {mode === 'video' && (
+          <TouchableOpacity
+            style={st.rightBtn}
+            onPress={() => {
+              const idx = DURATIONS.indexOf(maxDuration);
+              setMaxDuration(DURATIONS[(idx + 1) % DURATIONS.length]);
+            }}
+          >
+            <Ionicons name="time-outline" size={26} color="#fff" />
+            <AppText style={st.rightBtnLabel}>{maxDuration}s</AppText>
+          </TouchableOpacity>
+        )}
+
+      </View>
       {timerCountdown !== null && (
         <View style={st.countdownOverlay}>
           <AppText style={st.countdownText}>{timerCountdown}</AppText>
@@ -337,29 +405,20 @@ export default function StoryCameraScreen({ navigation, route }) {
 
         {/* Main controls row */}
         <View style={st.controlsRow}>
-          {/* Timer toggle */}
-          <TouchableOpacity
-            style={st.sideBtn}
-            onPress={() => {
-              const opts = [0, 3, 10];
-              const next = opts[(opts.indexOf(timerSec) + 1) % opts.length];
-              setTimerSec(next);
-            }}
-          >
-            <Ionicons name="timer-outline" size={26} color="#fff" />
-            {timerSec > 0 && (
-              <View style={st.sideBtnBadge}>
-                <AppText style={st.sideBtnBadgeText}>{timerSec}</AppText>
-              </View>
-            )}
+          {/* Effects button (left side) */}
+          <TouchableOpacity style={st.sideBtn}>
+            <Ionicons name="color-wand-outline" size={26} color="#fff" />
           </TouchableOpacity>
 
           {/* Record / Shutter button */}
           <Animated.View style={{ transform: [{ scale: recordBtnScale }] }}>
             <TouchableOpacity
               style={[st.shutterOuter, mode === 'video' && recording && st.shutterOuterRecording]}
-              onPress={handleRecordPress}
+              onPress={mode === 'photo' ? handleRecordPress : undefined}
+              onPressIn={mode === 'video' ? handleRecordPressIn : undefined}
+              onPressOut={mode === 'video' ? handleRecordPressOut : undefined}
               activeOpacity={0.85}
+              delayLongPress={100}
             >
               {mode === 'video' ? (
                 recording ? (
@@ -544,5 +603,25 @@ const st = StyleSheet.create({
   permBtn: {
     marginTop: 20, backgroundColor: '#2D5A27',
     paddingHorizontal: 24, paddingVertical: 12, borderRadius: 24,
+  },
+
+  rightStrip: {
+    position: 'absolute',
+    right: 12,
+    alignItems: 'center',
+    gap: 20,
+    zIndex: 10,
+  },
+  rightBtn: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  rightBtnLabel: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
+    textShadowColor: 'rgba(0,0,0,0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
 });
