@@ -112,8 +112,8 @@ def create_post():
                 post.music_stream_url = upload_result['secure_url']
                 _os.unlink(tmp_path)
             except Exception as e:
-                # Fallback: store the Deezer URL directly (may expire)
-                post.music_stream_url = music_preview_url
+                # Cloudinary upload failed — don't store the Deezer URL as it expires
+                post.music_stream_url = ''
         else:
             post.music_stream_url = ''
     db.session.add(post)

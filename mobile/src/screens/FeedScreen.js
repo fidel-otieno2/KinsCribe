@@ -1095,6 +1095,17 @@ export default function FeedScreen({ navigation }) {
     </View>
   );
 
+  const renderPost = useCallback(({ item }) => (
+    <PostCard
+      post={item}
+      navigation={navigation}
+      onUpdate={() => fetchFeed(true)}
+      isVisible={item.id === visiblePostId}
+    />
+  ), [visiblePostId, navigation, fetchFeed]);
+
+  const keyExtractor = useCallback((item) => String(item.id), []);
+
   return (
     <View style={[s.container, { backgroundColor: theme.bg }]}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
@@ -1162,15 +1173,8 @@ export default function FeedScreen({ navigation }) {
       ) : (
         <FlatList
           data={posts}
-          keyExtractor={i => String(i.id)}
-          renderItem={({ item }) => (
-            <PostCard
-              post={item}
-              navigation={navigation}
-              onUpdate={() => fetchFeed(true)}
-              isVisible={item.id === visiblePostId}
-            />
-          )}
+          keyExtractor={keyExtractor}
+          renderItem={renderPost}
           ListHeaderComponent={<ListHeader />}
           contentContainerStyle={{ paddingBottom: 110 }}
           refreshControl={
