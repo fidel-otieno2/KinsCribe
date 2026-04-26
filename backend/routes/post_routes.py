@@ -142,25 +142,40 @@ def create_post():
 def post_feed():
     user = me()
     current_id = user.id
-    # Only include accepted connections in feed
     interests = {c.following_id for c in Connection.query.filter_by(
         follower_id=current_id, status="accepted"
     ).all()}
     candidate_ids = interests | {current_id}
     all_posts = Post.query.filter(Post.user_id.in_(candidate_ids)).order_by(Post.created_at.desc()).limit(50).all()
+
+    # Also include posts where current user is an accepted collaborator
+    collab_post_ids = [
+        c.post_id for c in PostCollaborator.query.filter_by(user_id=current_id, status="accepted").all()
+    ]
+    if collab_post_ids:
+        collab_posts = Post.query.filter(
+            Post.id.in_(collab_post_ids),
+            ~Post.id.in_([p.id for p in all_posts])
+        ).order_by(Post.created_at.desc()).limit(20).all()
+        all_posts = sorted(all_posts + collab_posts, key=lambda x: x.created_at, reverse=True)[:50]
+
     result = []
     for p in all_posts:
         author = User.query.get(p.user_id)
         if not author:
             continue
-        # If author is private and we're not connected, skip (except own posts)
         if p.user_id != current_id and author.is_private and not _is_connected(current_id, p.user_id):
-            continue
+            # Allow if current user is an accepted collaborator on this post
+            is_collab = p.id in collab_post_ids if collab_post_ids else False
+            if not is_collab:
+                continue
         if p.privacy == "public":
             result.append(p.to_dict(current_id))
         elif p.privacy == "connections" and (p.user_id == current_id or _is_connected(current_id, p.user_id)):
             result.append(p.to_dict(current_id))
         elif p.user_id == current_id:
+            result.append(p.to_dict(current_id))
+        elif p.id in (collab_post_ids if collab_post_ids else []):
             result.append(p.to_dict(current_id))
     return jsonify({"posts": result})
 

@@ -73,10 +73,199 @@ Notifications.setNotificationHandler({
   }),
 });
 
+// ── Custom Tab Bar ───────────────────────────────────────────
+const TAB_ITEMS = [
+  { name: 'Feed',     icon: 'home',        iconFilled: 'home',        label: 'Home'    },
+  { name: 'Search',   icon: 'compass-outline', iconFilled: 'compass', label: 'Discover' },
+  { name: 'Create',   icon: 'add',         iconFilled: 'add',         label: ''        },
+  { name: 'Messages', icon: 'chatbubbles-outline', iconFilled: 'chatbubbles', label: 'Messages' },
+  { name: 'Profile',  icon: 'person-outline', iconFilled: 'person',   label: 'Profile' },
+];
+
+function CustomTabBar({ state, navigation, msgUnread, notifUnread, theme }) {
+  const scales = useRef(TAB_ITEMS.map(() => new Animated.Value(1))).current;
+
+  const handlePress = (name, index, isFocused) => {
+    Animated.sequence([
+      Animated.timing(scales[index], { toValue: 0.82, duration: 80, useNativeDriver: true }),
+      Animated.spring(scales[index], { toValue: 1, useNativeDriver: true, speed: 20 }),
+    ]).start();
+    if (!isFocused) navigation.navigate(name);
+  };
+
+  return (
+    <View style={nb.wrapper} pointerEvents="box-none">
+      <BlurView
+        intensity={Platform.OS === 'ios' ? 70 : 100}
+        tint={theme.mode === 'dark' ? 'dark' : 'light'}
+        style={nb.blur}
+      >
+        {/* Gold top border line */}
+        <View style={[nb.topLine, { backgroundColor: theme.gold }]} />
+
+        <View style={nb.row}>
+          {TAB_ITEMS.map((item, index) => {
+            const isFocused = state.index === index;
+            const isCreate = item.name === 'Create';
+
+            const badge =
+              item.name === 'Messages' ? msgUnread :
+              item.name === 'Feed'     ? notifUnread : 0;
+
+            return (
+              <TouchableOpacity
+                key={item.name}
+                onPress={() => handlePress(item.name, index, isFocused)}
+                activeOpacity={1}
+                style={nb.tab}
+              >
+                <Animated.View
+                  style={[
+                    nb.tabInner,
+                    { transform: [{ scale: scales[index] }] },
+                  ]}
+                >
+                  {isCreate ? (
+                    // ── Elevated centre CREATE button ──
+                    <LinearGradient
+                      colors={['#4A7C3F', '#2D5A27']}
+                      style={nb.createBtn}
+                    >
+                      <Ionicons name="add" size={30} color="#fff" />
+                    </LinearGradient>
+                  ) : (
+                    <View style={nb.iconWrap}>
+                      {/* Active indicator dot */}
+                      {isFocused && (
+                        <View style={[nb.activeDot, { backgroundColor: theme.primary }]} />
+                      )}
+
+                      <Ionicons
+                        name={isFocused ? item.iconFilled : item.icon}
+                        size={24}
+                        color={isFocused ? theme.primary : theme.dim}
+                      />
+
+                      {/* Label — only when active */}
+                      {isFocused && (
+                        <AppText style={[nb.label, { color: theme.primary }]}>
+                          {item.label}
+                        </AppText>
+                      )}
+
+                      {/* Unread badge */}
+                      {badge > 0 && (
+                        <View style={nb.badge}>
+                          <AppText style={nb.badgeText}>
+                            {badge > 9 ? '9+' : badge}
+                          </AppText>
+                        </View>
+                      )}
+                    </View>
+                  )}
+                </Animated.View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </BlurView>
+    </View>
+  );
+}
+
+const nb = StyleSheet.create({
+  wrapper: {
+    position: 'absolute',
+    bottom: 16,
+    left: 16,
+    right: 16,
+    zIndex: 999,
+  },
+  blur: {
+    borderRadius: 28,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(196,163,90,0.18)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 20,
+  },
+  topLine: {
+    height: 1,
+    opacity: 0.4,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    paddingHorizontal: 8,
+    paddingBottom: Platform.OS === 'ios' ? 24 : 10,
+    paddingTop: 8,
+  },
+  tab: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+  },
+  tabInner: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 48,
+  },
+  iconWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+  },
+  activeDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    marginBottom: 3,
+  },
+  label: {
+    fontSize: 10,
+    fontWeight: '700',
+    marginTop: 2,
+    letterSpacing: 0.3,
+  },
+  createBtn: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
+    shadowColor: '#2D5A27',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
+    elevation: 12,
+  },
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -10,
+    backgroundColor: '#C0392B',
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 9,
+    fontWeight: '800',
+  },
+});
+
+// ── Main Tabs ─────────────────────────────────────────────────
 function MainTabs() {
   const { theme } = useTheme();
   const { user } = useAuth();
-  const { t } = useTranslation();
   const [msgUnread, setMsgUnread] = useState(0);
   const [notifUnread, setNotifUnread] = useState(0);
   const pollRef = useRef(null);
@@ -101,97 +290,24 @@ function MainTabs() {
 
   return (
     <Tab.Navigator
-      screenOptions={{
-        headerShown: false,
-        tabBarStyle: {
-          backgroundColor: theme.tabBar,
-          borderTopColor: theme.tabBarBorder,
-          borderTopWidth: 1,
-          height: 64,
-          paddingBottom: 10,
-          shadowColor: theme.primary,
-          shadowOffset: { width: 0, height: -4 },
-          shadowOpacity: 0.15,
-          shadowRadius: 16,
-          elevation: 20,
-        },
-        tabBarActiveTintColor: theme.primary,
-        tabBarInactiveTintColor: theme.dim,
-        tabBarLabelStyle: { fontSize: 11, fontWeight: "600" },
-      }}
+      screenOptions={{ headerShown: false }}
+      tabBar={(props) => (
+        <CustomTabBar
+          {...props}
+          msgUnread={msgUnread}
+          notifUnread={notifUnread}
+          theme={theme}
+        />
+      )}
     >
-      <Tab.Screen
-        name="Feed"
-        component={FeedScreen}
-        options={{
-          tabBarLabel: t('home'),
-          tabBarIcon: ({ color, focused }) => (
-            <View>
-              <Ionicons name={focused ? "home" : "home-outline"} size={24} color={color} />
-              {notifUnread > 0 && (
-                <View style={tabBadge.dot}>
-                  <AppText style={tabBadge.dotText}>{notifUnread > 9 ? "9+" : notifUnread}</AppText>
-                </View>
-              )}
-            </View>
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Search"
-        component={SearchScreen}
-        options={{
-          tabBarLabel: t('discover'),
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "compass" : "compass-outline"} size={24} color={color} />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Create"
-        component={CreateScreen}
-        options={{
-          tabBarLabel: t('create'),
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "add-circle" : "add-circle-outline"} size={28} color={color} />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Messages"
-        component={MessagesScreen}
-        options={{
-          tabBarLabel: t('messages'),
-          tabBarIcon: ({ color, focused }) => (
-            <View>
-              <Ionicons name={focused ? "chatbubbles" : "chatbubbles-outline"} size={24} color={color} />
-              {msgUnread > 0 && (
-                <View style={tabBadge.dot}>
-                  <AppText style={tabBadge.dotText}>{msgUnread > 9 ? "9+" : msgUnread}</AppText>
-                </View>
-              )}
-            </View>
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Profile"
-        component={ProfileScreen}
-        options={{
-          tabBarLabel: t('profile'),
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "person-circle" : "person-circle-outline"} size={24} color={color} />
-          ),
-        }}
-      />
+      <Tab.Screen name="Feed"     component={FeedScreen} />
+      <Tab.Screen name="Search"   component={SearchScreen} />
+      <Tab.Screen name="Create"   component={CreateScreen} />
+      <Tab.Screen name="Messages" component={MessagesScreen} />
+      <Tab.Screen name="Profile"  component={ProfileScreen} />
     </Tab.Navigator>
   );
 }
-
-const tabBadge = {
-  dot: { position: "absolute", top: -4, right: -8, backgroundColor: "#e11d48", borderRadius: 8, minWidth: 16, height: 16, alignItems: "center", justifyContent: "center", paddingHorizontal: 3 },
-  dotText: { color: "#fff", fontSize: 9, fontWeight: "800" },
-};
 
 function RootNavigator({ navigationRef }) {
   const { user, loading } = useAuth();
