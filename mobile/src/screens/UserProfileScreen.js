@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, StyleSheet, Image, TouchableOpacity,
   ActivityIndicator, ScrollView, Dimensions, Alert, Modal,
@@ -8,6 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import { Video, ResizeMode } from 'expo-av';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../i18n';
@@ -16,6 +17,42 @@ import ProfileGroupsSection from '../components/ProfileGroupsSection';
 
 const { width } = Dimensions.get('window');
 const GRID = (width - 3) / 3;
+
+function GridItem({ post, onPress }) {
+  const isVideo = post.media_type === 'video' && !!post.media_url;
+  return (
+    <TouchableOpacity style={s.gridItem} activeOpacity={0.9} onPress={onPress}>
+      {isVideo ? (
+        <>
+          <Video
+            source={{ uri: post.media_url }}
+            style={s.gridImg}
+            resizeMode={ResizeMode.COVER}
+            shouldPlay
+            isLooping
+            isMuted
+            useNativeControls={false}
+          />
+          <View style={s.videoOverlay}>
+            <Ionicons name="play" size={22} color="#fff" />
+          </View>
+        </>
+      ) : post.media_url ? (
+        <Image source={{ uri: post.media_url }} style={s.gridImg} resizeMode="cover" />
+      ) : (
+        <View style={[s.gridImg, s.gridText]}>
+          <AppText style={s.gridCaption} numberOfLines={4}>{post.caption}</AppText>
+        </View>
+      )}
+      {post.like_count > 0 && (
+        <View style={s.gridLikes}>
+          <Ionicons name="heart" size={10} color="#fff" />
+          <AppText style={s.gridLikesText}>{post.like_count}</AppText>
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+}
 
 export default function UserProfileScreen({ route, navigation }) {
   const { userId, userName, userAvatar } = route.params;
@@ -369,20 +406,11 @@ export default function UserProfileScreen({ route, navigation }) {
         ) : tab === 'posts' ? (
           <View style={s.grid}>
             {posts.map(p => (
-              <TouchableOpacity key={p.id} style={s.gridItem} activeOpacity={0.9}
-                onPress={() => navigation.navigate('PostDetail', { postId: p.id })}>
-                {p.media_url
-                  ? <Image source={{ uri: p.media_url }} style={s.gridImg} resizeMode="cover" />
-                  : <View style={[s.gridImg, s.gridText]}>
-                      <AppText style={s.gridCaption} numberOfLines={4}>{p.caption}</AppText>
-                    </View>}
-                {p.like_count > 0 && (
-                  <View style={s.gridLikes}>
-                    <Ionicons name="heart" size={10} color="#fff" />
-                    <AppText style={s.gridLikesText}>{p.like_count}</AppText>
-                  </View>
-                )}
-              </TouchableOpacity>
+              <GridItem key={p.id} post={p} onPress={() =>
+                p.media_type === 'video'
+                  ? navigation.navigate('Reels', { startPostId: p.id })
+                  : navigation.navigate('PostDetail', { postId: p.id })
+              } />
             ))}
           </View>
         ) : (
@@ -530,6 +558,7 @@ const s = StyleSheet.create({
   gridCaption: { color: colors.text, fontSize: 11, textAlign: 'center' },
   gridLikes: { position: 'absolute', bottom: 4, left: 4, flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 10 },
   gridLikesText: { color: '#fff', fontSize: 10, fontWeight: '600' },
+  videoOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.18)' },
   listItem: { flexDirection: 'row', gap: 12, padding: 16, borderBottomWidth: 0.5, borderBottomColor: colors.border },
   listImg: { width: 70, height: 70, borderRadius: 8 },
   listInfo: { flex: 1, justifyContent: 'center' },

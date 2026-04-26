@@ -349,8 +349,8 @@ export default function StoryViewerScreen({ route, navigation }) {
         </View>
 
         <View style={s.headerRight}>
-          {/* Follow button — viewer only */}
-          {!isOwn && (
+          {/* Follow button — viewer only, not already connected */}
+          {!isOwn && !group.is_connected && (
             <TouchableOpacity
               style={s.followBtn}
               onPress={() => navigation.navigate('UserProfile', {

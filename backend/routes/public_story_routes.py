@@ -115,6 +115,7 @@ def story_feed():
             "author_username": u.username if u else None,
             "has_unseen": has_unseen,
             "is_self": False,
+            "is_connected": uid in following_ids,
             "stories": user_stories
         })
     # Unseen first, then seen

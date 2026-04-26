@@ -122,6 +122,60 @@ export default function CreateScreen({ navigation, route }) {
 
   // ─── MUSIC STATE ─────────────────────────────────────────────────
   const [showMusicModal, setShowMusicModal] = useState(false);
+  const [showLocationModal, setShowLocationModal] = useState(false);
+  const [storyLocationQuery, setStoryLocationQuery] = useState('');
+  const [storyLocationResults, setStoryLocationResults] = useState([]);
+  const [storyLocationLoading, setStoryLocationLoading] = useState(false);
+  const storyLocationTimer = useRef(null);
+
+  const searchStoryLocation = (text) => {
+    setStoryLocationQuery(text);
+    clearTimeout(storyLocationTimer.current);
+    if (!text.trim() || text.length < 2) { setStoryLocationResults([]); return; }
+    storyLocationTimer.current = setTimeout(async () => {
+      setStoryLocationLoading(true);
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(text)}&format=json&limit=6&addressdetails=1`,
+          { headers: { 'Accept-Language': 'en', 'User-Agent': 'KinsCribeApp/1.0' } }
+        );
+        const data = await res.json();
+        setStoryLocationResults(data.map(p => ({
+          id: p.place_id,
+          name: p.display_name.split(',').slice(0, 2).join(', '),
+          full: p.display_name,
+        })));
+      } catch {} finally { setStoryLocationLoading(false); }
+    }, 500);
+  };
+
+  const pickStoryLocation = (place) => {
+    selectLocation(place);
+    setStoryLocationQuery('');
+    setStoryLocationResults([]);
+    setShowLocationModal(false);
+  };
+
+  const detectAndPickLocation = async () => {
+    setStoryLocationLoading(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') { info('Allow location access in settings'); return; }
+      const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      const { latitude, longitude } = pos.coords;
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`,
+        { headers: { 'Accept-Language': 'en', 'User-Agent': 'KinsCribeApp/1.0' } }
+      );
+      const data = await res.json();
+      const name = [
+        data.address?.suburb || data.address?.neighbourhood || data.address?.quarter,
+        data.address?.city || data.address?.town || data.address?.village,
+      ].filter(Boolean).join(', ') || data.display_name?.split(',').slice(0, 2).join(', ');
+      pickStoryLocation({ id: data.place_id, name, full: data.display_name });
+    } catch { info('Could not detect location'); }
+    finally { setStoryLocationLoading(false); }
+  };
   const [selectedMusic, setSelectedMusic] = useState(null);
   const [musicSearch, setMusicSearch] = useState('');
   const [musicTracks, setMusicTracks] = useState([]);
@@ -572,7 +626,7 @@ export default function CreateScreen({ navigation, route }) {
       const res = await fetch(`${DEEZER_API}/chart/0/tracks?limit=25`);
       if (!res.ok) throw new Error('Network error');
       const data = await res.json();
-      setMusicTracks(data.data || []);
+      setMusicTracks((data.data || []).filter(Boolean));
     } catch {
       info('Could not load trending — check your connection');
       setMusicTracks([]);
@@ -586,7 +640,7 @@ export default function CreateScreen({ navigation, route }) {
       const res = await fetch(`${DEEZER_API}/search?q=${encodeURIComponent(query)}&limit=25`);
       if (!res.ok) throw new Error('Search failed');
       const data = await res.json();
-      setMusicTracks(data.data || []);
+      setMusicTracks((data.data || []).filter(Boolean));
     } catch { info('Search failed'); }
     finally { setMusicLoading(false); }
   };
@@ -908,20 +962,22 @@ export default function CreateScreen({ navigation, route }) {
                 </View>
               }
               renderItem={({ item }) => {
+                if (!item) return null;
                 const isSelected = selectedMusic?.id === item.id;
                 const isPlaying = playingTrackId === item.id;
+                const coverUri = item.album?.cover_medium || item.album?.cover || null;
                 return (
                   <View style={[s.musicRow, { borderBottomColor: theme.border }, isSelected && { backgroundColor: 'rgba(124,58,237,0.08)' }]}>
                     {/* Artwork */}
-                    {item.album?.cover_medium
-                      ? <Image source={{ uri: item.album.cover_medium }} style={s.musicCover} />
+                    {coverUri
+                      ? <Image source={{ uri: coverUri }} style={s.musicCover} />
                       : <View style={[s.musicCover, { backgroundColor: 'rgba(124,58,237,0.2)', alignItems: 'center', justifyContent: 'center' }]}>
                           <Ionicons name="musical-notes" size={18} color="#7c3aed" />
                         </View>}
 
                     {/* Info */}
                     <View style={{ flex: 1 }}>
-                      <AppText style={[s.musicTitle, { color: theme.text }]} numberOfLines={1}>{item.title}</AppText>
+                      <AppText style={[s.musicTitle, { color: theme.text }]} numberOfLines={1}>{item.title || 'Unknown'}</AppText>
                       <AppText style={[s.musicArtist, { color: theme.muted }]} numberOfLines={1}>
                         {item.artist?.name || 'Unknown'}
                       </AppText>
@@ -960,7 +1016,93 @@ export default function CreateScreen({ navigation, route }) {
         </View>
       </View>
     </Modal>
-      {snippetTrack && (() => {
+
+    {/* ── STORY LOCATION MODAL ── */}
+    <Modal
+      visible={showLocationModal}
+      animationType="slide"
+      transparent
+      onRequestClose={() => setShowLocationModal(false)}
+    >
+      <View style={s.modalOverlay}>
+        <View style={[s.modalSheet, { backgroundColor: theme.bgCard, maxHeight: '75%' }]}>
+          <View style={s.modalHandle} />
+          <AppText style={[s.modalTitle, { color: theme.text }]}>Add Location</AppText>
+
+          {/* Auto-detect button */}
+          <TouchableOpacity
+            style={[s.locAutoBtn, { borderColor: theme.border2 }]}
+            onPress={detectAndPickLocation}
+            disabled={storyLocationLoading}
+          >
+            {storyLocationLoading
+              ? <ActivityIndicator size="small" color="#10b981" />
+              : <Ionicons name="navigate" size={18} color="#10b981" />}
+            <AppText style={s.locAutoBtnText}>
+              {storyLocationLoading ? 'Detecting...' : 'Use my current location'}
+            </AppText>
+          </TouchableOpacity>
+
+          <View style={s.locDividerRow}>
+            <View style={[s.locDivider, { backgroundColor: theme.border }]} />
+            <AppText style={[s.locDividerText, { color: theme.dim }]}>or search</AppText>
+            <View style={[s.locDivider, { backgroundColor: theme.border }]} />
+          </View>
+
+          {/* Search input */}
+          <View style={[s.locSearchRow, { backgroundColor: theme.bgSecondary, borderColor: storyLocationQuery ? '#7c3aed' : theme.border2 }]}>
+            <Ionicons name="search" size={16} color={storyLocationQuery ? '#7c3aed' : theme.muted} />
+            <TextInput
+              style={[s.locSearchInput, { color: theme.text }]}
+              placeholder="Search city, place, address..."
+              placeholderTextColor={theme.dim}
+              value={storyLocationQuery}
+              onChangeText={searchStoryLocation}
+              autoFocus={false}
+              returnKeyType="search"
+            />
+            {storyLocationLoading && <ActivityIndicator size="small" color="#7c3aed" />}
+            {storyLocationQuery.length > 0 && !storyLocationLoading && (
+              <TouchableOpacity onPress={() => { setStoryLocationQuery(''); setStoryLocationResults([]); }}>
+                <Ionicons name="close-circle" size={16} color={theme.muted} />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Results */}
+          <ScrollView style={{ maxHeight: 280 }} keyboardShouldPersistTaps="handled">
+            {storyLocationResults.map((item, i) => (
+              <TouchableOpacity
+                key={item.id || i}
+                style={[s.locResultRow, { borderBottomColor: theme.border }]}
+                onPress={() => pickStoryLocation(item)}
+              >
+                <View style={s.locResultIcon}>
+                  <Ionicons name="location-sharp" size={14} color="#7c3aed" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <AppText style={[s.locResultName, { color: theme.text }]} numberOfLines={1}>{item.name}</AppText>
+                  <AppText style={[s.locResultFull, { color: theme.muted }]} numberOfLines={1}>{item.full}</AppText>
+                </View>
+              </TouchableOpacity>
+            ))}
+            {storyLocationQuery.length >= 2 && !storyLocationLoading && storyLocationResults.length === 0 && (
+              <View style={{ alignItems: 'center', padding: 24 }}>
+                <Ionicons name="location-outline" size={32} color={theme.dim} />
+                <AppText style={{ color: theme.muted, marginTop: 8, fontSize: 13 }}>No places found</AppText>
+              </View>
+            )}
+          </ScrollView>
+
+          <TouchableOpacity
+            style={[s.modalClose, { borderColor: theme.border2, marginTop: 8 }]}
+            onPress={() => setShowLocationModal(false)}
+          >
+            <AppText style={{ color: theme.text, fontWeight: '600' }}>Cancel</AppText>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
         const maxStart = Math.max(0, trackDuration - 30);
         const barCount = 40;
         return (
@@ -972,7 +1114,7 @@ export default function CreateScreen({ navigation, route }) {
 
             {/* Track info */}
             <View style={s.snippetTrackRow}>
-              {snippetTrack.album?.cover_medium
+              {snippetTrack?.album?.cover_medium
                 ? <Image source={{ uri: snippetTrack.album.cover_medium }} style={s.snippetArt} />
                 : <View style={[s.snippetArt, { backgroundColor: 'rgba(124,58,237,0.25)', alignItems: 'center', justifyContent: 'center' }]}>
                     <Ionicons name="musical-notes" size={22} color="#7c3aed" />
@@ -1844,12 +1986,16 @@ export default function CreateScreen({ navigation, route }) {
               </TouchableOpacity>
 
               {/* Location */}
-              <TouchableOpacity style={s.storyTool} onPress={detectCurrentLocation}>
+              <TouchableOpacity style={s.storyTool} onPress={() => {
+                if (selectedLocation) { clearLocation(); } else { setShowLocationModal(true); }
+              }}>
                 <View style={[s.storyToolIcon, selectedLocation && { backgroundColor: 'rgba(74,124,63,0.6)', borderColor: '#3B82F6' }]}>
-                  <Ionicons name="location" size={20} color={selectedLocation ? '#8B5CF6' : '#fff'} />
+                  {detectingLocation || storyLocationLoading
+                    ? <ActivityIndicator size="small" color="#fff" />
+                    : <Ionicons name="location" size={20} color={selectedLocation ? '#8B5CF6' : '#fff'} />}
                 </View>
                 <AppText style={[s.storyToolLabel, selectedLocation && { color: '#8B5CF6' }]}>
-                  {selectedLocation ? 'Added' : 'Location'}
+                  {selectedLocation ? selectedLocation.name.split(',')[0] : 'Location'}
                 </AppText>
               </TouchableOpacity>
             </View>
@@ -2249,6 +2395,19 @@ const s = StyleSheet.create({
   modalSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 12, paddingBottom: 36, maxHeight: '70%' },
   modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(100,116,139,0.4)', alignSelf: 'center', marginBottom: 16 },
   modalTitle: { fontSize: 18, fontWeight: '700', paddingHorizontal: 20, marginBottom: 12 },
+
+  // Story location modal
+  locAutoBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, marginBottom: 16, padding: 14, borderRadius: 12, borderWidth: 1, backgroundColor: 'rgba(16,185,129,0.08)' },
+  locAutoBtnText: { color: '#10b981', fontWeight: '700', fontSize: 14 },
+  locDividerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, marginBottom: 12 },
+  locDivider: { flex: 1, height: 1 },
+  locDividerText: { fontSize: 12 },
+  locSearchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, marginBottom: 8, borderRadius: 12, borderWidth: 1.5, paddingHorizontal: 12, paddingVertical: 10 },
+  locSearchInput: { flex: 1, fontSize: 14 },
+  locResultRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 0.5 },
+  locResultIcon: { width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(124,58,237,0.12)', alignItems: 'center', justifyContent: 'center' },
+  locResultName: { fontSize: 13, fontWeight: '600' },
+  locResultFull: { fontSize: 11, marginTop: 1 },
 
   // Schedule picker
   pickerRow: { flexDirection: 'row', paddingHorizontal: 16, gap: 6, marginBottom: 20 },

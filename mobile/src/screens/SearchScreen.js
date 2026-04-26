@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   View, FlatList, TouchableOpacity, StyleSheet,
-  Image, ActivityIndicator, StatusBar, TextInput, ScrollView,
+  Image, ActivityIndicator, StatusBar, TextInput, ScrollView, Dimensions,
 } from "react-native";
 import AppText from '../components/AppText';
+import { Video, ResizeMode } from 'expo-av';
 import { useTranslation } from '../i18n';
 import { useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
@@ -12,6 +13,9 @@ import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { colors, radius } from "../theme";
+
+const { width } = Dimensions.get('window');
+const GRID_SIZE = (width - 32 - 4) / 3; // 3 cols, 16px side padding, 2px gaps
 
 function Avatar({ uri, name, size = 52 }) {
   return uri ? (
@@ -217,17 +221,49 @@ export default function SearchScreen({ navigation }) {
                   </ScrollView>
                 )}
                 <View style={s.postsGrid}>
-                  {posts.map(p => (
-                    <TouchableOpacity key={p.id} style={s.postThumb} activeOpacity={0.85}>
-                      {p.media_url ? (
-                        <Image source={{ uri: p.media_url }} style={s.postThumbImg} resizeMode="cover" />
-                      ) : (
-                        <View style={[s.postThumbImg, { backgroundColor: theme.bgSecondary, padding: 8, justifyContent: 'center' }]}>
-                          <AppText style={[s.postThumbCaption, { color: theme.muted }]} numberOfLines={4}>{p.caption}</AppText>
-                        </View>
-                      )}
-                    </TouchableOpacity>
-                  ))}
+                  {posts.map(p => {
+                    const isVideo = p.media_type === 'video' && !!p.media_url;
+                    return (
+                      <TouchableOpacity
+                        key={p.id}
+                        style={s.postThumb}
+                        activeOpacity={0.85}
+                        onPress={() => isVideo
+                          ? navigation.navigate('Reels', { startPostId: p.id })
+                          : navigation.navigate('PostDetail', { postId: p.id })
+                        }
+                      >
+                        {isVideo ? (
+                          <>
+                            <Video
+                              source={{ uri: p.media_url }}
+                              style={s.postThumbImg}
+                              resizeMode={ResizeMode.COVER}
+                              shouldPlay
+                              isLooping
+                              isMuted
+                              useNativeControls={false}
+                            />
+                            <View style={s.videoOverlay}>
+                              <Ionicons name="play" size={18} color="#fff" />
+                            </View>
+                          </>
+                        ) : p.media_url ? (
+                          <Image source={{ uri: p.media_url }} style={s.postThumbImg} resizeMode="cover" />
+                        ) : (
+                          <View style={[s.postThumbImg, { backgroundColor: theme.bgSecondary, padding: 8, justifyContent: 'center' }]}>
+                            <AppText style={[s.postThumbCaption, { color: theme.muted }]} numberOfLines={4}>{p.caption}</AppText>
+                          </View>
+                        )}
+                        {p.like_count > 0 && (
+                          <View style={s.thumbLikes}>
+                            <Ionicons name="heart" size={9} color="#fff" />
+                            <AppText style={s.thumbLikesText}>{p.like_count}</AppText>
+                          </View>
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               </View>
             )}
@@ -238,7 +274,6 @@ export default function SearchScreen({ navigation }) {
   );
 }
 
-const THUMB = 116;
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   header: { paddingHorizontal: 16, paddingTop: 56, paddingBottom: 12 },
@@ -258,11 +293,13 @@ const s = StyleSheet.create({
   connectGrad: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 16 },
   connectText: { color: "#fff", fontWeight: "700", fontSize: 13 },
   connectedText: { color: colors.muted, fontWeight: "600", fontSize: 13 },
-  postsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 3 },
-  postThumb: { width: THUMB, height: THUMB },
+  postsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 2 },
+  postThumb: { width: GRID_SIZE, height: GRID_SIZE, position: 'relative', overflow: 'hidden', borderRadius: 4 },
   postThumbImg: { width: "100%", height: "100%", borderRadius: 4 },
-  postThumbText: { backgroundColor: colors.bgSecondary, padding: 8, justifyContent: "center" },
   postThumbCaption: { fontSize: 11, color: colors.muted },
+  videoOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.2)' },
+  thumbLikes: { position: 'absolute', bottom: 4, left: 4, flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 4, paddingVertical: 2, borderRadius: 8 },
+  thumbLikesText: { color: '#fff', fontSize: 9, fontWeight: '600' },
   emptyWrap: { alignItems: "center", marginTop: 40, gap: 8 },
   emptyText: { color: colors.muted, fontSize: 14, textAlign: "center" },
   filterBtn: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1 },
