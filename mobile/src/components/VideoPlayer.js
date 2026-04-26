@@ -29,6 +29,8 @@ export default function VideoPlayer({
   saved, onSave,
   authorName, authorAvatar,
   caption,
+  feedMode = false, // when true: hides right actions + author overlay (feed handles them)
+  onPress,          // called when video area is tapped in feedMode — navigates to Reels
 }) {
   const { dataSaver, autoplayVideo } = useTheme();
   const videoRef = useRef(null);
@@ -86,13 +88,13 @@ export default function VideoPlayer({
 
   const handleDoubleTap = useRef(0);
   const onTap = () => {
+    if (feedMode) {
+      onPress?.();
+      return;
+    }
     const now = Date.now();
     if (now - handleDoubleTap.current < 300) {
-      // double tap — like
-      if (!liked) {
-        onLike?.();
-        burstHeart();
-      }
+      if (!liked) { onLike?.(); burstHeart(); }
     } else {
       togglePlay();
     }
@@ -178,79 +180,65 @@ export default function VideoPlayer({
         <Ionicons name={muted ? 'volume-mute' : 'volume-high'} size={18} color="#fff" />
       </TouchableOpacity>
 
-      {/* Right-side action buttons */}
-      <View style={s.rightActions}>
-        {/* Like */}
-        <TouchableOpacity style={s.actionItem} onPress={onLike}>
-          <Animated.View>
-            <Ionicons
-              name={liked ? 'heart' : 'heart-outline'}
-              size={30}
-              color={liked ? '#e11d48' : '#fff'}
-            />
-          </Animated.View>
-          <AppText style={s.actionCount}>{likeCount > 0 ? likeCount : ''}</AppText>
-        </TouchableOpacity>
-
-        {/* Comment */}
-        <TouchableOpacity style={s.actionItem} onPress={onComment}>
-          <Ionicons name="chatbubble-ellipses-outline" size={28} color="#fff" />
-          <AppText style={s.actionCount}>{commentCount > 0 ? commentCount : ''}</AppText>
-        </TouchableOpacity>
-
-        {/* Share */}
-        <TouchableOpacity style={s.actionItem} onPress={onShare}>
-          <Ionicons name="paper-plane-outline" size={27} color="#fff" />
-        </TouchableOpacity>
-
-        {/* Save */}
-        <TouchableOpacity style={s.actionItem} onPress={onSave}>
-          <Ionicons
-            name={saved ? 'bookmark' : 'bookmark-outline'}
-            size={27}
-            color={saved ? '#7c3aed' : '#fff'}
-          />
-        </TouchableOpacity>
-      </View>
-
-      {/* Bottom-left: author + caption */}
-      <View style={s.bottomLeft}>
-        {/* Author row */}
-        <View style={s.authorRow}>
-          <View style={s.avatarWrap}>
-            {authorAvatar
-              ? <Image source={{ uri: authorAvatar }} style={s.avatar} />
-              : <View style={[s.avatar, s.avatarFallback]}>
-                  <AppText style={s.avatarLetter}>{authorName?.[0]?.toUpperCase()}</AppText>
-                </View>}
-          </View>
-          <AppText style={s.authorName}>{authorName}</AppText>
-        </View>
-
-        {/* Caption */}
-        {caption ? (
-          <TouchableOpacity onPress={() => setShowCaption(v => !v)} activeOpacity={0.9}>
-            <AppText
-              style={s.caption}
-              numberOfLines={showCaption ? undefined : 2}
-            >
-              {caption}
-            </AppText>
-            {caption.length > 80 && !showCaption && (
-              <AppText style={s.moreText}>more</AppText>
-            )}
+      {/* Right-side action buttons — hidden in feedMode */}
+      {!feedMode && (
+        <View style={s.rightActions}>
+          <TouchableOpacity style={s.actionItem} onPress={onLike}>
+            <Animated.View>
+              <Ionicons name={liked ? 'heart' : 'heart-outline'} size={30} color={liked ? '#e11d48' : '#fff'} />
+            </Animated.View>
+            <AppText style={s.actionCount}>{likeCount > 0 ? likeCount : ''}</AppText>
           </TouchableOpacity>
-        ) : null}
+          <TouchableOpacity style={s.actionItem} onPress={onComment}>
+            <Ionicons name="chatbubble-ellipses-outline" size={28} color="#fff" />
+            <AppText style={s.actionCount}>{commentCount > 0 ? commentCount : ''}</AppText>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.actionItem} onPress={onShare}>
+            <Ionicons name="paper-plane-outline" size={27} color="#fff" />
+          </TouchableOpacity>
+          <TouchableOpacity style={s.actionItem} onPress={onSave}>
+            <Ionicons name={saved ? 'bookmark' : 'bookmark-outline'} size={27} color={saved ? '#7c3aed' : '#fff'} />
+          </TouchableOpacity>
+        </View>
+      )}
 
-        {/* Progress bar + time */}
-        <View style={s.progressRow}>
-          <AppText style={s.timeText}>{fmt(progress)}</AppText>
+      {/* Bottom-left: author + caption — hidden in feedMode */}
+      {!feedMode && (
+        <View style={s.bottomLeft}>
+          <View style={s.authorRow}>
+            <View style={s.avatarWrap}>
+              {authorAvatar
+                ? <Image source={{ uri: authorAvatar }} style={s.avatar} />
+                : <View style={[s.avatar, s.avatarFallback]}>
+                    <AppText style={s.avatarLetter}>{authorName?.[0]?.toUpperCase()}</AppText>
+                  </View>}
+            </View>
+            <AppText style={s.authorName}>{authorName}</AppText>
+          </View>
+          {caption ? (
+            <TouchableOpacity onPress={() => setShowCaption(v => !v)} activeOpacity={0.9}>
+              <AppText style={s.caption} numberOfLines={showCaption ? undefined : 2}>{caption}</AppText>
+              {caption.length > 80 && !showCaption && <AppText style={s.moreText}>more</AppText>}
+            </TouchableOpacity>
+          ) : null}
+          <View style={s.progressRow}>
+            <AppText style={s.timeText}>{fmt(progress)}</AppText>
+            <View style={s.progressTrack}>
+              <View style={[s.progressFill, { width: `${pct}%` }]} />
+            </View>
+            <AppText style={s.timeText}>{fmt(duration)}</AppText>
+          </View>
+        </View>
+      )}
+
+      {/* feedMode: minimal progress bar at bottom */}
+      {feedMode && (
+        <View style={s.feedProgressRow} pointerEvents="none">
           <View style={s.progressTrack}>
             <View style={[s.progressFill, { width: `${pct}%` }]} />
           </View>
-          <AppText style={s.timeText}>{fmt(duration)}</AppText>
         </View>
-      </View>
+      )}
     </View>
   );
 }
@@ -409,5 +397,10 @@ const s = StyleSheet.create({
     color: 'rgba(255,255,255,0.75)',
     fontSize: 11,
     fontWeight: '600',
+  },
+  feedProgressRow: {
+    position: 'absolute',
+    bottom: 0, left: 0, right: 0,
+    paddingHorizontal: 0,
   },
 });

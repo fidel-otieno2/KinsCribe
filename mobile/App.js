@@ -60,6 +60,7 @@ import PostDetailScreen from "./src/screens/PostDetailScreen";
 import MessageRequestsScreen from "./src/screens/MessageRequestsScreen";
 import CallScreen from "./src/screens/CallScreen";
 import CallLogsScreen from "./src/screens/CallLogsScreen";
+import ReelsScreen from "./src/screens/ReelsScreen";
 import FamilyPublicScreen from "./src/screens/FamilyPublicScreen";
 
 const Stack = createNativeStackNavigator();
@@ -76,11 +77,12 @@ Notifications.setNotificationHandler({
 
 // ── Custom Tab Bar ───────────────────────────────────────────
 const TAB_ITEMS = [
-  { name: 'Feed',     icon: 'home',        iconFilled: 'home',        label: 'Home'    },
-  { name: 'Search',   icon: 'compass-outline', iconFilled: 'compass', label: 'Discover' },
-  { name: 'Create',   icon: 'add',         iconFilled: 'add',         label: ''        },
-  { name: 'Messages', icon: 'chatbubbles-outline', iconFilled: 'chatbubbles', label: 'Messages' },
-  { name: 'Profile',  icon: 'person-outline', iconFilled: 'person',   label: 'Profile' },
+  { name: 'Feed',     icon: 'home-outline',        iconFilled: 'home',        label: 'Home'    },
+  { name: 'Search',   icon: 'compass-outline',      iconFilled: 'compass',     label: 'Discover' },
+  { name: 'Create',   icon: 'add',                  iconFilled: 'add',         label: ''        },
+  { name: 'Reels',    icon: 'film-outline',          iconFilled: 'film',        label: 'Reels'   },
+  { name: 'Messages', icon: 'chatbubbles-outline',   iconFilled: 'chatbubbles', label: 'Messages' },
+  { name: 'Profile',  icon: 'person-outline',        iconFilled: 'person',      label: 'Profile' },
 ];
 
 function CustomTabBar({ state, navigation, msgUnread, notifUnread, theme, user }) {
@@ -372,6 +374,7 @@ function MainTabs() {
       <Tab.Screen name="Feed"     component={FeedScreen} />
       <Tab.Screen name="Search"   component={SearchScreen} />
       <Tab.Screen name="Create"   component={CreateScreen} />
+      <Tab.Screen name="Reels"    component={ReelsScreen} />
       <Tab.Screen name="Messages" component={MessagesScreen} />
       <Tab.Screen name="Profile"  component={ProfileScreen} />
     </Tab.Navigator>

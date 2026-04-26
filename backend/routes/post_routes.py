@@ -180,6 +180,19 @@ def post_feed():
     return jsonify({"posts": result})
 
 
+@post_bp.route("/reels", methods=["GET"])
+@jwt_required()
+def public_reels():
+    """Public video posts only — never includes family-privacy posts."""
+    current_id = int(get_jwt_identity())
+    posts = Post.query.filter(
+        Post.media_type == 'video',
+        Post.media_url.isnot(None),
+        Post.privacy == 'public',
+    ).order_by(Post.created_at.desc()).limit(50).all()
+    return jsonify({"reels": [p.to_dict(current_id) for p in posts]})
+
+
 @post_bp.route("/explore", methods=["GET"])
 @jwt_required()
 def explore():

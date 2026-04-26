@@ -388,8 +388,7 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation, isVisible 
 
   return (
     <View style={pc.card}>
-      {/* Header — hidden for video posts (overlaid inside VideoPlayer) */}
-      {!isVideoPost && (
+      {/* Header */}
       <View style={pc.header}>
         <TouchableOpacity
           onPress={() => navigation.navigate("UserProfile", { userId: post.user_id, userName: post.author_name, userAvatar: post.author_avatar })}
@@ -458,7 +457,6 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation, isVisible 
           </TouchableOpacity>
         )}
       </View>
-      )}{/* end !isVideoPost header */}
 
       {/* Collaborators bottom sheet */}
       <Modal visible={showCollabs} transparent animationType="slide" onRequestClose={() => setShowCollabs(false)}>
@@ -503,17 +501,8 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation, isVisible 
               <VideoPlayer
                 uri={mediaList[0].url}
                 isVisible={isVisible}
-                liked={liked}
-                likeCount={likeCount}
-                onLike={toggleLike}
-                onComment={openComments}
-                onShare={() => setShowShare(true)}
-                saved={saved}
-                onSave={toggleSave}
-                authorName={post.author_name}
-                authorAvatar={post.author_avatar}
-                caption={post.caption}
-                commentCount={post.comment_count}
+                feedMode
+                onPress={() => navigation.navigate('Reels', { startPostId: post.id })}
               />
             </View>
           );
@@ -615,8 +604,8 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation, isVisible 
         );
       })()}
 
-      {/* Actions / Likes / Caption / Timestamp — hidden for video (overlaid inside VideoPlayer) */}
-      {!isVideoPost && (
+      {/* Actions / Likes / Caption / Timestamp */}
+      {(
         <>
           {/* Actions */}
           <View style={pc.actions}>
