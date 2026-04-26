@@ -241,6 +241,12 @@ export default function ProfileScreen({ navigation }) {
 
   const Header = () => (
     <View>
+      {/* Greenish cover gradient - like stories section */}
+      <LinearGradient
+        colors={['#1a3a1a', '#2D5A27', '#4A7C3F', '#3a6b35']}
+        style={s.coverBg}
+      />
+
       {/* Top bar */}
       <View style={s.topBar}>
         <View style={s.topBarLeft}>
@@ -769,6 +775,7 @@ export default function ProfileScreen({ navigation }) {
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
+  coverBg: { position: 'absolute', top: 0, left: 0, right: 0, height: 180 },
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 52, paddingHorizontal: 16, paddingBottom: 12 },
   topBarLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   username: { fontSize: 22, fontWeight: '900', letterSpacing: -0.5, color: colors.text },
