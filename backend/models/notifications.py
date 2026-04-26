@@ -117,6 +117,18 @@ class NotificationSettings(db.Model):
         }
 
 
+class NotificationReadReceipt(db.Model):
+    """Persists which notification IDs a user has read."""
+    __tablename__ = "notification_read_receipts"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    notification_key = db.Column(db.String(100), nullable=False)  # e.g. "post_like-42"
+    read_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (db.UniqueConstraint("user_id", "notification_key"),)
+
+
 class DeviceToken(db.Model):
     """Store push notification tokens for devices"""
     __tablename__ = "device_tokens"

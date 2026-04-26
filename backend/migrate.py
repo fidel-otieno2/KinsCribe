@@ -96,6 +96,18 @@ def run_migrations():
             "ALTER TABLE public_stories ADD COLUMN IF NOT EXISTS location VARCHAR(200)",
             "ALTER TABLE public_stories ADD COLUMN IF NOT EXISTS music_artist VARCHAR(200)",
             "ALTER TABLE public_stories ADD COLUMN IF NOT EXISTS music_artwork VARCHAR(300)",
+
+            # Notification read receipts — persists which notifications a user has read
+            """
+            CREATE TABLE IF NOT EXISTS notification_read_receipts (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                notification_key VARCHAR(100) NOT NULL,
+                read_at TIMESTAMP DEFAULT NOW(),
+                UNIQUE(user_id, notification_key)
+            )
+            """,
+            "CREATE INDEX IF NOT EXISTS idx_notif_read_user ON notification_read_receipts(user_id)",
         ]
         
         print(f"🚀 Running {len(migrations)} migrations...")

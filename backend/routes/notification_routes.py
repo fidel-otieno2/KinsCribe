@@ -5,18 +5,29 @@ from models.user import User
 from models.story import Story, Comment as StoryComment, Like as StoryLike
 from models.social import Post, PostLike, PostComment, Connection
 from models.family import Family
+from models.notifications import NotificationReadReceipt
 import json
 from datetime import datetime
 
 notification_bp = Blueprint("notifications", __name__)
 
-# In-memory store for read notification IDs per user
-# In production this should be a DB table, but works for now
-_read_store = {}
-
 # In-memory store for mention notifications { user_id: [notif_dict, ...] }
 _mention_store = {}
 
+
+def _get_read_ids(user_id):
+    rows = NotificationReadReceipt.query.filter_by(user_id=user_id).all()
+    return set(r.notification_key for r in rows)
+
+
+def _mark_ids_read(user_id, ids):
+    for nid in ids:
+        exists = NotificationReadReceipt.query.filter_by(
+            user_id=user_id, notification_key=nid
+        ).first()
+        if not exists:
+            db.session.add(NotificationReadReceipt(user_id=user_id, notification_key=nid))
+    db.session.commit()
 
 def _get_all_notifications(user):
     notifs = []
@@ -239,7 +250,7 @@ def _get_all_notifications(user):
 def get_notifications():
     user = User.query.get(int(get_jwt_identity()))
     notifs = _get_all_notifications(user)
-    read_ids = set(_read_store.get(user.id, []))
+    read_ids = _get_read_ids(user.id)
     for n in notifs:
         n["is_read"] = n["id"] in read_ids
     unread_count = sum(1 for n in notifs if not n["is_read"])
@@ -251,7 +262,7 @@ def get_notifications():
 def get_notification_count():
     user = User.query.get(int(get_jwt_identity()))
     notifs = _get_all_notifications(user)
-    read_ids = set(_read_store.get(user.id, []))
+    read_ids = _get_read_ids(user.id)
     unread_count = sum(1 for n in notifs if n["id"] not in read_ids)
     return jsonify({"unread_count": unread_count})
 
@@ -286,14 +297,12 @@ def mark_read():
     if mark_all:
         user = User.query.get(user_id)
         notifs = _get_all_notifications(user)
-        _read_store[user_id] = [n["id"] for n in notifs]
+        _mark_ids_read(user_id, [n["id"] for n in notifs])
     elif ids:
-        existing = set(_read_store.get(user_id, []))
-        existing.update(ids)
-        _read_store[user_id] = list(existing)
+        _mark_ids_read(user_id, ids)
 
     user = User.query.get(user_id)
     notifs = _get_all_notifications(user)
-    read_ids = set(_read_store.get(user_id, []))
+    read_ids = _get_read_ids(user_id)
     unread_count = sum(1 for n in notifs if n["id"] not in read_ids)
     return jsonify({"message": "Marked as read", "unread_count": unread_count})

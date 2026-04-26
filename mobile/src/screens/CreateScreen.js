@@ -418,8 +418,9 @@ export default function CreateScreen({ navigation, route }) {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) return info('Allow photo access in your device settings');
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.All,
+      mediaTypes: ['images', 'videos'],
       allowsMultipleSelection: allowMultiple,
+      videoMaxDuration: 120,
       quality: 0.9,
     });
     if (!result.canceled) {
@@ -427,7 +428,7 @@ export default function CreateScreen({ navigation, route }) {
       const files = assets.map(a => ({
         uri: a.uri,
         type: a.type === 'video' ? 'video' : 'image',
-        name: a.fileName || `media_${Date.now()}.jpg`,
+        name: a.fileName || `media_${Date.now()}.${a.type === 'video' ? 'mp4' : 'jpg'}`,
       }));
       setMediaFiles(prev => allowMultiple ? [...prev, ...files].slice(0, 10) : files);
     }
