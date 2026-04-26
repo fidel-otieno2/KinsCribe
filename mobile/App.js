@@ -402,8 +402,9 @@ function RootNavigator({ navigationRef }) {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, backgroundColor: theme.bg, alignItems: "center", justifyContent: "center" }}>
+      <View style={{ flex: 1, backgroundColor: theme.bg, alignItems: "center", justifyContent: "center", gap: 12 }}>
         <ActivityIndicator color="#7c3aed" size="large" />
+        <AppText style={{ color: theme.dim, fontSize: 13 }}>Connecting to server…</AppText>
       </View>
     );
   }

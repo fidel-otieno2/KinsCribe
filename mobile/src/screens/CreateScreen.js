@@ -705,6 +705,7 @@ export default function CreateScreen({ navigation, route }) {
         formData.append('privacy', privacy);
         formData.append('bg_color', bgColor);
         if (textContent) formData.append('text_content', textContent);
+        if (location) formData.append('location', location);
         if (selectedMusic) {
           formData.append('music', JSON.stringify({
             title: selectedMusic.title,
@@ -716,7 +717,12 @@ export default function CreateScreen({ navigation, route }) {
           formData.append('music_id', selectedMusic.id);
         }
         if (mediaFiles[0]) {
-          formData.append('file', { uri: mediaFiles[0].uri, type: mediaFiles[0].type === 'video' ? 'video/mp4' : 'image/jpeg', name: 'story_media.jpg' });
+          const isVid = mediaFiles[0].type === 'video' || mediaFiles[0].mediaType === 'video';
+          formData.append('file', {
+            uri: mediaFiles[0].uri,
+            type: isVid ? 'video/mp4' : 'image/jpeg',
+            name: isVid ? 'story_media.mp4' : 'story_media.jpg',
+          });
         }
         await api.post('/pstories/', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
         setMediaFiles([]); setTextContent(''); setSelectedMusic(null);

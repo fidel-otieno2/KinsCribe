@@ -3,7 +3,7 @@ import {
   View, StyleSheet, Image, TouchableOpacity,
   Dimensions, StatusBar, Animated, TextInput,
   KeyboardAvoidingView, Platform, PanResponder,
-  Modal, ScrollView, ActivityIndicator,
+  Modal, ScrollView, ActivityIndicator, Easing,
 } from 'react-native';
 import { Video } from 'expo-av';
 import Svg, { Defs, ClipPath, Polygon, Image as SvgImage } from 'react-native-svg';
@@ -48,6 +48,26 @@ export default function StoryViewerScreen({ route, navigation }) {
   const animRef = useRef(null);
   const translateY = useRef(new Animated.Value(0)).current;
   const opacity = useRef(new Animated.Value(1)).current;
+  const discSpin = useRef(new Animated.Value(0)).current;
+  const discSpinAnim = useRef(null);
+
+  // Spin the music disc continuously while story is playing
+  useEffect(() => {
+    if (story?.music_name && !paused) {
+      discSpinAnim.current = Animated.loop(
+        Animated.timing(discSpin, {
+          toValue: 1,
+          duration: 4000,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        })
+      );
+      discSpinAnim.current.start();
+    } else {
+      discSpinAnim.current?.stop();
+    }
+    return () => discSpinAnim.current?.stop();
+  }, [story?.id, paused]);
 
   const group = storyGroups[groupIndex];
   const story = group?.stories[storyIndex];
@@ -224,11 +244,41 @@ export default function StoryViewerScreen({ route, navigation }) {
       {/* ── TEXT OVERLAY ── */}
       {story.text_content ? (
         <View style={s.textOverlay} pointerEvents="none">
-          <AppText style={s.storyText}>{story.text_content}</AppText>
+          <View style={s.textOverlayBubble}>
+            <AppText style={s.storyText}>{story.text_content}</AppText>
+          </View>
         </View>
       ) : null}
 
-      {/* ── PROGRESS BARS ── */}
+      {/* ── LOCATION STICKER ── */}
+      {story.location ? (
+        <View style={s.locationSticker} pointerEvents="none">
+          <Ionicons name="location-sharp" size={13} color="#fff" />
+          <AppText style={s.locationStickerText} numberOfLines={1}>{story.location}</AppText>
+        </View>
+      ) : null}
+
+      {/* ── MUSIC DISC ── */}
+      {story.music_name ? (
+        <View style={s.musicSticker} pointerEvents="none">
+          <Animated.View style={[s.musicDisc, {
+            transform: [{ rotate: discSpin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }]
+          }]}>
+            {story.music_artwork
+              ? <Image source={{ uri: story.music_artwork }} style={s.musicDiscImg} />
+              : <LinearGradient colors={['#7c3aed', '#3b82f6']} style={s.musicDiscImg}>
+                  <Ionicons name="musical-notes" size={14} color="#fff" />
+                </LinearGradient>}
+            <View style={s.musicDiscHole} />
+          </Animated.View>
+          <View style={s.musicStickerInfo}>
+            <AppText style={s.musicStickerTitle} numberOfLines={1}>{story.music_name}</AppText>
+            {story.music_artist ? (
+              <AppText style={s.musicStickerArtist} numberOfLines={1}>{story.music_artist}</AppText>
+            ) : null}
+          </View>
+        </View>
+      ) : null}
       <View style={s.progressRow}>
         {group.stories.map((_, i) => (
           <View key={i} style={s.progressTrack}>
@@ -283,14 +333,6 @@ export default function StoryViewerScreen({ route, navigation }) {
           activeOpacity={1}
         />
       </View>
-
-      {/* ── MUSIC PILL ── */}
-      {story.music_name && (
-        <View style={s.musicPill}>
-          <Ionicons name="musical-notes" size={12} color="#fff" />
-          <AppText style={s.musicText} numberOfLines={1}>{story.music_name}</AppText>
-        </View>
-      )}
 
       {/* ── VIEW COUNT (own) ── */}
       {isOwn && (
@@ -485,9 +527,78 @@ const s = StyleSheet.create({
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     alignItems: 'center', justifyContent: 'center', padding: 32,
   },
+  textOverlayBubble: {
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    borderRadius: 16,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    maxWidth: '85%',
+  },
   storyText: {
-    color: '#fff', fontSize: 26, fontWeight: '700', textAlign: 'center',
-    textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 6,
+    color: '#fff', fontSize: 22, fontWeight: '700', textAlign: 'center',
+    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
+    lineHeight: 30,
+  },
+
+  // Location sticker
+  locationSticker: {
+    position: 'absolute',
+    bottom: 160,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    maxWidth: width * 0.7,
+  },
+  locationStickerText: {
+    color: '#fff', fontSize: 13, fontWeight: '700',
+    textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+  },
+
+  // Music disc sticker
+  musicSticker: {
+    position: 'absolute',
+    bottom: 120,
+    left: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 30,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+    maxWidth: width * 0.65,
+  },
+  musicDisc: {
+    width: 36, height: 36, borderRadius: 18,
+    overflow: 'hidden',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: 'rgba(255,255,255,0.3)',
+  },
+  musicDiscImg: {
+    width: '100%', height: '100%',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  musicDiscHole: {
+    position: 'absolute',
+    width: 8, height: 8, borderRadius: 4,
+    backgroundColor: '#000',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)',
+  },
+  musicStickerInfo: { flex: 1 },
+  musicStickerTitle: {
+    color: '#fff', fontSize: 12, fontWeight: '700',
+  },
+  musicStickerArtist: {
+    color: 'rgba(255,255,255,0.65)', fontSize: 10, marginTop: 1,
   },
 
   progressRow: { position: 'absolute', top: 54, left: 10, right: 10, flexDirection: 'row', gap: 3 },
@@ -508,13 +619,6 @@ const s = StyleSheet.create({
   tapZones: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 110, flexDirection: 'row' },
   tapLeft: { flex: 1 },
   tapRight: { flex: 2 },
-
-  musicPill: {
-    position: 'absolute', bottom: 115, left: 16,
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20,
-  },
-  musicText: { color: '#fff', fontSize: 12, maxWidth: 160 },
 
   viewCount: {
     position: 'absolute', bottom: 115, right: 16,

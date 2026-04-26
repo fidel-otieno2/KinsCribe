@@ -91,6 +91,11 @@ def run_migrations():
                 UNIQUE(post_id, user_id)
             )
             """,
+
+            # Public stories — location + music metadata
+            "ALTER TABLE public_stories ADD COLUMN IF NOT EXISTS location VARCHAR(200)",
+            "ALTER TABLE public_stories ADD COLUMN IF NOT EXISTS music_artist VARCHAR(200)",
+            "ALTER TABLE public_stories ADD COLUMN IF NOT EXISTS music_artwork VARCHAR(300)",
         ]
         
         print(f"🚀 Running {len(migrations)} migrations...")

@@ -34,13 +34,32 @@ def create_story():
         result = cloudinary.uploader.upload(file, resource_type=resource_type, folder="kinscribe/pstories")
         media_url = result["secure_url"]
     data = request.form if request.files else request.get_json(force=True, silent=True) or {}
+
+    # Parse music — sent as JSON string from the app
+    music_name = None
+    music_artist = None
+    music_artwork = None
+    music_raw = data.get("music")
+    if music_raw:
+        try:
+            import json as _json
+            m = _json.loads(music_raw) if isinstance(music_raw, str) else music_raw
+            music_name = m.get("title") or m.get("music_name")
+            music_artist = m.get("artist") or m.get("music_artist")
+            music_artwork = m.get("cover") or m.get("artwork")
+        except Exception:
+            music_name = str(music_raw)
+
     story = PublicStory(
         media_url=media_url,
         media_type=media_type if media_url else "text",
         text_content=data.get("text_content"),
         bg_color=data.get("bg_color", "#7c3aed"),
+        location=data.get("location"),
         music_url=data.get("music_url"),
-        music_name=data.get("music_name"),
+        music_name=music_name,
+        music_artist=music_artist,
+        music_artwork=music_artwork,
         privacy=data.get("privacy", "public"),
         expires_at=datetime.utcnow() + timedelta(hours=24),
         user_id=user.id

@@ -32,7 +32,7 @@ export function AuthProvider({ children }) {
       const token = await AsyncStorage.getItem('access_token');
       
       if (token) {
-        const timeout = setTimeout(() => setLoading(false), 8000);
+        const timeout = setTimeout(() => setLoading(false), 65000);
         try {
           const { data } = await api.get('/auth/me');
           setUser(data);

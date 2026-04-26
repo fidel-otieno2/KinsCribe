@@ -215,8 +215,11 @@ class PublicStory(db.Model):
     media_type = db.Column(db.String(20), nullable=True)
     text_content = db.Column(db.Text, nullable=True)
     bg_color = db.Column(db.String(20), nullable=True)
+    location = db.Column(db.String(200), nullable=True)
     music_url = db.Column(db.String(300), nullable=True)
     music_name = db.Column(db.String(200), nullable=True)
+    music_artist = db.Column(db.String(200), nullable=True)
+    music_artwork = db.Column(db.String(300), nullable=True)
     sticker_data = db.Column(db.Text, nullable=True)
     privacy = db.Column(db.String(20), default="public")
     view_count = db.Column(db.Integer, default=0)
@@ -233,7 +236,9 @@ class PublicStory(db.Model):
         return {
             "id": self.id, "media_url": self.media_url, "media_type": self.media_type,
             "text_content": self.text_content, "bg_color": self.bg_color,
+            "location": self.location,
             "music_url": self.music_url, "music_name": self.music_name,
+            "music_artist": self.music_artist, "music_artwork": self.music_artwork,
             "privacy": self.privacy, "view_count": self.view_count,
             "viewed_by_me": viewed,
             "expires_at": _iso(self.expires_at),
