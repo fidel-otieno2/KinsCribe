@@ -62,12 +62,36 @@ def create_story():
         music_name=music_name,
         music_artist=music_artist,
         music_artwork=music_artwork,
+        sticker_data=data.get("sticker_data"),
         privacy=data.get("privacy", "public"),
         expires_at=datetime.utcnow() + timedelta(hours=24),
         user_id=user.id
     )
     db.session.add(story)
     db.session.commit()
+
+    # Notify mentioned users
+    sticker_raw = data.get("sticker_data")
+    if sticker_raw:
+        try:
+            import json as _json
+            from models.notifications import Notification
+            stickers = _json.loads(sticker_raw) if isinstance(sticker_raw, str) else sticker_raw
+            for sticker in stickers:
+                if sticker.get("type") == "mention":
+                    mentioned_id = sticker.get("user_id")
+                    if mentioned_id and mentioned_id != user.id:
+                        db.session.add(Notification(
+                            user_id=mentioned_id,
+                            from_user_id=user.id,
+                            type="story_mention",
+                            title=f"{user.name} mentioned you in their story",
+                            message="Tap to view the story",
+                        ))
+            db.session.commit()
+        except Exception:
+            pass
+
     return jsonify({"story": story.to_dict(user.id)}), 201
 
 

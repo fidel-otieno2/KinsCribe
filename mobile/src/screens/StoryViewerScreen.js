@@ -328,6 +328,31 @@ export default function StoryViewerScreen({ route, navigation }) {
 
 
 
+      {/* ── MENTION STICKERS ── */}
+      {(() => {
+        try {
+          const stickers = story.sticker_data
+            ? (typeof story.sticker_data === 'string' ? JSON.parse(story.sticker_data) : story.sticker_data)
+            : [];
+          return stickers.filter(st => st.type === 'mention').map((st, i) => (
+            <TouchableOpacity
+              key={i}
+                  style={[
+                s.mentionSticker,
+                { top: `${(st.y || 0.4) * 100}%`, left: `${(st.x || 0.3) * 100}%` }
+              ]}
+              onPress={() => navigation.navigate('UserProfile', {
+                userId: st.user_id,
+                userName: st.name,
+                userAvatar: st.avatar,
+              })}
+            >
+              <AppText style={s.mentionStickerText}>@{st.username || st.name}</AppText>
+            </TouchableOpacity>
+          ));
+        } catch { return null; }
+      })()}
+
       {/* ── MUSIC DISC ── */}
       {story.music_name ? (
         <View style={s.musicSticker} pointerEvents="none">
@@ -685,6 +710,14 @@ const s = StyleSheet.create({
     maxWidth: width * 0.45,
   },
   locationInlineText: { color: '#fff', fontSize: 10, fontWeight: '600' },
+  mentionSticker: {
+    position: 'absolute',
+    backgroundColor: 'rgba(124,58,237,0.75)',
+    paddingHorizontal: 12, paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)',
+  },
+  mentionStickerText: { color: '#fff', fontSize: 14, fontWeight: '800' },
 
   // Music disc sticker
   musicSticker: {

@@ -123,6 +123,39 @@ export default function CreateScreen({ navigation, route }) {
   // ─── MUSIC STATE ─────────────────────────────────────────────────
   const [showMusicModal, setShowMusicModal] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
+  // ── MENTION STATE ──────────────────────────────────────────────
+  const [showMentionModal, setShowMentionModal] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState('');
+  const [mentionResults, setMentionResults] = useState([]);
+  const [mentionLoading, setMentionLoading] = useState(false);
+  const [storyMentions, setStoryMentions] = useState([]); // [{user_id, name, username, avatar, x, y}]
+  const mentionTimer = useRef(null);
+
+  const searchMentions = (text) => {
+    setMentionQuery(text);
+    clearTimeout(mentionTimer.current);
+    if (!text.trim() || text.length < 1) { setMentionResults([]); return; }
+    mentionTimer.current = setTimeout(async () => {
+      setMentionLoading(true);
+      try {
+        const { data } = await api.get(`/connections/search?q=${encodeURIComponent(text)}`);
+        setMentionResults(data.users || []);
+      } catch {} finally { setMentionLoading(false); }
+    }, 300);
+  };
+
+  const addMention = (u) => {
+    if (storyMentions.find(m => m.user_id === u.id)) { setShowMentionModal(false); return; }
+    setStoryMentions(prev => [...prev, {
+      user_id: u.id, name: u.name, username: u.username,
+      avatar: u.avatar_url, x: 0.3, y: 0.4,
+    }]);
+    setMentionQuery('');
+    setMentionResults([]);
+    setShowMentionModal(false);
+  };
+
+  const removeMention = (user_id) => setStoryMentions(prev => prev.filter(m => m.user_id !== user_id));
   const [storyLocationQuery, setStoryLocationQuery] = useState('');
   const [storyLocationResults, setStoryLocationResults] = useState([]);
   const [storyLocationLoading, setStoryLocationLoading] = useState(false);
@@ -762,6 +795,11 @@ export default function CreateScreen({ navigation, route }) {
         formData.append('bg_color', bgColor);
         if (textContent) formData.append('text_content', textContent);
         if (location) formData.append('location', location);
+        if (storyMentions.length > 0) {
+          formData.append('sticker_data', JSON.stringify(
+            storyMentions.map(m => ({ type: 'mention', ...m }))
+          ));
+        }
         if (selectedMusic) {
           formData.append('music', JSON.stringify({
             title: selectedMusic.title,
@@ -1099,6 +1137,87 @@ export default function CreateScreen({ navigation, route }) {
             onPress={() => setShowLocationModal(false)}
           >
             <AppText style={{ color: theme.text, fontWeight: '600' }}>Cancel</AppText>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+
+    {/* ── MENTION MODAL ── */}
+    <Modal
+      visible={showMentionModal}
+      animationType="slide"
+      transparent
+      onRequestClose={() => setShowMentionModal(false)}
+    >
+      <View style={s.modalOverlay}>
+        <View style={[s.modalSheet, { backgroundColor: theme.bgCard, maxHeight: '70%' }]}>
+          <View style={s.modalHandle} />
+          <AppText style={[s.modalTitle, { color: theme.text }]}>Tag People</AppText>
+
+          <View style={[s.locSearchRow, { backgroundColor: theme.bgSecondary, borderColor: mentionQuery ? '#7c3aed' : theme.border2 }]}>
+            <AppText style={{ color: '#7c3aed', fontWeight: '800', fontSize: 16, paddingLeft: 4 }}>@</AppText>
+            <TextInput
+              style={[s.locSearchInput, { color: theme.text }]}
+              placeholder="Search by name or username..."
+              placeholderTextColor={theme.dim}
+              value={mentionQuery}
+              onChangeText={searchMentions}
+              autoFocus
+              autoCapitalize="none"
+            />
+            {mentionLoading && <ActivityIndicator size="small" color="#7c3aed" />}
+          </View>
+
+          {/* Already tagged */}
+          {storyMentions.length > 0 && (
+            <View style={{ paddingHorizontal: 16, marginBottom: 8 }}>
+              <AppText style={[s.cpLabel, { color: theme.muted }]}>TAGGED</AppText>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                {storyMentions.map(m => (
+                  <View key={m.user_id} style={s.mentionTagChip}>
+                    <AppText style={s.mentionTagChipText}>@{m.username || m.name}</AppText>
+                    <TouchableOpacity onPress={() => removeMention(m.user_id)}>
+                      <Ionicons name="close-circle" size={14} color="#a78bfa" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+
+          <ScrollView style={{ maxHeight: 300 }} keyboardShouldPersistTaps="handled">
+            {mentionResults.map((u) => (
+              <TouchableOpacity
+                key={u.id}
+                style={[s.locResultRow, { borderBottomColor: theme.border }]}
+                onPress={() => addMention(u)}
+              >
+                <View style={[s.locResultIcon, { width: 38, height: 38, borderRadius: 19, overflow: 'hidden' }]}>
+                  {u.avatar_url
+                    ? <Image source={{ uri: u.avatar_url }} style={{ width: 38, height: 38 }} />
+                    : <AppText style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>{u.name?.[0]?.toUpperCase()}</AppText>}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <AppText style={[s.locResultName, { color: theme.text }]}>{u.name}</AppText>
+                  <AppText style={[s.locResultFull, { color: theme.muted }]}>@{u.username}</AppText>
+                </View>
+                {storyMentions.find(m => m.user_id === u.id) && (
+                  <Ionicons name="checkmark-circle" size={20} color="#10b981" />
+                )}
+              </TouchableOpacity>
+            ))}
+            {mentionQuery.length >= 1 && !mentionLoading && mentionResults.length === 0 && (
+              <View style={{ alignItems: 'center', padding: 24 }}>
+                <AppText style={{ color: theme.muted, fontSize: 13 }}>No users found</AppText>
+              </View>
+            )}
+          </ScrollView>
+
+          <TouchableOpacity
+            style={[s.modalClose, { borderColor: theme.border2, marginTop: 8 }]}
+            onPress={() => setShowMentionModal(false)}
+          >
+            <AppText style={{ color: theme.text, fontWeight: '600' }}>Done</AppText>
           </TouchableOpacity>
         </View>
       </View>
@@ -1906,6 +2025,15 @@ export default function CreateScreen({ navigation, route }) {
                       </TouchableOpacity>
                     </View>
                   )}
+                  {/* Mention stickers on media canvas */}
+                  {storyMentions.map(m => (
+                    <View key={m.user_id} style={[s.mentionSticker, { top: `${m.y * 100}%`, left: `${m.x * 100}%` }]}>
+                      <AppText style={s.mentionStickerText}>@{m.username || m.name}</AppText>
+                      <TouchableOpacity onPress={() => removeMention(m.user_id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                        <Ionicons name="close-circle" size={14} color="rgba(255,255,255,0.8)" />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
                   {/* Remove media */}
                   <TouchableOpacity style={s.storyRemove} onPress={() => setMediaFiles([])}>
                     <View style={s.storyRemoveBtn}>
@@ -1948,6 +2076,15 @@ export default function CreateScreen({ navigation, route }) {
                       </TouchableOpacity>
                     </View>
                   )}
+                  {/* Mention stickers on canvas */}
+                  {storyMentions.map(m => (
+                    <View key={m.user_id} style={[s.mentionSticker, { top: `${m.y * 100}%`, left: `${m.x * 100}%` }]}>
+                      <AppText style={s.mentionStickerText}>@{m.username || m.name}</AppText>
+                      <TouchableOpacity onPress={() => removeMention(m.user_id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                        <Ionicons name="close-circle" size={14} color="rgba(255,255,255,0.8)" />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
                 </LinearGradient>
               )}
             </View>
@@ -1999,6 +2136,16 @@ export default function CreateScreen({ navigation, route }) {
                 </View>
                 <AppText style={[s.storyToolLabel, selectedLocation && { color: '#8B5CF6' }]}>
                   {selectedLocation ? selectedLocation.name.split(',')[0] : 'Location'}
+                </AppText>
+              </TouchableOpacity>
+
+              {/* Mention */}
+              <TouchableOpacity style={s.storyTool} onPress={() => setShowMentionModal(true)}>
+                <View style={[s.storyToolIcon, storyMentions.length > 0 && { backgroundColor: 'rgba(74,124,63,0.6)', borderColor: '#3B82F6' }]}>
+                  <AppText style={{ color: storyMentions.length > 0 ? '#8B5CF6' : '#fff', fontSize: 18, fontWeight: '800' }}>@</AppText>
+                </View>
+                <AppText style={[s.storyToolLabel, storyMentions.length > 0 && { color: '#8B5CF6' }]}>
+                  {storyMentions.length > 0 ? `${storyMentions.length} tagged` : 'Mention'}
                 </AppText>
               </TouchableOpacity>
             </View>
@@ -2328,6 +2475,10 @@ const s = StyleSheet.create({
   storyOverlayText: { color: '#fff', fontSize: 20, fontWeight: '700', textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
   storyMusicSticker: { position: 'absolute', bottom: 16, left: 16, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, maxWidth: '70%' },
   storyMusicStickerText: { color: '#fff', fontSize: 11, flex: 1 },
+  mentionSticker: { position: 'absolute', flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(124,58,237,0.75)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
+  mentionStickerText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  mentionTagChip: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(124,58,237,0.15)', borderWidth: 1, borderColor: 'rgba(124,58,237,0.4)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
+  mentionTagChipText: { color: '#a78bfa', fontSize: 13, fontWeight: '600' },
   storyRemove: { position: 'absolute', top: 12, right: 12 },
   storyRemoveBtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
   storyToolStrip: { flexDirection: 'row', justifyContent: 'space-around', paddingVertical: 14, paddingHorizontal: 8, marginBottom: 4 },

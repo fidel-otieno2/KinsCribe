@@ -20,6 +20,7 @@ import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
 import VideoPlayer from "../components/VideoPlayer";
 import { useTranslation } from "../i18n";
+import { toStreamableUri } from "../utils/cloudinary";
 
 const { width } = Dimensions.get("window");
 
@@ -260,7 +261,7 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation, isVisible 
           shouldDuckAndroid: true,
         });
         const { sound } = await Audio.Sound.createAsync(
-          { uri: post.music.stream_url },
+          { uri: toStreamableUri(post.music.stream_url) },
           {
             shouldPlay: true,
             positionMillis: (post.music.start_time || 0) * 1000,

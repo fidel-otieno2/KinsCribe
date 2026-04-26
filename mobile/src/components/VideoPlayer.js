@@ -12,6 +12,8 @@ import { useTheme } from '../context/ThemeContext';
 const { width } = Dimensions.get('window');
 const VIDEO_HEIGHT = width * (16 / 9);
 
+import { toStreamableUri } from '../utils/cloudinary';
+
 export default function VideoPlayer({
   uri,
   isVisible,
@@ -109,7 +111,7 @@ export default function VideoPlayer({
     <View style={s.container}>
       <Video
         ref={videoRef}
-        source={{ uri }}
+        source={{ uri: toStreamableUri(uri) }}
         style={s.video}
         resizeMode={ResizeMode.COVER}
         shouldPlay={false}

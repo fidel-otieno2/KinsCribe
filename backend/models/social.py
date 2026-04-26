@@ -239,6 +239,7 @@ class PublicStory(db.Model):
             "location": self.location,
             "music_url": self.music_url, "music_name": self.music_name,
             "music_artist": self.music_artist, "music_artwork": self.music_artwork,
+            "sticker_data": self.sticker_data,
             "privacy": self.privacy, "view_count": self.view_count,
             "viewed_by_me": viewed,
             "expires_at": _iso(self.expires_at),
