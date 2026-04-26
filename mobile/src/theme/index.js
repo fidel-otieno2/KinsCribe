@@ -126,6 +126,15 @@ export const gradients = {
   glow:        ['rgba(124,58,237,0.4)', 'rgba(59,130,246,0.2)', 'transparent'],
 };
 
+export const spacing = {
+  xs:  4,
+  sm:  8,
+  md:  12,
+  lg:  16,
+  xl:  24,
+  xxl: 32,
+};
+
 export const radius = {
   xs:   6,
   sm:   10,

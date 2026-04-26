@@ -101,9 +101,8 @@ function CustomTabBar({ state, navigation, msgUnread, notifUnread, theme, user }
   };
 
   const isDark = theme.mode === 'dark';
-  // Match exactly the FeedScreen background color
-  const barBg = isDark ? 'rgba(28,26,20,0.96)' : 'rgba(245,240,232,0.96)';
-  const borderCol = isDark ? 'rgba(196,163,90,0.15)' : 'rgba(45,90,39,0.12)';
+  const barBg = isDark ? 'rgba(11,15,26,0.97)' : 'rgba(248,250,252,0.97)';
+  const borderCol = isDark ? 'rgba(124,58,237,0.2)' : 'rgba(124,58,237,0.12)';
 
   return (
     <View style={nb.wrapper} pointerEvents="box-none">
@@ -114,7 +113,7 @@ function CustomTabBar({ state, navigation, msgUnread, notifUnread, theme, user }
       >
         {/* Gold/green top accent line */}
         <View style={[nb.topLine, {
-          backgroundColor: isDark ? theme.gold : theme.primary,
+          backgroundColor: '#7C3AED',
         }]} />
 
         <View style={nb.row}>
@@ -141,7 +140,7 @@ function CustomTabBar({ state, navigation, msgUnread, notifUnread, theme, user }
                 >
                   {isCreate ? (
                     <LinearGradient
-                      colors={['#4A7C3F', '#2D5A27']}
+                      colors={['#7C3AED', '#3B82F6']}
                       style={nb.createBtn}
                     >
                       <Ionicons name="add" size={30} color="#fff" />
@@ -156,8 +155,8 @@ function CustomTabBar({ state, navigation, msgUnread, notifUnread, theme, user }
                       {isFocused && (
                         <View style={[nb.activePill, {
                           backgroundColor: isDark
-                            ? 'rgba(74,124,63,0.15)'
-                            : 'rgba(45,90,39,0.1)',
+                            ? 'rgba(124,58,237,0.15)'
+                            : 'rgba(124,58,237,0.1)',
                         }]} />
                       )}
 
@@ -285,7 +284,7 @@ const nb = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 6,
-    shadowColor: '#2D5A27',
+    shadowColor: '#7C3AED',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.5,
     shadowRadius: 12,
