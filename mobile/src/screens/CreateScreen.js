@@ -418,13 +418,14 @@ export default function CreateScreen({ navigation, route }) {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) return info('Allow photo access in your device settings');
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images', 'videos'],
+      mediaTypes: ImagePicker.MediaTypeOptions.All,
       allowsMultipleSelection: allowMultiple,
+      allowsEditing: false,
       videoMaxDuration: 120,
-      quality: 0.9,
+      quality: 1,
     });
     if (!result.canceled) {
-      const assets = result.assets || [result];
+      const assets = result.assets || [];
       const files = assets.map(a => ({
         uri: a.uri,
         type: a.type === 'video' ? 'video' : 'image',

@@ -211,7 +211,11 @@ export default function StoryViewerScreen({ route, navigation }) {
 
       {/* ── BACKGROUND ── */}
       {story.media_url && story.media_type === 'image' && (
-        <Image source={{ uri: story.media_url }} style={s.bg} resizeMode="cover" />
+        <Image
+          source={{ uri: story.media_url }}
+          style={s.bg}
+          resizeMode="cover"
+        />
       )}
       {isVideo && (
         <Video
@@ -220,9 +224,9 @@ export default function StoryViewerScreen({ route, navigation }) {
           resizeMode="cover"
           shouldPlay={!paused}
           isLooping={false}
+          useNativeControls={false}
           onPlaybackStatusUpdate={status => {
             if (status.isLoaded && status.durationMillis && !paused) {
-              // drive progress bar from video playback
               const pct = status.positionMillis / status.durationMillis;
               progress.setValue(pct);
               if (status.didJustFinish) goNext();
@@ -231,7 +235,10 @@ export default function StoryViewerScreen({ route, navigation }) {
         />
       )}
       {story.media_type === 'text' && (
-        <View style={[s.bg, { backgroundColor: story.bg_color || '#7c3aed' }]} />
+        <LinearGradient
+          colors={[story.bg_color || '#7c3aed', '#0f172a']}
+          style={s.bg}
+        />
       )}
       {!story.media_url && story.media_type !== 'text' && (
         <View style={[s.bg, { backgroundColor: '#0f172a' }]} />
@@ -295,19 +302,80 @@ export default function StoryViewerScreen({ route, navigation }) {
       {/* ── HEADER ── */}
       <View style={s.header}>
         <View style={s.authorRow}>
-          <HexAvatar uri={group.author_avatar} name={group.author_name} size={38} />
-          <View>
-            <AppText style={s.authorName}>{group.author_name}</AppText>
+          <TouchableOpacity
+            onPress={() => !isOwn && navigation.navigate('UserProfile', {
+              userId: group.user_id,
+              userName: group.author_name,
+              userAvatar: group.author_avatar,
+            })}
+            activeOpacity={isOwn ? 1 : 0.8}
+          >
+            <HexAvatar uri={group.author_avatar} name={group.author_name} size={38} />
+          </TouchableOpacity>
+          <View style={{ gap: 2 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <AppText style={s.authorName}>{group.author_name}</AppText>
+              {/* Privacy badge — creator only */}
+              {isOwn && story.privacy && (
+                <View style={[
+                  s.privacyBadge,
+                  story.privacy === 'public'      && s.privacyPublic,
+                  story.privacy === 'connections' && s.privacyConnections,
+                  story.privacy === 'family'      && s.privacyFamily,
+                ]}>
+                  <Ionicons
+                    name={
+                      story.privacy === 'public'      ? 'globe-outline' :
+                      story.privacy === 'connections' ? 'people-outline' :
+                      'home-outline'
+                    }
+                    size={10}
+                    color="#fff"
+                  />
+                  <AppText style={s.privacyBadgeText}>
+                    {story.privacy === 'public'      ? 'Public' :
+                     story.privacy === 'connections' ? 'Connections' :
+                     'Family'}
+                  </AppText>
+                </View>
+              )}
+            </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <AppText style={s.storyTime}>{timeAgo(story.created_at)}</AppText>
               <AppText style={s.storyDot}>·</AppText>
-              <AppText style={s.storyTime}>
-                {storyIndex + 1}/{group.stories.length}
-              </AppText>
+              <AppText style={s.storyTime}>{storyIndex + 1}/{group.stories.length}</AppText>
             </View>
           </View>
         </View>
+
         <View style={s.headerRight}>
+          {/* Follow button — viewer only */}
+          {!isOwn && (
+            <TouchableOpacity
+              style={s.followBtn}
+              onPress={() => navigation.navigate('UserProfile', {
+                userId: group.user_id,
+                userName: group.author_name,
+                userAvatar: group.author_avatar,
+              })}
+              activeOpacity={0.85}
+            >
+              <AppText style={s.followBtnText}>Follow</AppText>
+            </TouchableOpacity>
+          )}
+          {/* More options — creator only */}
+          {isOwn && (
+            <TouchableOpacity
+              style={s.headerBtn}
+              onPress={() => {
+                pauseProgress();
+                setShowViews(true);
+                loadViews();
+              }}
+            >
+              <Ionicons name="ellipsis-horizontal" size={22} color="#fff" />
+            </TouchableOpacity>
+          )}
           <TouchableOpacity onPress={() => navigation.goBack()} style={s.headerBtn}>
             <Ionicons name="close" size={24} color="#fff" />
           </TouchableOpacity>
@@ -518,10 +586,10 @@ export function HexAvatar({ uri, name, size = 54, hasStory = false, hasSeen = fa
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000' },
-  bg: { position: 'absolute', width, height },
-  topGrad: { position: 'absolute', top: 0, left: 0, right: 0, height: 130 },
-  bottomGrad: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 220 },
+  container: { flex: 1, backgroundColor: '#000', width, height },
+  bg: { position: 'absolute', top: 0, left: 0, width, height },
+  topGrad: { position: 'absolute', top: 0, left: 0, right: 0, height: 160 },
+  bottomGrad: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 260 },
 
   textOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
@@ -611,12 +679,32 @@ const s = StyleSheet.create({
   },
   authorRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   authorName: { color: '#fff', fontWeight: '700', fontSize: 14 },
-  storyTime: { color: 'rgba(255,255,255,0.65)', fontSize: 11, marginTop: 1 },
+  storyTime: { color: 'rgba(255,255,255,0.65)', fontSize: 11 },
   storyDot: { color: 'rgba(255,255,255,0.4)', fontSize: 11 },
-  headerRight: { flexDirection: 'row', gap: 6 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   headerBtn: { padding: 6 },
 
-  tapZones: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 110, flexDirection: 'row' },
+  // Privacy badge
+  privacyBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    paddingHorizontal: 7, paddingVertical: 3,
+    borderRadius: 20,
+  },
+  privacyPublic:      { backgroundColor: 'rgba(59,130,246,0.75)' },
+  privacyConnections: { backgroundColor: 'rgba(124,58,237,0.75)' },
+  privacyFamily:      { backgroundColor: 'rgba(16,185,129,0.75)' },
+  privacyBadgeText: { color: '#fff', fontSize: 9, fontWeight: '700', letterSpacing: 0.3 },
+
+  // Follow button (viewer)
+  followBtn: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.5)',
+    borderRadius: 20,
+    paddingHorizontal: 14, paddingVertical: 5,
+  },
+  followBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+
+  tapZones: { position: 'absolute', top: 110, left: 0, right: 0, bottom: 100, flexDirection: 'row' },
   tapLeft: { flex: 1 },
   tapRight: { flex: 2 },
 

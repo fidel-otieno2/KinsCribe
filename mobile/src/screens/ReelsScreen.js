@@ -67,7 +67,7 @@ function ReelCard({ reel, isVisible, navigation, onUpdate }) {
     setPosting(true);
     try {
       const { data } = await api.post(`/posts/${reel.id}/comments`, { text: commentText });
-      setComments(c => [...c, { ...data.comment, author_name: user?.name }]);
+      setComments(c => [...c, { ...data.comment, author_name: user?.name, author_avatar: user?.avatar_url }]);
       setCommentText('');
     } catch {} finally { setPosting(false); }
   };
@@ -91,46 +91,6 @@ function ReelCard({ reel, isVisible, navigation, onUpdate }) {
         commentCount={reel.comment_count}
         fullScreen
       />
-
-      {/* Right side actions */}
-      <View style={s.actions}>
-        {/* Avatar */}
-        <TouchableOpacity
-          style={s.avatarWrap}
-          onPress={() => navigation.navigate('UserProfile', { userId: reel.user_id, userName: reel.author_name, userAvatar: reel.author_avatar })}
-        >
-          <LinearGradient colors={['#7C3AED', '#3B82F6']} style={s.avatarRing}>
-            {reel.author_avatar
-              ? <Image source={{ uri: reel.author_avatar }} style={s.avatarImg} />
-              : <AppText style={s.avatarLetter}>{reel.author_name?.[0]?.toUpperCase()}</AppText>}
-          </LinearGradient>
-          <View style={s.followDot}>
-            <Ionicons name="add" size={10} color="#fff" />
-          </View>
-        </TouchableOpacity>
-
-        {/* Like */}
-        <TouchableOpacity style={s.actionBtn} onPress={toggleLike}>
-          <Ionicons name={liked ? 'heart' : 'heart-outline'} size={30} color={liked ? '#e11d48' : '#fff'} />
-          <AppText style={s.actionCount}>{likeCount > 0 ? likeCount : ''}</AppText>
-        </TouchableOpacity>
-
-        {/* Comment */}
-        <TouchableOpacity style={s.actionBtn} onPress={openComments}>
-          <Ionicons name="chatbubble-outline" size={28} color="#fff" />
-          <AppText style={s.actionCount}>{reel.comment_count > 0 ? reel.comment_count : ''}</AppText>
-        </TouchableOpacity>
-
-        {/* Save */}
-        <TouchableOpacity style={s.actionBtn} onPress={toggleSave}>
-          <Ionicons name={saved ? 'bookmark' : 'bookmark-outline'} size={28} color={saved ? '#7C3AED' : '#fff'} />
-        </TouchableOpacity>
-
-        {/* Share */}
-        <TouchableOpacity style={s.actionBtn}>
-          <Ionicons name="paper-plane-outline" size={28} color="#fff" />
-        </TouchableOpacity>
-      </View>
 
       {/* Bottom info */}
       <View style={s.bottomInfo}>
@@ -177,7 +137,9 @@ function ReelCard({ reel, isVisible, navigation, onUpdate }) {
                   renderItem={({ item }) => (
                     <View style={s.commentRow}>
                       <View style={s.commentAvatar}>
-                        <AppText style={s.commentAvatarText}>{item.author_name?.[0] || 'U'}</AppText>
+                        {item.author_avatar
+                          ? <Image source={{ uri: item.author_avatar }} style={s.commentAvatarImg} />
+                          : <AppText style={s.commentAvatarText}>{item.author_name?.[0] || 'U'}</AppText>}
                       </View>
                       <View style={{ flex: 1 }}>
                         <AppText style={s.commentText}>
@@ -190,7 +152,9 @@ function ReelCard({ reel, isVisible, navigation, onUpdate }) {
                 />}
             <View style={s.commentInputRow}>
               <View style={s.commentAvatar}>
-                <AppText style={s.commentAvatarText}>{user?.name?.[0] || 'U'}</AppText>
+                {user?.avatar_url
+                  ? <Image source={{ uri: user.avatar_url }} style={s.commentAvatarImg} />
+                  : <AppText style={s.commentAvatarText}>{user?.name?.[0] || 'U'}</AppText>}
               </View>
               <TextInput
                 style={s.commentInput}
@@ -329,19 +293,6 @@ const s = StyleSheet.create({
 
   reelCard: { width, height, backgroundColor: '#000' },
 
-  // Right actions
-  actions: {
-    position: 'absolute', right: 12, bottom: 120,
-    alignItems: 'center', gap: 20,
-  },
-  avatarWrap: { position: 'relative', marginBottom: 4 },
-  avatarRing: { width: 48, height: 48, borderRadius: 24, padding: 2, alignItems: 'center', justifyContent: 'center' },
-  avatarImg: { width: 44, height: 44, borderRadius: 22 },
-  avatarLetter: { color: '#fff', fontWeight: '800', fontSize: 18 },
-  followDot: { position: 'absolute', bottom: -4, left: '50%', marginLeft: -10, width: 20, height: 20, borderRadius: 10, backgroundColor: '#7C3AED', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#000' },
-  actionBtn: { alignItems: 'center', gap: 4 },
-  actionCount: { color: '#fff', fontSize: 12, fontWeight: '700' },
-
   // Bottom info
   bottomInfo: {
     position: 'absolute', bottom: 90, left: 16, right: 80,
@@ -360,7 +311,8 @@ const s = StyleSheet.create({
   commentsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: 'rgba(255,255,255,0.1)' },
   commentsTitle: { fontSize: 15, fontWeight: '700', color: '#fff' },
   commentRow: { flexDirection: 'row', gap: 10, marginBottom: 16, alignItems: 'flex-start' },
-  commentAvatar: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#7C3AED', alignItems: 'center', justifyContent: 'center' },
+  commentAvatar: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#7C3AED', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  commentAvatarImg: { width: 30, height: 30, borderRadius: 15 },
   commentAvatarText: { color: '#fff', fontWeight: '700', fontSize: 11 },
   commentText: { fontSize: 13, color: '#E2E8F0', lineHeight: 18 },
   commentName: { fontWeight: '700', color: '#fff' },

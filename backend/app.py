@@ -183,6 +183,9 @@ def _run_migrations():
         "ALTER TABLE public_stories ADD COLUMN IF NOT EXISTS view_count INTEGER DEFAULT 0",
         "ALTER TABLE public_stories ADD COLUMN IF NOT EXISTS bg_color VARCHAR(20)",
         "ALTER TABLE public_stories ADD COLUMN IF NOT EXISTS text_content TEXT",
+        "ALTER TABLE public_stories ADD COLUMN IF NOT EXISTS location VARCHAR(200)",
+        "ALTER TABLE public_stories ADD COLUMN IF NOT EXISTS music_artist VARCHAR(200)",
+        "ALTER TABLE public_stories ADD COLUMN IF NOT EXISTS music_artwork VARCHAR(300)",
         # Indexes
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_apple_id ON users(apple_id)",
         # Subscription fields

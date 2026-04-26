@@ -326,6 +326,11 @@ export default function PostDetailScreen({ route, navigation }) {
           </View>
         )}
         <View style={s.inputRow}>
+          <View style={[s.commentAvatar, { backgroundColor: theme.primary }]}>
+            {user?.avatar_url
+              ? <Image source={{ uri: user.avatar_url }} style={s.commentAvatarImg} />
+              : <AppText style={s.commentAvatarLetter}>{user?.name?.[0]?.toUpperCase() || 'U'}</AppText>}
+          </View>
           <View style={[s.commentInputWrap, { backgroundColor: theme.bgSecondary, borderColor: theme.border2 }]}>
             <TextInput
               ref={inputRef}

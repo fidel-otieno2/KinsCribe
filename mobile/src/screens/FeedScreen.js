@@ -363,7 +363,7 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation, isVisible 
     setPosting(true);
     try {
       const { data } = await api.post(`/posts/${post.id}/comments`, { text: commentText });
-      setComments(c => [...c, { ...data.comment, author_name: user?.name }]);
+      setComments(c => [...c, { ...data.comment, author_name: user?.name, author_avatar: user?.avatar_url }]);
       setCommentText("");
     } catch {} finally { setPosting(false); }
   };
@@ -715,7 +715,9 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation, isVisible 
                 renderItem={({ item }) => (
                   <View style={pc.commentRow}>
                     <View style={[pc.commentAvatar, { backgroundColor: theme.primary }]}>
-                      <AppText style={pc.commentAvatarText}>{item.author_name?.[0] || "U"}</AppText>
+                      {item.author_avatar
+                        ? <Image source={{ uri: item.author_avatar }} style={pc.commentAvatarImg} />
+                        : <AppText style={pc.commentAvatarText}>{item.author_name?.[0] || 'U'}</AppText>}
                     </View>
                     <View style={{ flex: 1 }}>
                       <AppText style={[pc.commentText, { color: theme.text }]}>
@@ -729,7 +731,9 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation, isVisible 
             )}
             <View style={[pc.commentInputRow, { borderTopColor: theme.border }]}>
               <View style={[pc.commentAvatar, { backgroundColor: theme.primary }]}>
-                <AppText style={pc.commentAvatarText}>{user?.name?.[0] || "U"}</AppText>
+                {user?.avatar_url
+                  ? <Image source={{ uri: user.avatar_url }} style={pc.commentAvatarImg} />
+                  : <AppText style={pc.commentAvatarText}>{user?.name?.[0] || 'U'}</AppText>}
               </View>
               <TextInput
                 style={[pc.commentInput, { color: theme.text }]}
@@ -799,7 +803,8 @@ const pc = StyleSheet.create({
   commentsHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 0.5, borderBottomColor: colors.border },
   commentsTitle: { fontSize: 15, fontWeight: "700", color: colors.text },
   commentRow: { flexDirection: "row", gap: 10, marginBottom: 16, alignItems: "flex-start" },
-  commentAvatar: { width: 30, height: 30, borderRadius: 15, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" },
+  commentAvatar: { width: 30, height: 30, borderRadius: 15, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center", overflow: 'hidden' },
+  commentAvatarImg: { width: 30, height: 30, borderRadius: 15 },
   commentAvatarText: { color: "#fff", fontWeight: "700", fontSize: 11 },
   commentText: { fontSize: 13, color: colors.text, lineHeight: 18 },
   commentName: { fontWeight: "700" },
