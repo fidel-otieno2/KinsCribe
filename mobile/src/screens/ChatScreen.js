@@ -755,7 +755,8 @@ export default function ChatScreen({ route, navigation }) {
             </TouchableOpacity>
             <TouchableOpacity onPress={async () => {
               try {
-                const { data } = await api.post('/ai/family-summary', { messages });
+                const recentMsgs = messages.slice(-30).map(m => ({ sender_name: m.sender_name, text: m.text, media_url: m.media_url }));
+                const { data } = await api.post('/ai/family-summary', { messages: recentMsgs });
                 Alert.alert('💬 Family Chat Summary', data.summary || 'No summary available');
               } catch { Alert.alert('Error', 'Failed to generate summary'); }
             }} style={{ padding: 4 }}>
@@ -765,12 +766,11 @@ export default function ChatScreen({ route, navigation }) {
               style={cs.headerIconBtn}
               onPress={() => navigation.navigate('Call', {
                 callType: 'group',
-                callerName: 'Family Group',
+                callerName: title || 'Family Group',
                 callerAvatar: null,
                 isIncoming: false,
-                participants: [],
                 conversationId: convId,
-                myName: user?.name || 'Someone',
+                calleeId: null,
               })}
             >
               <Ionicons name="videocam-outline" size={20} color="#10b981" />
@@ -1383,9 +1383,16 @@ export default function ChatScreen({ route, navigation }) {
 
             <TouchableOpacity
               style={cs.blockConfirmBtn}
-              onPress={() => {
-                setShowBlockModal(false);
-                Alert.alert('Blocked', `${title} has been blocked.`);
+              onPress={async () => {
+                try {
+                  await api.post(`/connections/${otherUserId}/block`);
+                  setShowBlockModal(false);
+                  Alert.alert('Blocked', `${title} has been blocked.`, [
+                    { text: 'OK', onPress: () => navigation.goBack() }
+                  ]);
+                } catch {
+                  Alert.alert('Error', 'Failed to block user. Try again.');
+                }
               }}
             >
               <AppText style={cs.blockConfirmText}>Block {title}</AppText>
