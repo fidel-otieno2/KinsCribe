@@ -26,6 +26,7 @@ const GRID = (width - 3) / 3;
 const TABS = [
   { key: 'posts', icon: 'grid-outline', iconActive: 'grid' },
   { key: 'reels', icon: 'film-outline', iconActive: 'film' },
+  { key: 'family', icon: 'people-outline', iconActive: 'people' },
   { key: 'saved', icon: 'bookmark-outline', iconActive: 'bookmark' },
   { key: 'tagged', icon: 'at-outline', iconActive: 'at' },
   { key: 'liked', icon: 'heart-outline', iconActive: 'heart' },
@@ -52,6 +53,9 @@ export default function ProfileScreen({ navigation }) {
   const [myStories, setMyStories] = useState([]);
   const [family, setFamily] = useState(null);
   const [myGroups, setMyGroups] = useState({ admin_groups: [], member_groups: [] });
+  const [familyPostsGroup, setFamilyPostsGroup] = useState(null); // selected group for family tab
+  const [familyPosts, setFamilyPosts] = useState([]); // stories for selected group
+  const [familyPostsLoading, setFamilyPostsLoading] = useState(false);
   const [addHighlight, setAddHighlight] = useState({ visible: false, title: '', selected: [], saving: false });
   const [viewHighlight, setViewHighlight] = useState({ visible: false, highlight: null, index: 0 });
 
@@ -77,7 +81,13 @@ export default function ProfileScreen({ navigation }) {
         api.get('/family/my-family').then(r => setFamily(r.data.family)).catch(() => {});
       }
       api.get(`/family/user/${user.id}/groups`)
-        .then(r => setMyGroups({ admin_groups: r.data.admin_groups || [], member_groups: r.data.member_groups || [] }))
+        .then(r => {
+          const groups = { admin_groups: r.data.admin_groups || [], member_groups: r.data.member_groups || [] };
+          setMyGroups(groups);
+          // Auto-select first group for family tab
+          const allGroups = [...(r.data.admin_groups || []), ...(r.data.member_groups || [])];
+          if (allGroups.length > 0) setFamilyPostsGroup(prev => prev || allGroups[0]);
+        })
         .catch(() => {});
       setStats({
         posts: allPosts.length,
@@ -92,6 +102,20 @@ export default function ProfileScreen({ navigation }) {
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
   useFocusEffect(useCallback(() => { fetchAll(); }, [fetchAll]));
+
+  const fetchFamilyPosts = useCallback(async (group) => {
+    if (!group || !user) return;
+    setFamilyPostsLoading(true);
+    try {
+      const { data } = await api.get(`/stories/user/${user.id}/family/${group.id}`);
+      setFamilyPosts(data.stories || []);
+    } catch { setFamilyPosts([]); }
+    finally { setFamilyPostsLoading(false); }
+  }, [user]);
+
+  useEffect(() => {
+    if (tab === 'family' && familyPostsGroup) fetchFamilyPosts(familyPostsGroup);
+  }, [tab, familyPostsGroup, fetchFamilyPosts]);
 
   const handleAvatarUpload = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -237,6 +261,7 @@ export default function ProfileScreen({ navigation }) {
     tab === 'saved' ? savedPosts :
     tab === 'tagged' ? taggedPosts :
     tab === 'liked' ? likedPosts :
+    tab === 'family' ? [] : // handled separately
     posts.filter(p => tab === 'reels' ? p.media_type === 'video' : true);
 
   const Header = () => (
@@ -729,7 +754,89 @@ export default function ProfileScreen({ navigation }) {
           memberGroups={myGroups.member_groups}
           onGroupPress={() => navigation.navigate('Family')}
         />
-        {currentData.length === 0 ? (
+
+        {/* ── FAMILY TAB: group switcher + stories ── */}
+        {tab === 'family' ? (
+          <View style={{ flex: 1 }}>
+            {/* Group switcher chips */}
+            {(() => {
+              const allGroups = [...myGroups.admin_groups, ...myGroups.member_groups];
+              if (allGroups.length === 0) return (
+                <View style={s.empty}>
+                  <Ionicons name="people-outline" size={48} color={theme.dim} />
+                  <AppText style={[s.emptyTitle, { color: theme.muted }]}>Not in any family group yet</AppText>
+                  <TouchableOpacity style={s.createBtn} onPress={() => navigation.navigate('FamilyGate')}>
+                    <AppText style={s.createBtnText}>Join or Create a Family</AppText>
+                  </TouchableOpacity>
+                </View>
+              );
+              return (
+                <>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.groupChipsRow}>
+                    {allGroups.map(g => {
+                      const active = familyPostsGroup?.id === g.id;
+                      return (
+                        <TouchableOpacity
+                          key={g.id}
+                          style={[s.groupChip, { borderColor: active ? '#10b981' : theme.border2, backgroundColor: active ? 'rgba(16,185,129,0.12)' : theme.bgCard }]}
+                          onPress={() => setFamilyPostsGroup(g)}
+                        >
+                          <Ionicons name="people" size={13} color={active ? '#10b981' : theme.muted} />
+                          <AppText style={[s.groupChipText, { color: active ? '#10b981' : theme.muted }]}>{g.name}</AppText>
+                          {(myGroups.admin_groups.find(ag => ag.id === g.id)) && (
+                            <View style={s.groupChipAdminDot} />
+                          )}
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+
+                  {familyPostsLoading ? (
+                    <ActivityIndicator color={theme.primary} style={{ marginTop: 40 }} />
+                  ) : familyPosts.length === 0 ? (
+                    <View style={s.empty}>
+                      <Ionicons name="library-outline" size={48} color={theme.dim} />
+                      <AppText style={[s.emptyTitle, { color: theme.muted }]}>
+                        No posts in {familyPostsGroup?.name || 'this group'} yet
+                      </AppText>
+                      <TouchableOpacity style={s.createBtn} onPress={() => navigation.navigate('Create', { initialMode: 'family' })}>
+                        <AppText style={s.createBtnText}>Post to this group</AppText>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <View style={s.grid}>
+                      {familyPosts.map(item => (
+                        <TouchableOpacity
+                          key={item.id}
+                          style={s.gridItem}
+                          activeOpacity={0.85}
+                          onPress={() => navigation.navigate('Family')}
+                        >
+                          {item.media_url ? (
+                            <Image source={{ uri: item.media_url }} style={s.gridImg} resizeMode="cover" />
+                          ) : (
+                            <View style={[s.gridImg, s.gridText, { backgroundColor: theme.bgSecondary }]}>
+                              <AppText style={[s.gridCaption, { color: theme.text }]} numberOfLines={3}>{item.title}</AppText>
+                            </View>
+                          )}
+                          <View style={s.familyStoryBadge}>
+                            <Ionicons name="people" size={9} color="#10b981" />
+                          </View>
+                          {item.like_count > 0 && (
+                            <View style={s.gridLikes}>
+                              <Ionicons name="heart" size={10} color="#fff" />
+                              <AppText style={s.gridLikesText}>{item.like_count}</AppText>
+                            </View>
+                          )}
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                </>
+              );
+            })()}
+          </View>
+        ) : currentData.length === 0 ? (
           <View style={s.empty}>
             <Ionicons
               name={tab === 'saved' ? 'bookmark-outline' : tab === 'reels' ? 'film-outline' : tab === 'tagged' ? 'at-outline' : tab === 'liked' ? 'heart-outline' : 'camera-outline'}
@@ -888,4 +995,10 @@ const s = StyleSheet.create({
   listCaption: { fontSize: 14, color: colors.text, lineHeight: 19 },
   listMeta: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
   listMetaText: { fontSize: 12, color: colors.muted },
+  // Family tab
+  groupChipsRow: { paddingHorizontal: 16, paddingVertical: 12, gap: 8 },
+  groupChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1.5 },
+  groupChipText: { fontSize: 13, fontWeight: '700' },
+  groupChipAdminDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#f59e0b' },
+  familyStoryBadge: { position: 'absolute', top: 5, right: 5, backgroundColor: 'rgba(16,185,129,0.85)', borderRadius: 6, padding: 3 },
 });

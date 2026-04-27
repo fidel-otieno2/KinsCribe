@@ -79,13 +79,17 @@ export default function StoryViewerScreen({ route, navigation }) {
           staysActiveInBackground: false,
           shouldDuckAndroid: true,
         });
+        // Force HTTPS
+        const musicUri = story.music_url.replace(/^http:\/\//i, 'https://');
         const { sound } = await Audio.Sound.createAsync(
-          { uri: story.music_url },
-          { shouldPlay: !paused, isLooping: true, volume: 1.0 }
+          { uri: musicUri },
+          { shouldPlay: true, isLooping: true, volume: 1.0 }
         );
         if (cancelled) { await sound.unloadAsync(); return; }
         musicSound.current = sound;
-      } catch {}
+      } catch (e) {
+        console.log('Story music error:', e?.message, story.music_url);
+      }
     };
 
     loadAndPlay();

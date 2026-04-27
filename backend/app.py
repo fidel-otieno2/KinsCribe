@@ -232,6 +232,16 @@ def _run_migrations():
         WHERE family_id IS NOT NULL
         ON CONFLICT (user_id, family_id) DO NOTHING
         """,
+        # Families table — extended profile fields
+        "ALTER TABLE families ADD COLUMN IF NOT EXISTS avatar_url VARCHAR(300)",
+        "ALTER TABLE families ADD COLUMN IF NOT EXISTS motto VARCHAR(200)",
+        "ALTER TABLE families ADD COLUMN IF NOT EXISTS username VARCHAR(50)",
+        "ALTER TABLE families ADD COLUMN IF NOT EXISTS theme_color VARCHAR(20) DEFAULT '#7c3aed'",
+        "ALTER TABLE families ADD COLUMN IF NOT EXISTS privacy VARCHAR(20) DEFAULT 'private'",
+        "ALTER TABLE families ADD COLUMN IF NOT EXISTS permissions TEXT",
+        # Stories — family_name denorm not needed (join), but ensure family_id index
+        "CREATE INDEX IF NOT EXISTS idx_stories_family_id ON stories(family_id)",
+        "CREATE INDEX IF NOT EXISTS idx_stories_user_family ON stories(user_id, family_id)",
         # Call logs table
         """
         CREATE TABLE IF NOT EXISTS call_logs (

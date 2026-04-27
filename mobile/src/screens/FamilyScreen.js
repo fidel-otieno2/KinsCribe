@@ -100,10 +100,10 @@ function FamilyFeedTab({ navigation, userRole }) {
               <AppText style={ft.authorName}>{story.author_name}</AppText>
               <AppText style={ft.time}>{timeAgo(story.created_at)}</AppText>
             </View>
-            {story.privacy === 'family' && (
-              <View style={ft.privacyBadge}>
-                <Ionicons name="people" size={11} color="#10b981" />
-                <AppText style={ft.privacyText}>{t('family')}</AppText>
+            {story.family_name && (
+              <View style={ft.groupBadge}>
+                <Ionicons name="people" size={10} color="#10b981" />
+                <AppText style={ft.groupBadgeText}>{story.family_name}</AppText>
               </View>
             )}
           </View>
@@ -142,6 +142,8 @@ const ft = StyleSheet.create({
   time: { fontSize: 12, color: colors.muted },
   privacyBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(16,185,129,0.1)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
   privacyText: { fontSize: 11, color: '#10b981', fontWeight: '600' },
+  groupBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(16,185,129,0.12)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20, borderWidth: 0.5, borderColor: 'rgba(16,185,129,0.3)' },
+  groupBadgeText: { fontSize: 10, color: '#10b981', fontWeight: '700', maxWidth: 80 },
   title: { fontSize: 16, fontWeight: '700', color: colors.text, marginBottom: 6 },
   content: { fontSize: 14, color: colors.muted, lineHeight: 20, marginBottom: 10 },
   media: { width: '100%', height: 200, borderRadius: radius.md, marginBottom: 10 },
@@ -391,21 +393,21 @@ export default function FamilyScreen({ navigation }) {
           <LinearGradient colors={['#7c3aed', '#3b82f6']} style={s.familyIcon}>
             <Ionicons name="people" size={20} color="#fff" />
           </LinearGradient>
-          <View>
+          <TouchableOpacity onPress={() => navigation.navigate('FamilyProfile')} activeOpacity={0.75}>
             <AppText style={s.familyName}>{family?.name || 'My Family'}</AppText>
-            <AppText style={s.memberCount}>{members.length} members</AppText>
-          </View>
+            <AppText style={s.memberCount}>{members.length} members · tap to edit</AppText>
+          </TouchableOpacity>
         </View>
         <View style={s.headerRight}>
           <TouchableOpacity
-            style={s.chatBtn}
-            onPress={() => navigation.navigate('Chat', {
-              conversationId: null,
-              title: `${family?.name || 'Family'} Chat`,
-              type: 'family',
-            })}
+            style={s.aiBtnWrap}
+            onPress={() => navigation.navigate('FeedAI')}
+            activeOpacity={0.8}
           >
-            <Ionicons name="chatbubbles-outline" size={20} color={colors.primary} />
+            <LinearGradient colors={['#7c3aed', '#3b82f6']} style={s.aiBtn}>
+              <Ionicons name="sparkles" size={15} color="#fff" />
+              <AppText style={s.aiBtnText}>Family AI</AppText>
+            </LinearGradient>
           </TouchableOpacity>
           <TouchableOpacity style={s.chatBtn} onPress={() => navigation.navigate('Storybooks')}>
             <Ionicons name="book-outline" size={20} color={colors.muted} />
@@ -471,6 +473,9 @@ const s = StyleSheet.create({
   memberCount: { fontSize: 12, color: colors.muted, marginTop: 1 },
   headerRight: { flexDirection: 'row', gap: 8 },
   chatBtn: { width: 38, height: 38, borderRadius: 12, backgroundColor: 'rgba(30,41,59,0.8)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border2 },
+  aiBtnWrap: { borderRadius: 20, overflow: 'hidden' },
+  aiBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20 },
+  aiBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },
   tabRow: { flexDirection: 'row', borderBottomWidth: 0.5, borderBottomColor: colors.border },
   tabBtn: { flex: 1, alignItems: 'center', paddingVertical: 12, gap: 3 },
   tabBtnActive: { borderBottomWidth: 2, borderBottomColor: colors.primary },

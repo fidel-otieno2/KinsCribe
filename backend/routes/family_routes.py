@@ -1,10 +1,10 @@
 from flask import Blueprint, request, jsonify
 from extensions import db, mail
-from models.family import Family, FamilyMember
+from models.family import Family, FamilyMember, FamilyInvite
 from models.user import User
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from flask_mail import Message
-import json
+import json, secrets
 
 family_bp = Blueprint("family", __name__)
 
@@ -448,24 +448,363 @@ def share_memory():
     return jsonify({"memory": story.to_dict()}), 201
 
 
+# ── Family Profile Editing ────────────────────────────────────
+
+@family_bp.route("/<int:family_id>/update", methods=["PATCH"])
+@jwt_required()
+def update_family(family_id):
+    """Admin/owner: update family identity fields."""
+    import cloudinary, cloudinary.uploader, os
+    cloudinary.config(
+        cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
+        api_key=os.getenv("CLOUDINARY_API_KEY"),
+        api_secret=os.getenv("CLOUDINARY_API_SECRET")
+    )
+    user = current_user()
+    membership = FamilyMember.query.filter_by(user_id=user.id, family_id=family_id).first()
+    if not membership or membership.role not in ("admin", "owner"):
+        return jsonify({"error": "Admins only"}), 403
+    family = Family.query.get_or_404(family_id)
+
+    # Handle multipart (cover/avatar upload) or JSON
+    if request.files:
+        data = request.form
+        if "cover" in request.files:
+            result = cloudinary.uploader.upload(request.files["cover"], folder="kinscribe/family_covers")
+            family.cover_url = result["secure_url"]
+        if "avatar" in request.files:
+            result = cloudinary.uploader.upload(request.files["avatar"], folder="kinscribe/family_avatars")
+            family.avatar_url = result["secure_url"]
+    else:
+        data = request.get_json(force=True, silent=True) or {}
+
+    for field in ("name", "description", "motto", "username", "theme_color", "privacy"):
+        if field in data and data[field] is not None:
+            setattr(family, field, data[field])
+
+    # Permissions JSON blob
+    if "permissions" in data:
+        family.permissions = json.dumps(data["permissions"])
+
+    db.session.commit()
+    return jsonify({"family": family.to_dict()})
+
+
+@family_bp.route("/<int:family_id>/insights", methods=["GET"])
+@jwt_required()
+def family_insights(family_id):
+    """Return activity insights for a family (members only)."""
+    from models.story import Story, Like, Comment
+    user = current_user()
+    membership = FamilyMember.query.filter_by(user_id=user.id, family_id=family_id).first()
+    if not membership and user.family_id != family_id:
+        return jsonify({"error": "Access denied"}), 403
+
+    members = FamilyMember.query.filter_by(family_id=family_id).all()
+    stories = Story.query.filter_by(family_id=family_id).all()
+    story_ids = [s.id for s in stories]
+
+    total_likes = Like.query.filter(Like.story_id.in_(story_ids)).count() if story_ids else 0
+    total_comments = Comment.query.filter(Comment.story_id.in_(story_ids)).count() if story_ids else 0
+
+    # Per-member post count for leaderboard
+    leaderboard = []
+    for fm in members:
+        u = User.query.get(fm.user_id)
+        if not u:
+            continue
+        count = Story.query.filter_by(user_id=fm.user_id, family_id=family_id).count()
+        leaderboard.append({"id": u.id, "name": u.name, "avatar_url": u.avatar_url, "post_count": count, "role": fm.role})
+    leaderboard.sort(key=lambda x: x["post_count"], reverse=True)
+
+    return jsonify({
+        "total_members": len(members),
+        "total_stories": len(stories),
+        "total_likes": total_likes,
+        "total_comments": total_comments,
+        "leaderboard": leaderboard[:10],
+    })
+
+
+@family_bp.route("/<int:family_id>/transfer", methods=["POST"])
+@jwt_required()
+def transfer_ownership(family_id):
+    """Transfer ownership to another member (current owner only)."""
+    user = current_user()
+    my_membership = FamilyMember.query.filter_by(user_id=user.id, family_id=family_id).first()
+    if not my_membership or my_membership.role != "admin":
+        return jsonify({"error": "Only the current admin/owner can transfer"}), 403
+    new_owner_id = request.json.get("user_id")
+    target = FamilyMember.query.filter_by(user_id=new_owner_id, family_id=family_id).first()
+    if not target:
+        return jsonify({"error": "User is not a member"}), 404
+    target.role = "admin"
+    my_membership.role = "member"
+    # Sync user.role
+    new_owner = User.query.get(new_owner_id)
+    if new_owner and new_owner.family_id == family_id:
+        new_owner.role = "admin"
+    if user.family_id == family_id:
+        user.role = "member"
+    db.session.commit()
+    return jsonify({"message": "Ownership transferred"})
+
+
+@family_bp.route("/<int:family_id>/delete", methods=["DELETE"])
+@jwt_required()
+def delete_family(family_id):
+    """Owner-only: permanently delete the family."""
+    user = current_user()
+    my_membership = FamilyMember.query.filter_by(user_id=user.id, family_id=family_id).first()
+    if not my_membership or my_membership.role != "admin":
+        return jsonify({"error": "Only the admin/owner can delete this family"}), 403
+    family = Family.query.get_or_404(family_id)
+    # Clear family_id on all members
+    for fm in FamilyMember.query.filter_by(family_id=family_id).all():
+        u = User.query.get(fm.user_id)
+        if u and u.family_id == family_id:
+            u.family_id = None
+            u.role = "member"
+    db.session.delete(family)
+    db.session.commit()
+    return jsonify({"message": "Family deleted"})
+
+
+@family_bp.route("/<int:family_id>/regenerate-code", methods=["POST"])
+@jwt_required()
+def regenerate_invite_code(family_id):
+    """Admin: generate a new invite code."""
+    user = current_user()
+    membership = FamilyMember.query.filter_by(user_id=user.id, family_id=family_id).first()
+    if not membership or membership.role != "admin":
+        return jsonify({"error": "Admins only"}), 403
+    family = Family.query.get_or_404(family_id)
+    family.invite_code = Family.generate_invite_code()
+    db.session.commit()
+    return jsonify({"invite_code": family.invite_code})
+
+
+@family_bp.route("/<int:family_id>/members", methods=["GET"])
+@jwt_required()
+def get_family_members(family_id):
+    """Get full member list for a specific family (members only)."""
+    user = current_user()
+    membership = FamilyMember.query.filter_by(user_id=user.id, family_id=family_id).first()
+    if not membership and user.family_id != family_id:
+        return jsonify({"error": "Access denied"}), 403
+    fm_list = FamilyMember.query.filter_by(family_id=family_id).all()
+    members = []
+    for fm in fm_list:
+        u = User.query.get(fm.user_id)
+        if u:
+            d = u.to_dict()
+            d["role"] = fm.role
+            d["joined_at"] = fm.joined_at.isoformat() if fm.joined_at else None
+            members.append(d)
+    return jsonify({"members": members})
+
+
+@family_bp.route("/<int:family_id>/members/<int:member_id>/role", methods=["PATCH"])
+@jwt_required()
+def update_member_role_v2(member_id, family_id):
+    """Admin: update a member's role in a specific family."""
+    admin = current_user()
+    admin_membership = FamilyMember.query.filter_by(user_id=admin.id, family_id=family_id).first()
+    if not admin_membership or admin_membership.role != "admin":
+        return jsonify({"error": "Admins only"}), 403
+    membership = FamilyMember.query.filter_by(user_id=member_id, family_id=family_id).first()
+    if not membership:
+        return jsonify({"error": "Member not found"}), 404
+    new_role = request.json.get("role", "member")
+    membership.role = new_role
+    member = User.query.get(member_id)
+    if member and member.family_id == family_id:
+        member.role = new_role
+    db.session.commit()
+    return jsonify({"message": "Role updated", "role": new_role})
+
+
+@family_bp.route("/<int:family_id>/members/<int:member_id>", methods=["DELETE"])
+@jwt_required()
+def remove_member_v2(member_id, family_id):
+    """Admin: remove a member from a specific family."""
+    admin = current_user()
+    admin_membership = FamilyMember.query.filter_by(user_id=admin.id, family_id=family_id).first()
+    if not admin_membership or admin_membership.role != "admin":
+        return jsonify({"error": "Admins only"}), 403
+    membership = FamilyMember.query.filter_by(user_id=member_id, family_id=family_id).first()
+    if not membership:
+        return jsonify({"error": "Member not found"}), 404
+    db.session.delete(membership)
+    member = User.query.get(member_id)
+    if member and member.family_id == family_id:
+        other = FamilyMember.query.filter(
+            FamilyMember.user_id == member_id,
+            FamilyMember.family_id != family_id
+        ).first()
+        member.family_id = other.family_id if other else None
+        member.role = other.role if other else "member"
+    db.session.commit()
+    return jsonify({"message": "Member removed"})
+
+
 @family_bp.route("/user/<int:user_id>/groups", methods=["GET"])
 @jwt_required()
 def user_groups(user_id):
-    """Return admin_groups and member_groups for any user based on users.family_id + users.role."""
+    """Return admin_groups and member_groups for any user using the FamilyMember join table."""
     target = User.query.get_or_404(user_id)
     admin_groups = []
     member_groups = []
-    if target.family_id:
-        f = Family.query.get(target.family_id)
-        if f:
-            entry = {
-                "id": f.id,
-                "name": f.name,
-                "cover_url": f.cover_url,
-                "member_count": User.query.filter_by(family_id=f.id).count(),
-            }
-            if target.role == "admin":
-                admin_groups.append(entry)
-            else:
-                member_groups.append(entry)
+    memberships = FamilyMember.query.filter_by(user_id=target.id).all()
+    for fm in memberships:
+        f = Family.query.get(fm.family_id)
+        if not f:
+            continue
+        entry = {
+            "id": f.id,
+            "name": f.name,
+            "cover_url": f.cover_url,
+            "member_count": FamilyMember.query.filter_by(family_id=f.id).count(),
+        }
+        if fm.role == "admin":
+            admin_groups.append(entry)
+        else:
+            member_groups.append(entry)
     return jsonify({"admin_groups": admin_groups, "member_groups": member_groups})
+
+
+# ── User-to-User Family Invitations ──────────────────────────
+
+@family_bp.route("/invite/send", methods=["POST"])
+@jwt_required()
+def send_family_invite():
+    """Send a family invite to a specific user by user_id."""
+    from models.social import Message as DM, Conversation, ConversationParticipant
+    from models.notifications import Notification
+
+    sender = current_user()
+    data = request.get_json(force=True, silent=True) or {}
+    to_user_id = data.get("user_id")
+    if not to_user_id:
+        return jsonify({"error": "user_id required"}), 400
+
+    if not sender.family_id:
+        return jsonify({"error": "You are not in a family"}), 400
+
+    membership = FamilyMember.query.filter_by(user_id=sender.id, family_id=sender.family_id).first()
+    if not membership or membership.role not in ("owner", "admin"):
+        return jsonify({"error": "Only owners and admins can invite"}), 403
+
+    target = User.query.get(to_user_id)
+    if not target:
+        return jsonify({"error": "User not found"}), 404
+
+    # Check already a member
+    already = FamilyMember.query.filter_by(user_id=to_user_id, family_id=sender.family_id).first()
+    if already:
+        return jsonify({"error": "User is already a member"}), 400
+
+    # Check pending invite already exists
+    existing = FamilyInvite.query.filter_by(
+        invited_user_id=to_user_id, family_id=sender.family_id, status="pending"
+    ).first()
+    if existing:
+        return jsonify({"error": "Invite already sent"}), 400
+
+    family = Family.query.get(sender.family_id)
+    token = secrets.token_urlsafe(32)
+
+    invite = FamilyInvite(
+        family_id=sender.family_id,
+        invited_by=sender.id,
+        invited_user_id=to_user_id,
+        token=token,
+    )
+    db.session.add(invite)
+
+    # Send DM
+    try:
+        a_convs = {p.conversation_id for p in ConversationParticipant.query.filter_by(user_id=sender.id).all()}
+        b_convs = {p.conversation_id for p in ConversationParticipant.query.filter_by(user_id=to_user_id).all()}
+        shared = a_convs & b_convs
+        conv = None
+        for cid in shared:
+            c = Conversation.query.get(cid)
+            if c and c.type == "dm":
+                conv = c
+                break
+        if not conv:
+            conv = Conversation(type="dm")
+            db.session.add(conv)
+            db.session.flush()
+            db.session.add(ConversationParticipant(conversation_id=conv.id, user_id=sender.id))
+            db.session.add(ConversationParticipant(conversation_id=conv.id, user_id=to_user_id))
+
+        msg_text = f"👨‍👩‍👧 {sender.name} invited you to join the **{family.name}** family on KinsCribe! Tap to accept or decline."
+        dm = DM(text=msg_text, conversation_id=conv.id, sender_id=sender.id,
+                media_type="family_invite", media_url=token)
+        db.session.add(dm)
+    except Exception:
+        pass
+
+    # Send notification
+    db.session.add(Notification(
+        user_id=to_user_id,
+        from_user_id=sender.id,
+        type="family_invite",
+        title=f"{sender.name} invited you to join {family.name}",
+        message=f"Tap to accept or decline the family invitation.",
+        data=json.dumps({"token": token, "family_id": sender.family_id,
+                         "family_name": family.name, "family_avatar": family.avatar_url}),
+    ))
+
+    db.session.commit()
+    return jsonify({"message": "Invite sent", "token": token}), 201
+
+
+@family_bp.route("/invite/<token>/accept", methods=["POST"])
+@jwt_required()
+def accept_family_invite(token):
+    user = current_user()
+    invite = FamilyInvite.query.filter_by(token=token, invited_user_id=user.id, status="pending").first()
+    if not invite:
+        return jsonify({"error": "Invalid or expired invite"}), 404
+
+    family = Family.query.get(invite.family_id)
+    if not family:
+        return jsonify({"error": "Family not found"}), 404
+
+    # Add as member
+    existing = FamilyMember.query.filter_by(user_id=user.id, family_id=family.id).first()
+    if not existing:
+        db.session.add(FamilyMember(user_id=user.id, family_id=family.id, role="member"))
+    if not user.family_id:
+        user.family_id = family.id
+
+    invite.status = "accepted"
+
+    # Notify inviter
+    from models.notifications import Notification
+    db.session.add(Notification(
+        user_id=invite.invited_by,
+        from_user_id=user.id,
+        type="family_invite_accepted",
+        title=f"{user.name} accepted your family invitation!",
+        message=f"{user.name} has joined {family.name}.",
+        data=json.dumps({"family_id": family.id}),
+    ))
+
+    db.session.commit()
+    return jsonify({"message": "Joined family", "family": family.to_dict()}), 200
+
+
+@family_bp.route("/invite/<token>/decline", methods=["POST"])
+@jwt_required()
+def decline_family_invite(token):
+    user = current_user()
+    invite = FamilyInvite.query.filter_by(token=token, invited_user_id=user.id, status="pending").first()
+    if not invite:
+        return jsonify({"error": "Invalid or expired invite"}), 404
+    invite.status = "declined"
+    db.session.commit()
+    return jsonify({"message": "Invite declined"}), 200

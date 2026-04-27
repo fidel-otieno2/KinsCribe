@@ -244,12 +244,27 @@ export default function CreateScreen({ navigation, route }) {
   const [storyDate, setStoryDate] = useState('');
   const [familyPrivacy, setFamilyPrivacy] = useState('family');
 
+  // Family group selection
+  const [myFamilyGroups, setMyFamilyGroups] = useState([]);
+  const [showGroupPicker, setShowGroupPicker] = useState(false);
+  const [selectedGroup, setSelectedGroup] = useState(null);
+  const [uploadingToGroup, setUploadingToGroup] = useState(null); // group name while uploading
+
   // ─── ON MOUNT ───────────────────────────────────────────────────
   useEffect(() => {
     checkExistingDraft();
     Audio.setAudioModeAsync({ playsInSilentModeIOS: true, allowsRecordingIOS: false });
+    fetchMyFamilyGroups();
     return () => { stopAllAudio(); };
   }, []);
+
+  const fetchMyFamilyGroups = async () => {
+    try {
+      const { data } = await api.get('/family/my-families');
+      setMyFamilyGroups(data.families || []);
+      if (data.families?.length === 1) setSelectedGroup(data.families[0]);
+    } catch {}
+  };
 
   // ─── DRAFT SYSTEM ───────────────────────────────────────────────
   const checkExistingDraft = async () => {
@@ -762,27 +777,45 @@ export default function CreateScreen({ navigation, route }) {
     </View>
   );
 
+  // ─── FAMILY POST SUBMIT ─────────────────────────────────────────
+  const submitFamilyPost = async (group) => {
+    setShowGroupPicker(false);
+    setUploadingToGroup(group.name);
+    setLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append('title', familyTitle);
+      formData.append('content', familyContent);
+      formData.append('privacy', 'family');
+      formData.append('family_id', String(group.id));
+      if (storyDate) formData.append('story_date', storyDate);
+      if (mediaFiles[0]) {
+        const isVid = mediaFiles[0].type === 'video' || mediaFiles[0].mediaType === 'video';
+        formData.append('file', { uri: mediaFiles[0].uri, type: isVid ? 'video/mp4' : 'image/jpeg', name: isVid ? 'media.mp4' : 'media.jpg' });
+      }
+      const { data } = await api.post('/stories/', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+      await AsyncStorage.removeItem(DRAFT_KEY);
+      setFamilyTitle(''); setFamilyContent(''); setMediaFiles([]);
+      setSelectedGroup(myFamilyGroups.length === 1 ? myFamilyGroups[0] : null);
+      navigation.navigate('AIProcessing', { storyId: data.story?.id });
+    } catch (err) {
+      error(err.response?.data?.error || 'Failed to post story. Try again.');
+    } finally { setLoading(false); setUploadingToGroup(null); }
+  };
+
   // ─── POST SUBMIT ────────────────────────────────────────────────
   const handlePost = async () => {
     if (mode === 'family') {
       if (!familyTitle.trim()) return info('Please add a title for your story');
-      setLoading(true);
-      try {
-        const formData = new FormData();
-        formData.append('title', familyTitle);
-        formData.append('content', familyContent);
-        formData.append('privacy', familyPrivacy);
-        if (storyDate) formData.append('story_date', storyDate);
-        if (mediaFiles[0]) {
-          formData.append('file', { uri: mediaFiles[0].uri, type: 'image/jpeg', name: 'media.jpg' });
-        }
-        const { data } = await api.post('/stories/', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-        await AsyncStorage.removeItem(DRAFT_KEY);
-        setFamilyTitle(''); setFamilyContent(''); setMediaFiles([]);
-        navigation.navigate('AIProcessing', { storyId: data.story?.id });
-      } catch (err) {
-        error(err.response?.data?.error || 'Failed to post story. Try again.');
-      } finally { setLoading(false); }
+      if (myFamilyGroups.length === 0) return info('You need to join a family group first');
+      // If group already selected, post directly; otherwise show picker
+      if (selectedGroup) {
+        await submitFamilyPost(selectedGroup);
+      } else if (myFamilyGroups.length === 1) {
+        await submitFamilyPost(myFamilyGroups[0]);
+      } else {
+        setShowGroupPicker(true);
+      }
       return;
     }
 
@@ -806,6 +839,7 @@ export default function CreateScreen({ navigation, route }) {
             artist: selectedMusic.artist,
             cover: selectedMusic.artwork || '',
             music_id: String(selectedMusic.id),
+            stream_url: selectedMusic.stream_url || '',
             start_time: selectedMusic.start_time || 0,
           }));
           formData.append('music_id', selectedMusic.id);
@@ -1328,6 +1362,48 @@ export default function CreateScreen({ navigation, route }) {
       })()}
       <SchedulePickerModal />
 
+      {/* ── GROUP PICKER MODAL (Family mode) ── */}
+      <Modal visible={showGroupPicker} animationType="slide" transparent onRequestClose={() => setShowGroupPicker(false)}>
+        <View style={s.modalOverlay}>
+          <View style={[s.modalSheet, { backgroundColor: theme.bgCard, maxHeight: '60%' }]}>
+            <View style={s.modalHandle} />
+            <AppText style={[s.modalTitle, { color: theme.text }]}>Post to which group?</AppText>
+            <ScrollView keyboardShouldPersistTaps="handled">
+              {myFamilyGroups.map(g => (
+                <TouchableOpacity
+                  key={g.id}
+                  style={[s.groupPickerRow, { borderBottomColor: theme.border }, selectedGroup?.id === g.id && { backgroundColor: 'rgba(16,185,129,0.08)' }]}
+                  onPress={() => { setSelectedGroup(g); submitFamilyPost(g); }}
+                >
+                  <LinearGradient colors={['#10b981', '#059669']} style={s.groupPickerIcon}>
+                    <Ionicons name="people" size={18} color="#fff" />
+                  </LinearGradient>
+                  <View style={{ flex: 1 }}>
+                    <AppText style={[s.groupPickerName, { color: theme.text }]}>{g.name}</AppText>
+                    <AppText style={[s.groupPickerSub, { color: theme.muted }]}>{g.member_count} members · {g.my_role}</AppText>
+                  </View>
+                  {selectedGroup?.id === g.id && <Ionicons name="checkmark-circle" size={20} color="#10b981" />}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity style={[s.modalClose, { borderColor: theme.border2 }]} onPress={() => setShowGroupPicker(false)}>
+              <AppText style={{ color: theme.text, fontWeight: '600' }}>Cancel</AppText>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── UPLOADING OVERLAY ── */}
+      {uploadingToGroup && (
+        <View style={s.uploadingOverlay}>
+          <View style={[s.uploadingCard, { backgroundColor: theme.bgCard }]}>
+            <ActivityIndicator size="large" color="#10b981" />
+            <AppText style={[s.uploadingText, { color: theme.text }]}>Uploading to {uploadingToGroup}...</AppText>
+            <AppText style={[s.uploadingSub, { color: theme.muted }]}>Only members of this group can see this post</AppText>
+          </View>
+        </View>
+      )}
+
       <LinearGradient
         colors={isDark ? ['#0f172a', '#1e1040', '#0f172a'] : [theme.bg, theme.bgSecondary, theme.bg]}
         style={StyleSheet.absoluteFill}
@@ -1348,7 +1424,11 @@ export default function CreateScreen({ navigation, route }) {
           >
             {loading
               ? <ActivityIndicator color="#fff" size="small" />
-              : <AppText style={s.postBtnText}>{scheduledDate ? 'Schedule' : t('share')}</AppText>}
+              : <AppText style={s.postBtnText}>
+                  {mode === 'family'
+                    ? (selectedGroup ? `Post to ${selectedGroup.name}` : 'Share')
+                    : scheduledDate ? 'Schedule' : t('share')}
+                </AppText>}
           </TouchableOpacity>
         </View>
       </View>
@@ -2222,6 +2302,22 @@ export default function CreateScreen({ navigation, route }) {
         {/* ══════════ FAMILY STORY MODE ══════════ */}
         {mode === 'family' && (
           <>
+            {/* Group selector */}
+            <TouchableOpacity
+              style={[s.groupSelectorRow, { backgroundColor: theme.bgCard, borderColor: selectedGroup ? '#10b981' : theme.border2 }]}
+              onPress={() => myFamilyGroups.length > 0 ? setShowGroupPicker(true) : info('You are not in any family group yet')}
+            >
+              <LinearGradient colors={['#10b981', '#059669']} style={s.groupSelectorIcon}>
+                <Ionicons name="people" size={16} color="#fff" />
+              </LinearGradient>
+              <View style={{ flex: 1 }}>
+                <AppText style={[s.groupSelectorLabel, { color: theme.muted }]}>Posting to</AppText>
+                <AppText style={[s.groupSelectorName, { color: selectedGroup ? theme.text : theme.dim }]}>
+                  {selectedGroup ? selectedGroup.name : myFamilyGroups.length === 0 ? 'No groups — join a family first' : 'Select a group...'}
+                </AppText>
+              </View>
+              <Ionicons name="chevron-down" size={16} color={theme.muted} />
+            </TouchableOpacity>
             {mediaFiles[0] ? (
               <View style={s.mediaThumbLarge}>
                 <Image source={{ uri: mediaFiles[0].uri }} style={s.mediaThumbLargeImg} resizeMode="cover" />
@@ -2549,6 +2645,24 @@ const s = StyleSheet.create({
   modalSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 12, paddingBottom: 36, maxHeight: '70%' },
   modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(100,116,139,0.4)', alignSelf: 'center', marginBottom: 16 },
   modalTitle: { fontSize: 18, fontWeight: '700', paddingHorizontal: 20, marginBottom: 12 },
+
+  // Group picker
+  groupPickerRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 0.5 },
+  groupPickerIcon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  groupPickerName: { fontSize: 15, fontWeight: '700' },
+  groupPickerSub: { fontSize: 12, marginTop: 2 },
+
+  // Group selector (in family form)
+  groupSelectorRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 12, borderWidth: 1.5, padding: 12, marginBottom: 16 },
+  groupSelectorIcon: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  groupSelectorLabel: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  groupSelectorName: { fontSize: 14, fontWeight: '600', marginTop: 1 },
+
+  // Uploading overlay
+  uploadingOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.7)', alignItems: 'center', justifyContent: 'center', zIndex: 999 },
+  uploadingCard: { borderRadius: 20, padding: 28, alignItems: 'center', gap: 14, width: 280 },
+  uploadingText: { fontSize: 16, fontWeight: '700', textAlign: 'center' },
+  uploadingSub: { fontSize: 12, textAlign: 'center', lineHeight: 17 },
 
   // Story location modal
   locAutoBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, marginBottom: 16, padding: 14, borderRadius: 12, borderWidth: 1, backgroundColor: 'rgba(16,185,129,0.08)' },

@@ -35,6 +35,9 @@ const TYPE_CONFIG = {
   message:          { icon: 'chatbubbles',      color: '#f59e0b', bg: 'rgba(245,158,11,0.18)',   label: 'sent you a message',             source: 'Message',      sourceBg: '#78350f', sourceColor: '#fbbf24' },
   birthday:         { icon: 'gift',             color: '#f59e0b', bg: 'rgba(245,158,11,0.18)',   label: '',                               source: 'Birthday',     sourceBg: '#78350f', sourceColor: '#fbbf24' },
   collab_invite:    { icon: 'people',           color: '#a78bfa', bg: 'rgba(124,58,237,0.18)',   label: 'invited you to co-create',       source: 'Collab',       sourceBg: '#3b0764', sourceColor: '#a78bfa' },
+  family_invite:    { icon: 'home',             color: '#10b981', bg: 'rgba(16,185,129,0.18)',   label: 'invited you to join their family', source: 'Family',     sourceBg: '#064e3b', sourceColor: '#34d399' },
+  family_invite_accepted: { icon: 'checkmark-circle', color: '#10b981', bg: 'rgba(16,185,129,0.18)', label: 'accepted your family invitation', source: 'Family', sourceBg: '#064e3b', sourceColor: '#34d399' },
+  story_mention:    { icon: 'at',               color: '#7c3aed', bg: 'rgba(124,58,237,0.18)',   label: 'mentioned you in a story',       source: 'Story',        sourceBg: '#3b0764', sourceColor: '#a78bfa' },
 };
 
 function Avatar({ url, name, size = 48 }) {
@@ -138,6 +141,8 @@ function NotifRow({ item, onPress, index, onAccept, onDecline }) {
                 <AppText style={s.declineBtnText}>Decline</AppText>
               </TouchableOpacity>
             </View>
+          ) : item.type === 'family_invite' ? (
+            <FamilyInviteActions item={item} onAccept={onAccept} onDecline={onDecline} refreshUser={refreshUser} />
           ) : (
             <View style={s.metaRow}>
               <View style={[s.sourcePill, { backgroundColor: cfg.sourceBg + '55', borderColor: cfg.sourceBg + '99' }]}>
@@ -166,8 +171,68 @@ const TABS = [
   { key: 'messages',    labelKey: 'messages',      icon: 'chatbubbles' },
 ];
 
+function FamilyInviteActions({ item, onAccept, onDecline, refreshUser }) {
+  const [loading, setLoading] = useState(null);
+  const [done, setDone] = useState(null);
+
+  const getToken = () => {
+    try {
+      const d = typeof item.data === 'string' ? JSON.parse(item.data) : item.data;
+      return d?.token;
+    } catch { return null; }
+  };
+
+  const handle = async (action) => {
+    const token = getToken();
+    if (!token) return;
+    setLoading(action);
+    try {
+      await api.post(`/family/invite/${token}/${action}`);
+      if (action === 'accept') {
+        await refreshUser(); // auto-adds family to user context
+      }
+      setDone(action);
+      action === 'accept' ? onAccept(item) : onDecline(item);
+    } catch {}
+    finally { setLoading(null); }
+  };
+
+  if (done) {
+    return (
+      <View style={{ paddingTop: 6 }}>
+        <AppText style={{ color: done === 'accept' ? '#10b981' : '#94a3b8', fontSize: 12, fontWeight: '600' }}>
+          {done === 'accept' ? '✅ Joined family!' : '❌ Declined'}
+        </AppText>
+      </View>
+    );
+  }
+
+  return (
+    <View style={s.requestBtns}>
+      <TouchableOpacity
+        style={s.acceptBtn}
+        onPress={() => handle('accept')}
+        disabled={!!loading}
+      >
+        {loading === 'accept'
+          ? <ActivityIndicator size="small" color="#fff" />
+          : <AppText style={s.acceptBtnText}>🏠 Join Family</AppText>}
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={s.declineBtn}
+        onPress={() => handle('decline')}
+        disabled={!!loading}
+      >
+        {loading === 'decline'
+          ? <ActivityIndicator size="small" color="#94a3b8" />
+          : <AppText style={s.declineBtnText}>Decline</AppText>}
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 export default function NotificationsScreen({ navigation }) {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const { t } = useTranslation();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -246,7 +311,7 @@ export default function NotificationsScreen({ navigation }) {
 
   const filtered = notifications.filter(n => {
     if (tab === 'all') return true;
-    if (tab === 'requests') return n.type === 'follow_request' || n.type === 'collab_invite';
+    if (tab === 'requests') return n.type === 'follow_request' || n.type === 'collab_invite' || n.type === 'family_invite';
     if (tab === 'family') return n.source === 'family_story' || n.source === 'family';
     if (tab === 'posts') return n.source === 'post';
     if (tab === 'connections') return n.type === 'connection';
@@ -256,7 +321,7 @@ export default function NotificationsScreen({ navigation }) {
 
   const tabCounts = {
     all: notifications.filter(n => !n.is_read).length,
-    requests: notifications.filter(n => n.type === 'follow_request' || n.type === 'collab_invite').length,
+    requests: notifications.filter(n => n.type === 'follow_request' || n.type === 'collab_invite' || n.type === 'family_invite').length,
     family: notifications.filter(n => !n.is_read && (n.source === 'family_story' || n.source === 'family')).length,
     posts: notifications.filter(n => !n.is_read && n.source === 'post').length,
     connections: notifications.filter(n => !n.is_read && n.type === 'connection').length,

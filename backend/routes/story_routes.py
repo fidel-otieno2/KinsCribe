@@ -72,6 +72,21 @@ def create_story():
         except ValueError:
             pass
 
+    # Allow posting to a specific family group the user belongs to
+    target_family_id = data.get("family_id")
+    if target_family_id:
+        try:
+            target_family_id = int(target_family_id)
+        except (ValueError, TypeError):
+            target_family_id = None
+    # Verify membership if a specific family_id was provided
+    if target_family_id and target_family_id != user.family_id:
+        from models.family import FamilyMember
+        membership = FamilyMember.query.filter_by(user_id=user.id, family_id=target_family_id).first()
+        if not membership:
+            return jsonify({"error": "You are not a member of that family"}), 403
+    final_family_id = target_family_id or user.family_id
+
     try:
         story = Story(
             title=data.get("title", ""),
@@ -84,7 +99,7 @@ def create_story():
             privacy=data.get("privacy", "family"),
             story_date=parsed_date,
             user_id=user.id,
-            family_id=user.family_id
+            family_id=final_family_id
         )
         db.session.add(story)
         db.session.commit()
@@ -113,8 +128,15 @@ def family_stories():
     err = require_family(user)
     if err:
         return err
+    # Support filtering by a specific family_id (must be a member)
+    family_id = request.args.get('family_id', user.family_id, type=int)
+    from models.family import FamilyMember
+    if family_id != user.family_id:
+        membership = FamilyMember.query.filter_by(user_id=user.id, family_id=family_id).first()
+        if not membership:
+            return jsonify({"error": "Access denied"}), 403
     limit = request.args.get('limit', 50, type=int)
-    stories = Story.query.filter_by(family_id=user.family_id)\
+    stories = Story.query.filter_by(family_id=family_id)\
         .order_by(Story.created_at.desc()).limit(limit).all()
     return jsonify({"stories": [s.to_dict() for s in stories]})
 
@@ -126,8 +148,14 @@ def family_feed():
     err = require_family(user)
     if err:
         return err
-    stories = Story.query.filter_by(family_id=user.family_id)\
-        .order_by(Story.created_at.desc()).all()
+    # Show stories from ALL families the user belongs to
+    from models.family import FamilyMember
+    memberships = FamilyMember.query.filter_by(user_id=user.id).all()
+    family_ids = [fm.family_id for fm in memberships]
+    if user.family_id and user.family_id not in family_ids:
+        family_ids.append(user.family_id)
+    stories = Story.query.filter(Story.family_id.in_(family_ids))\
+        .order_by(Story.created_at.desc()).limit(100).all()
     user_liked = {l.story_id for l in Like.query.filter_by(user_id=user.id).all()}
     user_saved = {s.story_id for s in SavedStory.query.filter_by(user_id=user.id).all()}
     result = []
@@ -158,8 +186,13 @@ def get_story(story_id):
     story = Story.query.get_or_404(story_id)
     if story.privacy == "private" and story.user_id != user.id:
         return jsonify({"error": "Access denied"}), 403
-    if story.privacy == "family" and story.family_id != user.family_id:
-        return jsonify({"error": "Access denied"}), 403
+    if story.privacy == "family":
+        from models.family import FamilyMember
+        is_member = (story.family_id == user.family_id) or bool(
+            FamilyMember.query.filter_by(user_id=user.id, family_id=story.family_id).first()
+        )
+        if not is_member:
+            return jsonify({"error": "Access denied"}), 403
     return jsonify({"story": story.to_dict()})
 
 
@@ -219,6 +252,21 @@ def toggle_like(story_id):
     db.session.add(Like(user_id=user_id, story_id=story_id))
     db.session.commit()
     return jsonify({"liked": True})
+
+
+@story_bp.route("/user/<int:user_id>/family/<int:family_id>", methods=["GET"])
+@jwt_required()
+def user_family_stories(user_id, family_id):
+    """Get stories posted by a specific user in a specific family group.
+    Only accessible by members of that family."""
+    current = current_user()
+    from models.family import FamilyMember
+    membership = FamilyMember.query.filter_by(user_id=current.id, family_id=family_id).first()
+    if not membership and current.family_id != family_id:
+        return jsonify({"error": "Access denied"}), 403
+    stories = Story.query.filter_by(user_id=user_id, family_id=family_id)\
+        .order_by(Story.created_at.desc()).all()
+    return jsonify({"stories": [s.to_dict() for s in stories]})
 
 
 @story_bp.route("/notifications", methods=["GET"])

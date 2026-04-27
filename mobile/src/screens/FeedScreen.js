@@ -961,34 +961,39 @@ export default function FeedScreen({ navigation }) {
               const myGroup = storyGroups.find(g => g.is_self);
               const hasMyStory = myGroup && myGroup.stories.length > 0;
               return (
-                <TouchableOpacity
-                  style={s.storyItem}
-                  activeOpacity={0.85}
-                  onPress={() => {
-                    if (hasMyStory) {
-                      const idx = storyGroups.indexOf(myGroup);
-                      navigation.navigate('StoryViewer', { storyGroups, initialGroupIndex: idx });
-                    } else {
-                      navigation.navigate('Create', { initialMode: 'story' });
-                    }
-                  }}
-                >
+                <View style={s.storyItem}>
                   <View style={[s.storyGlow, { backgroundColor: hasMyStory ? 'rgba(74,124,63,0.3)' : 'rgba(196,163,90,0.12)' }]} />
                   <View style={s.hexWrap}>
-                    <HexAvatar
-                      uri={user?.avatar_url}
-                      name={user?.name}
-                      size={54}
-                      hasStory={hasMyStory}
-                      hasSeen={false}
-                    />
-                    {/* Plus badge */}
-                    <View style={[s.plusBadge, { backgroundColor: theme.primary }]}>
+                    <TouchableOpacity
+                      activeOpacity={0.85}
+                      onPress={() => {
+                        if (hasMyStory) {
+                          const idx = storyGroups.indexOf(myGroup);
+                          navigation.navigate('StoryViewer', { storyGroups, initialGroupIndex: idx });
+                        } else {
+                          navigation.navigate('Create', { initialMode: 'story' });
+                        }
+                      }}
+                    >
+                      <HexAvatar
+                        uri={user?.avatar_url}
+                        name={user?.name}
+                        size={54}
+                        hasStory={hasMyStory}
+                        hasSeen={false}
+                      />
+                    </TouchableOpacity>
+                    {/* Plus badge — always goes to Create story */}
+                    <TouchableOpacity
+                      style={[s.plusBadge, { backgroundColor: theme.primary }]}
+                      onPress={() => navigation.navigate('Create', { initialMode: 'story' })}
+                      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                    >
                       <Ionicons name="add" size={12} color="#fff" />
-                    </View>
+                    </TouchableOpacity>
                   </View>
                   <AppText style={[s.storyLabel, { color: theme.text }]}>Your Story</AppText>
-                </TouchableOpacity>
+                </View>
               );
             })()}
 

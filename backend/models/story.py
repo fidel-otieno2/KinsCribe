@@ -56,6 +56,7 @@ class Story(db.Model):
             "privacy": self.privacy,
             "user_id": self.user_id,
             "family_id": self.family_id,
+            "family_name": self.family.name if self.family else None,
             "like_count": len(self.likes),
             "comment_count": len(self.comments),
             "repost_count": self.repost_count or 0,
