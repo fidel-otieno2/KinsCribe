@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   View, StyleSheet, TouchableOpacity, ScrollView,
   Image, Alert, ActivityIndicator, Modal, TextInput,
+  KeyboardAvoidingView, Platform,
 } from 'react-native';
 import AppText from '../components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -154,7 +155,15 @@ export default function AccountSwitcherScreen({ navigation }) {
         onRequestClose={() => setShowAddModal(false)}
       >
         <View style={s.modalOverlay}>
-          <View style={[s.modalContent, { backgroundColor: theme.bg }]}>
+          <TouchableOpacity 
+            style={{ flex: 1 }} 
+            activeOpacity={1} 
+            onPress={() => setShowAddModal(false)} 
+          />
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          >
+          <View style={[s.modalContent, { backgroundColor: theme.bgCard || theme.bg }]}>
             <View style={s.modalHeader}>
               <AppText style={[s.modalTitle, { color: theme.text }]}>Add Account</AppText>
               <TouchableOpacity onPress={() => setShowAddModal(false)} style={s.modalClose}>
@@ -196,6 +205,7 @@ export default function AccountSwitcherScreen({ navigation }) {
               />
             </View>
           </View>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
     </View>
