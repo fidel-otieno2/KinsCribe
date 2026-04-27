@@ -48,7 +48,11 @@ export default function AccountSwitcherScreen({ navigation }) {
       setAddForm({ email: '', password: '' });
       navigation.reset({ index: 0, routes: [{ name: 'Main', params: { screen: 'Profile' } }] });
     } catch (error) {
-      Alert.alert('Add Account Failed', error.response?.data?.error || 'Could not add account.');
+      const msg = error.response?.data?.error
+        || error.response?.data?.message
+        || error.message
+        || 'Wrong email or password. Please try again.';
+      Alert.alert('Login Failed', msg);
     } finally {
       setAddLoading(false);
     }
