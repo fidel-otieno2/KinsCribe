@@ -27,7 +27,7 @@ export default function AccountSwitcherScreen({ navigation }) {
     setSwitching(account.id);
     try {
       await switchAccount(account.id);
-      navigation.goBack();
+      navigation.reset({ index: 0, routes: [{ name: 'Main', params: { screen: 'Profile' } }] });
     } catch (error) {
       Alert.alert('Switch Failed', error.message || 'Could not switch to that account.');
     } finally {
@@ -46,7 +46,7 @@ export default function AccountSwitcherScreen({ navigation }) {
       await addAccount(addForm.email.trim(), addForm.password);
       setShowAddModal(false);
       setAddForm({ email: '', password: '' });
-      navigation.goBack();
+      navigation.reset({ index: 0, routes: [{ name: 'Main', params: { screen: 'Profile' } }] });
     } catch (error) {
       Alert.alert('Add Account Failed', error.response?.data?.error || 'Could not add account.');
     } finally {
