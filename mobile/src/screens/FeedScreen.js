@@ -1186,6 +1186,19 @@ export default function FeedScreen({ navigation }) {
               )}
             </TouchableOpacity>
 
+            {/* Switch Account */}
+            <TouchableOpacity
+              onPress={() => navigation.navigate("AccountSwitcher")}
+              style={s.switchAvatarBtn}
+            >
+              {user?.avatar_url
+                ? <Image source={{ uri: user.avatar_url }} style={s.switchAvatarImg} />
+                : <View style={[s.switchAvatarImg, { backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }]}>
+                    <AppText style={{ color: '#fff', fontWeight: '800', fontSize: 12 }}>{user?.name?.[0]?.toUpperCase()}</AppText>
+                  </View>}
+              <View style={s.switchDot} />
+            </TouchableOpacity>
+
             {/* AI Button */}
             <TouchableOpacity
               onPress={() => navigation.navigate("FeedAI")}
@@ -1425,6 +1438,9 @@ const s = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
+  switchAvatarBtn: { position: 'relative', width: 32, height: 32 },
+  switchAvatarImg: { width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: '#7C3AED' },
+  switchDot: { position: 'absolute', bottom: 0, right: 0, width: 10, height: 10, borderRadius: 5, backgroundColor: '#10b981', borderWidth: 2, borderColor: colors.bg },
   headerBtn: {
     width: 38,
     height: 38,
