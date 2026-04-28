@@ -241,6 +241,34 @@ def _get_all_notifications(user):
     except Exception:
         pass
 
+    # ── 9. Family invite notifications ───────────────────────
+    try:
+        from models.family import FamilyInvite
+        pending_invites = FamilyInvite.query.filter_by(invited_user_id=user.id, status="pending").all()
+        for inv in pending_invites:
+            inviter = User.query.get(inv.invited_by)
+            family = inv.family
+            if inviter and family:
+                notifs.append({
+                    "id": f"family_invite-{inv.id}",
+                    "type": "family_invite",
+                    "source": "family",
+                    "actor_name": inviter.name,
+                    "actor_avatar": inviter.avatar_url,
+                    "actor_id": inviter.id,
+                    "title": f"{inviter.name} invited you to join {family.name}",
+                    "body": family.name,
+                    "data": json.dumps({
+                        "token": inv.token,
+                        "family_id": family.id,
+                        "family_name": family.name,
+                        "family_avatar": family.avatar_url,
+                    }),
+                    "created_at": inv.created_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                })
+    except Exception:
+        pass
+
     notifs.sort(key=lambda x: x["created_at"], reverse=True)
     return notifs[:60]
 

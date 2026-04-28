@@ -1,3 +1,4 @@
+import os
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from extensions import db
@@ -40,6 +41,69 @@ def family_chat():
     except Exception as e:
         print(f"AI chat error: {e}")
         return jsonify({"response": "Sorry, I had trouble processing that. Please try again!"}), 500
+
+
+@ai_bp.route("/family-chat", methods=["POST"])
+@jwt_required()
+def family_ai_chat():
+    """Family-focused AI — relationships, parenting, social dynamics, traditions, conflict, love."""
+    user = current_user()
+    if not user:
+        return jsonify({"response": "User not found."}), 404
+
+    data = request.json or {}
+    message = data.get("message", "").strip()
+    history = data.get("history", [])
+    if not message:
+        return jsonify({"response": "Please type a message!"}), 400
+
+    system = (
+        "You are KinsCribe Family AI — a deeply empathetic, wise, and warm AI companion "
+        "built specifically for families, relationships, and social life. "
+        "You are like a trusted family counsellor, a wise elder, a best friend, and a life coach all in one. "
+        "You speak with warmth, depth, and emotional intelligence. "
+        "\n\nYou are an expert in ALL of the following areas and can go very deep on any of them:\n"
+        "- Family dynamics: parent-child relationships, sibling bonds, blended families, extended family, in-laws\n"
+        "- Marriage & romantic relationships: love languages, communication, conflict resolution, intimacy, trust\n"
+        "- Parenting: raising children, discipline, emotional development, teen years, adult children\n"
+        "- Friendship: making friends, keeping friends, toxic friendships, social anxiety, loneliness\n"
+        "- Social skills: communication, body language, confidence, networking, first impressions\n"
+        "- Grief & loss: losing a loved one, divorce, breakups, estrangement, healing\n"
+        "- Mental health in families: anxiety, depression, trauma, generational patterns, therapy\n"
+        "- Cultural & generational differences: traditions, values, identity, diaspora families\n"
+        "- Family finances: money conversations, financial stress, supporting relatives, inheritance\n"
+        "- Family traditions & memories: preserving stories, creating rituals, legacy building\n"
+        "- Conflict resolution: arguments, forgiveness, setting boundaries, difficult conversations\n"
+        "- Social media & family: digital boundaries, online relationships, family privacy\n"
+        "- Life transitions: moving, marriage, divorce, new baby, empty nest, aging parents\n"
+        "- Community & belonging: finding your tribe, cultural identity, social circles\n"
+        "\nAlways format responses with **bold** for key points, bullet points for lists, and warm conversational language. "
+        "Be real, honest, and never preachy. Give practical advice, not just theory. "
+        "If someone is in crisis, always encourage professional help while still being supportive. "
+        "Only mention KinsCribe if the user asks."
+    )
+
+    if user.name:
+        system += f" You are speaking with {user.name}."
+
+    messages = [{"role": "system", "content": system}]
+    if history:
+        messages.extend(history)
+    messages.append({"role": "user", "content": message})
+
+    try:
+        from groq import Groq
+        client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=messages,
+            max_tokens=1200,
+            temperature=0.75
+        )
+        return jsonify({"response": response.choices[0].message.content.strip()})
+    except Exception as e:
+        print(f"Family AI error: {e}")
+        return jsonify({"response": "Sorry, I'm having trouble right now. Please try again!"}), 500
 
 
 @ai_bp.route("/story-idea", methods=["POST"])
