@@ -1,9 +1,10 @@
 from flask import Blueprint, request, jsonify
-import jsonfrom flask_jwt_extended import jwt_required, get_jwt_identity
+import json
+from flask_jwt_extended import jwt_required, get_jwt_identity
 from extensions import db
 from models.user import User
 from models.social import Post, PostLike, PostComment, PostSave, Connection, PostCollaborator
-import cloudinary, cloudinary.uploader, os, json
+import cloudinary, cloudinary.uploader, os
 
 post_bp = Blueprint("posts", __name__)
 
