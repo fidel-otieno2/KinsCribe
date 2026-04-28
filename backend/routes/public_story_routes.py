@@ -287,25 +287,6 @@ def family_moments(family_id):
     """Get active moments for a family group."""
     from models.family import FamilyMember
     current_id = int(get_jwt_identity())
-    # Must be a member
-    member = FamilyMember.query.filter_by(user_id=current_id, family_id=family_id).first()
-    if not member:
-        return jsonify({"error": "Not a member"}), 403
-    now = datetime.utcnow()
-    moments = PublicStory.query.filter(
-        PublicStory.family_id == family_id,
-        PublicStory.is_moment == True,
-        PublicStory.expires_at > now,
-    ).order_by(PublicStory.created_at.desc()).all()
-    return jsonify({"moments": [m.to_dict(current_id) for m in moments]})
-
-
-@public_story_bp.route("/family/<int:family_id>/moments", methods=["GET"])
-@jwt_required()
-def family_moments(family_id):
-    """Get active moments for a family group."""
-    from models.family import FamilyMember
-    current_id = int(get_jwt_identity())
     member = FamilyMember.query.filter_by(user_id=current_id, family_id=family_id).first()
     if not member:
         return jsonify({"error": "Not a member"}), 403
