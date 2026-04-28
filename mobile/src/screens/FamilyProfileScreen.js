@@ -80,6 +80,19 @@ export default function FamilyProfileScreen({ navigation }) {
   });
   const [savingPrivacy, setSavingPrivacy] = useState(false);
 
+  // ── Section 5 state ──────────────────────────────────────────
+  const [contentSettings, setContentSettings] = useState({
+    who_post_stories: 'members',
+    who_upload_media: 'members',
+    who_tag_members:  'members',
+    who_mention:      'members',
+    story_duration:   '24h',
+    story_custom_hrs: 72,
+    allow_downloads:  false,
+    allow_resharing:  false,
+  });
+  const [savingContent, setSavingContent] = useState(false);
+
   // ── Invite state ──────────────────────────────────────────
   const [inviteQuery, setInviteQuery] = useState('');
   const [inviteResults, setInviteResults] = useState([]);
@@ -119,6 +132,7 @@ export default function FamilyProfileScreen({ navigation }) {
           if (p.adminCanEdit) setAdminPerms(prev => ({ ...prev, ...p.adminCanEdit }));
           if (p.rolePerms) setRolePerms(prev => ({ ...prev, ...p.rolePerms }));
           if (p.privacyPerms) setPrivacyPerms(prev => ({ ...prev, ...p.privacyPerms }));
+          if (p.contentSettings) setContentSettings(prev => ({ ...prev, ...p.contentSettings }));
         } catch {}
       }
     } catch { error('Could not load family'); }
@@ -137,6 +151,19 @@ export default function FamilyProfileScreen({ navigation }) {
       if (type === 'avatar') setAvatarUri(result.assets[0].uri);
       else setCoverUri(result.assets[0].uri);
     }
+  };
+
+  const saveContent = async () => {
+    if (!isOwner) return;
+    setSavingContent(true);
+    try {
+      await api.patch(`/family/${family.id}/update`, {
+        permissions: JSON.stringify({ adminCanEdit: adminPerms, rolePerms, privacyPerms, contentSettings }),
+      });
+      success('Content settings saved!');
+    } catch (e) {
+      error(e.response?.data?.error || 'Failed to save');
+    } finally { setSavingContent(false); }
   };
 
   const savePrivacy = async () => {
@@ -843,6 +870,117 @@ export default function FamilyProfileScreen({ navigation }) {
           </View>
         )}
 
+        {/* ── SECTION 5: FAMILY CONTENT SETTINGS ── */}
+        {isOwner && (
+          <View style={s.section}>
+            <View style={s.sectionHeaderRow}>
+              <Ionicons name="settings-outline" size={16} color="#a78bfa" />
+              <AppText style={s.sectionTitle}>Content Settings</AppText>
+            </View>
+            <AppText style={[s.sectionSub, { color: theme.muted }]}>Control how content behaves inside the family</AppText>
+
+            {/* Who can rows */}
+            {[
+              { key: 'who_post_stories', label: 'Post Family Stories', icon: 'time-outline' },
+              { key: 'who_upload_media', label: 'Upload Media',        icon: 'image-outline' },
+              { key: 'who_tag_members',  label: 'Tag Members',         icon: 'pricetag-outline' },
+              { key: 'who_mention',      label: 'Mention (@)',          icon: 'at-outline' },
+            ].map(item => (
+              <View key={item.key} style={s.contentRow}>
+                <View style={s.permLeft}>
+                  <View style={[s.permIcon, { backgroundColor: 'rgba(124,58,237,0.12)' }]}>
+                    <Ionicons name={item.icon} size={16} color="#a78bfa" />
+                  </View>
+                  <AppText style={[s.permLabel, { color: '#fff' }]}>{item.label}</AppText>
+                </View>
+                <View style={s.whoRow}>
+                  {['members', 'admins', 'owner'].map(v => (
+                    <TouchableOpacity
+                      key={v}
+                      style={[s.whoChip, contentSettings[item.key] === v && s.whoChipActive]}
+                      onPress={() => setContentSettings(p => ({ ...p, [item.key]: v }))}
+                    >
+                      <AppText style={[s.whoChipText, { color: contentSettings[item.key] === v ? '#fff' : theme.muted }]}>
+                        {v === 'members' ? 'All' : v === 'admins' ? 'Admins' : 'Owner'}
+                      </AppText>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            ))}
+
+            {/* Story Duration */}
+            <AppText style={[s.label, { color: theme.muted, marginTop: 20 }]}>Story Duration</AppText>
+            <View style={s.segmentRow}>
+              {['24h', '48h', 'custom'].map(v => (
+                <TouchableOpacity
+                  key={v}
+                  style={[s.segment, contentSettings.story_duration === v && s.segmentActive]}
+                  onPress={() => setContentSettings(p => ({ ...p, story_duration: v }))}
+                >
+                  <AppText style={[s.segmentText, { color: contentSettings.story_duration === v ? '#fff' : theme.muted }]}>
+                    {v === 'custom' ? 'Custom' : v}
+                  </AppText>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {contentSettings.story_duration === 'custom' && (
+              <View style={s.customHrsRow}>
+                <AppText style={[s.sectionSub, { color: theme.muted, marginBottom: 0 }]}>Hours:</AppText>
+                {[48, 72, 96, 120, 168].map(h => (
+                  <TouchableOpacity
+                    key={h}
+                    style={[s.whoChip, contentSettings.story_custom_hrs === h && s.whoChipActive]}
+                    onPress={() => setContentSettings(p => ({ ...p, story_custom_hrs: h }))}
+                  >
+                    <AppText style={[s.whoChipText, { color: contentSettings.story_custom_hrs === h ? '#fff' : theme.muted }]}>{h}h</AppText>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
+            {/* Toggles */}
+            {[
+              { key: 'allow_downloads', label: 'Allow Downloads',  sub: 'Members can save stories to their device', icon: 'download-outline',  color: '#3b82f6' },
+              { key: 'allow_resharing', label: 'Allow Resharing',  sub: 'Members can reshare stories outside family', icon: 'share-social-outline', color: '#10b981' },
+            ].map(item => (
+              <TouchableOpacity
+                key={item.key}
+                style={s.permRow}
+                onPress={() => setContentSettings(p => ({ ...p, [item.key]: !p[item.key] }))}
+                activeOpacity={0.8}
+              >
+                <View style={s.permLeft}>
+                  <View style={[s.permIcon, { backgroundColor: contentSettings[item.key] ? `${item.color}22` : 'rgba(100,116,139,0.1)' }]}>
+                    <Ionicons name={item.icon} size={16} color={contentSettings[item.key] ? item.color : theme.muted} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <AppText style={[s.permLabel, { color: contentSettings[item.key] ? '#fff' : theme.muted }]}>{item.label}</AppText>
+                    <AppText style={{ color: theme.dim, fontSize: 11, marginTop: 2 }}>{item.sub}</AppText>
+                  </View>
+                </View>
+                <View style={[s.toggle, { backgroundColor: contentSettings[item.key] ? item.color : 'rgba(100,116,139,0.3)' }]}>
+                  <View style={[s.toggleThumb, { transform: [{ translateX: contentSettings[item.key] ? 18 : 2 }] }]} />
+                </View>
+              </TouchableOpacity>
+            ))}
+
+            {/* Save */}
+            <TouchableOpacity
+              style={[s.savePrivacyBtn, savingContent && { opacity: 0.5 }]}
+              onPress={saveContent}
+              disabled={savingContent}
+            >
+              <LinearGradient colors={['#7c3aed', '#3b82f6']} style={s.savePrivacyGrad}>
+                {savingContent
+                  ? <ActivityIndicator color="#fff" size="small" />
+                  : <><Ionicons name="checkmark-circle-outline" size={16} color="#fff" />
+                    <AppText style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>Save Content Settings</AppText></>}
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* ── ROLE ACTION MODAL ── */}
         <Modal visible={showRoleModal} transparent animationType="slide" onRequestClose={() => setShowRoleModal(false)}>
           <View style={s.modalOverlay}>
@@ -1030,4 +1168,12 @@ const s = StyleSheet.create({
   segmentText: { fontSize: 11, fontWeight: '600' },
   savePrivacyBtn: { borderRadius: radius.md, overflow: 'hidden', marginTop: 16 },
   savePrivacyGrad: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 13 },
+
+  // Section 5 — Content Settings
+  contentRow: { marginBottom: 14 },
+  whoRow: { flexDirection: 'row', gap: 6, marginTop: 8, marginLeft: 46 },
+  whoChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.full, borderWidth: 1, borderColor: 'rgba(100,116,139,0.3)', backgroundColor: 'rgba(30,41,59,0.5)' },
+  whoChipActive: { backgroundColor: 'rgba(124,58,237,0.25)', borderColor: '#7c3aed' },
+  whoChipText: { fontSize: 12, fontWeight: '600' },
+  customHrsRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 14 },
 });

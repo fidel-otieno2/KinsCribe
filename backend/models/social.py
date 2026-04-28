@@ -222,6 +222,8 @@ class PublicStory(db.Model):
     music_artwork = db.Column(db.String(300), nullable=True)
     sticker_data = db.Column(db.Text, nullable=True)
     privacy = db.Column(db.String(20), default="public")
+    is_moment = db.Column(db.Boolean, default=False)   # True = family moment (expires)
+    family_id = db.Column(db.Integer, db.ForeignKey("families.id"), nullable=True)
     view_count = db.Column(db.Integer, default=0)
     expires_at = db.Column(db.DateTime, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -240,6 +242,8 @@ class PublicStory(db.Model):
             "music_url": self.music_url, "music_name": self.music_name,
             "music_artist": self.music_artist, "music_artwork": self.music_artwork,
             "sticker_data": self.sticker_data,
+            "is_moment": self.is_moment,
+            "family_id": self.family_id,
             "privacy": self.privacy, "view_count": self.view_count,
             "viewed_by_me": viewed,
             "expires_at": _iso(self.expires_at),
