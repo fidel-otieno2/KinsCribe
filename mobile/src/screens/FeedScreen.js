@@ -816,7 +816,7 @@ const pc = StyleSheet.create({
 
 // ── Feed Screen ────────────────────────────────────────────────
 export default function FeedScreen({ navigation }) {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const { theme, isDark } = useTheme();
   const { t } = useTranslation();
   const [posts, setPosts] = useState([]);
@@ -825,6 +825,38 @@ export default function FeedScreen({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showJoinFamily, setShowJoinFamily] = useState(false);
+  const [showFamilyPicker, setShowFamilyPicker] = useState(false);
+  const [myFamilies, setMyFamilies] = useState([]);
+  const [switchingFamily, setSwitchingFamily] = useState(null);
+
+  const openFamilyBanner = async () => {
+    if (!user?.family_id) { setShowJoinFamily(true); return; }
+    try {
+      const { data } = await api.get('/family/my-families');
+      const families = data.families || [];
+      if (families.length === 1) {
+        navigation.navigate('Family');
+      } else {
+        setMyFamilies(families);
+        setShowFamilyPicker(true);
+      }
+    } catch {
+      navigation.navigate('Family');
+    }
+  };
+
+  const switchAndNavigate = async (familyId) => {
+    setSwitchingFamily(familyId);
+    try {
+      if (familyId !== user?.family_id) {
+        await api.post('/family/switch', { family_id: familyId });
+        await refreshUser();
+      }
+      setShowFamilyPicker(false);
+      navigation.navigate('Family');
+    } catch {}
+    finally { setSwitchingFamily(null); }
+  };
   const [showBiometricPrompt, setShowBiometricPrompt] = useState(false);
   const [biometricType, setBiometricType] = useState('fingerprint');
   const [visiblePostId, setVisiblePostId] = useState(null);
@@ -1031,7 +1063,7 @@ export default function FeedScreen({ navigation }) {
       {/* Family Banner */}
       <TouchableOpacity
         style={s.familyBanner}
-        onPress={() => user?.family_id ? navigation.navigate('Family') : setShowJoinFamily(true)}
+        onPress={openFamilyBanner}
         activeOpacity={0.88}
       >
         <LinearGradient
@@ -1222,6 +1254,61 @@ export default function FeedScreen({ navigation }) {
         onClose={() => setShowJoinFamily(false)}
         onJoined={() => fetchFeed(true)}
       />
+
+      {/* Family Group Picker */}
+      <Modal visible={showFamilyPicker} transparent animationType="slide" onRequestClose={() => setShowFamilyPicker(false)}>
+        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.6)' }}>
+          <View style={[fp.sheet, { backgroundColor: theme.bgCard }]}>
+            <View style={fp.handle} />
+            <AppText style={[fp.title, { color: theme.text }]}>Your Family Groups</AppText>
+            <AppText style={[fp.sub, { color: theme.muted }]}>Choose a group to open</AppText>
+            <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
+              {myFamilies.map(f => (
+                <TouchableOpacity
+                  key={f.id}
+                  style={[fp.row, { borderBottomColor: theme.border }, f.is_primary && fp.rowActive]}
+                  onPress={() => switchAndNavigate(f.id)}
+                  disabled={!!switchingFamily}
+                >
+                  {/* Avatar */}
+                  <View style={fp.avatar}>
+                    {f.avatar_url
+                      ? <Image source={{ uri: f.avatar_url }} style={{ width: 48, height: 48, borderRadius: 24 }} />
+                      : <LinearGradient colors={[f.theme_color || '#7c3aed', '#3b82f6']} style={fp.avatarGrad}>
+                          <Ionicons name="people" size={22} color="#fff" />
+                        </LinearGradient>}
+                  </View>
+                  {/* Info */}
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <AppText style={[fp.name, { color: theme.text }]}>{f.name}</AppText>
+                      {f.is_primary && (
+                        <View style={fp.activeBadge}>
+                          <AppText style={fp.activeBadgeText}>Active</AppText>
+                        </View>
+                      )}
+                    </View>
+                    <AppText style={[fp.role, { color: theme.muted }]}>
+                      {f.my_role === 'owner' ? '👑 Owner' : f.my_role === 'admin' ? '⚙️ Admin' : '👤 Member'}
+                      {f.member_count ? ` · ${f.member_count} members` : ''}
+                    </AppText>
+                  </View>
+                  {/* Action */}
+                  {switchingFamily === f.id
+                    ? <ActivityIndicator size="small" color={colors.primary} />
+                    : <Ionicons name="chevron-forward" size={18} color={theme.muted} />}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity
+              style={[fp.cancelBtn, { borderColor: theme.border2 }]}
+              onPress={() => setShowFamilyPicker(false)}
+            >
+              <AppText style={{ color: theme.muted, fontWeight: '600' }}>Cancel</AppText>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* Floating KinsCribe AI button */}
       <TouchableOpacity
@@ -1662,4 +1749,20 @@ const bm = StyleSheet.create({
   enableBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
   skipBtn: { paddingVertical: 10, paddingHorizontal: 24 },
   skipText: { color: colors.muted, fontSize: 14, fontWeight: '500' },
+});
+
+const fp = StyleSheet.create({
+  sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 36, paddingTop: 12 },
+  handle: { width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(100,116,139,0.4)', alignSelf: 'center', marginBottom: 16 },
+  title: { fontSize: 18, fontWeight: '800', paddingHorizontal: 20, marginBottom: 4 },
+  sub: { fontSize: 13, paddingHorizontal: 20, marginBottom: 16 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 0.5 },
+  rowActive: { backgroundColor: 'rgba(124,58,237,0.06)' },
+  avatar: { width: 48, height: 48, borderRadius: 24, overflow: 'hidden' },
+  avatarGrad: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
+  name: { fontSize: 15, fontWeight: '700' },
+  role: { fontSize: 12, marginTop: 2 },
+  activeBadge: { backgroundColor: 'rgba(16,185,129,0.15)', borderWidth: 1, borderColor: 'rgba(16,185,129,0.4)', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 20 },
+  activeBadgeText: { color: '#10b981', fontSize: 10, fontWeight: '700' },
+  cancelBtn: { margin: 16, padding: 14, borderRadius: 12, borderWidth: 1, alignItems: 'center' },
 });

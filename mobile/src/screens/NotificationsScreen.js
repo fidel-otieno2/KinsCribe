@@ -75,7 +75,7 @@ function TypingDots() {
   );
 }
 
-function NotifRow({ item, onPress, index, onAccept, onDecline }) {
+function NotifRow({ item, onPress, index, onAccept, onDecline, refreshUser }) {
   const { t } = useTranslation();
   const cfg = TYPE_CONFIG[item.type] || TYPE_CONFIG.post_like;
   const anim = useRef(new Animated.Value(0)).current;
@@ -405,6 +405,7 @@ export default function NotificationsScreen({ navigation }) {
               index={index}
               onAccept={handleAcceptRequest}
               onDecline={handleDeclineRequest}
+              refreshUser={refreshUser}
             />
           )}
           showsVerticalScrollIndicator={false}

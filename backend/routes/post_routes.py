@@ -285,6 +285,53 @@ def add_comment(post_id):
     )
     db.session.add(c)
     db.session.commit()
+
+    # ── Notifications ───────────────────────────────────────────
+    try:
+        from models.notifications import Notification
+        from models.family import FamilyMember
+        post = Post.query.get(post_id)
+        if post:
+            notif_data = json.dumps({
+                "post_id": post_id,
+                "comment_id": c.id,
+                "commenter_name": user.name,
+                "post_author_name": User.query.get(post.user_id).name if post.user_id else "",
+            })
+            recipients = set()
+
+            # Always notify the post owner (unless they commented themselves)
+            if post.user_id != user.id:
+                recipients.add(post.user_id)
+
+            # If post is family privacy, notify all family members
+            if post.privacy == 'family' and user.family_id:
+                members = FamilyMember.query.filter_by(family_id=user.family_id).all()
+                for m in members:
+                    if m.user_id != user.id:  # don't notify the commenter
+                        recipients.add(m.user_id)
+
+            for uid in recipients:
+                target_user = User.query.get(uid)
+                if not target_user:
+                    continue
+                if uid == post.user_id:
+                    title = f"{user.name} commented on your post"
+                else:
+                    post_owner = User.query.get(post.user_id)
+                    title = f"{user.name} commented on {post_owner.name if post_owner else 'a'}'s post"
+                db.session.add(Notification(
+                    user_id=uid,
+                    from_user_id=user.id,
+                    type="post_comment",
+                    title=title,
+                    message=c.text[:100],
+                    data=notif_data,
+                ))
+            db.session.commit()
+    except Exception:
+        pass
+
     return jsonify({"comment": c.to_dict()}), 201
 
 
