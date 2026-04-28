@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import {
   View, TouchableOpacity, StyleSheet, ActivityIndicator,
   ScrollView, Image, RefreshControl, Alert, TextInput,
-  Clipboard, Dimensions,
+  Clipboard, Dimensions, Modal, FlatList,
 } from 'react-native';
 import AppText from '../components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -45,12 +45,19 @@ function Avatar({ uri, name, size = 44 }) {
 
 // ── Family Feed Tab ───────────────────────────────────────────
 function FamilyFeedTab({ navigation, userRole }) {
+  const { user } = useAuth();
   const { t } = useTranslation();
   const [stories, setStories] = useState([]);
   const [announcements, setAnnouncements] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [viewer, setViewer] = useState(null); // { story }
+  const [comments, setComments] = useState([]);
+  const [commentText, setCommentText] = useState('');
+  const [postingComment, setPostingComment] = useState(false);
+  const [loadingComments, setLoadingComments] = useState(false);
+  const [showComments, setShowComments] = useState(null); // story id
 
-  useEffect(() => {
+  const fetchStories = () => {
     Promise.all([
       api.get('/stories/feed').catch(() => ({ data: { stories: [] } })),
       api.get('/family/announcements').catch(() => ({ data: { announcements: [] } })),
@@ -58,13 +65,57 @@ function FamilyFeedTab({ navigation, userRole }) {
       setStories(storiesRes.data.stories || []);
       setAnnouncements(annRes.data.announcements || []);
     }).finally(() => setLoading(false));
-  }, []);
+  };
+
+  useEffect(() => { fetchStories(); }, []);
+
+  const toggleLike = async (story) => {
+    const liked = story.liked_by_me;
+    setStories(prev => prev.map(s => s.id === story.id
+      ? { ...s, liked_by_me: !liked, like_count: liked ? s.like_count - 1 : s.like_count + 1 }
+      : s
+    ));
+    try { await api.post(`/stories/${story.id}/like`); }
+    catch { setStories(prev => prev.map(s => s.id === story.id ? { ...s, liked_by_me: liked, like_count: story.like_count } : s)); }
+  };
+
+  const deleteStory = (story) => {
+    Alert.alert('Delete Story', 'Remove this family story?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: async () => {
+        try {
+          await api.delete(`/stories/${story.id}`);
+          setStories(prev => prev.filter(s => s.id !== story.id));
+        } catch { Alert.alert('Error', 'Could not delete story'); }
+      }},
+    ]);
+  };
+
+  const openComments = async (storyId) => {
+    setShowComments(storyId);
+    setLoadingComments(true);
+    try {
+      const { data } = await api.get(`/stories/${storyId}/comments`);
+      setComments(data.comments || []);
+    } catch {} finally { setLoadingComments(false); }
+  };
+
+  const postComment = async (storyId) => {
+    if (!commentText.trim()) return;
+    setPostingComment(true);
+    try {
+      const { data } = await api.post(`/stories/${storyId}/comments`, { text: commentText });
+      setComments(prev => [...prev, { ...data.comment, author_name: user?.name }]);
+      setCommentText('');
+      setStories(prev => prev.map(s => s.id === storyId ? { ...s, comment_count: (s.comment_count || 0) + 1 } : s));
+    } catch {} finally { setPostingComment(false); }
+  };
 
   if (loading) return <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />;
 
   return (
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
-      {/* Admin Announcements */}
+      {/* Announcements */}
       {announcements.length > 0 && (
         <View style={{ marginBottom: 16 }}>
           <AppText style={ft.sectionLabel}>📢 Announcements</AppText>
@@ -81,6 +132,7 @@ function FamilyFeedTab({ navigation, userRole }) {
           ))}
         </View>
       )}
+
       {stories.length === 0 ? (
         <View style={ft.empty}>
           <Ionicons name="library-outline" size={48} color={colors.dim} />
@@ -88,42 +140,132 @@ function FamilyFeedTab({ navigation, userRole }) {
           <AppText style={ft.emptySub}>{t('share_first_memory')}</AppText>
         </View>
       ) : stories.map(story => (
-        <TouchableOpacity
-          key={story.id}
-          style={ft.card}
-          onPress={() => navigation.navigate('UserProfile', { userId: story.user_id, userName: story.author_name })}
-          activeOpacity={0.85}
-        >
+        <View key={story.id} style={ft.card}>
+          {/* Header */}
           <View style={ft.cardHeader}>
-            <Avatar uri={story.author_avatar} name={story.author_name} size={38} />
+            <TouchableOpacity onPress={() => navigation.navigate('UserProfile', { userId: story.user_id, userName: story.author_name })}>
+              <Avatar uri={story.author_avatar} name={story.author_name} size={38} />
+            </TouchableOpacity>
             <View style={{ flex: 1, marginLeft: 10 }}>
               <AppText style={ft.authorName}>{story.author_name}</AppText>
               <AppText style={ft.time}>{timeAgo(story.created_at)}</AppText>
             </View>
-            {story.family_name && (
-              <View style={ft.groupBadge}>
-                <Ionicons name="people" size={10} color="#10b981" />
-                <AppText style={ft.groupBadgeText}>{story.family_name}</AppText>
-              </View>
+            {/* Delete — only owner or admin */}
+            {(story.user_id === user?.id || user?.role === 'admin') && (
+              <TouchableOpacity onPress={() => deleteStory(story)} style={{ padding: 6 }}>
+                <Ionicons name="trash-outline" size={18} color="#f87171" />
+              </TouchableOpacity>
             )}
           </View>
+
+          {/* Title & content */}
           <AppText style={ft.title}>{story.title}</AppText>
           {story.content ? <AppText style={ft.content} numberOfLines={3}>{story.content}</AppText> : null}
-          {story.media_url && story.media_type === 'image' && (
-            <Image source={{ uri: story.media_url }} style={ft.media} resizeMode="cover" />
+
+          {/* Media — tappable for full screen */}
+          {story.media_url && (
+            <TouchableOpacity onPress={() => setViewer(story)} activeOpacity={0.9}>
+              <Image source={{ uri: story.media_url }} style={ft.media} resizeMode="cover" />
+              {story.media_type === 'video' && (
+                <View style={ft.playOverlay}>
+                  <Ionicons name="play-circle" size={52} color="rgba(255,255,255,0.9)" />
+                </View>
+              )}
+            </TouchableOpacity>
           )}
+
+          {/* Actions — like & comment only, NO share */}
           <View style={ft.actions}>
-            <View style={ft.actionItem}>
-              <Ionicons name="heart-outline" size={16} color={colors.muted} />
-              <AppText style={ft.actionText}>{story.like_count}</AppText>
+            <TouchableOpacity style={ft.actionItem} onPress={() => toggleLike(story)}>
+              <Ionicons
+                name={story.liked_by_me ? 'heart' : 'heart-outline'}
+                size={20}
+                color={story.liked_by_me ? '#e11d48' : colors.muted}
+              />
+              <AppText style={[ft.actionText, story.liked_by_me && { color: '#e11d48' }]}>
+                {story.like_count || 0}
+              </AppText>
+            </TouchableOpacity>
+            <TouchableOpacity style={ft.actionItem} onPress={() => openComments(story.id)}>
+              <Ionicons name="chatbubble-outline" size={20} color={colors.muted} />
+              <AppText style={ft.actionText}>{story.comment_count || 0}</AppText>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ))}
+
+      {/* Full-screen media viewer */}
+      <Modal visible={!!viewer} transparent animationType="fade" onRequestClose={() => setViewer(null)}>
+        <View style={ft.viewerOverlay}>
+          <TouchableOpacity style={ft.viewerClose} onPress={() => setViewer(null)}>
+            <Ionicons name="close" size={28} color="#fff" />
+          </TouchableOpacity>
+          {viewer?.media_url && (
+            <Image source={{ uri: viewer.media_url }} style={ft.viewerImg} resizeMode="contain" />
+          )}
+          {viewer?.title ? (
+            <View style={ft.viewerCaption}>
+              <AppText style={ft.viewerTitle}>{viewer.title}</AppText>
+              {viewer.content ? <AppText style={ft.viewerContent}>{viewer.content}</AppText> : null}
             </View>
-            <View style={ft.actionItem}>
-              <Ionicons name="chatbubble-outline" size={16} color={colors.muted} />
-              <AppText style={ft.actionText}>{story.comment_count}</AppText>
+          ) : null}
+        </View>
+      </Modal>
+
+      {/* Comments modal */}
+      <Modal visible={!!showComments} animationType="slide" transparent onRequestClose={() => setShowComments(null)}>
+        <View style={ft.commentsOverlay}>
+          <View style={ft.commentsSheet}>
+            <View style={ft.commentsHandle} />
+            <View style={ft.commentsHeader}>
+              <AppText style={ft.commentsTitle}>Comments</AppText>
+              <TouchableOpacity onPress={() => setShowComments(null)}>
+                <Ionicons name="close" size={22} color={colors.muted} />
+              </TouchableOpacity>
+            </View>
+            {loadingComments
+              ? <ActivityIndicator color={colors.primary} style={{ marginTop: 30 }} />
+              : <FlatList
+                  data={comments}
+                  keyExtractor={(_, i) => String(i)}
+                  style={{ flex: 1 }}
+                  contentContainerStyle={{ padding: 16 }}
+                  ListEmptyComponent={<AppText style={{ color: colors.muted, textAlign: 'center', marginTop: 20 }}>No comments yet</AppText>}
+                  renderItem={({ item }) => (
+                    <View style={ft.commentRow}>
+                      <View style={ft.commentAvatar}>
+                        <AppText style={ft.commentAvatarText}>{item.author_name?.[0] || 'U'}</AppText>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <AppText style={ft.commentText}>
+                          <AppText style={ft.commentName}>{item.author_name} </AppText>
+                          {item.text}
+                        </AppText>
+                      </View>
+                    </View>
+                  )}
+                />
+            }
+            <View style={ft.commentInputRow}>
+              <View style={ft.commentAvatar}>
+                <AppText style={ft.commentAvatarText}>{user?.name?.[0] || 'U'}</AppText>
+              </View>
+              <TextInput
+                style={ft.commentInput}
+                placeholder="Add a comment..."
+                placeholderTextColor={colors.dim}
+                value={commentText}
+                onChangeText={setCommentText}
+              />
+              <TouchableOpacity onPress={() => postComment(showComments)} disabled={postingComment || !commentText.trim()}>
+                {postingComment
+                  ? <ActivityIndicator size="small" color={colors.primary} />
+                  : <AppText style={[ft.postBtn, !commentText.trim() && { opacity: 0.4 }]}>Post</AppText>}
+              </TouchableOpacity>
             </View>
           </View>
-        </TouchableOpacity>
-      ))}
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -147,9 +289,31 @@ const ft = StyleSheet.create({
   title: { fontSize: 16, fontWeight: '700', color: colors.text, marginBottom: 6 },
   content: { fontSize: 14, color: colors.muted, lineHeight: 20, marginBottom: 10 },
   media: { width: '100%', height: 200, borderRadius: radius.md, marginBottom: 10 },
-  actions: { flexDirection: 'row', gap: 16 },
-  actionItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  actionText: { fontSize: 13, color: colors.muted },
+  playOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 10, alignItems: 'center', justifyContent: 'center' },
+  actions: { flexDirection: 'row', gap: 20, paddingTop: 8, borderTopWidth: 0.5, borderTopColor: colors.border, marginTop: 4 },
+  actionItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  actionText: { fontSize: 13, color: colors.muted, fontWeight: '600' },
+  // Full-screen viewer
+  viewerOverlay: { flex: 1, backgroundColor: '#000', justifyContent: 'center' },
+  viewerClose: { position: 'absolute', top: 52, right: 16, zIndex: 10, padding: 8, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 20 },
+  viewerImg: { width: '100%', height: '75%' },
+  viewerCaption: { padding: 20 },
+  viewerTitle: { fontSize: 18, fontWeight: '700', color: '#fff', marginBottom: 6 },
+  viewerContent: { fontSize: 14, color: 'rgba(255,255,255,0.7)', lineHeight: 20 },
+  // Comments
+  commentsOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
+  commentsSheet: { backgroundColor: colors.bgCard || colors.bgSecondary, borderTopLeftRadius: 24, borderTopRightRadius: 24, height: '70%' },
+  commentsHandle: { width: 40, height: 4, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 2, alignSelf: 'center', marginTop: 12, marginBottom: 8 },
+  commentsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: colors.border },
+  commentsTitle: { fontSize: 15, fontWeight: '700', color: colors.text },
+  commentRow: { flexDirection: 'row', gap: 10, marginBottom: 16, alignItems: 'flex-start' },
+  commentAvatar: { width: 30, height: 30, borderRadius: 15, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+  commentAvatarText: { color: '#fff', fontWeight: '700', fontSize: 11 },
+  commentText: { fontSize: 13, color: colors.text, lineHeight: 18 },
+  commentName: { fontWeight: '700' },
+  commentInputRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderTopWidth: 0.5, borderTopColor: colors.border },
+  commentInput: { flex: 1, color: colors.text, fontSize: 14 },
+  postBtn: { color: colors.primary, fontWeight: '700', fontSize: 14 },
 });
 
 // ── Members Tab ───────────────────────────────────────────────
@@ -401,7 +565,7 @@ export default function FamilyScreen({ navigation }) {
         <View style={s.headerRight}>
           <TouchableOpacity
             style={s.aiBtnWrap}
-            onPress={() => navigation.navigate('FeedAI')}
+            onPress={() => navigation.navigate('FamilyAI')}
             activeOpacity={0.8}
           >
             <LinearGradient colors={['#7c3aed', '#3b82f6']} style={s.aiBtn}>
