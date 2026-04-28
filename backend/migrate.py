@@ -108,6 +108,25 @@ def run_migrations():
             )
             """,
             "CREATE INDEX IF NOT EXISTS idx_notif_read_user ON notification_read_receipts(user_id)",
+
+            # Family invites — user-to-user family invitations
+            """
+            CREATE TABLE IF NOT EXISTS family_invites (
+                id SERIAL PRIMARY KEY,
+                family_id INTEGER NOT NULL REFERENCES families(id) ON DELETE CASCADE,
+                invited_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                invited_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                token VARCHAR(64) UNIQUE NOT NULL,
+                status VARCHAR(20) DEFAULT 'pending',
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+            """,
+            "CREATE INDEX IF NOT EXISTS idx_family_invites_user ON family_invites(invited_user_id)",
+            "CREATE INDEX IF NOT EXISTS idx_family_invites_family ON family_invites(family_id)",
+
+            # Public stories — sticker data for mentions
+            "ALTER TABLE public_stories ADD COLUMN IF NOT EXISTS sticker_data TEXT",
+            "ALTER TABLE public_stories ADD COLUMN IF NOT EXISTS music_url VARCHAR(300)",
         ]
         
         print(f"🚀 Running {len(migrations)} migrations...")
