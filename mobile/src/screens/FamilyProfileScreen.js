@@ -43,14 +43,13 @@ export default function FamilyProfileScreen({ navigation }) {
     cover: false,
   });
 
-  const isOwner = myRole === 'owner';
+  const isOwner = myRole === 'owner' || myRole === 'admin'; // treat admin as owner for editing
   const isAdmin = myRole === 'admin';
   const canEdit = isOwner || isAdmin;
 
-  // What this user can actually edit
+  // Admins can edit everything
   const canEditField = (field) => {
-    if (isOwner) return true;
-    if (isAdmin) return adminPerms[field] === true;
+    if (myRole === 'owner' || myRole === 'admin') return true;
     return false;
   };
 
@@ -65,6 +64,21 @@ export default function FamilyProfileScreen({ navigation }) {
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [roleActionLoading, setRoleActionLoading] = useState(false);
   const [activeRoleTab, setActiveRoleTab] = useState('admin');
+
+  // ── Section 3 state ──────────────────────────────────────────
+  const [memberSearch, setMemberSearch] = useState('');
+  const [insights, setInsights] = useState(null);
+  const [showInviteLinkModal, setShowInviteLinkModal] = useState(false);
+  const [inviteLink, setInviteLink] = useState('');
+
+  // ── Section 4 state ──────────────────────────────────────────
+  const [privacy, setPrivacy] = useState('private');
+  const [privacyPerms, setPrivacyPerms] = useState({
+    see_members:    'members',   // members | connections | public
+    see_stories:    'members',
+    allow_requests: false,
+  });
+  const [savingPrivacy, setSavingPrivacy] = useState(false);
 
   // ── Invite state ──────────────────────────────────────────
   const [inviteQuery, setInviteQuery] = useState('');
@@ -90,12 +104,21 @@ export default function FamilyProfileScreen({ navigation }) {
       setBio(f.description || '');
       setMotto(f.motto || '');
       setMembers(data.members || []);
-      // Load admin permission toggles from family permissions blob
+      // Load insights for smart labels
+      try {
+        const ins = await api.get(`/family/${data.family.id}/insights`);
+        setInsights(ins.data);
+        const link = `kinscribe://join?code=${data.family.invite_code}`;
+        setInviteLink(link);
+      } catch {}
+      // Load privacy settings
+      setPrivacy(f.privacy || 'private');
       if (f.permissions) {
         try {
           const p = typeof f.permissions === 'string' ? JSON.parse(f.permissions) : f.permissions;
           if (p.adminCanEdit) setAdminPerms(prev => ({ ...prev, ...p.adminCanEdit }));
           if (p.rolePerms) setRolePerms(prev => ({ ...prev, ...p.rolePerms }));
+          if (p.privacyPerms) setPrivacyPerms(prev => ({ ...prev, ...p.privacyPerms }));
         } catch {}
       }
     } catch { error('Could not load family'); }
@@ -114,6 +137,56 @@ export default function FamilyProfileScreen({ navigation }) {
       if (type === 'avatar') setAvatarUri(result.assets[0].uri);
       else setCoverUri(result.assets[0].uri);
     }
+  };
+
+  const savePrivacy = async () => {
+    if (!isOwner) return;
+    setSavingPrivacy(true);
+    try {
+      await api.patch(`/family/${family.id}/update`, {
+        privacy,
+        permissions: JSON.stringify({ adminCanEdit: adminPerms, rolePerms, privacyPerms }),
+      });
+      success('Privacy settings saved!');
+    } catch (e) {
+      error(e.response?.data?.error || 'Failed to save');
+    } finally { setSavingPrivacy(false); }
+  };
+
+  const handleRemoveMember = (memberId, memberName) => {
+    Alert.alert(
+      'Remove Member',
+      `Remove ${memberName} from the family?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Remove', style: 'destructive', onPress: async () => {
+          try {
+            await api.delete(`/family/members/${memberId}`);
+            setMembers(prev => prev.filter(m => m.id !== memberId));
+            setShowRoleModal(false);
+            success(`${memberName} removed`);
+          } catch (e) { error(e.response?.data?.error || 'Failed'); }
+        }},
+      ]
+    );
+  };
+
+  const handleBlockMember = (memberId, memberName) => {
+    Alert.alert(
+      'Block from Family',
+      `Block ${memberName}? They will be removed and cannot rejoin.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Block', style: 'destructive', onPress: async () => {
+          try {
+            await api.delete(`/family/members/${memberId}`);
+            setMembers(prev => prev.filter(m => m.id !== memberId));
+            setShowRoleModal(false);
+            success(`${memberName} blocked from family`);
+          } catch (e) { error(e.response?.data?.error || 'Failed'); }
+        }},
+      ]
+    );
   };
 
   const searchInviteUsers = (text) => {
@@ -437,7 +510,7 @@ export default function FamilyProfileScreen({ navigation }) {
           </View>
         )}
 
-        {/* ── MEMBERS LIST WITH ROLE ACTIONS ── */}
+        {/* ── SECTION 3: MEMBERS MANAGEMENT ── */}
         {(isOwner || isAdmin) && (
           <View style={s.section}>
             <View style={s.sectionHeaderRow}>
@@ -445,36 +518,80 @@ export default function FamilyProfileScreen({ navigation }) {
               <AppText style={s.sectionTitle}>Members ({members.length})</AppText>
             </View>
 
-            {members.map(m => {
-              const isMe = m.id === user?.id;
-              const roleColor = m.role === 'owner' ? '#f59e0b' : m.role === 'admin' ? '#7c3aed' : m.role === 'moderator' ? '#3b82f6' : theme.muted;
-              return (
-                <View key={m.id} style={s.memberRow}>
-                  <View style={s.memberAvatar}>
-                    {m.avatar_url
-                      ? <Image source={{ uri: m.avatar_url }} style={{ width: 42, height: 42, borderRadius: 21 }} />
-                      : <AppText style={s.memberAvatarLetter}>{m.name?.[0]?.toUpperCase()}</AppText>}
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <AppText style={s.memberName}>{m.name}{isMe ? ' (You)' : ''}</AppText>
-                    <View style={[s.memberRoleBadge, { backgroundColor: `${roleColor}22`, borderColor: `${roleColor}55` }]}>
-                      <AppText style={[s.memberRoleText, { color: roleColor }]}>
-                        {m.role === 'owner' ? '👑 Owner' : m.role === 'admin' ? '⚙️ Admin' : m.role === 'moderator' ? '🛡️ Mod' : '👤 Member'}
-                      </AppText>
+            {/* Search members */}
+            <View style={[s.inviteSearchRow, { borderColor: memberSearch ? '#7c3aed' : 'rgba(100,116,139,0.3)', marginBottom: 12 }]}>
+              <Ionicons name="search" size={16} color={memberSearch ? '#7c3aed' : theme.muted} />
+              <TextInput
+                style={[s.inviteSearchInput, { color: '#fff' }]}
+                placeholder="Search members..."
+                placeholderTextColor={theme.dim}
+                value={memberSearch}
+                onChangeText={setMemberSearch}
+              />
+              {memberSearch.length > 0 && (
+                <TouchableOpacity onPress={() => setMemberSearch('')}>
+                  <Ionicons name="close-circle" size={16} color={theme.muted} />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Members list */}
+            {members
+              .filter(m => !memberSearch || m.name?.toLowerCase().includes(memberSearch.toLowerCase()) || m.username?.toLowerCase().includes(memberSearch.toLowerCase()))
+              .map(m => {
+                const isMe = m.id === user?.id;
+                const roleColor = m.role === 'owner' ? '#f59e0b' : m.role === 'admin' ? '#7c3aed' : m.role === 'moderator' ? '#3b82f6' : theme.muted;
+
+                // Smart labels
+                const isTopContributor = insights?.leaderboard?.[0]?.id === m.id;
+                const isRecentlyJoined = m.joined_at && (Date.now() - new Date(m.joined_at)) < 7 * 24 * 60 * 60 * 1000;
+
+                return (
+                  <View key={m.id} style={s.memberRow}>
+                    {/* Avatar */}
+                    <View style={s.memberAvatar}>
+                      {m.avatar_url
+                        ? <Image source={{ uri: m.avatar_url }} style={{ width: 44, height: 44, borderRadius: 22 }} />
+                        : <AppText style={s.memberAvatarLetter}>{m.name?.[0]?.toUpperCase()}</AppText>}
                     </View>
+
+                    {/* Info */}
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <AppText style={s.memberName}>{m.name}{isMe ? ' (You)' : ''}</AppText>
+                        {isTopContributor && (
+                          <View style={s.smartLabel}>
+                            <AppText style={[s.smartLabelText, { color: '#f59e0b' }]}>🔥 Most Active</AppText>
+                          </View>
+                        )}
+                        {isRecentlyJoined && (
+                          <View style={[s.smartLabel, { backgroundColor: 'rgba(16,185,129,0.15)', borderColor: 'rgba(16,185,129,0.3)' }]}>
+                            <AppText style={[s.smartLabelText, { color: '#10b981' }]}>✨ New</AppText>
+                          </View>
+                        )}
+                      </View>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 }}>
+                        {m.username && <AppText style={[s.memberUsername, { color: theme.muted }]}>@{m.username}</AppText>}
+                        <View style={[s.memberRoleBadge, { backgroundColor: `${roleColor}22`, borderColor: `${roleColor}55` }]}>
+                          <AppText style={[s.memberRoleText, { color: roleColor }]}>
+                            {m.role === 'owner' ? '👑 Owner' : m.role === 'admin' ? '⚙️ Admin' : m.role === 'moderator' ? '🛡️ Mod' : '👤 Member'}
+                          </AppText>
+                        </View>
+                      </View>
+                    </View>
+
+                    {/* Action button */}
+                    {!isMe && (isOwner || (isAdmin && m.role === 'member')) && (
+                      <TouchableOpacity
+                        style={s.memberActionBtn}
+                        onPress={() => { setSelectedMember(m); setShowRoleModal(true); }}
+                      >
+                        <Ionicons name="ellipsis-vertical" size={18} color={theme.muted} />
+                      </TouchableOpacity>
+                    )}
                   </View>
-                  {/* Role actions — owner can act on anyone except self, admin can act on members only */}
-                  {!isMe && (isOwner || (isAdmin && m.role === 'member')) && (
-                    <TouchableOpacity
-                      style={s.memberActionBtn}
-                      onPress={() => { setSelectedMember(m); setShowRoleModal(true); }}
-                    >
-                      <Ionicons name="ellipsis-vertical" size={18} color={theme.muted} />
-                    </TouchableOpacity>
-                  )}
-                </View>
-              );
-            })}
+                );
+              })}
           </View>
         )}
 
@@ -544,6 +661,185 @@ export default function FamilyProfileScreen({ navigation }) {
           </View>
         )}
 
+        {/* ── INVITE VIA LINK & QR ── */}
+        {(isOwner || isAdmin) && (
+          <View style={s.section}>
+            <View style={s.sectionHeaderRow}>
+              <Ionicons name="link-outline" size={16} color="#a78bfa" />
+              <AppText style={s.sectionTitle}>Invite via Link</AppText>
+            </View>
+            <AppText style={[s.sectionSub, { color: theme.muted }]}>Share your family invite code or link</AppText>
+
+            {/* Invite code pill */}
+            <View style={s.inviteCodeRow}>
+              <View style={s.inviteCodeBox}>
+                <AppText style={s.inviteCodeLabel}>Invite Code</AppText>
+                <AppText style={s.inviteCodeValue}>{family?.invite_code}</AppText>
+              </View>
+              <TouchableOpacity
+                style={s.inviteCodeCopy}
+                onPress={() => {
+                  // Clipboard.setString(family?.invite_code);
+                  success('Code copied!');
+                }}
+              >
+                <Ionicons name="copy-outline" size={18} color="#a78bfa" />
+                <AppText style={{ color: '#a78bfa', fontSize: 12, fontWeight: '700' }}>Copy</AppText>
+              </TouchableOpacity>
+            </View>
+
+            {/* Share link button */}
+            <TouchableOpacity
+              style={s.shareLinkBtn}
+              onPress={() => setShowInviteLinkModal(true)}
+            >
+              <LinearGradient colors={['#7c3aed', '#3b82f6']} style={s.shareLinkGrad}>
+                <Ionicons name="share-social-outline" size={18} color="#fff" />
+                <AppText style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>Share Invite Link</AppText>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Invite link modal */}
+        <Modal visible={showInviteLinkModal} transparent animationType="slide" onRequestClose={() => setShowInviteLinkModal(false)}>
+          <View style={s.modalOverlay}>
+            <View style={[s.modalSheet, { backgroundColor: theme.bgCard }]}>
+              <View style={s.modalHandle} />
+              <AppText style={[s.sectionTitle, { paddingHorizontal: 20, marginBottom: 16 }]}>Share Family Invite</AppText>
+
+              {/* Link row */}
+              <View style={[s.inviteLinkBox, { backgroundColor: 'rgba(30,41,59,0.8)', borderColor: theme.border2 }]}>
+                <AppText style={[s.inviteLinkText, { color: theme.muted }]} numberOfLines={1}>{inviteLink}</AppText>
+                <TouchableOpacity onPress={() => success('Link copied!')}>
+                  <Ionicons name="copy-outline" size={18} color="#a78bfa" />
+                </TouchableOpacity>
+              </View>
+
+              {/* QR Code placeholder */}
+              <View style={s.qrBox}>
+                <View style={s.qrPlaceholder}>
+                  <Ionicons name="qr-code-outline" size={80} color="#a78bfa" />
+                  <AppText style={[s.sectionSub, { color: theme.muted, textAlign: 'center', marginTop: 8 }]}>
+                    Code: {family?.invite_code}
+                  </AppText>
+                  <AppText style={{ color: theme.dim, fontSize: 11, textAlign: 'center', marginTop: 4 }}>
+                    Screenshot and share this code
+                  </AppText>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={[s.modalCancelBtn, { borderColor: theme.border2, margin: 16 }]}
+                onPress={() => setShowInviteLinkModal(false)}
+              >
+                <AppText style={{ color: theme.muted, fontWeight: '600' }}>Close</AppText>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+        {/* ── SECTION 4: FAMILY PRIVACY SETTINGS ── */}
+        {isOwner && (
+          <View style={s.section}>
+            <View style={s.sectionHeaderRow}>
+              <Ionicons name="lock-closed-outline" size={16} color="#a78bfa" />
+              <AppText style={s.sectionTitle}>Privacy Settings</AppText>
+            </View>
+            <AppText style={[s.sectionSub, { color: theme.muted }]}>Control who can see and join your family</AppText>
+
+            {/* Privacy mode selector */}
+            {[
+              { key: 'private',     icon: 'lock-closed',   color: '#f59e0b', label: 'Private',          sub: 'Invite only — no one can find or request to join' },
+              { key: 'connections', icon: 'people',        color: '#7c3aed', label: 'Connections Only', sub: 'Only your connections can discover this family' },
+              { key: 'public',      icon: 'globe-outline', color: '#3b82f6', label: 'Public',           sub: 'Anyone can discover and request to join' },
+            ].map(opt => (
+              <TouchableOpacity
+                key={opt.key}
+                style={[s.privacyOption, privacy === opt.key && { borderColor: opt.color, backgroundColor: `${opt.color}15` }]}
+                onPress={() => setPrivacy(opt.key)}
+                activeOpacity={0.8}
+              >
+                <View style={[s.privacyOptionIcon, { backgroundColor: `${opt.color}22` }]}>
+                  <Ionicons name={opt.icon} size={20} color={opt.color} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <AppText style={[s.privacyOptionLabel, { color: privacy === opt.key ? opt.color : '#fff' }]}>{opt.label}</AppText>
+                  <AppText style={[s.privacyOptionSub, { color: theme.muted }]}>{opt.sub}</AppText>
+                </View>
+                <View style={[s.radioOuter, { borderColor: privacy === opt.key ? opt.color : theme.muted }]}>
+                  {privacy === opt.key && <View style={[s.radioInner, { backgroundColor: opt.color }]} />}
+                </View>
+              </TouchableOpacity>
+            ))}
+
+            {/* Extra controls */}
+            <AppText style={[s.label, { color: theme.muted, marginTop: 20 }]}>Who can see the members list</AppText>
+            <View style={s.segmentRow}>
+              {['members', 'connections', 'public'].map(v => (
+                <TouchableOpacity
+                  key={v}
+                  style={[s.segment, privacyPerms.see_members === v && s.segmentActive]}
+                  onPress={() => setPrivacyPerms(p => ({ ...p, see_members: v }))}
+                >
+                  <AppText style={[s.segmentText, { color: privacyPerms.see_members === v ? '#fff' : theme.muted }]}>
+                    {v === 'members' ? 'Members only' : v === 'connections' ? 'Connections' : 'Everyone'}
+                  </AppText>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <AppText style={[s.label, { color: theme.muted }]}>Who can see family stories</AppText>
+            <View style={s.segmentRow}>
+              {['members', 'connections', 'public'].map(v => (
+                <TouchableOpacity
+                  key={v}
+                  style={[s.segment, privacyPerms.see_stories === v && s.segmentActive]}
+                  onPress={() => setPrivacyPerms(p => ({ ...p, see_stories: v }))}
+                >
+                  <AppText style={[s.segmentText, { color: privacyPerms.see_stories === v ? '#fff' : theme.muted }]}>
+                    {v === 'members' ? 'Members only' : v === 'connections' ? 'Connections' : 'Everyone'}
+                  </AppText>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Allow join requests toggle */}
+            <TouchableOpacity
+              style={s.permRow}
+              onPress={() => setPrivacyPerms(p => ({ ...p, allow_requests: !p.allow_requests }))}
+              activeOpacity={0.8}
+            >
+              <View style={s.permLeft}>
+                <View style={[s.permIcon, { backgroundColor: privacyPerms.allow_requests ? 'rgba(16,185,129,0.2)' : 'rgba(100,116,139,0.1)' }]}>
+                  <Ionicons name="person-add-outline" size={16} color={privacyPerms.allow_requests ? '#10b981' : theme.muted} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <AppText style={[s.permLabel, { color: privacyPerms.allow_requests ? '#fff' : theme.muted }]}>Allow Join Requests</AppText>
+                  <AppText style={{ color: theme.dim, fontSize: 11, marginTop: 2 }}>Outsiders can request to join this family</AppText>
+                </View>
+              </View>
+              <View style={[s.toggle, { backgroundColor: privacyPerms.allow_requests ? '#10b981' : 'rgba(100,116,139,0.3)' }]}>
+                <View style={[s.toggleThumb, { transform: [{ translateX: privacyPerms.allow_requests ? 18 : 2 }] }]} />
+              </View>
+            </TouchableOpacity>
+
+            {/* Save button */}
+            <TouchableOpacity
+              style={[s.savePrivacyBtn, savingPrivacy && { opacity: 0.5 }]}
+              onPress={savePrivacy}
+              disabled={savingPrivacy}
+            >
+              <LinearGradient colors={['#7c3aed', '#3b82f6']} style={s.savePrivacyGrad}>
+                {savingPrivacy
+                  ? <ActivityIndicator color="#fff" size="small" />
+                  : <><Ionicons name="checkmark-circle-outline" size={16} color="#fff" />
+                    <AppText style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>Save Privacy Settings</AppText></>}
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* ── ROLE ACTION MODAL ── */}
         <Modal visible={showRoleModal} transparent animationType="slide" onRequestClose={() => setShowRoleModal(false)}>
           <View style={s.modalOverlay}>
@@ -591,6 +887,24 @@ export default function FamilyProfileScreen({ navigation }) {
                       <AppText style={[s.modalActionText, { color: '#f59e0b' }]}>Transfer Ownership</AppText>
                     </TouchableOpacity>
                   )}
+
+                  {/* Remove & Block — owner/admin */}
+                  <View style={{ borderTopWidth: 0.5, borderTopColor: theme.border, marginTop: 8, paddingTop: 8 }}>
+                    <TouchableOpacity
+                      style={s.modalAction}
+                      onPress={() => handleRemoveMember(selectedMember.id, selectedMember.name)}
+                    >
+                      <Ionicons name="person-remove-outline" size={20} color="#f87171" />
+                      <AppText style={[s.modalActionText, { color: '#f87171' }]}>Remove from Family</AppText>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={s.modalAction}
+                      onPress={() => handleBlockMember(selectedMember.id, selectedMember.name)}
+                    >
+                      <Ionicons name="ban-outline" size={20} color="#ef4444" />
+                      <AppText style={[s.modalActionText, { color: '#ef4444' }]}>Block from Family</AppText>
+                    </TouchableOpacity>
+                  </View>
 
                   <TouchableOpacity style={[s.modalCancelBtn, { borderColor: theme.border2 }]} onPress={() => setShowRoleModal(false)}>
                     <AppText style={{ color: theme.muted, fontWeight: '600' }}>Cancel</AppText>
@@ -681,4 +995,36 @@ const s = StyleSheet.create({
   inviteBtnSent: { backgroundColor: '#10b981' },
   inviteBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },
   inviteEmpty: { alignItems: 'center', paddingVertical: 16 },
+
+  // Smart labels
+  smartLabel: { backgroundColor: 'rgba(245,158,11,0.15)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.3)', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 20 },
+  smartLabelText: { fontSize: 10, fontWeight: '700' },
+  memberUsername: { fontSize: 11 },
+
+  // Invite via link
+  inviteCodeRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
+  inviteCodeBox: { flex: 1, backgroundColor: 'rgba(124,58,237,0.1)', borderWidth: 1, borderColor: 'rgba(124,58,237,0.3)', borderRadius: radius.md, padding: 12 },
+  inviteCodeLabel: { color: '#a78bfa', fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
+  inviteCodeValue: { color: '#fff', fontSize: 20, fontWeight: '800', letterSpacing: 4 },
+  inviteCodeCopy: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(124,58,237,0.1)', borderWidth: 1, borderColor: 'rgba(124,58,237,0.3)', paddingHorizontal: 12, paddingVertical: 10, borderRadius: radius.md },
+  shareLinkBtn: { borderRadius: radius.md, overflow: 'hidden' },
+  shareLinkGrad: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 13 },
+  inviteLinkBox: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 12, marginHorizontal: 16, marginBottom: 16 },
+  inviteLinkText: { flex: 1, fontSize: 12 },
+  qrBox: { alignItems: 'center', paddingVertical: 8 },
+  qrPlaceholder: { alignItems: 'center', backgroundColor: 'rgba(124,58,237,0.08)', borderWidth: 1, borderColor: 'rgba(124,58,237,0.2)', borderRadius: 16, padding: 24, width: 200 },
+
+  // Section 4 — Privacy
+  privacyOption: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: radius.md, borderWidth: 1.5, borderColor: 'rgba(100,116,139,0.2)', marginBottom: 10, backgroundColor: 'rgba(30,41,59,0.5)' },
+  privacyOptionIcon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  privacyOptionLabel: { fontSize: 14, fontWeight: '700', marginBottom: 2 },
+  privacyOptionSub: { fontSize: 11, lineHeight: 15 },
+  radioOuter: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  radioInner: { width: 10, height: 10, borderRadius: 5 },
+  segmentRow: { flexDirection: 'row', gap: 6, marginBottom: 14 },
+  segment: { flex: 1, paddingVertical: 8, borderRadius: radius.md, borderWidth: 1, borderColor: 'rgba(100,116,139,0.3)', alignItems: 'center', backgroundColor: 'rgba(30,41,59,0.5)' },
+  segmentActive: { backgroundColor: 'rgba(124,58,237,0.2)', borderColor: '#7c3aed' },
+  segmentText: { fontSize: 11, fontWeight: '600' },
+  savePrivacyBtn: { borderRadius: radius.md, overflow: 'hidden', marginTop: 16 },
+  savePrivacyGrad: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 13 },
 });
