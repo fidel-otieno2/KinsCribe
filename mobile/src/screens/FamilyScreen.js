@@ -44,7 +44,7 @@ function Avatar({ uri, name, size = 44 }) {
 }
 
 // ── Family Feed Tab ───────────────────────────────────────────
-function FamilyFeedTab({ navigation, userRole }) {
+function FamilyFeedTab({ navigation, myRole }) {
   const { user } = useAuth();
   const { t } = useTranslation();
   const [stories, setStories] = useState([]);
@@ -151,7 +151,7 @@ function FamilyFeedTab({ navigation, userRole }) {
               <AppText style={ft.time}>{timeAgo(story.created_at)}</AppText>
             </View>
             {/* Delete — only owner or admin */}
-            {(story.user_id === user?.id || user?.role === 'admin') && (
+            {(story.user_id === user?.id || myRole === 'admin') && (
               <TouchableOpacity onPress={() => deleteStory(story)} style={{ padding: 6 }}>
                 <Ionicons name="trash-outline" size={18} color="#f87171" />
               </TouchableOpacity>
@@ -317,7 +317,7 @@ const ft = StyleSheet.create({
 });
 
 // ── Members Tab ───────────────────────────────────────────────
-function MembersTab({ members, user, family, navigation, success, error }) {
+function MembersTab({ members, user, myRole, family, navigation, success, error }) {
   const { t } = useTranslation();
   const [inviteEmail, setInviteEmail] = useState('');
   const [sending, setSending] = useState(false);
@@ -355,7 +355,7 @@ function MembersTab({ members, user, family, navigation, success, error }) {
       </BlurView>
 
       {/* Invite by email */}
-      {user?.role === 'admin' && (
+      {myRole === 'admin' && (
         <View style={mt.inviteRow}>
           <TextInput
             style={mt.inviteInput}
@@ -379,7 +379,7 @@ function MembersTab({ members, user, family, navigation, success, error }) {
           style={mt.memberRow}
           onPress={() => navigation.navigate('UserProfile', { userId: m.id, userName: m.name, userAvatar: m.avatar_url })}
           onLongPress={() => {
-            if (user?.role !== 'admin' || m.id === user?.id) return;
+            if (myRole !== 'admin' || m.id === user?.id) return;
             Alert.alert(
               `Manage ${m.name}`,
               'Change role or remove member',
@@ -523,12 +523,17 @@ export default function FamilyScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [tab, setTab] = useState('feed');
+  const [myRole, setMyRole] = useState('member');
 
   const fetchFamily = useCallback(async () => {
     try {
       const { data } = await api.get('/family/my-family');
       setFamily(data.family);
-      setMembers(data.members || []);
+      const memberList = data.members || [];
+      setMembers(memberList);
+      // Derive role from members list — most reliable source
+      const me = memberList.find(m => m.id === user?.id);
+      setMyRole(me?.role || user?.role || 'member');
     } catch (err) {
       if (err.response?.status === 404) navigation.navigate('JoinFamily');
     } finally {
@@ -559,7 +564,7 @@ export default function FamilyScreen({ navigation }) {
           </LinearGradient>
           <TouchableOpacity onPress={() => navigation.navigate('FamilyProfile')} activeOpacity={0.75}>
             <AppText style={s.familyName}>{family?.name || 'My Family'}</AppText>
-            <AppText style={s.memberCount}>{members.length} members · tap to edit</AppText>
+            <AppText style={s.memberCount}>{members.length} members{myRole === 'admin' ? ' · tap to edit' : ''}</AppText>
           </TouchableOpacity>
         </View>
         <View style={s.headerRight}>
@@ -620,9 +625,9 @@ export default function FamilyScreen({ navigation }) {
       </View>
 
       {/* Tab content */}
-      {tab === 'feed' && <FamilyFeedTab navigation={navigation} userRole={user?.role} />}
+      {tab === 'feed' && <FamilyFeedTab navigation={navigation} myRole={myRole} />}
       {tab === 'chat' && <ChatRedirect navigation={navigation} family={family} onDone={() => setTab('feed')} />}
-      {tab === 'members' && <MembersTab members={members} user={user} family={family} navigation={navigation} success={success} error={error} />}
+      {tab === 'members' && <MembersTab members={members} user={user} myRole={myRole} family={family} navigation={navigation} success={success} error={error} />}
       {tab === 'timeline' && <TimelineTab navigation={navigation} />}
     </View>
   );
