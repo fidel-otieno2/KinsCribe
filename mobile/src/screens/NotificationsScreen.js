@@ -272,9 +272,14 @@ export default function NotificationsScreen({ navigation }) {
 
   const navigateFromDetail = (item) => {
     setShowDetail(null);
-    if (item.source === 'post' && item.post_id) {
-      navigation.navigate('Main', { screen: 'Feed' });
-    } else if (item.source === 'family_story' && item.story_id) {
+    if ((item.source === 'post' && item.post_id) || item.type === 'post_comment') {
+      const postId = item.post_id || (item.data ? JSON.parse(typeof item.data === 'string' ? item.data : JSON.stringify(item.data))?.post_id : null);
+      if (postId) {
+        navigation.navigate('PostDetail', { postId, autoOpenComments: item.type === 'post_comment' });
+        return;
+      }
+    }
+    if (item.source === 'family_story' && item.story_id) {
       navigation.navigate('Family');
     } else if (item.source === 'connection' && item.actor_id) {
       navigation.navigate('UserProfile', { userId: item.actor_id, userName: item.actor_name, userAvatar: item.actor_avatar });

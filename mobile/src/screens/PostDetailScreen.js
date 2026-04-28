@@ -19,7 +19,7 @@ import { formatDistanceToNow } from '../utils/time';
 const { width, height } = Dimensions.get('window');
 
 export default function PostDetailScreen({ route, navigation }) {
-  const { postId } = route.params;
+  const { postId, autoOpenComments } = route.params;
   const { user } = useAuth();
   const { theme } = useTheme();
   const { toast, hide, success, error } = useToast();
@@ -37,6 +37,14 @@ export default function PostDetailScreen({ route, navigation }) {
   const [videoStatus, setVideoStatus] = useState({});
   const [replyTo, setReplyTo] = useState(null);
   const inputRef = useRef(null);
+
+  // Auto-open comments if navigated from a comment notification
+  useEffect(() => {
+    if (autoOpenComments && inputRef.current) {
+      const timer = setTimeout(() => inputRef.current?.focus(), 600);
+      return () => clearTimeout(timer);
+    }
+  }, [autoOpenComments, loading]);
 
   const fetchPost = useCallback(async () => {
     try {
