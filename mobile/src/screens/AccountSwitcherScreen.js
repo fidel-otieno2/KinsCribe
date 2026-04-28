@@ -82,7 +82,7 @@ export default function AccountSwitcherScreen({ navigation }) {
 
   return (
     <View style={[s.container, { backgroundColor: theme.bg }]}>
-      <LinearGradient colors={['#1C1A14', '#2A2720', '#1C1A14']} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={['#0F172A', '#1E1040', '#0F172A']} style={StyleSheet.absoluteFill} />
 
       <View style={s.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
@@ -234,7 +234,7 @@ const s = StyleSheet.create({
     padding: 14, 
     borderRadius: radius.lg, 
     borderWidth: 1, 
-    backgroundColor: 'rgba(30,41,59,0.5)' 
+    backgroundColor: 'rgba(30,41,59,0.6)', 
   },
   accountRowActive: { borderColor: '#7c3aed', backgroundColor: 'rgba(124,58,237,0.08)' },
   avatarWrap: { width: 52, height: 52 },
