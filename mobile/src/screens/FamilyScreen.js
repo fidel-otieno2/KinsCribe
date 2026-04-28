@@ -1,8 +1,8 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, TouchableOpacity, StyleSheet, ActivityIndicator,
   ScrollView, Image, RefreshControl, Alert, TextInput,
-  Clipboard, Dimensions, Modal, FlatList,
+  Clipboard, Dimensions, Modal, FlatList, Animated,
 } from 'react-native';
 import AppText from '../components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -15,6 +15,7 @@ import { useTranslation } from '../i18n';
 import { colors, radius } from '../theme';
 import Toast from '../components/Toast';
 import useToast from '../hooks/useToast';
+import { HexAvatar } from './StoryViewerScreen';
 
 const { width } = Dimensions.get('window');
 
@@ -44,30 +45,43 @@ function Avatar({ uri, name, size = 44 }) {
 }
 
 // ── Family Feed Tab ───────────────────────────────────────────
-function FamilyFeedTab({ navigation, myRole }) {
+function FamilyFeedTab({ navigation, myRole, familyId, familyName }) {
   const { user } = useAuth();
   const { t } = useTranslation();
   const [stories, setStories] = useState([]);
   const [announcements, setAnnouncements] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [viewer, setViewer] = useState(null); // { story }
+  const [viewer, setViewer] = useState(null);
   const [comments, setComments] = useState([]);
   const [commentText, setCommentText] = useState('');
   const [postingComment, setPostingComment] = useState(false);
   const [loadingComments, setLoadingComments] = useState(false);
-  const [showComments, setShowComments] = useState(null); // story id
+  const [showComments, setShowComments] = useState(null);
+  // Moments/stories bubbles
+  const [moments, setMoments] = useState([]);
 
   const fetchStories = () => {
     Promise.all([
       api.get('/stories/feed').catch(() => ({ data: { stories: [] } })),
       api.get('/family/announcements').catch(() => ({ data: { announcements: [] } })),
-    ]).then(([storiesRes, annRes]) => {
+      familyId ? api.get(`/pstories/family/${familyId}/moments`).catch(() => ({ data: { moments: [] } })) : Promise.resolve({ data: { moments: [] } }),
+    ]).then(([storiesRes, annRes, momentsRes]) => {
       setStories(storiesRes.data.stories || []);
       setAnnouncements(annRes.data.announcements || []);
+      setMoments(momentsRes.data.moments || []);
     }).finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchStories(); }, []);
+  useEffect(() => { fetchStories(); }, [familyId]);
+
+  // Group moments by user for story bubbles
+  const momentGroups = Object.values(
+    moments.reduce((acc, m) => {
+      if (!acc[m.user_id]) acc[m.user_id] = { user_id: m.user_id, author_name: m.author_name, author_avatar: m.author_avatar, stories: [] };
+      acc[m.user_id].stories.push(m);
+      return acc;
+    }, {})
+  );
 
   const toggleLike = async (story) => {
     const liked = story.liked_by_me;
@@ -114,7 +128,80 @@ function FamilyFeedTab({ navigation, myRole }) {
   if (loading) return <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />;
 
   return (
-    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
+    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+
+      {/* ── MOMENTS / STORY BUBBLES ROW ── */}
+      <View style={ft.storiesWrap}>
+        <View style={ft.storiesHeader}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <View style={ft.storiesHeaderDot} />
+            <AppText style={ft.storiesHeaderTitle}>Moments</AppText>
+          </View>
+          {momentGroups.filter(g => !g.stories.every(s => s.viewed_by_me)).length > 0 && (
+            <View style={ft.unseenBadge}>
+              <AppText style={ft.unseenBadgeText}>
+                {momentGroups.filter(g => g.stories.some(s => !s.viewed_by_me)).length} new
+              </AppText>
+            </View>
+          )}
+        </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={ft.storiesRow}>
+          {/* Add moment button */}
+          <TouchableOpacity
+            style={ft.storyItem}
+            onPress={() => navigation.navigate('Create', {
+              initialMode: 'story',
+              momentConfig: { family_id: familyId, is_moment: true, expires_hours: 24 },
+            })}
+          >
+            <View style={ft.addMomentWrap}>
+              <HexAvatar uri={user?.avatar_url} name={user?.name} size={52} hasStory={false} />
+              <View style={[ft.plusBadge, { backgroundColor: colors.primary }]}>
+                <Ionicons name="add" size={12} color="#fff" />
+              </View>
+            </View>
+            <AppText style={[ft.storyLabel, { color: colors.muted }]}>Add</AppText>
+          </TouchableOpacity>
+
+          {/* Moment bubbles */}
+          {momentGroups.map((g, idx) => {
+            const hasUnseen = g.stories.some(s => !s.viewed_by_me);
+            const isMe = g.user_id === user?.id;
+            return (
+              <TouchableOpacity
+                key={g.user_id}
+                style={ft.storyItem}
+                onPress={() => {
+                  const storyGroups = momentGroups.map(gr => ({
+                    user_id: gr.user_id,
+                    author_name: gr.author_name,
+                    author_avatar: gr.author_avatar,
+                    is_self: gr.user_id === user?.id,
+                    has_unseen: gr.stories.some(s => !s.viewed_by_me),
+                    stories: gr.stories,
+                  }));
+                  navigation.navigate('StoryViewer', { storyGroups, initialGroupIndex: idx });
+                }}
+              >
+                <View style={ft.hexWrap}>
+                  <HexAvatar
+                    uri={g.author_avatar}
+                    name={g.author_name}
+                    size={52}
+                    hasStory
+                    hasSeen={!hasUnseen}
+                  />
+                </View>
+                <AppText style={[ft.storyLabel, { color: hasUnseen ? colors.text : colors.muted }]} numberOfLines={1}>
+                  {isMe ? 'You' : g.author_name?.split(' ')[0]}
+                </AppText>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+
+      <View style={{ padding: 16 }}>
       {/* Announcements */}
       {announcements.length > 0 && (
         <View style={{ marginBottom: 16 }}>
@@ -266,11 +353,26 @@ function FamilyFeedTab({ navigation, myRole }) {
           </View>
         </View>
       </Modal>
+      </View>{/* end padding wrapper */}
     </ScrollView>
   );
 }
 
 const ft = StyleSheet.create({
+  // Story bubbles
+  storiesWrap: { borderBottomWidth: 0.5, borderBottomColor: colors.border },
+  storiesHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 },
+  storiesHeaderDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primary },
+  storiesHeaderTitle: { fontSize: 12, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', color: colors.text },
+  unseenBadge: { backgroundColor: 'rgba(124,58,237,0.2)', borderWidth: 1, borderColor: 'rgba(124,58,237,0.4)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 20 },
+  unseenBadgeText: { fontSize: 10, fontWeight: '700', color: '#a78bfa' },
+  storiesRow: { paddingHorizontal: 12, paddingVertical: 10, paddingBottom: 14, gap: 16 },
+  storyItem: { alignItems: 'center', width: 66 },
+  addMomentWrap: { position: 'relative', width: 62, height: 62, alignItems: 'center', justifyContent: 'center' },
+  hexWrap: { position: 'relative', width: 62, height: 62, alignItems: 'center', justifyContent: 'center' },
+  plusBadge: { position: 'absolute', bottom: 0, right: 0, width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.bg },
+  storyLabel: { fontSize: 11, textAlign: 'center', maxWidth: 66, marginTop: 5, fontWeight: '500' },
+  // Feed
   empty: { alignItems: 'center', marginTop: 60, gap: 10 },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: colors.text },
   emptySub: { fontSize: 14, color: colors.muted },
@@ -589,6 +691,7 @@ export default function FamilyScreen({ navigation }) {
         {[
           { icon: 'git-network-outline', label: 'Tree', screen: 'FamilyTree', color: '#7c3aed' },
           { icon: 'calendar-outline', label: 'Calendar', screen: 'FamilyCalendar', color: '#3b82f6' },
+          { icon: 'sparkles-outline', label: 'Moments', screen: 'FamilyMoments', color: '#ec4899' },
           { icon: 'restaurant-outline', label: 'Recipes', screen: 'FamilyRecipes', color: '#f59e0b' },
           { icon: 'wallet-outline', label: 'Budget', screen: 'FamilyBudget', color: '#10b981' },
           { icon: 'book-outline', label: 'Storybooks', screen: 'Storybooks', color: '#ec4899' },
@@ -601,6 +704,8 @@ export default function FamilyScreen({ navigation }) {
             onPress={() => {
               if (item.screen === null) {
                 navigation.navigate('Chat', { conversationId: null, title: `${family?.name || 'Family'} Chat`, type: 'family' });
+              } else if (item.screen === 'FamilyMoments') {
+                navigation.navigate('FamilyMoments', { familyId: family?.id, familyName: family?.name });
               } else {
                 navigation.navigate(item.screen);
               }
@@ -614,21 +719,34 @@ export default function FamilyScreen({ navigation }) {
         ))}
       </ScrollView>
 
-      {/* Tabs */}
-      <View style={s.tabRow}>
-        {TABS.map(t => (
-          <TouchableOpacity key={t.key} style={[s.tabBtn, tab === t.key && s.tabBtnActive]} onPress={() => setTab(t.key)}>
-            <Ionicons name={tab === t.key ? t.iconActive : t.icon} size={18} color={tab === t.key ? colors.primary : colors.muted} />
-            <AppText style={[s.tabLabel, tab === t.key && s.tabLabelActive]}>{t.label}</AppText>
-          </TouchableOpacity>
-        ))}
-      </View>
-
       {/* Tab content */}
-      {tab === 'feed' && <FamilyFeedTab navigation={navigation} myRole={myRole} />}
+      {tab === 'feed' && <FamilyFeedTab navigation={navigation} myRole={myRole} familyId={family?.id} familyName={family?.name} />}
       {tab === 'chat' && <ChatRedirect navigation={navigation} family={family} onDone={() => setTab('feed')} />}
       {tab === 'members' && <MembersTab members={members} user={user} myRole={myRole} family={family} navigation={navigation} success={success} error={error} />}
       {tab === 'timeline' && <TimelineTab navigation={navigation} />}
+
+      {/* ── BOTTOM TAB BAR ── */}
+      <View style={s.bottomBar}>
+        {TABS.map(t => (
+          <TouchableOpacity
+            key={t.key}
+            style={s.bottomTabBtn}
+            onPress={() => setTab(t.key)}
+            activeOpacity={0.8}
+          >
+            <View style={[s.bottomTabIcon, tab === t.key && s.bottomTabIconActive]}>
+              <Ionicons
+                name={tab === t.key ? t.iconActive : t.icon}
+                size={22}
+                color={tab === t.key ? '#fff' : colors.muted}
+              />
+            </View>
+            <AppText style={[s.bottomTabLabel, tab === t.key && s.bottomTabLabelActive]}>
+              {t.label}
+            </AppText>
+          </TouchableOpacity>
+        ))}
+      </View>
     </View>
   );
 }
@@ -654,4 +772,18 @@ const s = StyleSheet.create({
   quickItem: { alignItems: 'center', gap: 6, width: 60 },
   quickIcon: { width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   quickLabel: { fontSize: 11, color: colors.muted, fontWeight: '600', textAlign: 'center' },
+
+  // Bottom tab bar
+  bottomBar: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    flexDirection: 'row',
+    backgroundColor: 'rgba(15,23,42,0.97)',
+    borderTopWidth: 0.5, borderTopColor: colors.border,
+    paddingBottom: 24, paddingTop: 8,
+  },
+  bottomTabBtn: { flex: 1, alignItems: 'center', gap: 4 },
+  bottomTabIcon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  bottomTabIconActive: { backgroundColor: 'rgba(124,58,237,0.2)' },
+  bottomTabLabel: { fontSize: 10, color: colors.muted, fontWeight: '600' },
+  bottomTabLabelActive: { color: colors.primary, fontWeight: '700' },
 });

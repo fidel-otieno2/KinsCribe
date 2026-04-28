@@ -72,6 +72,7 @@ export default function CreateScreen({ navigation, route }) {
 
   // Core state
   const [mode, setMode] = useState(route?.params?.initialMode || 'post');
+  const momentConfig = route?.params?.momentConfig || null;
 
   // Handle media captured from StoryCameraScreen
   useEffect(() => {
@@ -248,6 +249,9 @@ export default function CreateScreen({ navigation, route }) {
   const [myFamilyGroups, setMyFamilyGroups] = useState([]);
   const [showGroupPicker, setShowGroupPicker] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState(null);
+  // Story audience: 'public' = feedscreen, 'family' = specific group
+  const [storyAudience, setStoryAudience] = useState('public');
+  const [storyFamilyGroup, setStoryFamilyGroup] = useState(null); // selected family group for story
   const [uploadingToGroup, setUploadingToGroup] = useState(null); // group name while uploading
 
   // ─── ON MOUNT ───────────────────────────────────────────────────
@@ -824,10 +828,21 @@ export default function CreateScreen({ navigation, route }) {
       setLoading(true);
       try {
         const formData = new FormData();
-        formData.append('privacy', privacy);
+        formData.append('privacy', momentConfig ? 'family' : storyAudience === 'family' ? 'family' : privacy);
         formData.append('bg_color', bgColor);
         if (textContent) formData.append('text_content', textContent);
         if (location) formData.append('location', location);
+        // Moment config (from FamilyMoments screen)
+        if (momentConfig) {
+          formData.append('is_moment', 'true');
+          formData.append('family_id', String(momentConfig.family_id));
+          formData.append('expires_hours', String(momentConfig.expires_hours || 24));
+        } else if (storyAudience === 'family' && storyFamilyGroup) {
+          // Story posted to a specific family group — only members can see it
+          formData.append('is_moment', 'true');
+          formData.append('family_id', String(storyFamilyGroup.id));
+          formData.append('expires_hours', '24');
+        }
         if (storyMentions.length > 0) {
           formData.append('sticker_data', JSON.stringify(
             storyMentions.map(m => ({ type: 'mention', ...m }))
@@ -854,8 +869,18 @@ export default function CreateScreen({ navigation, route }) {
         }
         await api.post('/pstories/', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
         setMediaFiles([]); setTextContent(''); setSelectedMusic(null);
-        success('Story posted! It will disappear in 24 hours');
-        navigation.navigate('Feed');
+        if (momentConfig) {
+          success('Moment shared! It disappears in 24h ✨');
+          navigation.goBack();
+        } else if (storyAudience === 'family' && storyFamilyGroup) {
+          success(`Moment shared with ${storyFamilyGroup.name}! Only members can see it 👨‍👩‍👧`);
+          setStoryFamilyGroup(null);
+          setStoryAudience('public');
+          navigation.navigate('Feed');
+        } else {
+          success('Story posted! It will disappear in 24 hours');
+          navigation.navigate('Feed');
+        }
       } catch (err) {
         error(err.response?.data?.error || 'Failed to post story. Try again.');
       } finally { setLoading(false); }
@@ -1373,7 +1398,15 @@ export default function CreateScreen({ navigation, route }) {
                 <TouchableOpacity
                   key={g.id}
                   style={[s.groupPickerRow, { borderBottomColor: theme.border }, selectedGroup?.id === g.id && { backgroundColor: 'rgba(16,185,129,0.08)' }]}
-                  onPress={() => { setSelectedGroup(g); submitFamilyPost(g); }}
+                  onPress={() => {
+                    if (mode === 'story') {
+                      setStoryFamilyGroup(g);
+                      setShowGroupPicker(false);
+                    } else {
+                      setSelectedGroup(g);
+                      submitFamilyPost(g);
+                    }
+                  }}
                 >
                   <LinearGradient colors={['#10b981', '#059669']} style={s.groupPickerIcon}>
                     <Ionicons name="people" size={18} color="#fff" />
@@ -2274,27 +2307,44 @@ export default function CreateScreen({ navigation, route }) {
             )}
 
             {/* ── AUDIENCE ── */}
-            <View style={s.storyAudienceRow}>
-              <Ionicons name="people-outline" size={14} color={theme.muted} />
-              <AppText style={[s.storyAudienceLabel, { color: theme.muted }]}>Audience:</AppText>
-              {PRIVACY_OPTS.slice(0, 2).map(opt => (
+            <View style={{ marginBottom: 16 }}>
+              <View style={s.storyAudienceRow}>
+                <Ionicons name="people-outline" size={14} color={theme.muted} />
+                <AppText style={[s.storyAudienceLabel, { color: theme.muted }]}>Post to:</AppText>
                 <TouchableOpacity
-                  key={opt.key}
-                  style={[
-                    s.storyAudienceBtn,
-                    { borderColor: theme.border2 },
-                    privacy === opt.key && { borderColor: opt.color, backgroundColor: `${opt.color}22` },
-                  ]}
-                  onPress={() => setPrivacy(opt.key)}
+                  style={[s.storyAudienceBtn, { borderColor: theme.border2 }, storyAudience === 'public' && { borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.15)' }]}
+                  onPress={() => { setStoryAudience('public'); setStoryFamilyGroup(null); }}
                 >
-                  <AppText style={[
-                    s.storyAudienceBtnText,
-                    { color: privacy === opt.key ? opt.color : theme.muted },
-                  ]}>
-                    {opt.label}
-                  </AppText>
+                  <Ionicons name="globe-outline" size={12} color={storyAudience === 'public' ? '#3b82f6' : theme.muted} />
+                  <AppText style={[s.storyAudienceBtnText, { color: storyAudience === 'public' ? '#3b82f6' : theme.muted }]}>Feed</AppText>
                 </TouchableOpacity>
-              ))}
+                <TouchableOpacity
+                  style={[s.storyAudienceBtn, { borderColor: theme.border2 }, storyAudience === 'family' && { borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.15)' }]}
+                  onPress={() => setStoryAudience('family')}
+                >
+                  <Ionicons name="people" size={12} color={storyAudience === 'family' ? '#10b981' : theme.muted} />
+                  <AppText style={[s.storyAudienceBtnText, { color: storyAudience === 'family' ? '#10b981' : theme.muted }]}>Family Group</AppText>
+                </TouchableOpacity>
+              </View>
+
+              {/* Group picker when family selected */}
+              {storyAudience === 'family' && (
+                <TouchableOpacity
+                  style={[s.storyGroupPicker, { borderColor: storyFamilyGroup ? '#10b981' : theme.border2, backgroundColor: theme.bgCard }]}
+                  onPress={() => {
+                    if (myFamilyGroups.length === 0) { info('Join a family group first'); return; }
+                    if (myFamilyGroups.length === 1) { setStoryFamilyGroup(myFamilyGroups[0]); return; }
+                    // show picker modal reusing showGroupPicker
+                    setShowGroupPicker(true);
+                  }}
+                >
+                  <Ionicons name="people" size={16} color={storyFamilyGroup ? '#10b981' : theme.muted} />
+                  <AppText style={{ flex: 1, color: storyFamilyGroup ? '#fff' : theme.dim, fontSize: 14 }}>
+                    {storyFamilyGroup ? storyFamilyGroup.name : 'Select a family group...'}
+                  </AppText>
+                  <Ionicons name="chevron-down" size={14} color={theme.muted} />
+                </TouchableOpacity>
+              )}
             </View>
           </>
         )}
@@ -2588,10 +2638,11 @@ const s = StyleSheet.create({
   bgColorRow: { flexDirection: 'row', gap: 10 },
   bgColorDot: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   bgColorDotActive: { borderWidth: 3, borderColor: '#fff' },
-  storyAudienceRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16, flexWrap: 'wrap' },
+  storyAudienceRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' },
   storyAudienceLabel: { fontSize: 12, fontWeight: '600' },
-  storyAudienceBtn: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, borderWidth: 1 },
+  storyAudienceBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, borderWidth: 1 },
   storyAudienceBtnText: { fontSize: 12, fontWeight: '600' },
+  storyGroupPicker: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 12, marginTop: 4 },
 
   // Family
   mediaThumbLarge: { width: '100%', height: 200, borderRadius: radius.lg, overflow: 'hidden', marginBottom: 16, position: 'relative' },

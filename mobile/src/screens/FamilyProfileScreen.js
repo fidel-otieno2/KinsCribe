@@ -86,8 +86,6 @@ export default function FamilyProfileScreen({ navigation }) {
     who_upload_media: 'members',
     who_tag_members:  'members',
     who_mention:      'members',
-    story_duration:   '24h',
-    story_custom_hrs: 72,
     allow_downloads:  false,
     allow_resharing:  false,
   });
@@ -908,36 +906,6 @@ export default function FamilyProfileScreen({ navigation }) {
                 </View>
               </View>
             ))}
-
-            {/* Story Duration */}
-            <AppText style={[s.label, { color: theme.muted, marginTop: 20 }]}>Story Duration</AppText>
-            <View style={s.segmentRow}>
-              {['24h', '48h', 'custom'].map(v => (
-                <TouchableOpacity
-                  key={v}
-                  style={[s.segment, contentSettings.story_duration === v && s.segmentActive]}
-                  onPress={() => setContentSettings(p => ({ ...p, story_duration: v }))}
-                >
-                  <AppText style={[s.segmentText, { color: contentSettings.story_duration === v ? '#fff' : theme.muted }]}>
-                    {v === 'custom' ? 'Custom' : v}
-                  </AppText>
-                </TouchableOpacity>
-              ))}
-            </View>
-            {contentSettings.story_duration === 'custom' && (
-              <View style={s.customHrsRow}>
-                <AppText style={[s.sectionSub, { color: theme.muted, marginBottom: 0 }]}>Hours:</AppText>
-                {[48, 72, 96, 120, 168].map(h => (
-                  <TouchableOpacity
-                    key={h}
-                    style={[s.whoChip, contentSettings.story_custom_hrs === h && s.whoChipActive]}
-                    onPress={() => setContentSettings(p => ({ ...p, story_custom_hrs: h }))}
-                  >
-                    <AppText style={[s.whoChipText, { color: contentSettings.story_custom_hrs === h ? '#fff' : theme.muted }]}>{h}h</AppText>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
 
             {/* Toggles */}
             {[

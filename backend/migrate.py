@@ -127,6 +127,9 @@ def run_migrations():
             # Public stories — sticker data for mentions
             "ALTER TABLE public_stories ADD COLUMN IF NOT EXISTS sticker_data TEXT",
             "ALTER TABLE public_stories ADD COLUMN IF NOT EXISTS music_url VARCHAR(300)",
+            "ALTER TABLE public_stories ADD COLUMN IF NOT EXISTS is_moment BOOLEAN DEFAULT FALSE",
+            "ALTER TABLE public_stories ADD COLUMN IF NOT EXISTS family_id INTEGER REFERENCES families(id) ON DELETE SET NULL",
+            "CREATE INDEX IF NOT EXISTS idx_public_stories_family ON public_stories(family_id)",
         ]
         
         print(f"🚀 Running {len(migrations)} migrations...")

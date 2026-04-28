@@ -52,6 +52,7 @@ import FamilyCalendarScreen from "./src/screens/FamilyCalendarScreen";
 import FamilyRecipesScreen from "./src/screens/FamilyRecipesScreen";
 import FamilyBudgetScreen from "./src/screens/FamilyBudgetScreen";
 import FamilyProfileScreen from "./src/screens/FamilyProfileScreen";
+import FamilyMomentsScreen from "./src/screens/FamilyMomentsScreen";
 import FamilyAIScreen from "./src/screens/FamilyAIScreen";
 import PostInsightsScreen from "./src/screens/PostInsightsScreen";
 import AccountSwitcherScreen from "./src/screens/AccountSwitcherScreen";
@@ -459,6 +460,7 @@ function RootNavigator({ navigationRef }) {
           <Stack.Screen name="FamilyRecipes" component={FamilyRecipesScreen} options={{ animation: "slide_from_right" }} />
           <Stack.Screen name="FamilyBudget" component={FamilyBudgetScreen} options={{ animation: "slide_from_right" }} />
           <Stack.Screen name="FamilyProfile" component={FamilyProfileScreen} options={{ animation: "slide_from_right" }} />
+          <Stack.Screen name="FamilyMoments" component={FamilyMomentsScreen} options={{ animation: "slide_from_right" }} />
           <Stack.Screen name="FamilyProfileEdit" component={FamilyProfileScreen} options={{ animation: "slide_from_right" }} />
           <Stack.Screen name="FamilyAI" component={FamilyAIScreen} options={{ animation: "slide_from_right" }} />
           <Stack.Screen name="PostInsights" component={PostInsightsScreen} options={{ animation: "slide_from_right" }} />

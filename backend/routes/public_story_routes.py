@@ -63,8 +63,10 @@ def create_story():
         music_artist=music_artist,
         music_artwork=music_artwork,
         sticker_data=data.get("sticker_data"),
+        is_moment=data.get("is_moment", False) in (True, "true", "1"),
+        family_id=int(data["family_id"]) if data.get("family_id") else None,
         privacy=data.get("privacy", "public"),
-        expires_at=datetime.utcnow() + timedelta(hours=24),
+        expires_at=datetime.utcnow() + timedelta(hours=int(data.get("expires_hours", 24))),
         user_id=user.id
     )
     db.session.add(story)
@@ -107,7 +109,8 @@ def story_feed():
     now = datetime.utcnow()
     stories = PublicStory.query.filter(
         PublicStory.user_id.in_(candidate_ids),
-        PublicStory.expires_at > now
+        PublicStory.expires_at > now,
+        (PublicStory.is_moment == False) | (PublicStory.is_moment == None),  # exclude family-only moments
     ).order_by(PublicStory.created_at.desc()).all()
 
     by_user = {}
@@ -276,3 +279,40 @@ def get_collections():
             collections[col] = 0
         collections[col] += 1
     return jsonify({"collections": [{ "name": k, "count": v } for k, v in collections.items()]})
+
+
+@public_story_bp.route("/family/<int:family_id>/moments", methods=["GET"])
+@jwt_required()
+def family_moments(family_id):
+    """Get active moments for a family group."""
+    from models.family import FamilyMember
+    current_id = int(get_jwt_identity())
+    # Must be a member
+    member = FamilyMember.query.filter_by(user_id=current_id, family_id=family_id).first()
+    if not member:
+        return jsonify({"error": "Not a member"}), 403
+    now = datetime.utcnow()
+    moments = PublicStory.query.filter(
+        PublicStory.family_id == family_id,
+        PublicStory.is_moment == True,
+        PublicStory.expires_at > now,
+    ).order_by(PublicStory.created_at.desc()).all()
+    return jsonify({"moments": [m.to_dict(current_id) for m in moments]})
+
+
+@public_story_bp.route("/family/<int:family_id>/moments", methods=["GET"])
+@jwt_required()
+def family_moments(family_id):
+    """Get active moments for a family group."""
+    from models.family import FamilyMember
+    current_id = int(get_jwt_identity())
+    member = FamilyMember.query.filter_by(user_id=current_id, family_id=family_id).first()
+    if not member:
+        return jsonify({"error": "Not a member"}), 403
+    now = datetime.utcnow()
+    moments = PublicStory.query.filter(
+        PublicStory.family_id == family_id,
+        PublicStory.is_moment == True,
+        PublicStory.expires_at > now,
+    ).order_by(PublicStory.created_at.desc()).all()
+    return jsonify({"moments": [m.to_dict(current_id) for m in moments]})
