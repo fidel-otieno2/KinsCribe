@@ -438,21 +438,33 @@ def verify_email(token):
 
 @auth_bp.route("/login", methods=["POST"])
 def login():
-    data = request.json
-    user = User.query.filter_by(email=data["email"]).first()
+    try:
+        data = request.json or {}
+        email = data.get("email", "").strip().lower()
+        password = data.get("password", "")
+        
+        if not email or not password:
+            return jsonify({"error": "Email and password are required"}), 400
+        
+        user = User.query.filter_by(email=email).first()
 
-    if not user:
-        return jsonify({"error": "No account found with this email"}), 401
-    if user.google_id and not user.password:
-        return jsonify({"error": "This account uses Google Sign-In. Please tap \"Continue with Google\"."}), 401
-    if not bcrypt.check_password_hash(user.password, data["password"]):
-        return jsonify({"error": "Incorrect password"}), 401
+        if not user:
+            return jsonify({"error": "No account found with this email"}), 401
+        if user.google_id and not user.password:
+            return jsonify({"error": "This account uses Google Sign-In. Please tap \"Continue with Google\"."}), 401
+        if not bcrypt.check_password_hash(user.password, password):
+            return jsonify({"error": "Incorrect password"}), 401
 
-    # If 2FA is enabled, return challenge instead of tokens
-    if user.two_factor_enabled:
-        return jsonify({"requires_2fa": True, "user_id": user.id})
+        # If 2FA is enabled, return challenge instead of tokens
+        if user.two_factor_enabled:
+            return jsonify({"requires_2fa": True, "user_id": user.id})
 
-    return jsonify(_tokens(user))
+        return jsonify(_tokens(user))
+    except Exception as e:
+        print(f"Login error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": "Login failed. Please try again."}), 500
 
 
 @auth_bp.route("/avatar", methods=["POST"])

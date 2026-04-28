@@ -802,6 +802,13 @@ export default function LoginScreen({ navigation }) {
   const handleLogin = async () => {
     setError('');
     setLoading(true);
+    
+    // Add a timeout to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      setLoading(false);
+      setError('Login request timed out. Please check your connection and try again.');
+    }, 30000); // 30 second timeout
+    
     try {
       // Set biometric flag BEFORE login so FeedScreen sees it on mount
       if (await isBiometricAvailable()) {
@@ -816,6 +823,7 @@ export default function LoginScreen({ navigation }) {
       }
 
       const result = await login(form.email, form.password);
+      clearTimeout(timeoutId);
 
       if (result?.requires_2fa) {
         setTwoFAUserId(result.user_id);
@@ -824,11 +832,21 @@ export default function LoginScreen({ navigation }) {
         return;
       }
     } catch (err) {
+      clearTimeout(timeoutId);
       // Clear the flag if login failed
       await AsyncStorage.removeItem('show_biometric_prompt');
       await AsyncStorage.removeItem('biometric_credentials');
-      setError(err.response?.data?.error || 'Login failed. Check your credentials.');
+      
+      // Better error messages
+      if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+        setError('Connection timeout. Please check your internet and try again.');
+      } else if (err.code === 'ERR_NETWORK' || !err.response) {
+        setError('Network error. Please check your internet connection.');
+      } else {
+        setError(err.response?.data?.error || 'Login failed. Check your credentials.');
+      }
     } finally {
+      clearTimeout(timeoutId);
       setLoading(false);
     }
   };

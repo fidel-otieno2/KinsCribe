@@ -93,16 +93,26 @@ export function AuthProvider({ children }) {
   };
 
   const login = async (email, password) => {
-    const { data } = await api.post('/auth/login', { email, password });
-    if (data.requires_2fa) {
-      return { requires_2fa: true, user_id: data.user_id };
+    try {
+      const { data } = await api.post('/auth/login', { 
+        email: email.trim().toLowerCase(), 
+        password 
+      });
+      
+      if (data.requires_2fa) {
+        return { requires_2fa: true, user_id: data.user_id };
+      }
+      
+      await AsyncStorage.setItem('access_token', data.access_token);
+      await AsyncStorage.setItem('refresh_token', data.refresh_token);
+      await AsyncStorage.setItem(ACTIVE_ACCOUNT_KEY, data.user.id.toString());
+      setUser(data.user);
+      await _saveAccountToList(data.user, data.access_token, data.refresh_token);
+      return data.user;
+    } catch (error) {
+      console.error('Login error:', error.message, error.response?.data);
+      throw error;
     }
-    await AsyncStorage.setItem('access_token', data.access_token);
-    await AsyncStorage.setItem('refresh_token', data.refresh_token);
-    await AsyncStorage.setItem(ACTIVE_ACCOUNT_KEY, data.user.id.toString());
-    setUser(data.user);
-    await _saveAccountToList(data.user, data.access_token, data.refresh_token);
-    return data.user;
   };
 
   const loginWithGoogle = async (data) => {
