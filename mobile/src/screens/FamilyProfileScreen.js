@@ -806,7 +806,7 @@ export default function FamilyProfileScreen({ navigation }) {
 
             {/* Allow join requests toggle */}
             <TouchableOpacity
-              style={s.permRow}
+              style={[s.permRow, { alignItems: 'center' }]}
               onPress={() => setPrivacyPerms(p => ({ ...p, allow_requests: !p.allow_requests }))}
               activeOpacity={0.8}
             >
@@ -819,7 +819,10 @@ export default function FamilyProfileScreen({ navigation }) {
                   <AppText style={{ color: theme.dim, fontSize: 11, marginTop: 2 }}>Outsiders can request to join this family</AppText>
                 </View>
               </View>
-              <View style={[s.toggle, { backgroundColor: privacyPerms.allow_requests ? '#10b981' : 'rgba(100,116,139,0.3)' }]}>
+              <View style={[s.toggle, { backgroundColor: privacyPerms.allow_requests ? '#10b981' : 'rgba(100,116,139,0.3)', alignItems: 'center', justifyContent: 'center', flexDirection: 'row' }]}>
+                {privacyPerms.allow_requests
+                  ? <Ionicons name="checkmark" size={14} color="#fff" style={{ position: 'absolute', right: 4 }} />
+                  : null}
                 <View style={[s.toggleThumb, { transform: [{ translateX: privacyPerms.allow_requests ? 18 : 2 }] }]} />
               </View>
             </TouchableOpacity>
