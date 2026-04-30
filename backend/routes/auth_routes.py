@@ -1067,32 +1067,73 @@ def test_endpoint():
     })
 
 
-@auth_bp.route("/admin/reset-password", methods=["POST"])
-def admin_reset_password():
-    """Emergency password reset - REMOVE IN PRODUCTION"""
+@auth_bp.route("/admin/check-password", methods=["POST"])
+def admin_check_password():
+    """Check password hash details - REMOVE IN PRODUCTION"""
     data = request.json or {}
-    secret = data.get("secret")
     email = data.get("email", "").strip().lower()
-    new_password = data.get("new_password", "")
+    test_password = data.get("password", "")
     
-    # Simple secret check - use your JWT_SECRET_KEY
-    if secret != os.getenv("JWT_SECRET_KEY"):
-        return jsonify({"error": "Unauthorized"}), 401
-    
-    if not email or not new_password:
-        return jsonify({"error": "email and new_password required"}), 400
+    if not email:
+        return jsonify({"error": "email required"}), 400
     
     user = User.query.filter_by(email=email).first()
     if not user:
         return jsonify({"error": "User not found"}), 404
     
+    # Show hash info
+    stored_hash = user.password or ""
+    hash_prefix = stored_hash[:7] if stored_hash else "none"
+    
+    # Test if password matches
+    if test_password and stored_hash:
+        matches = bcrypt.check_password_hash(stored_hash, test_password)
+    else:
+        matches = None
+    
+    return jsonify({
+        "email": email,
+        "has_password": bool(stored_hash),
+        "hash_prefix": hash_prefix,
+        "hash_length": len(stored_hash),
+        "password_tested": bool(test_password),
+        "password_matches": matches,
+        "google_id": bool(user.google_id),
+        "apple_id": bool(user.apple_id),
+    })
+
+
+@auth_bp.route("/admin/force-reset", methods=["POST"])
+def admin_force_reset():
+    """Force reset password without secret - REMOVE IN PRODUCTION"""
+    data = request.json or {}
+    email = data.get("email", "").strip().lower()
+    new_password = data.get("new_password", "")
+    confirm_email = data.get("confirm_email", "").strip().lower()
+    
+    # Safety check - must confirm email twice
+    if email != confirm_email:
+        return jsonify({"error": "Email confirmation doesn't match"}), 400
+    
+    if not email or not new_password:
+        return jsonify({"error": "email and new_password required"}), 400
+    
+    if len(new_password) < 6:
+        return jsonify({"error": "Password must be at least 6 characters"}), 400
+    
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    
+    # Hash and save new password
     user.password = bcrypt.generate_password_hash(new_password).decode("utf-8")
     db.session.commit()
     
     return jsonify({
         "message": "Password reset successfully",
         "email": email,
-        "user_id": user.id
+        "user_id": user.id,
+        "can_login": True
     })
 def test_email():
     """Test email configuration"""
