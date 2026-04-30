@@ -440,33 +440,53 @@ def verify_email(token):
 def login():
     import time
     start_time = time.time()
+    print(f"\n{'='*60}")
+    print(f"[LOGIN] Request received at {time.strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"[LOGIN] Headers: {dict(request.headers)}")
+    print(f"[LOGIN] Content-Type: {request.content_type}")
+    print(f"[LOGIN] Raw data length: {len(request.get_data())}")
+    print(f"{'='*60}\n")
+    
     try:
-        print(f"[LOGIN] Request received at {start_time}")
         data = request.json or {}
+        print(f"[LOGIN] Parsed JSON data keys: {list(data.keys())}")
+        
         email = data.get("email", "").strip().lower()
         password = data.get("password", "")
         
+        print(f"[LOGIN] Email: {email}")
+        print(f"[LOGIN] Password length: {len(password)}")
+        
         if not email or not password:
+            print(f"[LOGIN] Missing credentials")
             return jsonify({"error": "Email and password are required"}), 400
         
         print(f"[LOGIN] Querying user for email: {email}")
         query_start = time.time()
         user = User.query.filter_by(email=email).first()
         print(f"[LOGIN] Query took {time.time() - query_start:.2f}s")
+        print(f"[LOGIN] User found: {user is not None}")
 
         if not user:
+            print(f"[LOGIN] No user found with email: {email}")
             return jsonify({"error": "No account found with this email"}), 401
         if user.google_id and not user.password:
+            print(f"[LOGIN] User is Google-only account")
             return jsonify({"error": "This account uses Google Sign-In. Please tap \"Continue with Google\"."}), 401
         
         print(f"[LOGIN] Checking password hash")
         hash_start = time.time()
-        if not bcrypt.check_password_hash(user.password, password):
-            return jsonify({"error": "Incorrect password"}), 401
+        password_valid = bcrypt.check_password_hash(user.password, password)
         print(f"[LOGIN] Password check took {time.time() - hash_start:.2f}s")
+        print(f"[LOGIN] Password valid: {password_valid}")
+        
+        if not password_valid:
+            print(f"[LOGIN] Incorrect password")
+            return jsonify({"error": "Incorrect password"}), 401
 
         # If 2FA is enabled, return challenge instead of tokens
         if user.two_factor_enabled:
+            print(f"[LOGIN] 2FA required")
             return jsonify({"requires_2fa": True, "user_id": user.id})
 
         print(f"[LOGIN] Generating tokens")
@@ -474,6 +494,7 @@ def login():
         result = _tokens(user)
         print(f"[LOGIN] Token generation took {time.time() - token_start:.2f}s")
         print(f"[LOGIN] Total login time: {time.time() - start_time:.2f}s")
+        print(f"[LOGIN] SUCCESS\n")
         return jsonify(result)
     except Exception as e:
         print(f"[LOGIN] ERROR after {time.time() - start_time:.2f}s: {str(e)}")
@@ -1034,7 +1055,16 @@ def remove_phone():
     return jsonify({"message": "Phone number removed", "user": user.to_dict()})
 
 
-@auth_bp.route("/test-email", methods=["GET"])
+@auth_bp.route("/test", methods=["GET", "POST"])
+def test_endpoint():
+    """Simple test endpoint to verify server is responding"""
+    return jsonify({
+        "status": "ok",
+        "method": request.method,
+        "timestamp": datetime.utcnow().isoformat(),
+        "headers": dict(request.headers),
+        "data": request.get_json(silent=True) if request.method == "POST" else None
+    })
 def test_email():
     """Test email configuration"""
     config_info = {
