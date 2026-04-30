@@ -27,6 +27,47 @@ def require_family(user):
     return None
 
 
+def _upload_media_file(file):
+    """Upload media file to Cloudinary and return URL and type."""
+    mime = file.content_type or ""
+    resource_type = "video" if "video" in mime else "raw" if "audio" in mime else "image"
+    media_type = "video" if "video" in mime else "audio" if "audio" in mime else "image"
+    result = cloudinary.uploader.upload(file, resource_type=resource_type, folder="kinscribe/stories")
+    return result["secure_url"], media_type
+
+
+def _upload_music_file(music_file):
+    """Upload music file to Cloudinary and return URL."""
+    result = cloudinary.uploader.upload(music_file, resource_type="raw", folder="kinscribe/music")
+    return result["secure_url"]
+
+
+def _parse_story_date(story_date_str):
+    """Parse story date from string, supporting ISO and YYYY-MM-DD formats."""
+    if not story_date_str:
+        return None
+    try:
+        return datetime.fromisoformat(story_date_str).date()
+    except (ValueError, TypeError):
+        try:
+            return datetime.strptime(story_date_str, "%Y-%m-%d").date()
+        except ValueError:
+            print(f"Invalid date format: {story_date_str}")
+            return None
+
+
+def _validate_family_membership(user, target_family_id):
+    """Validate user membership in target family."""
+    if not target_family_id or target_family_id == user.family_id:
+        return target_family_id or user.family_id
+    
+    from models.family import FamilyMember
+    membership = FamilyMember.query.filter_by(user_id=user.id, family_id=target_family_id).first()
+    if not membership:
+        return None
+    return target_family_id
+
+
 @story_bp.route("/", methods=["POST"])
 @jwt_required()
 def create_story():
@@ -38,23 +79,18 @@ def create_story():
     media_url = None
     media_type = "text"
 
+    # Upload media file if present
     try:
         if "file" in request.files:
-            file = request.files["file"]
-            mime = file.content_type or ""
-            resource_type = "video" if "video" in mime else "raw" if "audio" in mime else "image"
-            media_type = "video" if "video" in mime else "audio" if "audio" in mime else "image"
-            result = cloudinary.uploader.upload(file, resource_type=resource_type, folder="kinscribe/stories")
-            media_url = result["secure_url"]
+            media_url, media_type = _upload_media_file(request.files["file"])
     except Exception as e:
         return jsonify({"error": f"File upload failed: {str(e)}"}), 500
 
+    # Upload music file if present
     music_url = None
     try:
         if "music" in request.files:
-            music_file = request.files["music"]
-            music_result = cloudinary.uploader.upload(music_file, resource_type="raw", folder="kinscribe/music")
-            music_url = music_result["secure_url"]
+            music_url = _upload_music_file(request.files["music"])
     except Exception as e:
         return jsonify({"error": f"Music upload failed: {str(e)}"}), 500
 
@@ -64,29 +100,22 @@ def create_story():
         music_url = data.get("music_url")
     music_name = data.get("music_name")
 
-    story_date = data.get("story_date") or None
-    parsed_date = None
-    if story_date:
-        try:
-            parsed_date = datetime.strptime(story_date, "%Y-%m-%d").date()
-        except ValueError:
-            pass
+    # Parse story date
+    parsed_date = _parse_story_date(data.get("story_date"))
 
-    # Allow posting to a specific family group the user belongs to
+    # Validate family membership
     target_family_id = data.get("family_id")
     if target_family_id:
         try:
             target_family_id = int(target_family_id)
         except (ValueError, TypeError):
             target_family_id = None
-    # Verify membership if a specific family_id was provided
-    if target_family_id and target_family_id != user.family_id:
-        from models.family import FamilyMember
-        membership = FamilyMember.query.filter_by(user_id=user.id, family_id=target_family_id).first()
-        if not membership:
-            return jsonify({"error": "You are not a member of that family"}), 403
-    final_family_id = target_family_id or user.family_id
+    
+    final_family_id = _validate_family_membership(user, target_family_id)
+    if final_family_id is None:
+        return jsonify({"error": "You are not a member of that family"}), 403
 
+    # Create story
     try:
         story = Story(
             title=data.get("title", ""),
@@ -112,8 +141,10 @@ def create_story():
         import threading
         from services.ai_service import process_story
         threading.Thread(target=process_story, args=(story.id,), daemon=True).start()
-    except Exception:
-        pass
+    except ImportError:
+        print("AI service not available")
+    except Exception as e:
+        print(f"Failed to start AI processing: {str(e)}")
 
     try:
         return jsonify({"story": story.to_dict()}), 201
@@ -136,7 +167,8 @@ def family_stories():
         if not membership:
             return jsonify({"error": "Access denied"}), 403
     limit = request.args.get('limit', 50, type=int)
-    stories = Story.query.filter_by(family_id=family_id)\
+    # Exclude archived stories by default
+    stories = Story.query.filter_by(family_id=family_id, is_archived=False)\
         .order_by(Story.created_at.desc()).limit(limit).all()
     return jsonify({"stories": [s.to_dict() for s in stories]})
 
@@ -259,6 +291,12 @@ def toggle_like(story_id):
 def user_family_stories(user_id, family_id):
     """Get stories posted by a specific user in a specific family group.
     Only accessible by members of that family."""
+    # Validate parameters
+    if not user_id or user_id <= 0:
+        return jsonify({"error": "Invalid user_id"}), 400
+    if not family_id or family_id <= 0:
+        return jsonify({"error": "Invalid family_id"}), 400
+    
     current = current_user()
     from models.family import FamilyMember
     membership = FamilyMember.query.filter_by(user_id=current.id, family_id=family_id).first()
@@ -393,3 +431,55 @@ def repost_story(story_id):
 def report_story(story_id):
     # placeholder — just acknowledge for now
     return jsonify({"message": "Story reported. Our team will review it."})
+
+
+@story_bp.route("/<int:story_id>/archive", methods=["POST"])
+@jwt_required()
+def toggle_archive(story_id):
+    user = current_user()
+    story = Story.query.get_or_404(story_id)
+    if story.user_id != user.id:
+        return jsonify({"error": "Not authorized"}), 403
+    story.is_archived = not story.is_archived
+    story.archived_at = datetime.utcnow() if story.is_archived else None
+    db.session.commit()
+    return jsonify({"archived": story.is_archived})
+
+
+@story_bp.route("/<int:story_id>/highlight", methods=["POST"])
+@jwt_required()
+def toggle_highlight(story_id):
+    user = current_user()
+    story = Story.query.get_or_404(story_id)
+    # Allow family admins/owner to highlight
+    from models.family import FamilyMember
+    membership = FamilyMember.query.filter_by(user_id=user.id, family_id=story.family_id).first()
+    is_admin = membership and membership.role in ('owner', 'admin')
+    if story.user_id != user.id and not is_admin:
+        return jsonify({"error": "Not authorized"}), 403
+    story.is_highlighted = not story.is_highlighted
+    story.highlighted_at = datetime.utcnow() if story.is_highlighted else None
+    db.session.commit()
+    return jsonify({"highlighted": story.is_highlighted})
+
+
+@story_bp.route("/family/<int:family_id>/highlights", methods=["GET"])
+@jwt_required()
+def family_highlights(family_id):
+    user = current_user()
+    from models.family import FamilyMember
+    membership = FamilyMember.query.filter_by(user_id=user.id, family_id=family_id).first()
+    if not membership and user.family_id != family_id:
+        return jsonify({"error": "Access denied"}), 403
+    stories = Story.query.filter_by(family_id=family_id, is_highlighted=True)\
+        .order_by(Story.highlighted_at.desc()).all()
+    return jsonify({"stories": [s.to_dict() for s in stories]})
+
+
+@story_bp.route("/archived", methods=["GET"])
+@jwt_required()
+def my_archived():
+    user = current_user()
+    stories = Story.query.filter_by(user_id=user.id, is_archived=True)\
+        .order_by(Story.archived_at.desc()).all()
+    return jsonify({"stories": [s.to_dict() for s in stories]})

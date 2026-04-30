@@ -28,6 +28,12 @@ class Story(db.Model):
     repost_count = db.Column(db.Integer, default=0)
     is_announcement = db.Column(db.Boolean, default=False)
 
+    # Archive & Highlights
+    is_archived = db.Column(db.Boolean, default=False)
+    is_highlighted = db.Column(db.Boolean, default=False)
+    archived_at = db.Column(db.DateTime, nullable=True)
+    highlighted_at = db.Column(db.DateTime, nullable=True)
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -61,6 +67,10 @@ class Story(db.Model):
             "comment_count": len(self.comments),
             "repost_count": self.repost_count or 0,
             "is_announcement": self.is_announcement or False,
+            "is_archived": self.is_archived or False,
+            "is_highlighted": self.is_highlighted or False,
+            "archived_at": utc_iso(self.archived_at) if self.archived_at else None,
+            "highlighted_at": utc_iso(self.highlighted_at) if self.highlighted_at else None,
             "author_name": self.author.name if self.author else None,
             "author_avatar": self.author.avatar_url if self.author else None,
             "created_at": utc_iso(self.created_at)

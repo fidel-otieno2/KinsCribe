@@ -28,6 +28,7 @@ const TABS = [
   { key: 'reels', icon: 'film-outline', iconActive: 'film' },
   { key: 'family', icon: 'people-outline', iconActive: 'people' },
   { key: 'saved', icon: 'bookmark-outline', iconActive: 'bookmark' },
+  { key: 'archived', icon: 'archive-outline', iconActive: 'archive' },
   { key: 'tagged', icon: 'at-outline', iconActive: 'at' },
   { key: 'liked', icon: 'heart-outline', iconActive: 'heart' },
 ];
@@ -51,6 +52,7 @@ export default function ProfileScreen({ navigation }) {
   const [stats, setStats] = useState({ posts: 0, connections: 0, interests: 0 });
   const [listModal, setListModal] = useState({ visible: false, type: null, data: [], loading: false });
   const [myStories, setMyStories] = useState([]);
+  const [archivedStories, setArchivedStories] = useState([]);
   const [family, setFamily] = useState(null);
   const [myGroups, setMyGroups] = useState({ admin_groups: [], member_groups: [] });
   const [familyPostsGroup, setFamilyPostsGroup] = useState(null); // selected group for family tab
@@ -62,13 +64,14 @@ export default function ProfileScreen({ navigation }) {
   const fetchAll = useCallback(async () => {
     if (!user) return;
     try {
-      const [postsRes, savedRes, highlightsRes, taggedRes, likedRes, storiesRes] = await Promise.all([
+      const [postsRes, savedRes, highlightsRes, taggedRes, likedRes, storiesRes, archivedRes] = await Promise.all([
         api.get(`/posts/user/${user.id}`).catch(() => ({ data: { posts: [] } })),
         api.get('/pstories/saved').catch(() => ({ data: { posts: [] } })),
         api.get(`/pstories/highlights?user_id=${user.id}`).catch(() => ({ data: { highlights: [] } })),
         api.get(`/posts/tagged/${user.id}`).catch(() => ({ data: { posts: [] } })),
         api.get(`/posts/liked/${user.id}`).catch(() => ({ data: { posts: [] } })),
         api.get('/pstories/my').catch(() => ({ data: { stories: [] } })),
+        api.get('/stories/archived').catch(() => ({ data: { stories: [] } })),
       ]);
       const allPosts = postsRes.data.posts || [];
       setPosts(allPosts);
@@ -77,6 +80,7 @@ export default function ProfileScreen({ navigation }) {
       setLikedPosts(likedRes.data.posts || []);
       setHighlights(highlightsRes.data.highlights || []);
       setMyStories(storiesRes.data.stories || []);
+      setArchivedStories(archivedRes.data.stories || []);
       if (user?.family_id) {
         api.get('/family/my-family').then(r => setFamily(r.data.family)).catch(() => {});
       }
@@ -261,6 +265,7 @@ export default function ProfileScreen({ navigation }) {
     tab === 'saved' ? savedPosts :
     tab === 'tagged' ? taggedPosts :
     tab === 'liked' ? likedPosts :
+    tab === 'archived' ? [] : // handled separately
     tab === 'family' ? [] : // handled separately
     posts.filter(p => tab === 'reels' ? p.media_type === 'video' : true);
 
@@ -836,14 +841,54 @@ export default function ProfileScreen({ navigation }) {
               );
             })()}
           </View>
+        ) : tab === 'archived' ? (
+          <View style={{ flex: 1 }}>
+            {archivedStories.length === 0 ? (
+              <View style={s.empty}>
+                <Ionicons name="archive-outline" size={48} color={theme.dim} />
+                <AppText style={[s.emptyTitle, { color: theme.muted }]}>No archived stories</AppText>
+                <AppText style={[s.emptySub, { color: theme.dim, fontSize: 13, textAlign: 'center', marginTop: 4 }]}>
+                  Archive stories to hide them from your profile{`\n`}while keeping them saved privately.
+                </AppText>
+              </View>
+            ) : (
+              <View style={s.grid}>
+                {archivedStories.map(item => (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={s.gridItem}
+                    activeOpacity={0.85}
+                    onPress={() => navigation.navigate('Family')}
+                  >
+                    {item.media_url ? (
+                      <Image source={{ uri: item.media_url }} style={s.gridImg} resizeMode="cover" />
+                    ) : (
+                      <View style={[s.gridImg, s.gridText, { backgroundColor: theme.bgSecondary }]}>
+                        <AppText style={[s.gridCaption, { color: theme.text }]} numberOfLines={3}>{item.title}</AppText>
+                      </View>
+                    )}
+                    <View style={s.archivedBadge}>
+                      <Ionicons name="archive" size={9} color="#f59e0b" />
+                    </View>
+                    {item.like_count > 0 && (
+                      <View style={s.gridLikes}>
+                        <Ionicons name="heart" size={10} color="#fff" />
+                        <AppText style={s.gridLikesText}>{item.like_count}</AppText>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
         ) : currentData.length === 0 ? (
           <View style={s.empty}>
             <Ionicons
-              name={tab === 'saved' ? 'bookmark-outline' : tab === 'reels' ? 'film-outline' : tab === 'tagged' ? 'at-outline' : tab === 'liked' ? 'heart-outline' : 'camera-outline'}
+              name={tab === 'saved' ? 'bookmark-outline' : tab === 'reels' ? 'film-outline' : tab === 'tagged' ? 'at-outline' : tab === 'liked' ? 'heart-outline' : tab === 'archived' ? 'archive-outline' : 'camera-outline'}
               size={48} color={theme.dim}
             />
             <AppText style={[s.emptyTitle, { color: theme.muted }]}>
-              {tab === 'saved' ? 'No saved posts' : tab === 'reels' ? 'No reels yet' : tab === 'tagged' ? 'No tagged posts yet' : tab === 'liked' ? 'No liked posts yet' : t('no_posts')}
+              {tab === 'saved' ? 'No saved posts' : tab === 'reels' ? 'No reels yet' : tab === 'tagged' ? 'No tagged posts yet' : tab === 'liked' ? 'No liked posts yet' : tab === 'archived' ? 'No archived stories' : t('no_posts')}
             </AppText>
             {tab === 'posts' && (
               <TouchableOpacity style={s.createBtn} onPress={() => navigation.navigate('Create')}>
@@ -1001,4 +1046,6 @@ const s = StyleSheet.create({
   groupChipText: { fontSize: 13, fontWeight: '700' },
   groupChipAdminDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#f59e0b' },
   familyStoryBadge: { position: 'absolute', top: 5, right: 5, backgroundColor: 'rgba(16,185,129,0.85)', borderRadius: 6, padding: 3 },
+  archivedBadge: { position: 'absolute', top: 5, right: 5, backgroundColor: 'rgba(245,158,11,0.85)', borderRadius: 6, padding: 3 },
+  emptySub: { fontSize: 13, color: colors.dim, textAlign: 'center', marginTop: 4, lineHeight: 19 },
 });

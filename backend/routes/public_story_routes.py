@@ -20,38 +20,77 @@ def me():
     return User.query.get(int(get_jwt_identity()))
 
 
+def _upload_public_story_media(file):
+    """Upload public story media to Cloudinary."""
+    mime = file.content_type or ""
+    resource_type = "video" if "video" in mime else "image"
+    media_type = "video" if "video" in mime else "image"
+    result = cloudinary.uploader.upload(file, resource_type=resource_type, folder="kinscribe/pstories")
+    return result["secure_url"], media_type
+
+
+def _parse_music_data(music_raw):
+    """Parse music data from JSON string or dict."""
+    if not music_raw:
+        return None, None, None, None
+    
+    try:
+        import json as _json
+        m = _json.loads(music_raw) if isinstance(music_raw, str) else music_raw
+        return (
+            m.get("title") or m.get("music_name"),
+            m.get("artist") or m.get("music_artist"),
+            m.get("cover") or m.get("artwork"),
+            m.get("stream_url") or m.get("music_url") or m.get("url")
+        )
+    except Exception:
+        return str(music_raw), None, None, None
+
+
+def _notify_mentioned_users(user, story_id, sticker_data):
+    """Send notifications to users mentioned in story stickers."""
+    if not sticker_data:
+        return
+    
+    try:
+        import json as _json
+        from models.notifications import Notification
+        stickers = _json.loads(sticker_data) if isinstance(sticker_data, str) else sticker_data
+        for sticker in stickers:
+            if sticker.get("type") == "mention":
+                mentioned_id = sticker.get("user_id")
+                if mentioned_id and mentioned_id != user.id:
+                    db.session.add(Notification(
+                        user_id=mentioned_id,
+                        from_user_id=user.id,
+                        type="story_mention",
+                        title=f"{user.name} mentioned you in their story",
+                        message="Tap to view the story",
+                    ))
+        db.session.commit()
+    except ImportError:
+        print("Notification model not available")
+    except Exception as e:
+        print(f"Failed to send story mention notifications: {str(e)}")
+
+
 @public_story_bp.route("/", methods=["POST"])
 @jwt_required()
 def create_story():
     user = me()
     media_url = None
     media_type = "text"
+    
+    # Upload media if present
     if "file" in request.files:
-        file = request.files["file"]
-        mime = file.content_type or ""
-        resource_type = "video" if "video" in mime else "image"
-        media_type = "video" if "video" in mime else "image"
-        result = cloudinary.uploader.upload(file, resource_type=resource_type, folder="kinscribe/pstories")
-        media_url = result["secure_url"]
+        media_url, media_type = _upload_public_story_media(request.files["file"])
+    
     data = request.form if request.files else request.get_json(force=True, silent=True) or {}
 
-    # Parse music — sent as JSON string from the app
-    music_name = None
-    music_artist = None
-    music_artwork = None
-    music_url = None
-    music_raw = data.get("music")
-    if music_raw:
-        try:
-            import json as _json
-            m = _json.loads(music_raw) if isinstance(music_raw, str) else music_raw
-            music_name = m.get("title") or m.get("music_name")
-            music_artist = m.get("artist") or m.get("music_artist")
-            music_artwork = m.get("cover") or m.get("artwork")
-            music_url = m.get("stream_url") or m.get("music_url") or m.get("url")
-        except Exception:
-            music_name = str(music_raw)
+    # Parse music data
+    music_name, music_artist, music_artwork, music_url = _parse_music_data(data.get("music"))
 
+    # Create story
     story = PublicStory(
         media_url=media_url,
         media_type=media_type if media_url else "text",
@@ -73,26 +112,7 @@ def create_story():
     db.session.commit()
 
     # Notify mentioned users
-    sticker_raw = data.get("sticker_data")
-    if sticker_raw:
-        try:
-            import json as _json
-            from models.notifications import Notification
-            stickers = _json.loads(sticker_raw) if isinstance(sticker_raw, str) else sticker_raw
-            for sticker in stickers:
-                if sticker.get("type") == "mention":
-                    mentioned_id = sticker.get("user_id")
-                    if mentioned_id and mentioned_id != user.id:
-                        db.session.add(Notification(
-                            user_id=mentioned_id,
-                            from_user_id=user.id,
-                            type="story_mention",
-                            title=f"{user.name} mentioned you in their story",
-                            message="Tap to view the story",
-                        ))
-            db.session.commit()
-        except Exception:
-            pass
+    _notify_mentioned_users(user, story.id, data.get("sticker_data"))
 
     return jsonify({"story": story.to_dict(user.id)}), 201
 
@@ -110,7 +130,7 @@ def story_feed():
     stories = PublicStory.query.filter(
         PublicStory.user_id.in_(candidate_ids),
         PublicStory.expires_at > now,
-        (PublicStory.is_moment == False) | (PublicStory.is_moment == None),  # exclude family-only moments
+        (PublicStory.is_moment == False) | (PublicStory.is_moment.is_(None)),  # exclude family-only moments
     ).order_by(PublicStory.created_at.desc()).all()
 
     by_user = {}
@@ -293,7 +313,7 @@ def family_moments(family_id):
     now = datetime.utcnow()
     moments = PublicStory.query.filter(
         PublicStory.family_id == family_id,
-        PublicStory.is_moment == True,
+        PublicStory.is_moment.is_(True),
         PublicStory.expires_at > now,
     ).order_by(PublicStory.created_at.desc()).all()
     return jsonify({"moments": [m.to_dict(current_id) for m in moments]})

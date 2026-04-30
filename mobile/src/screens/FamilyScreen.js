@@ -50,6 +50,7 @@ function FamilyFeedTab({ navigation, myRole, familyId, familyName }) {
   const { t } = useTranslation();
   const [stories, setStories] = useState([]);
   const [announcements, setAnnouncements] = useState([]);
+  const [highlights, setHighlights] = useState([]);
   const [loading, setLoading] = useState(true);
   const [viewer, setViewer] = useState(null);
   const [comments, setComments] = useState([]);
@@ -65,10 +66,12 @@ function FamilyFeedTab({ navigation, myRole, familyId, familyName }) {
       api.get('/stories/feed').catch(() => ({ data: { stories: [] } })),
       api.get('/family/announcements').catch(() => ({ data: { announcements: [] } })),
       familyId ? api.get(`/pstories/family/${familyId}/moments`).catch(() => ({ data: { moments: [] } })) : Promise.resolve({ data: { moments: [] } }),
-    ]).then(([storiesRes, annRes, momentsRes]) => {
+      familyId ? api.get(`/stories/family/${familyId}/highlights`).catch(() => ({ data: { stories: [] } })) : Promise.resolve({ data: { stories: [] } }),
+    ]).then(([storiesRes, annRes, momentsRes, highlightsRes]) => {
       setStories(storiesRes.data.stories || []);
       setAnnouncements(annRes.data.announcements || []);
       setMoments(momentsRes.data.moments || []);
+      setHighlights(highlightsRes.data.stories || []);
     }).finally(() => setLoading(false));
   };
 
@@ -103,6 +106,26 @@ function FamilyFeedTab({ navigation, myRole, familyId, familyName }) {
         } catch { Alert.alert('Error', 'Could not delete story'); }
       }},
     ]);
+  };
+
+  const toggleArchive = async (story) => {
+    const wasArchived = story.is_archived;
+    setStories(prev => prev.map(s => s.id === story.id ? { ...s, is_archived: !wasArchived } : s));
+    try {
+      await api.post(`/stories/${story.id}/archive`);
+    } catch {
+      setStories(prev => prev.map(s => s.id === story.id ? { ...s, is_archived: wasArchived } : s));
+    }
+  };
+
+  const toggleHighlight = async (story) => {
+    const wasHighlighted = story.is_highlighted;
+    setStories(prev => prev.map(s => s.id === story.id ? { ...s, is_highlighted: !wasHighlighted } : s));
+    try {
+      await api.post(`/stories/${story.id}/highlight`);
+    } catch {
+      setStories(prev => prev.map(s => s.id === story.id ? { ...s, is_highlighted: wasHighlighted } : s));
+    }
   };
 
   const openComments = async (storyId) => {
@@ -202,6 +225,49 @@ function FamilyFeedTab({ navigation, myRole, familyId, familyName }) {
       </View>
 
       <View style={{ padding: 16 }}>
+      {/* Family Highlights */}
+      {highlights.length > 0 && (
+        <View style={{ marginBottom: 16 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+            <Ionicons name="star" size={16} color="#7c3aed" />
+            <AppText style={ft.sectionLabel}>Family Highlights</AppText>
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
+            {highlights.map(h => (
+              <TouchableOpacity
+                key={h.id}
+                style={ft.highlightCard}
+                onPress={() => setViewer(h)}
+                activeOpacity={0.85}
+              >
+                <LinearGradient colors={['rgba(124,58,237,0.2)', 'rgba(59,130,246,0.1)']} style={StyleSheet.absoluteFill} />
+                {h.media_url && h.media_type === 'image' && (
+                  <Image source={{ uri: h.media_url }} style={ft.highlightThumb} resizeMode="cover" />
+                )}
+                {h.media_url && h.media_type === 'video' && (
+                  <View style={ft.highlightThumb}>
+                    <LinearGradient colors={['rgba(124,58,237,0.4)', 'rgba(59,130,246,0.3)']} style={StyleSheet.absoluteFill} />
+                    <Ionicons name="play-circle" size={32} color="#fff" />
+                  </View>
+                )}
+                {!h.media_url && (
+                  <View style={[ft.highlightThumb, { backgroundColor: 'rgba(124,58,237,0.15)', alignItems: 'center', justifyContent: 'center' }]}>
+                    <Ionicons name="document-text-outline" size={32} color="#7c3aed" />
+                  </View>
+                )}
+                <View style={ft.highlightInfo}>
+                  <AppText style={ft.highlightTitle} numberOfLines={2}>{h.title}</AppText>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                    <Avatar uri={h.author_avatar} name={h.author_name} size={16} />
+                    <AppText style={ft.highlightAuthor} numberOfLines={1}>{h.author_name}</AppText>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
       {/* Announcements */}
       {announcements.length > 0 && (
         <View style={{ marginBottom: 16 }}>
@@ -228,6 +294,23 @@ function FamilyFeedTab({ navigation, myRole, familyId, familyName }) {
         </View>
       ) : stories.map(story => (
         <View key={story.id} style={ft.card}>
+          {/* Badges for archived/highlighted */}
+          {(story.is_archived || story.is_highlighted) && (
+            <View style={ft.badgesRow}>
+              {story.is_archived && (
+                <View style={ft.archivedBadge}>
+                  <Ionicons name="archive" size={11} color="#f59e0b" />
+                  <AppText style={ft.archivedBadgeText}>Archived</AppText>
+                </View>
+              )}
+              {story.is_highlighted && (
+                <View style={ft.highlightedBadge}>
+                  <Ionicons name="star" size={11} color="#7c3aed" />
+                  <AppText style={ft.highlightedBadgeText}>Highlighted</AppText>
+                </View>
+              )}
+            </View>
+          )}
           {/* Header */}
           <View style={ft.cardHeader}>
             <TouchableOpacity onPress={() => navigation.navigate('UserProfile', { userId: story.user_id, userName: story.author_name })}>
@@ -261,7 +344,7 @@ function FamilyFeedTab({ navigation, myRole, familyId, familyName }) {
             </TouchableOpacity>
           )}
 
-          {/* Actions — like & comment only, NO share */}
+          {/* Actions — like, comment, archive, highlight */}
           <View style={ft.actions}>
             <TouchableOpacity style={ft.actionItem} onPress={() => toggleLike(story)}>
               <Ionicons
@@ -277,6 +360,26 @@ function FamilyFeedTab({ navigation, myRole, familyId, familyName }) {
               <Ionicons name="chatbubble-outline" size={20} color={colors.muted} />
               <AppText style={ft.actionText}>{story.comment_count || 0}</AppText>
             </TouchableOpacity>
+            {/* Archive — owner only */}
+            {story.user_id === user?.id && (
+              <TouchableOpacity style={ft.actionItem} onPress={() => toggleArchive(story)}>
+                <Ionicons
+                  name={story.is_archived ? 'archive' : 'archive-outline'}
+                  size={20}
+                  color={story.is_archived ? '#f59e0b' : colors.muted}
+                />
+              </TouchableOpacity>
+            )}
+            {/* Highlight — owner or admin */}
+            {(story.user_id === user?.id || myRole === 'admin') && (
+              <TouchableOpacity style={ft.actionItem} onPress={() => toggleHighlight(story)}>
+                <Ionicons
+                  name={story.is_highlighted ? 'star' : 'star-outline'}
+                  size={20}
+                  color={story.is_highlighted ? '#7c3aed' : colors.muted}
+                />
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       ))}
@@ -372,15 +475,26 @@ const ft = StyleSheet.create({
   hexWrap: { position: 'relative', width: 62, height: 62, alignItems: 'center', justifyContent: 'center' },
   plusBadge: { position: 'absolute', bottom: 0, right: 0, width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.bg },
   storyLabel: { fontSize: 11, textAlign: 'center', maxWidth: 66, marginTop: 5, fontWeight: '500' },
+  // Highlights
+  highlightCard: { width: 180, borderRadius: radius.lg, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(124,58,237,0.3)' },
+  highlightThumb: { width: '100%', height: 100, backgroundColor: 'rgba(30,41,59,0.8)', alignItems: 'center', justifyContent: 'center' },
+  highlightInfo: { padding: 10 },
+  highlightTitle: { fontSize: 13, fontWeight: '700', color: colors.text, lineHeight: 17 },
+  highlightAuthor: { fontSize: 11, color: colors.muted, flex: 1 },
   // Feed
   empty: { alignItems: 'center', marginTop: 60, gap: 10 },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: colors.text },
   emptySub: { fontSize: 14, color: colors.muted },
-  sectionLabel: { fontSize: 11, fontWeight: '700', color: colors.muted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 },
+  sectionLabel: { fontSize: 11, fontWeight: '700', color: colors.muted, textTransform: 'uppercase', letterSpacing: 0.8 },
   announcementCard: { borderRadius: radius.md, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(245,158,11,0.3)', padding: 14, marginBottom: 10 },
   announcementTitle: { fontSize: 14, fontWeight: '700', color: '#f59e0b', flex: 1 },
   announcementContent: { fontSize: 13, color: colors.text, lineHeight: 18, marginBottom: 6 },
   card: { backgroundColor: colors.bgSecondary, borderRadius: radius.lg, padding: 16, marginBottom: 12, borderWidth: 0.5, borderColor: colors.border },
+  badgesRow: { flexDirection: 'row', gap: 6, marginBottom: 10 },
+  archivedBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(245,158,11,0.15)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(245,158,11,0.3)' },
+  archivedBadgeText: { fontSize: 10, color: '#f59e0b', fontWeight: '700' },
+  highlightedBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(124,58,237,0.15)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(124,58,237,0.3)' },
+  highlightedBadgeText: { fontSize: 10, color: '#7c3aed', fontWeight: '700' },
   cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
   authorName: { fontSize: 14, fontWeight: '700', color: colors.text },
   time: { fontSize: 12, color: colors.muted },
