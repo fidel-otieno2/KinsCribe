@@ -1,352 +1,760 @@
-import os
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from extensions import db
 from models.user import User
 from models.story import Story
-from services.ai_service import chat_completion
+from models.extras import Storybook
+import os
+import openai
+import cloudinary
+import cloudinary.uploader
 
 ai_bp = Blueprint("ai", __name__)
 
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
-@ai_bp.route("/test", methods=["GET"])
-def test_ai():
-    try:
-        result = chat_completion("Say hello in one word")
-        return jsonify({"status": "ok", "response": result})
-    except Exception as e:
-        return jsonify({"status": "error", "error": str(e)}), 500
+cloudinary.config(
+    cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
+    api_key=os.getenv("CLOUDINARY_API_KEY"),
+    api_secret=os.getenv("CLOUDINARY_API_SECRET")
+)
 
 
-def current_user():
+def me():
     return User.query.get(int(get_jwt_identity()))
 
 
-@ai_bp.route("/chat", methods=["POST"])
+# ============ AI STORY ENHANCER ============
+
+@ai_bp.route("/enhance-story", methods=["POST"])
 @jwt_required()
-def family_chat():
-    user = current_user()
-    if not user:
-        return jsonify({"response": "User not found."}), 404
-
+def enhance_story():
+    """
+    AI rewrites rough text into rich narrative.
+    User approves before publishing.
+    """
+    user = me()
     data = request.json or {}
-    message = data.get("message", "").strip()
-    history = data.get("history", [])
-    if not message:
-        return jsonify({"response": "Please type a message!"}), 400
-
+    
+    original_text = data.get("text", "").strip()
+    context = data.get("context", {})  # Optional: date, location, people involved
+    
+    if not original_text:
+        return jsonify({"error": "Text is required"}), 400
+    
     try:
-        response = chat_completion(message, history=history, user_name=user.name)
-        return jsonify({"response": response})
-    except Exception as e:
-        print(f"AI chat error: {e}")
-        return jsonify({"response": "Sorry, I had trouble processing that. Please try again!"}), 500
-
-
-@ai_bp.route("/family-chat", methods=["POST"])
-@jwt_required()
-def family_ai_chat():
-    """Family-focused AI — relationships, parenting, social dynamics, traditions, conflict, love."""
-    user = current_user()
-    if not user:
-        return jsonify({"response": "User not found."}), 404
-
-    data = request.json or {}
-    message = data.get("message", "").strip()
-    history = data.get("history", [])
-    if not message:
-        return jsonify({"response": "Please type a message!"}), 400
-
-    system = (
-        "You are KinsCribe Family AI — a deeply empathetic, wise, and warm AI companion "
-        "built specifically for families, relationships, and social life. "
-        "You are like a trusted family counsellor, a wise elder, a best friend, and a life coach all in one. "
-        "You speak with warmth, depth, and emotional intelligence. "
-        "\n\nYou are an expert in ALL of the following areas and can go very deep on any of them:\n"
-        "- Family dynamics: parent-child relationships, sibling bonds, blended families, extended family, in-laws\n"
-        "- Marriage & romantic relationships: love languages, communication, conflict resolution, intimacy, trust\n"
-        "- Parenting: raising children, discipline, emotional development, teen years, adult children\n"
-        "- Friendship: making friends, keeping friends, toxic friendships, social anxiety, loneliness\n"
-        "- Social skills: communication, body language, confidence, networking, first impressions\n"
-        "- Grief & loss: losing a loved one, divorce, breakups, estrangement, healing\n"
-        "- Mental health in families: anxiety, depression, trauma, generational patterns, therapy\n"
-        "- Cultural & generational differences: traditions, values, identity, diaspora families\n"
-        "- Family finances: money conversations, financial stress, supporting relatives, inheritance\n"
-        "- Family traditions & memories: preserving stories, creating rituals, legacy building\n"
-        "- Conflict resolution: arguments, forgiveness, setting boundaries, difficult conversations\n"
-        "- Social media & family: digital boundaries, online relationships, family privacy\n"
-        "- Life transitions: moving, marriage, divorce, new baby, empty nest, aging parents\n"
-        "- Community & belonging: finding your tribe, cultural identity, social circles\n"
-        "\nAlways format responses with **bold** for key points, bullet points for lists, and warm conversational language. "
-        "Be real, honest, and never preachy. Give practical advice, not just theory. "
-        "If someone is in crisis, always encourage professional help while still being supportive. "
-        "Only mention KinsCribe if the user asks."
-    )
-
-    if user.name:
-        system += f" You are speaking with {user.name}."
-
-    messages = [{"role": "system", "content": system}]
-    if history:
-        messages.extend(history)
-    messages.append({"role": "user", "content": message})
-
-    try:
-        from groq import Groq
-        client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-        response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=messages,
-            max_tokens=1200,
-            temperature=0.75
+        # Build context prompt
+        context_parts = []
+        if context.get("date"):
+            context_parts.append(f"Date: {context['date']}")
+        if context.get("location"):
+            context_parts.append(f"Location: {context['location']}")
+        if context.get("people"):
+            context_parts.append(f"People involved: {', '.join(context['people'])}")
+        
+        context_str = "\n".join(context_parts) if context_parts else ""
+        
+        # Call OpenAI
+        response = openai.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a family storytelling assistant. Your job is to take rough, "
+                        "informal text (like voice notes or short captions) and transform them "
+                        "into beautiful, readable narratives. Keep all the facts and emotions, "
+                        "but improve grammar, structure, and flow. Make it warm and personal. "
+                        "Preserve the original voice and tone. Don't add facts that weren't mentioned."
+                    )
+                },
+                {
+                    "role": "user",
+                    "content": f"Original text:\n{original_text}\n\n{context_str}\n\nPlease enhance this into a beautiful family story."
+                }
+            ],
+            temperature=0.7,
+            max_tokens=1000
         )
-        return jsonify({"response": response.choices[0].message.content.strip()})
+        
+        enhanced_text = response.choices[0].message.content.strip()
+        
+        # Generate a title suggestion
+        title_response = openai.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "Generate a short, meaningful title (3-6 words) for this family story."
+                },
+                {
+                    "role": "user",
+                    "content": enhanced_text
+                }
+            ],
+            temperature=0.7,
+            max_tokens=50
+        )
+        
+        suggested_title = title_response.choices[0].message.content.strip().strip('"')
+        
+        return jsonify({
+            "original": original_text,
+            "enhanced": enhanced_text,
+            "suggested_title": suggested_title,
+            "improvements": {
+                "word_count_before": len(original_text.split()),
+                "word_count_after": len(enhanced_text.split()),
+            }
+        })
+        
     except Exception as e:
-        print(f"Family AI error: {e}")
-        return jsonify({"response": "Sorry, I'm having trouble right now. Please try again!"}), 500
+        print(f"AI enhancement error: {e}")
+        return jsonify({"error": f"Enhancement failed: {str(e)}"}), 500
 
 
-@ai_bp.route("/story-idea", methods=["POST"])
+@ai_bp.route("/enhance-story-batch", methods=["POST"])
 @jwt_required()
-def generate_story_idea():
-    user = current_user()
-    theme = (request.json or {}).get("theme", "family memory")
-    prompt = f"""Generate a story idea for {user.name}'s family about '{theme}'.
-Make it emotional, personal, and family-focused. Include:
-1. Title
-2. Suggested story date
-3. Who should tell it
-4. Key memory points
-
-Format as bullet points."""
-    return jsonify({"idea": chat_completion(prompt)})
-
-
-@ai_bp.route("/summary", methods=["POST"])
-@jwt_required()
-def generate_summary():
-    content = (request.json or {}).get("content", "")
-    prompt = f"Summarize this family story in 2-3 emotional sentences:\n\n{content}"
-    return jsonify({"summary": chat_completion(prompt)})
-
-
-@ai_bp.route("/smart-replies", methods=["POST"])
-@jwt_required()
-def smart_replies():
-    """Generate 3 smart reply suggestions for a message."""
-    message = (request.json or {}).get("message", "").strip()
-    if not message:
-        return jsonify({"replies": []})
-    prompt = f"""Generate exactly 3 short, natural reply suggestions for this message: "{message}"
-Return only the 3 replies as a JSON array of strings, nothing else. Example: ["Sure!", "Sounds good", "Let me check"]"""
-    try:
-        import json as _json
-        raw = chat_completion(prompt)
-        replies = _json.loads(raw)
-        if isinstance(replies, list):
-            return jsonify({"replies": replies[:3]})
-    except Exception:
-        pass
-    return jsonify({"replies": ["Sure!", "Sounds good!", "Let me think about it"]})
-
-
-@ai_bp.route("/tone-check", methods=["POST"])
-@jwt_required()
-def tone_check():
-    """Check the tone and sentiment of a post caption before publishing."""
-    text = (request.json or {}).get("text", "").strip()
-    if not text:
-        return jsonify({"tone": "neutral", "score": 5, "suggestion": ""})
-    prompt = f"""Analyse the tone and sentiment of this social media post caption:
-"{text}"
-
-Respond with a JSON object with these exact keys:
-- tone: one of positive/negative/neutral/aggressive/sad/inspiring/funny
-- score: integer 1-10 (10 = very positive)
-- suggestion: one short sentence improvement tip if needed, or empty string if it's fine
-
-Return only the JSON object."""
-    try:
-        import json as _json
-        raw = chat_completion(prompt)
-        result = _json.loads(raw)
-        return jsonify(result)
-    except Exception:
-        return jsonify({"tone": "neutral", "score": 5, "suggestion": ""})
-
-
-@ai_bp.route("/caption", methods=["POST"])
-@jwt_required()
-def generate_caption():
+def enhance_story_batch():
+    """Enhance multiple stories at once"""
+    user = me()
     data = request.json or {}
-    context = data.get("context", "").strip()
-    tone = data.get("tone", "warm")
-    length = data.get("length", "medium")  # short | medium | long
-    emoji = data.get("emoji", "minimal")   # none | minimal | heavy
-    count = int(data.get("count", 1))
-    if not context:
-        return jsonify({"captions": [], "caption": ""}), 400
-
-    length_guide = {"short": "1 line, under 80 chars", "medium": "2-3 lines, under 150 chars", "long": "3-5 lines, storytelling style"}.get(length, "under 150 chars")
-    emoji_guide = {"none": "no emojis at all", "minimal": "1-2 emojis max", "heavy": "lots of emojis, expressive"}.get(emoji, "1-2 emojis")
-    tone_guide = {
-        "warm": "warm, loving, heartfelt",
-        "funny": "funny, witty, makes people laugh",
-        "deep": "deep, thoughtful, philosophical",
-        "romantic": "romantic, soft, loving",
-        "savage": "savage, bold, no filter",
-        "professional": "professional, clean, polished",
-        "inspiring": "inspiring, uplifting, motivating",
-        "nostalgic": "nostalgic, throwback, sentimental",
-        "aesthetic": "aesthetic, dreamy, artsy vibes",
-        "humble": "humble, grateful, down to earth",
-        "bold": "bold, confident, powerful",
-        "mysterious": "mysterious, cryptic, intriguing",
-        "grateful": "grateful, appreciative, blessed",
-        "sarcastic": "sarcastic, dry humor, ironic",
-        "motivational": "motivational, hustle, push harder",
-        "chill": "chill, relaxed, laid back",
-        "dramatic": "dramatic, over the top, theatrical",
-        "poetic": "poetic, lyrical, beautiful language",
-        "family": "family-focused, warm, inclusive",
-        "travel": "travel, adventure, wanderlust",
-        "foodie": "foodie, delicious, mouth-watering",
-    }.get(tone, tone)
-
-    prompt = f"""You are a creative social media caption writer.
-Content: {context}
-Tone: {tone_guide}
-Length: {length_guide}
-Emoji style: {emoji_guide}
-
-Write exactly {count} different caption options. Each must feel unique — vary the angle, energy, and style.
-Return ONLY a JSON array of {count} strings. No explanation, no numbering, just the array.
-Example format: ["caption 1", "caption 2"]"""
-    try:
-        import json as _json
-        raw = chat_completion(prompt)
-        # Try to parse as JSON array
-        captions = _json.loads(raw)
-        if isinstance(captions, list):
-            captions = [c.strip().strip('"') for c in captions if c][:count]
-        else:
-            captions = [str(captions).strip()]
-        return jsonify({"captions": captions, "caption": captions[0] if captions else ""})
-    except Exception:
-        # Fallback: split by newlines
-        lines = [l.strip().lstrip('0123456789.-) ') for l in raw.split('\n') if l.strip()]
-        captions = [l for l in lines if len(l) > 10][:count]
-        return jsonify({"captions": captions, "caption": captions[0] if captions else ""})
+    story_ids = data.get("story_ids", [])
+    
+    if not story_ids:
+        return jsonify({"error": "story_ids required"}), 400
+    
+    results = []
+    for story_id in story_ids:
+        story = Story.query.get(story_id)
+        if not story or story.user_id != user.id:
+            continue
+        
+        if story.ai_processed:
+            results.append({"story_id": story_id, "status": "already_enhanced"})
+            continue
+        
+        try:
+            response = openai.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "Enhance this family story. Keep facts, improve readability."
+                    },
+                    {
+                        "role": "user",
+                        "content": story.content or story.transcript or ""
+                    }
+                ],
+                temperature=0.7,
+                max_tokens=1000
+            )
+            
+            enhanced = response.choices[0].message.content.strip()
+            story.enhanced_text = enhanced
+            story.ai_processed = True
+            db.session.commit()
+            
+            results.append({"story_id": story_id, "status": "enhanced"})
+        except Exception as e:
+            results.append({"story_id": story_id, "status": "failed", "error": str(e)})
+    
+    return jsonify({"results": results})
 
 
-@ai_bp.route("/hashtags", methods=["POST"])
+# ============ VOICE-TO-STORY ============
+
+@ai_bp.route("/voice-to-story", methods=["POST"])
 @jwt_required()
-def generate_hashtags():
-    data = request.json or {}
-    caption = data.get("caption", "").strip()
-    location = data.get("location", "").strip()
-    tone = data.get("tone", "warm")
-    count = min(int(data.get("count", 10)), 30)
-    if not caption:
-        return jsonify({"hashtags": []}), 400
-
-    location_hint = f" Location: {location}." if location else ""
-    prompt = f"""You are a social media hashtag expert.
-Caption: "{caption}"
-Tone: {tone}{location_hint}
-
-Generate {count} hashtags. Categorize each as: trending, location, niche, community, or personal.
-Rate each as: high, medium, or low (reach potential).
-
-Return ONLY a JSON array. Each item must have: tag, category, level.
-Example:
-[
-  {{"tag": "#NairobiVibes", "category": "location", "level": "high"}},
-  {{"tag": "#ChillMoments", "category": "niche", "level": "medium"}}
-]
-No explanation. Just the JSON array."""
+def voice_to_story():
+    """
+    Transcribe voice memo, structure into story with title and paragraphs.
+    Suggest matching photo from gallery.
+    """
+    user = me()
+    
+    if "audio" not in request.files:
+        return jsonify({"error": "Audio file required"}), 400
+    
+    audio_file = request.files["audio"]
+    
     try:
-        import json as _json
-        raw = chat_completion(prompt)
-        # Strip markdown code blocks if present
-        raw = raw.strip().strip('`')
-        if raw.startswith('json'):
-            raw = raw[4:].strip()
-        hashtags = _json.loads(raw)
-        if isinstance(hashtags, list):
-            # Validate structure
-            result = []
-            for h in hashtags:
-                if isinstance(h, dict) and 'tag' in h:
-                    tag = h['tag'] if h['tag'].startswith('#') else f"#{h['tag']}"
-                    result.append({
-                        'tag': tag,
-                        'category': h.get('category', 'niche'),
-                        'level': h.get('level', 'medium'),
+        # Upload audio to Cloudinary
+        audio_result = cloudinary.uploader.upload(
+            audio_file,
+            resource_type="raw",
+            folder="kinscribe/audio"
+        )
+        audio_url = audio_result["secure_url"]
+        
+        # Transcribe with OpenAI Whisper
+        audio_file.seek(0)  # Reset file pointer
+        transcript = openai.audio.transcriptions.create(
+            model="whisper-1",
+            file=audio_file,
+            language="en"
+        )
+        
+        transcribed_text = transcript.text
+        
+        # Structure into story
+        story_response = openai.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a family storytelling assistant. Take this transcribed voice memo "
+                        "and structure it into a beautiful story with:\n"
+                        "1. A meaningful title (3-6 words)\n"
+                        "2. Well-structured paragraphs\n"
+                        "3. Proper grammar and punctuation\n"
+                        "4. Preserved emotions and personal voice\n\n"
+                        "Format your response as JSON:\n"
+                        "{\n"
+                        '  "title": "Story Title",\n'
+                        '  "content": "Structured story with paragraphs...",\n'
+                        '  "summary": "One sentence summary",\n'
+                        '  "suggested_tags": ["tag1", "tag2"],\n'
+                        '  "key_people": ["person1", "person2"],\n'
+                        '  "key_locations": ["location1"],\n'
+                        '  "estimated_date": "YYYY-MM-DD or null"\n'
+                        "}"
+                    )
+                },
+                {
+                    "role": "user",
+                    "content": f"Transcribed voice memo:\n\n{transcribed_text}"
+                }
+            ],
+            temperature=0.7,
+            response_format={"type": "json_object"}
+        )
+        
+        story_data = eval(story_response.choices[0].message.content)
+        
+        return jsonify({
+            "audio_url": audio_url,
+            "transcript": transcribed_text,
+            "title": story_data.get("title"),
+            "content": story_data.get("content"),
+            "summary": story_data.get("summary"),
+            "suggested_tags": story_data.get("suggested_tags", []),
+            "key_people": story_data.get("key_people", []),
+            "key_locations": story_data.get("key_locations", []),
+            "estimated_date": story_data.get("estimated_date"),
+        })
+        
+    except Exception as e:
+        print(f"Voice-to-story error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"Processing failed: {str(e)}"}), 500
+
+
+# ============ AI "ASK THE FAMILY" ============
+
+@ai_bp.route("/ask-family", methods=["POST"])
+@jwt_required()
+def ask_family():
+    """
+    Chat interface that answers questions about family using stories as context.
+    Returns relevant story with quote and link.
+    """
+    user = me()
+    data = request.json or {}
+    question = data.get("question", "").strip()
+    
+    if not question:
+        return jsonify({"error": "Question is required"}), 400
+    
+    try:
+        # Get all family stories as context
+        stories = Story.query.filter_by(family_id=user.family_id).order_by(
+            Story.story_date.desc().nullslast()
+        ).limit(100).all()
+        
+        if not stories:
+            return jsonify({
+                "answer": "I don't have any family stories to search through yet. Start adding stories to build your family history!",
+                "relevant_stories": []
+            })
+        
+        # Build context from stories
+        context_stories = []
+        for story in stories:
+            story_text = story.enhanced_text or story.content or story.transcript or ""
+            if story_text:
+                context_stories.append({
+                    "id": story.id,
+                    "title": story.title,
+                    "date": str(story.story_date) if story.story_date else "Unknown date",
+                    "location": story.location or "Unknown location",
+                    "author": story.author.name if story.author else "Unknown",
+                    "content": story_text[:500]  # Limit context size
+                })
+        
+        # Create context string
+        context_str = "\n\n".join([
+            f"Story {i+1}: {s['title']}\n"
+            f"Date: {s['date']}\n"
+            f"Location: {s['location']}\n"
+            f"By: {s['author']}\n"
+            f"Content: {s['content']}"
+            for i, s in enumerate(context_stories[:20])  # Limit to 20 stories
+        ])
+        
+        # Ask AI
+        response = openai.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a family historian assistant. Answer questions about the family "
+                        "using ONLY the information from the provided stories. If you find relevant "
+                        "information, quote it directly and mention which story it's from. "
+                        "If you can't find the answer in the stories, say so honestly. "
+                        "Be warm, personal, and conversational.\n\n"
+                        "Format your response as JSON:\n"
+                        "{\n"
+                        '  "answer": "Your conversational answer",\n'
+                        '  "relevant_story_ids": [1, 2],\n'
+                        '  "quotes": ["Quote from story 1", "Quote from story 2"],\n'
+                        '  "confidence": "high|medium|low"\n'
+                        "}"
+                    )
+                },
+                {
+                    "role": "user",
+                    "content": f"Family Stories:\n\n{context_str}\n\nQuestion: {question}"
+                }
+            ],
+            temperature=0.7,
+            response_format={"type": "json_object"}
+        )
+        
+        ai_response = eval(response.choices[0].message.content)
+        
+        # Get full story details for relevant stories
+        relevant_story_ids = ai_response.get("relevant_story_ids", [])
+        relevant_stories = []
+        for story_id in relevant_story_ids:
+            story = Story.query.get(story_id)
+            if story:
+                relevant_stories.append({
+                    "id": story.id,
+                    "title": story.title,
+                    "date": str(story.story_date) if story.story_date else None,
+                    "location": story.location,
+                    "author_name": story.author.name if story.author else None,
+                    "media_url": story.media_url,
+                })
+        
+        return jsonify({
+            "question": question,
+            "answer": ai_response.get("answer"),
+            "quotes": ai_response.get("quotes", []),
+            "confidence": ai_response.get("confidence", "medium"),
+            "relevant_stories": relevant_stories,
+        })
+        
+    except Exception as e:
+        print(f"Ask family error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"Failed to answer question: {str(e)}"}), 500
+
+
+@ai_bp.route("/ask-family/suggestions", methods=["GET"])
+@jwt_required()
+def ask_family_suggestions():
+    """Generate suggested questions based on family stories"""
+    user = me()
+    
+    try:
+        stories = Story.query.filter_by(family_id=user.family_id).limit(50).all()
+        
+        if not stories:
+            return jsonify({"suggestions": [
+                "Tell me about our family history",
+                "What are some memorable family events?",
+                "Who are the oldest family members?",
+            ]})
+        
+        # Extract themes from stories
+        titles = [s.title for s in stories[:20]]
+        locations = list(set([s.location for s in stories if s.location]))[:10]
+        
+        response = openai.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "Generate 5 interesting questions someone might ask about their family "
+                        "based on these story titles and locations. Make them specific and engaging."
+                    )
+                },
+                {
+                    "role": "user",
+                    "content": f"Story titles: {', '.join(titles)}\nLocations: {', '.join(locations)}"
+                }
+            ],
+            temperature=0.8,
+        )
+        
+        suggestions_text = response.choices[0].message.content
+        suggestions = [line.strip().strip('123456789.-) ') for line in suggestions_text.split('\n') if line.strip()]
+        
+        return jsonify({"suggestions": suggestions[:5]})
+        
+    except Exception as e:
+        return jsonify({"suggestions": [
+            "Where did grandma grow up?",
+            "What was our family like in the 1980s?",
+            "Tell me about family vacations",
+            "What are some funny family stories?",
+            "Who are the important people in our family?",
+        ]})
+
+
+# ============ AUTO MEMORY BOOK GENERATOR ============
+
+@ai_bp.route("/generate-memory-book", methods=["POST"])
+@jwt_required()
+def generate_memory_book():
+    """
+    AI collects all stories, photos, and milestones into a formatted PDF memory book.
+    Can be triggered annually or on demand.
+    """
+    user = me()
+    data = request.json or {}
+    
+    year = data.get("year")
+    title = data.get("title", f"{year or 'Family'} Memory Book")
+    include_photos = data.get("include_photos", True)
+    
+    try:
+        # Get stories for the year (or all stories)
+        query = Story.query.filter_by(family_id=user.family_id)
+        
+        if year:
+            from sqlalchemy import extract
+            query = query.filter(extract('year', Story.story_date) == year)
+        
+        stories = query.order_by(Story.story_date.asc().nullslast()).all()
+        
+        if not stories:
+            return jsonify({"error": "No stories found for this period"}), 404
+        
+        # AI curates and organizes stories
+        story_summaries = []
+        for story in stories:
+            story_summaries.append({
+                "title": story.title,
+                "date": str(story.story_date) if story.story_date else "Unknown",
+                "content": (story.enhanced_text or story.content or story.transcript or "")[:300],
+                "location": story.location,
+                "author": story.author.name if story.author else "Unknown",
+            })
+        
+        # Ask AI to organize into chapters
+        response = openai.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are creating a family memory book. Organize these stories into "
+                        "meaningful chapters (e.g., 'Family Gatherings', 'Vacations', 'Milestones'). "
+                        "Write a beautiful introduction and chapter descriptions. "
+                        "Format as JSON:\n"
+                        "{\n"
+                        '  "introduction": "Warm introduction text",\n'
+                        '  "chapters": [\n'
+                        '    {\n'
+                        '      "title": "Chapter Title",\n'
+                        '      "description": "Chapter description",\n'
+                        '      "story_indices": [0, 1, 2]\n'
+                        '    }\n'
+                        '  ],\n'
+                        '  "conclusion": "Closing thoughts"\n'
+                        "}"
+                    )
+                },
+                {
+                    "role": "user",
+                    "content": f"Book title: {title}\n\nStories:\n" + 
+                               "\n\n".join([f"{i}. {s['title']} ({s['date']})" for i, s in enumerate(story_summaries)])
+                }
+            ],
+            temperature=0.7,
+            response_format={"type": "json_object"}
+        )
+        
+        book_structure = eval(response.choices[0].message.content)
+        
+        # Create storybook entry
+        story_ids = [str(s.id) for s in stories]
+        
+        # Compile content
+        compiled_content = f"# {title}\n\n"
+        compiled_content += f"{book_structure.get('introduction', '')}\n\n"
+        
+        for chapter in book_structure.get('chapters', []):
+            compiled_content += f"## {chapter['title']}\n\n"
+            compiled_content += f"{chapter['description']}\n\n"
+            
+            for idx in chapter.get('story_indices', []):
+                if idx < len(stories):
+                    story = stories[idx]
+                    compiled_content += f"### {story.title}\n"
+                    if story.story_date:
+                        compiled_content += f"*{story.story_date}*\n\n"
+                    compiled_content += f"{story.enhanced_text or story.content or story.transcript}\n\n"
+                    compiled_content += "---\n\n"
+        
+        compiled_content += f"\n\n{book_structure.get('conclusion', '')}"
+        
+        # Create storybook
+        book = Storybook(
+            title=title,
+            description=f"AI-curated memory book for {year or 'the family'}",
+            compiled_content=compiled_content,
+            story_ids=",".join(story_ids),
+            privacy="family",
+            user_id=user.id,
+            family_id=user.family_id
+        )
+        db.session.add(book)
+        db.session.commit()
+        
+        return jsonify({
+            "storybook": book.to_dict(),
+            "chapters": book_structure.get('chapters', []),
+            "story_count": len(stories),
+            "message": f"Memory book created with {len(stories)} stories organized into {len(book_structure.get('chapters', []))} chapters"
+        }), 201
+        
+    except Exception as e:
+        print(f"Memory book generation error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"Failed to generate memory book: {str(e)}"}), 500
+
+
+# ============ DUPLICATE MEMORY DETECTOR ============
+
+@ai_bp.route("/detect-duplicates", methods=["POST"])
+@jwt_required()
+def detect_duplicates():
+    """
+    AI detects when multiple family members posted about the same event.
+    Suggests merging into one shared story.
+    """
+    user = me()
+    
+    try:
+        # Get recent stories from family
+        stories = Story.query.filter_by(family_id=user.family_id).filter(
+            Story.story_date.isnot(None)
+        ).order_by(Story.created_at.desc()).limit(100).all()
+        
+        if len(stories) < 2:
+            return jsonify({"duplicates": []})
+        
+        # Group stories by similar dates (within 7 days)
+        from datetime import timedelta
+        potential_groups = []
+        
+        for i, story1 in enumerate(stories):
+            for story2 in stories[i+1:]:
+                if not story1.story_date or not story2.story_date:
+                    continue
+                
+                date_diff = abs((story1.story_date - story2.story_date).days)
+                
+                if date_diff <= 7 and story1.user_id != story2.user_id:
+                    potential_groups.append((story1, story2))
+        
+        # Use AI to check if they're about the same event
+        duplicates = []
+        
+        for story1, story2 in potential_groups[:10]:  # Limit to 10 checks
+            content1 = story1.enhanced_text or story1.content or story1.transcript or ""
+            content2 = story2.enhanced_text or story2.content or story2.transcript or ""
+            
+            response = openai.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "Determine if these two stories are about the same event. "
+                            "Respond with JSON: {\"is_duplicate\": true/false, \"confidence\": \"high|medium|low\", \"reason\": \"explanation\"}"
+                        )
+                    },
+                    {
+                        "role": "user",
+                        "content": f"Story 1 ({story1.title}):\n{content1[:300]}\n\nStory 2 ({story2.title}):\n{content2[:300]}"
+                    }
+                ],
+                temperature=0.3,
+                response_format={"type": "json_object"}
+            )
+            
+            result = eval(response.choices[0].message.content)
+            
+            if result.get("is_duplicate") and result.get("confidence") in ["high", "medium"]:
+                duplicates.append({
+                    "story1": {
+                        "id": story1.id,
+                        "title": story1.title,
+                        "author": story1.author.name if story1.author else None,
+                        "date": str(story1.story_date),
+                    },
+                    "story2": {
+                        "id": story2.id,
+                        "title": story2.title,
+                        "author": story2.author.name if story2.author else None,
+                        "date": str(story2.story_date),
+                    },
+                    "confidence": result.get("confidence"),
+                    "reason": result.get("reason"),
+                })
+        
+        return jsonify({"duplicates": duplicates, "count": len(duplicates)})
+        
+    except Exception as e:
+        print(f"Duplicate detection error: {e}")
+        return jsonify({"duplicates": [], "error": str(e)})
+
+
+# ============ STORY PROMPT ENGINE ============
+
+@ai_bp.route("/story-prompts", methods=["GET"])
+@jwt_required()
+def story_prompts():
+    """
+    AI generates prompts based on gaps in timeline, birthdays, anniversaries.
+    "You haven't posted about 1998 yet. What do you remember?"
+    """
+    user = me()
+    
+    try:
+        stories = Story.query.filter_by(family_id=user.family_id).all()
+        
+        # Analyze timeline gaps
+        years_covered = set()
+        for story in stories:
+            if story.story_date:
+                years_covered.add(story.story_date.year)
+        
+        current_year = datetime.utcnow().year
+        prompts = []
+        
+        # Gap-based prompts
+        for year in range(current_year - 50, current_year):
+            if year not in years_covered:
+                prompts.append({
+                    "type": "gap",
+                    "prompt": f"You haven't posted about {year} yet. What do you remember from that year?",
+                    "year": year,
+                    "priority": "medium"
+                })
+        
+        # Recent events prompt
+        from datetime import datetime, timedelta
+        last_story_date = max([s.created_at for s in stories]) if stories else None
+        if not last_story_date or (datetime.utcnow() - last_story_date).days > 30:
+            prompts.append({
+                "type": "recent",
+                "prompt": "It's been a while! What's new with the family?",
+                "priority": "high"
+            })
+        
+        # Seasonal prompts
+        month = datetime.utcnow().month
+        seasonal_prompts = {
+            12: "Share a favorite holiday memory from this season",
+            6: "What's your favorite summer memory with the family?",
+            3: "Spring is here! Any special springtime traditions?",
+            9: "Back to school season - any memorable school stories?",
+        }
+        if month in seasonal_prompts:
+            prompts.append({
+                "type": "seasonal",
+                "prompt": seasonal_prompts[month],
+                "priority": "medium"
+            })
+        
+        # Use AI to generate personalized prompts
+        if stories:
+            recent_titles = [s.title for s in stories[-10:]]
+            
+            response = openai.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "Generate 3 thoughtful prompts to encourage family storytelling based on recent stories."
+                    },
+                    {
+                        "role": "user",
+                        "content": f"Recent stories: {', '.join(recent_titles)}"
+                    }
+                ],
+                temperature=0.8,
+            )
+            
+            ai_prompts = response.choices[0].message.content.split('\n')
+            for prompt_text in ai_prompts:
+                if prompt_text.strip():
+                    prompts.append({
+                        "type": "ai_generated",
+                        "prompt": prompt_text.strip().strip('123456789.-) '),
+                        "priority": "low"
                     })
-                elif isinstance(h, str):
-                    result.append({'tag': h if h.startswith('#') else f'#{h}', 'category': 'niche', 'level': 'medium'})
-            return jsonify({"hashtags": result[:count]})
-    except Exception:
-        pass
-    # Fallback
-    return jsonify({"hashtags": [
-        {"tag": "#explore", "category": "trending", "level": "high"},
-        {"tag": "#viral", "category": "trending", "level": "high"},
-        {"tag": "#photooftheday", "category": "niche", "level": "medium"},
-        {"tag": "#lifestyle", "category": "community", "level": "medium"},
-    ]})
-
-
-@ai_bp.route("/improve", methods=["POST"])
-@jwt_required()
-def improve_post():
-    """Rewrite/improve a caption to be more engaging."""
-    caption = (request.json or {}).get("caption", "").strip()
-    if not caption:
-        return jsonify({"improved": ""}), 400
-    prompt = f"""Improve this social media caption to be more engaging, emotional, and shareable:
-"{caption}"
-Keep the same meaning and tone. Return only the improved caption, no explanation."""
-    try:
-        return jsonify({"improved": chat_completion(prompt).strip('"').strip()})
-    except Exception:
-        return jsonify({"improved": caption}), 500
-
-
-@ai_bp.route("/family-summary", methods=["POST"])
-@jwt_required()
-def family_chat_summary():
-    """Generate an AI summary of recent family chat messages."""
-    import json as _json
-    user = current_user()
-    messages = (request.json or {}).get("messages", [])
-    if not messages:
-        return jsonify({"summary": "No messages to summarise yet."})
-
-    # Build a readable transcript (last 30 messages)
-    transcript_lines = []
-    for m in messages[-30:]:
-        sender = m.get("sender_name") or "Someone"
-        text = m.get("text") or ("[media]" if m.get("media_url") else "")
-        if text:
-            transcript_lines.append(f"{sender}: {text}")
-
-    transcript = "\n".join(transcript_lines)
-    if not transcript.strip():
-        return jsonify({"summary": "No text messages to summarise."})
-
-    prompt = f"""You are KinsCribe AI, a warm family assistant.
-Here is a recent family group chat transcript:
-
-{transcript}
-
-Write a warm, friendly summary of what the family has been talking about.
-Highlight key topics, decisions, plans, or memorable moments.
-Keep it to 3-5 sentences. Be warm and personal."""
-
-    try:
-        summary = chat_completion(prompt)
-        return jsonify({"summary": summary})
+        
+        # Sort by priority
+        priority_order = {"high": 0, "medium": 1, "low": 2}
+        prompts.sort(key=lambda x: priority_order.get(x.get("priority", "low"), 2))
+        
+        return jsonify({"prompts": prompts[:10]})
+        
     except Exception as e:
-        return jsonify({"summary": "Could not generate summary right now."}), 500
+        print(f"Story prompts error: {e}")
+        return jsonify({"prompts": [
+            {"type": "default", "prompt": "Share a favorite family memory", "priority": "medium"},
+            {"type": "default", "prompt": "Tell us about a special family tradition", "priority": "medium"},
+            {"type": "default", "prompt": "What's something funny that happened recently?", "priority": "medium"},
+        ]})
+
+
+# ============ HELPER FUNCTIONS ============
+
+from datetime import datetime
+
+def _extract_metadata_from_text(text):
+    """Extract dates, locations, people from text using AI"""
+    try:
+        response = openai.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "Extract metadata from this text. Return JSON:\n"
+                        '{"dates": ["YYYY-MM-DD"], "locations": ["place"], "people": ["name"]}'
+                    )
+                },
+                {"role": "user", "content": text}
+            ],
+            temperature=0.3,
+            response_format={"type": "json_object"}
+        )
+        return eval(response.choices[0].message.content)
+    except Exception:
+        return {"dates": [], "locations": [], "people": []}

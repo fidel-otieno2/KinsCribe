@@ -541,19 +541,22 @@ def post_to_family(post_id):
         return jsonify({"error": "You are not a member of that family"}), 403
     
     # Create family story from post
-    story = Story(
-        title=f"Shared from feed",
-        content=post.caption or "",
-        media_url=post.media_url,
-        media_type=post.media_type,
-        music_url=post.music_stream_url,
-        music_name=post.music_title,
-        location=post.location,
-        privacy="family",
-        user_id=user.id,
-        family_id=family_id
-    )
-    db.session.add(story)
-    db.session.commit()
-    
-    return jsonify({"message": "Posted to family", "story": story.to_dict()}), 201
+    try:
+        story = Story(
+            title=f"Shared from feed",
+            content=post.caption or "",
+            media_url=post.media_url,
+            media_type=post.media_type,
+            music_url=post.music_stream_url if hasattr(post, 'music_stream_url') else None,
+            music_name=f"{post.music_title} - {post.music_artist}" if hasattr(post, 'music_title') and post.music_title else None,
+            location=post.location,
+            privacy="family",
+            user_id=user.id,
+            family_id=family_id
+        )
+        db.session.add(story)
+        db.session.commit()
+        return jsonify({"message": "Posted to family", "story": story.to_dict()}), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": f"Failed to create story: {str(e)}"}), 500
