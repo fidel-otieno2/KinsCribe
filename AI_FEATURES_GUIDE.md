@@ -18,6 +18,8 @@ All AI endpoints implemented:
 1. ✅ **AIStoryEnhancer.jsx** - Story enhancement modal
 2. ✅ **VoiceToStory.jsx** - Voice recording & transcription
 3. ✅ **AskTheFamily.jsx** - AI chat interface
+4. ✅ **DuplicateMemoryDetector.jsx** - Duplicate detection & merging
+5. ✅ **StoryPromptEngine.jsx** - Timeline gap prompts
 
 ---
 
@@ -278,6 +280,7 @@ const generateMemoryBook = async () => {
 - Compares dates, content, locations
 - Suggests merging into one shared story
 - Shows both perspectives
+- Confidence levels (high/medium/low)
 
 **Backend Endpoint:**
 ```python
@@ -306,6 +309,30 @@ Response: {
 }
 ```
 
+**Frontend Usage:**
+```javascript
+import DuplicateMemoryDetector from './components/DuplicateMemoryDetector';
+
+// In Family Home or Settings
+<DuplicateMemoryDetector
+  token={userToken}
+  onMerge={(mergedStory) => {
+    // Navigate to merged story
+    navigation.navigate('StoryDetail', { story: mergedStory });
+  }}
+/>
+
+// Or add as a notification badge
+<TouchableOpacity onPress={() => navigation.navigate('DuplicateDetector')}>
+  <Ionicons name="copy-outline" size={24} />
+  {duplicateCount > 0 && (
+    <View style={styles.badge}>
+      <Text>{duplicateCount}</Text>
+    </View>
+  )}
+</TouchableOpacity>
+```
+
 ---
 
 ### 6. ✦ Story Prompt Engine
@@ -316,6 +343,7 @@ Response: {
 - Seasonal prompts (holidays, back-to-school)
 - AI-generated personalized prompts
 - Encourages consistent storytelling
+- Priority levels (high/medium/low)
 
 **Backend Endpoint:**
 ```python
@@ -341,6 +369,32 @@ Response: {
     }
   ]
 }
+```
+
+**Frontend Usage:**
+```javascript
+import StoryPromptEngine from './components/StoryPromptEngine';
+
+// In Family Home Screen
+<StoryPromptEngine
+  token={userToken}
+  onSelectPrompt={(prompt) => {
+    // Navigate to story creation with pre-filled prompt
+    navigation.navigate('CreateStory', {
+      prompt: prompt.prompt,
+      year: prompt.year,
+    });
+  }}
+/>
+
+// Or show as daily notification
+<View style={styles.promptCard}>
+  <Text style={styles.promptTitle}>Story Idea for Today</Text>
+  <Text style={styles.promptText}>{todayPrompt}</Text>
+  <TouchableOpacity onPress={() => startStoryFromPrompt()}>
+    <Text>Start Writing</Text>
+  </TouchableOpacity>
+</View>
 ```
 
 ---
@@ -372,9 +426,13 @@ OPENAI_API_KEY=sk-...
 import AIStoryEnhancer from './components/AIStoryEnhancer';
 import VoiceToStory from './components/VoiceToStory';
 import AskTheFamily from './screens/AskTheFamily';
+import DuplicateMemoryDetector from './components/DuplicateMemoryDetector';
+import StoryPromptEngine from './components/StoryPromptEngine';
 
 // In your navigation stack
 <Stack.Screen name="AskTheFamily" component={AskTheFamily} />
+<Stack.Screen name="DuplicateDetector" component={DuplicateMemoryDetector} />
+<Stack.Screen name="StoryPrompts" component={StoryPromptEngine} />
 ```
 
 ### 4. Add AI Features to UI
@@ -395,6 +453,16 @@ import AskTheFamily from './screens/AskTheFamily';
 <TouchableOpacity onPress={() => navigation.navigate('AskTheFamily')}>
   <Ionicons name="chatbubbles" size={24} color="#7c3aed" />
   <Text>Ask the Family AI</Text>
+</TouchableOpacity>
+
+<TouchableOpacity onPress={() => navigation.navigate('DuplicateDetector')}>
+  <Ionicons name="copy-outline" size={24} color="#7c3aed" />
+  <Text>Find Duplicate Memories</Text>
+</TouchableOpacity>
+
+<TouchableOpacity onPress={() => navigation.navigate('StoryPrompts')}>
+  <Ionicons name="bulb" size={24} color="#7c3aed" />
+  <Text>What Should I Post?</Text>
 </TouchableOpacity>
 ```
 

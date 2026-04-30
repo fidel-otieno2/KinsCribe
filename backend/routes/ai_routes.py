@@ -27,6 +27,7 @@ def me():
 # ============ AI STORY ENHANCER ============
 
 @ai_bp.route("/generate-caption", methods=["POST"])
+@ai_bp.route("/caption", methods=["POST"])
 @jwt_required()
 def generate_caption():
     """

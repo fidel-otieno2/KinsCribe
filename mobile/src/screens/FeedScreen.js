@@ -40,7 +40,9 @@ function JoinFamilyModal({ visible, onClose, onJoined }) {
   const { refreshUser } = useAuth();
   const { theme } = useTheme();
   const { t } = useTranslation();
+  const [mode, setMode] = useState('join'); // 'join' or 'create'
   const [code, setCode] = useState("");
+  const [familyName, setFamilyName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -57,6 +59,19 @@ function JoinFamilyModal({ visible, onClose, onJoined }) {
     } finally { setLoading(false); }
   };
 
+  const handleCreate = async () => {
+    if (!familyName.trim()) return setError("Enter a family name");
+    setError(""); setLoading(true);
+    try {
+      await api.post("/family/create", { name: familyName.trim() });
+      await refreshUser();
+      onJoined?.();
+      onClose();
+    } catch (err) {
+      setError(err.response?.data?.error || "Failed to create family");
+    } finally { setLoading(false); }
+  };
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <BlurView intensity={20} tint="dark" style={jf.overlay}>
@@ -68,10 +83,34 @@ function JoinFamilyModal({ visible, onClose, onJoined }) {
           </TouchableOpacity>
 
           <LinearGradient colors={["#7c3aed", "#3b82f6"]} style={jf.iconWrap}>
-            <Ionicons name="key" size={28} color="#fff" />
+            <Ionicons name={mode === 'join' ? 'key' : 'people'} size={28} color="#fff" />
           </LinearGradient>
-          <AppText style={jf.title}>Join a Family</AppText>
-          <AppText style={jf.sub}>Enter the 8-character invite code from your family admin</AppText>
+          <AppText style={jf.title}>{mode === 'join' ? 'Join a Family' : 'Create a Family'}</AppText>
+          <AppText style={jf.sub}>
+            {mode === 'join' 
+              ? 'Enter the 8-character invite code from your family admin'
+              : 'Start your own family group and invite members'}
+          </AppText>
+
+          {/* Mode Toggle */}
+          <View style={jf.modeToggle}>
+            <TouchableOpacity
+              style={[jf.modeBtn, mode === 'join' && jf.modeBtnActive]}
+              onPress={() => { setMode('join'); setError(''); }}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="key-outline" size={16} color={mode === 'join' ? '#fff' : theme.muted} />
+              <AppText style={[jf.modeBtnText, mode === 'join' && jf.modeBtnTextActive]}>Join</AppText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[jf.modeBtn, mode === 'create' && jf.modeBtnActive]}
+              onPress={() => { setMode('create'); setError(''); }}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="add-circle-outline" size={16} color={mode === 'create' ? '#fff' : theme.muted} />
+              <AppText style={[jf.modeBtnText, mode === 'create' && jf.modeBtnTextActive]}>Create</AppText>
+            </TouchableOpacity>
+          </View>
 
           {error ? (
             <View style={jf.errorBox}>
@@ -80,23 +119,44 @@ function JoinFamilyModal({ visible, onClose, onJoined }) {
             </View>
           ) : null}
 
-          <TextInput
-            style={jf.codeInput}
-            placeholder="AB12CD34"
-            placeholderTextColor={colors.dim}
-            autoCapitalize="characters"
-            value={code}
-            onChangeText={v => { setCode(v.toUpperCase()); setError(""); }}
-            maxLength={8}
-          />
-
-          <TouchableOpacity style={jf.joinBtn} onPress={handleJoin} disabled={loading} activeOpacity={0.85}>
-            <LinearGradient colors={["#7c3aed", "#3b82f6"]} style={jf.joinBtnGrad}>
-              {loading
-                ? <ActivityIndicator color="#fff" size="small" />
-                : <AppText style={jf.joinBtnText}>Join Family</AppText>}
-            </LinearGradient>
-          </TouchableOpacity>
+          {mode === 'join' ? (
+            <>
+              <TextInput
+                style={jf.codeInput}
+                placeholder="AB12CD34"
+                placeholderTextColor={colors.dim}
+                autoCapitalize="characters"
+                value={code}
+                onChangeText={v => { setCode(v.toUpperCase()); setError(""); }}
+                maxLength={8}
+              />
+              <TouchableOpacity style={jf.joinBtn} onPress={handleJoin} disabled={loading} activeOpacity={0.85}>
+                <LinearGradient colors={["#7c3aed", "#3b82f6"]} style={jf.joinBtnGrad}>
+                  {loading
+                    ? <ActivityIndicator color="#fff" size="small" />
+                    : <AppText style={jf.joinBtnText}>Join Family</AppText>}
+                </LinearGradient>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <TextInput
+                style={jf.nameInput}
+                placeholder="Family Name"
+                placeholderTextColor={colors.dim}
+                value={familyName}
+                onChangeText={v => { setFamilyName(v); setError(""); }}
+                maxLength={50}
+              />
+              <TouchableOpacity style={jf.joinBtn} onPress={handleCreate} disabled={loading} activeOpacity={0.85}>
+                <LinearGradient colors={["#7c3aed", "#3b82f6"]} style={jf.joinBtnGrad}>
+                  {loading
+                    ? <ActivityIndicator color="#fff" size="small" />
+                    : <AppText style={jf.joinBtnText}>Create Family</AppText>}
+                </LinearGradient>
+              </TouchableOpacity>
+            </>
+          )}
         </View>
       </BlurView>
     </Modal>
@@ -107,13 +167,19 @@ const jf = StyleSheet.create({
   overlay: { flex: 1, justifyContent: "flex-end" },
   sheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, overflow: "hidden", padding: 24, paddingBottom: 48 },
   handle: { width: 40, height: 4, backgroundColor: colors.border, borderRadius: 2, alignSelf: "center", marginBottom: 16 },
-  closeBtn: { position: "absolute", top: 20, right: 20, padding: 4 },
+  closeBtn: { position: "absolute", top: 20, right: 20, padding: 4, zIndex: 10 },
   iconWrap: { width: 60, height: 60, borderRadius: 20, alignItems: "center", justifyContent: "center", alignSelf: "center", marginBottom: 16 },
   title: { fontSize: 22, fontWeight: "800", color: colors.text, textAlign: "center", marginBottom: 6 },
-  sub: { fontSize: 13, color: colors.muted, textAlign: "center", marginBottom: 20, lineHeight: 19 },
+  sub: { fontSize: 13, color: colors.muted, textAlign: "center", marginBottom: 20, lineHeight: 19, paddingHorizontal: 10 },
+  modeToggle: { flexDirection: 'row', backgroundColor: 'rgba(30,41,59,0.6)', borderRadius: radius.lg, padding: 4, marginBottom: 20, gap: 4 },
+  modeBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: radius.md },
+  modeBtnActive: { backgroundColor: 'rgba(124,58,237,0.8)' },
+  modeBtnText: { fontSize: 14, fontWeight: '700', color: colors.muted },
+  modeBtnTextActive: { color: '#fff' },
   errorBox: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(248,113,113,0.1)", borderWidth: 1, borderColor: "rgba(248,113,113,0.3)", borderRadius: radius.sm, padding: 10, marginBottom: 14 },
   errorText: { color: "#f87171", fontSize: 12, flex: 1 },
   codeInput: { backgroundColor: "rgba(30,41,59,0.9)", borderWidth: 1.5, borderColor: "rgba(124,58,237,0.4)", borderRadius: radius.md, padding: 16, color: "#a78bfa", fontSize: 26, fontWeight: "800", letterSpacing: 10, textAlign: "center", marginBottom: 16 },
+  nameInput: { backgroundColor: "rgba(30,41,59,0.9)", borderWidth: 1.5, borderColor: "rgba(124,58,237,0.4)", borderRadius: radius.md, padding: 16, color: colors.text, fontSize: 16, fontWeight: "600", marginBottom: 16 },
   joinBtn: { borderRadius: radius.md, overflow: "hidden" },
   joinBtnGrad: { paddingVertical: 15, alignItems: "center" },
   joinBtnText: { color: "#fff", fontWeight: "700", fontSize: 16 },
