@@ -14,6 +14,7 @@ import { BlurView } from 'expo-blur';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import { colors } from '../theme';
+import { toStreamableUri } from '../utils/cloudinary';
 
 const { width, height } = Dimensions.get('window');
 const IMAGE_DURATION = 10000;
@@ -79,8 +80,8 @@ export default function StoryViewerScreen({ route, navigation }) {
           staysActiveInBackground: false,
           shouldDuckAndroid: true,
         });
-        // Force HTTPS
-        const musicUri = story.music_url.replace(/^http:\/\//i, 'https://');
+        // Use Cloudinary fix for music URLs
+        const musicUri = toStreamableUri(story.music_url);
         const { sound } = await Audio.Sound.createAsync(
           { uri: musicUri },
           { shouldPlay: true, isLooping: true, volume: 1.0 }

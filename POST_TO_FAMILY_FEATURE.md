@@ -34,6 +34,13 @@ Added a feature that allows users to share their feed posts to family stories wi
 - `families`: Stores user's family list
 - `postingToFamily`: Loading state for API call
 
+### Frontend (StoryViewerScreen.js)
+
+#### Music URL Fix
+- **Issue**: Deezer music URLs were returning 403 errors on Android
+- **Solution**: Applied `toStreamableUri()` utility to music URLs
+- **Impact**: Music now plays correctly in family stories shared from posts
+
 ### Backend (post_routes.py)
 
 #### New Endpoint: POST `/posts/<post_id>/post-to-family`
@@ -56,11 +63,12 @@ Added a feature that allows users to share their feed posts to family stories wi
 2. Creates new Story record with:
    - Post content as story content
    - Post media (image/video/carousel)
-   - Post music metadata
+   - Post music metadata (with proper field mapping)
    - Post location
    - Privacy set to "family"
    - User as story author
    - Target family_id
+3. Error handling with rollback on failure
 
 **Response**:
 ```json
@@ -69,6 +77,32 @@ Added a feature that allows users to share their feed posts to family stories wi
   "story": { ... }
 }
 ```
+
+**Error Handling**:
+- Returns 400 if family_id is missing
+- Returns 403 if user is not a member of the family
+- Returns 500 with error message if story creation fails
+- Database rollback on any error
+
+## Bug Fixes
+
+### 1. Music 403 Errors
+- **Problem**: Deezer music URLs in stories were returning HTTP 403 errors
+- **Root Cause**: URLs had query parameters and wrong resource type path
+- **Fix**: Applied `toStreamableUri()` utility in StoryViewerScreen.js
+- **Files Changed**: 
+  - `/mobile/src/screens/StoryViewerScreen.js` - Added import and usage of `toStreamableUri()`
+
+### 2. Backend 500 Errors
+- **Problem**: Story creation was failing with 500 errors
+- **Root Cause**: Missing error handling and improper field mapping
+- **Fix**: 
+  - Added try-catch with proper error messages
+  - Added `hasattr()` checks for optional music fields
+  - Combined music_title and music_artist into music_name field
+  - Added database rollback on failure
+- **Files Changed**:
+  - `/backend/routes/post_routes.py` - Enhanced error handling in `post_to_family()` endpoint
 
 ## User Flow
 
@@ -127,6 +161,11 @@ Added a feature that allows users to share their feed posts to family stories wi
 - All UI elements adapt to dark/light theme
 - Uses theme context for colors
 - Consistent with app design system
+
+### Music URL Handling
+- Cloudinary URLs are processed through `toStreamableUri()` utility
+- Strips query parameters that cause 403 errors
+- Fixes resource type path for Android ExoPlayer compatibility
 
 ## Future Enhancements
 - Add "Share to Multiple Families" option
