@@ -50,6 +50,10 @@ def create_app():
     app.register_blueprint(subscription_bp, url_prefix="/api/subscription")
     app.register_blueprint(call_bp, url_prefix="/api/calls")
 
+    @app.route("/")
+    def health_check():
+        return {"status": "ok"}, 200
+
     with app.app_context():
         _safe_migrate()
 
