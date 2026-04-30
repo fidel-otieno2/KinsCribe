@@ -26,6 +26,97 @@ def me():
 
 # ============ AI STORY ENHANCER ============
 
+@ai_bp.route("/generate-caption", methods=["POST"])
+@jwt_required()
+def generate_caption():
+    """
+    Generate AI caption suggestions for posts/stories.
+    Accepts image URL or text context.
+    """
+    user = me()
+    data = request.json or {}
+    
+    image_url = data.get("image_url")
+    context = data.get("context", "")  # Optional text context
+    tone = data.get("tone", "casual")  # casual, funny, heartfelt, poetic
+    
+    if not image_url and not context:
+        return jsonify({"error": "Either image_url or context is required"}), 400
+    
+    try:
+        # Build prompt based on tone
+        tone_instructions = {
+            "casual": "casual and friendly",
+            "funny": "humorous and witty",
+            "heartfelt": "warm and emotional",
+            "poetic": "poetic and artistic",
+            "professional": "professional and polished"
+        }
+        
+        tone_style = tone_instructions.get(tone, "casual and friendly")
+        
+        if image_url:
+            # Use GPT-4 Vision to analyze image and generate caption
+            response = openai.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": f"You are a creative caption writer. Generate 3 {tone_style} captions for social media posts. Each caption should be engaging and authentic. Return as JSON array: {{\"captions\": [\"caption1\", \"caption2\", \"caption3\"]}}"
+                    },
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": f"Generate 3 {tone_style} captions for this image.{' Context: ' + context if context else ''}"
+                            },
+                            {
+                                "type": "image_url",
+                                "image_url": {"url": image_url}
+                            }
+                        ]
+                    }
+                ],
+                temperature=0.8,
+                max_tokens=300,
+                response_format={"type": "json_object"}
+            )
+        else:
+            # Text-only caption generation
+            response = openai.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": f"You are a creative caption writer. Generate 3 {tone_style} captions for social media posts based on the context provided. Return as JSON array: {{\"captions\": [\"caption1\", \"caption2\", \"caption3\"]}}"
+                    },
+                    {
+                        "role": "user",
+                        "content": f"Generate 3 {tone_style} captions for a post about: {context}"
+                    }
+                ],
+                temperature=0.8,
+                max_tokens=300,
+                response_format={"type": "json_object"}
+            )
+        
+        result = eval(response.choices[0].message.content)
+        captions = result.get("captions", [])
+        
+        return jsonify({
+            "captions": captions,
+            "tone": tone,
+            "count": len(captions)
+        })
+        
+    except Exception as e:
+        print(f"Caption generation error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": "Caption generation unavailable", "details": str(e)}), 500
+
+
 @ai_bp.route("/enhance-story", methods=["POST"])
 @jwt_required()
 def enhance_story():
