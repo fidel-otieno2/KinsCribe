@@ -233,7 +233,7 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation, isVisible 
   const [showMenu, setShowMenu] = useState(false);
   const [showFamilyPicker, setShowFamilyPicker] = useState(false);
   const [families, setFamilies] = useState([]);
-  const [postingToFamily, setPostingToFamily] = useState(false);
+  const [postingToFamily, setPostingToFamily] = useState(null); // Changed to store family ID instead of boolean
   const lastTap = useRef(0);
   const scrollViewRef = useRef(null);
   const musicSoundRef = useRef(null);
@@ -715,8 +715,9 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation, isVisible 
                   } else {
                     Alert.alert('No Families', 'You need to join a family first');
                   }
-                } catch {
-                  Alert.alert('Error', 'Failed to load families');
+                } catch (err) {
+                  console.log('Load families error:', err.response?.data || err.message);
+                  Alert.alert('Error', err.response?.data?.error || 'Failed to load families. Please try again.');
                 }
               }}
             >
@@ -775,18 +776,19 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation, isVisible 
                   key={f.id}
                   style={[pc.familyRow, { borderBottomColor: theme.border }]}
                   onPress={async () => {
-                    setPostingToFamily(true);
+                    setPostingToFamily(f.id); // Set to specific family ID
                     try {
                       await api.post(`/posts/${post.id}/post-to-family`, { family_id: f.id });
                       setShowFamilyPicker(false);
+                      setPostingToFamily(null);
                       Alert.alert('Success', `Posted to ${f.name}`);
                     } catch (err) {
+                      console.log('Post to family error:', err.response?.data || err.message);
+                      setPostingToFamily(null);
                       Alert.alert('Error', err.response?.data?.error || 'Failed to post to family');
-                    } finally {
-                      setPostingToFamily(false);
                     }
                   }}
-                  disabled={postingToFamily}
+                  disabled={postingToFamily !== null} // Disable all when any is posting
                 >
                   <View style={pc.familyAvatar}>
                     {f.avatar_url
@@ -802,7 +804,7 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation, isVisible 
                       {f.member_count ? ` · ${f.member_count} members` : ''}
                     </AppText>
                   </View>
-                  {postingToFamily
+                  {postingToFamily === f.id
                     ? <ActivityIndicator size="small" color={colors.primary} />
                     : <Ionicons name="chevron-forward" size={18} color={theme.muted} />}
                 </TouchableOpacity>

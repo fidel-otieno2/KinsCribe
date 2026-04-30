@@ -433,12 +433,9 @@ function RootNavigator({ navigationRef }) {
         <>
           <Stack.Screen name="SetupProfile" component={SetupProfileScreen} />
         </>
-      ) : !user.family_id ? (
-        <>
-          <Stack.Screen name="FamilyGate" component={FamilyGateScreen} />
-          <Stack.Screen name="JoinFamily" component={JoinFamilyScreen} />
-        </>
       ) : (
+        // User is logged in and profile is complete - go to Main
+        // Family is now optional, so we don't block on !user.family_id
         <>
           <Stack.Screen name="Main" component={MainTabs} />
           <Stack.Screen name="Chat" component={ChatScreen} options={{ animation: "slide_from_right" }} />

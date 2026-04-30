@@ -90,6 +90,15 @@ export default function FamilyGateScreen({ navigation }) {
                   <Ionicons name="chevron-forward" size={20} color={colors.muted} />
                 </LinearGradient>
               </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={s.skipButton} 
+                onPress={() => navigation.replace('Main')} 
+                activeOpacity={0.7}
+              >
+                <AppText style={s.skipText}>Skip for now</AppText>
+                <AppText style={s.skipSubtext}>You can join or create a family later</AppText>
+              </TouchableOpacity>
             </View>
           </BlurView>
         ) : (
@@ -167,6 +176,9 @@ const s = StyleSheet.create({
   optIcon: { width: 48, height: 48, borderRadius: 14, backgroundColor: 'rgba(30,41,59,0.8)', alignItems: 'center', justifyContent: 'center' },
   optTitle: { fontSize: 15, fontWeight: '700', color: colors.text, marginBottom: 3 },
   optSub: { fontSize: 12, color: colors.muted },
+  skipButton: { marginTop: 24, padding: 16, alignItems: 'center', borderTopWidth: 1, borderTopColor: colors.border2 },
+  skipText: { fontSize: 15, fontWeight: '600', color: colors.muted, marginBottom: 4 },
+  skipSubtext: { fontSize: 12, color: colors.dim },
   errorBox: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(248,113,113,0.1)', borderWidth: 1, borderColor: 'rgba(248,113,113,0.3)', borderRadius: radius.sm, padding: 12, marginBottom: 16 },
   errorText: { color: '#f87171', fontSize: 13, flex: 1 },
   successBox: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(52,211,153,0.1)', borderWidth: 1, borderColor: 'rgba(52,211,153,0.3)', borderRadius: radius.sm, padding: 12, marginBottom: 16 },
