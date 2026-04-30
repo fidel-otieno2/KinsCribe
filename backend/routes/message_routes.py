@@ -29,7 +29,10 @@ cloudinary.config(
 
 
 def me():
-    return User.query.get(int(get_jwt_identity()))
+    user = User.query.get(int(get_jwt_identity()))
+    if not user:
+        return None
+    return user
 
 
 def _get_or_create_dm(user_a, user_b):
@@ -81,6 +84,8 @@ def _get_or_create_family_chat(family_id):
 @jwt_required()
 def get_conversations():
     user = me()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
     parts = ConversationParticipant.query.filter_by(user_id=user.id).all()
     convs = []
     for p in parts:

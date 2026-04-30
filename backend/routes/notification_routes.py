@@ -277,6 +277,8 @@ def _get_all_notifications(user):
 @jwt_required()
 def get_notifications():
     user = User.query.get(int(get_jwt_identity()))
+    if not user:
+        return jsonify({"error": "User not found"}), 404
     notifs = _get_all_notifications(user)
     read_ids = _get_read_ids(user.id)
     for n in notifs:
@@ -289,6 +291,8 @@ def get_notifications():
 @jwt_required()
 def get_notification_count():
     user = User.query.get(int(get_jwt_identity()))
+    if not user:
+        return jsonify({"error": "User not found"}), 404
     notifs = _get_all_notifications(user)
     read_ids = _get_read_ids(user.id)
     unread_count = sum(1 for n in notifs if n["id"] not in read_ids)

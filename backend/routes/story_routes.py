@@ -18,10 +18,15 @@ cloudinary.config(
 
 
 def current_user():
-    return User.query.get(int(get_jwt_identity()))
+    user = User.query.get(int(get_jwt_identity()))
+    if not user:
+        return None
+    return user
 
 
 def require_family(user):
+    if not user:
+        return jsonify({"error": "User not found"}), 404
     if not user.family_id:
         return jsonify({"error": "You must join a family first"}), 403
     return None
