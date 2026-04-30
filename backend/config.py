@@ -14,9 +14,12 @@ class Config:
     SQLALCHEMY_ENGINE_OPTIONS = {
         "pool_pre_ping": True,
         "pool_recycle": 300,
-        "pool_size": 5,
-        "max_overflow": 2,
-        **({"connect_args": {"connect_timeout": 10}} if _is_postgres else {}),
+        "pool_size": 10,
+        "max_overflow": 5,
+        **({"connect_args": {
+            "connect_timeout": 30,
+            "options": "-c statement_timeout=30000"
+        }} if _is_postgres else {}),
     }
     JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "jwt-dev-secret")
     JWT_ACCESS_TOKEN_EXPIRES = 3600

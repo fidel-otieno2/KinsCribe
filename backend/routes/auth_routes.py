@@ -438,7 +438,10 @@ def verify_email(token):
 
 @auth_bp.route("/login", methods=["POST"])
 def login():
+    import time
+    start_time = time.time()
     try:
+        print(f"[LOGIN] Request received at {start_time}")
         data = request.json or {}
         email = data.get("email", "").strip().lower()
         password = data.get("password", "")
@@ -446,22 +449,34 @@ def login():
         if not email or not password:
             return jsonify({"error": "Email and password are required"}), 400
         
+        print(f"[LOGIN] Querying user for email: {email}")
+        query_start = time.time()
         user = User.query.filter_by(email=email).first()
+        print(f"[LOGIN] Query took {time.time() - query_start:.2f}s")
 
         if not user:
             return jsonify({"error": "No account found with this email"}), 401
         if user.google_id and not user.password:
             return jsonify({"error": "This account uses Google Sign-In. Please tap \"Continue with Google\"."}), 401
+        
+        print(f"[LOGIN] Checking password hash")
+        hash_start = time.time()
         if not bcrypt.check_password_hash(user.password, password):
             return jsonify({"error": "Incorrect password"}), 401
+        print(f"[LOGIN] Password check took {time.time() - hash_start:.2f}s")
 
         # If 2FA is enabled, return challenge instead of tokens
         if user.two_factor_enabled:
             return jsonify({"requires_2fa": True, "user_id": user.id})
 
-        return jsonify(_tokens(user))
+        print(f"[LOGIN] Generating tokens")
+        token_start = time.time()
+        result = _tokens(user)
+        print(f"[LOGIN] Token generation took {time.time() - token_start:.2f}s")
+        print(f"[LOGIN] Total login time: {time.time() - start_time:.2f}s")
+        return jsonify(result)
     except Exception as e:
-        print(f"Login error: {str(e)}")
+        print(f"[LOGIN] ERROR after {time.time() - start_time:.2f}s: {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({"error": "Login failed. Please try again."}), 500

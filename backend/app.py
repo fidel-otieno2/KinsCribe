@@ -54,6 +54,20 @@ def create_app():
     def health_check():
         return {"status": "ok"}, 200
 
+    @app.route("/health")
+    def health_detailed():
+        import time
+        health = {"status": "ok", "timestamp": time.time()}
+        try:
+            start = time.time()
+            db.session.execute(db.text("SELECT 1"))
+            health["database"] = "connected"
+            health["db_ping_ms"] = round((time.time() - start) * 1000, 2)
+        except Exception as e:
+            health["database"] = f"error: {str(e)}"
+            health["status"] = "degraded"
+        return health, 200
+
     with app.app_context():
         _safe_migrate()
 
@@ -197,6 +211,8 @@ def _run_migrations():
         "ALTER TABLE public_stories ADD COLUMN IF NOT EXISTS music_artwork VARCHAR(300)",
         # Indexes
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_apple_id ON users(apple_id)",
+        "CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)",
+        "CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone)",
         # Subscription fields
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_premium BOOLEAN DEFAULT FALSE",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS premium_plan VARCHAR(20)",
