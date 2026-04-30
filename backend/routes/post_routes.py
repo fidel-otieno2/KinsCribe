@@ -499,7 +499,7 @@ def respond_collab(collab_id):
     return jsonify({"status": collab.status})
 
 
-@post_bp.route("/collab/search", methods=["GET"])
+@post_bp.route("/<int:post_id>/collab/search", methods=["GET"])
 @jwt_required()
 def search_collab_users():
     """Search users to invite as collaborators."""
@@ -518,3 +518,42 @@ def search_collab_users():
         {"id": u.id, "name": u.name, "username": u.username, "avatar": u.avatar_url}
         for u in users
     ]})
+
+
+@post_bp.route("/<int:post_id>/post-to-family", methods=["POST"])
+@jwt_required()
+def post_to_family(post_id):
+    """Convert a post to a family story."""
+    from models.story import Story
+    from models.family import FamilyMember
+    
+    user = me()
+    post = Post.query.get_or_404(post_id)
+    data = request.get_json() or {}
+    family_id = data.get("family_id")
+    
+    if not family_id:
+        return jsonify({"error": "family_id required"}), 400
+    
+    # Validate user is member of the family
+    membership = FamilyMember.query.filter_by(user_id=user.id, family_id=family_id).first()
+    if not membership and user.family_id != family_id:
+        return jsonify({"error": "You are not a member of that family"}), 403
+    
+    # Create family story from post
+    story = Story(
+        title=f"Shared from feed",
+        content=post.caption or "",
+        media_url=post.media_url,
+        media_type=post.media_type,
+        music_url=post.music_stream_url,
+        music_name=post.music_title,
+        location=post.location,
+        privacy="family",
+        user_id=user.id,
+        family_id=family_id
+    )
+    db.session.add(story)
+    db.session.commit()
+    
+    return jsonify({"message": "Posted to family", "story": story.to_dict()}), 201

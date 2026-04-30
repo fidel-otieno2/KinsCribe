@@ -230,6 +230,10 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation, isVisible 
   const [loadingComments, setLoadingComments] = useState(false);
   const [showShare, setShowShare] = useState(false);
   const [showCollabs, setShowCollabs] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
+  const [showFamilyPicker, setShowFamilyPicker] = useState(false);
+  const [families, setFamilies] = useState([]);
+  const [postingToFamily, setPostingToFamily] = useState(false);
   const lastTap = useRef(0);
   const scrollViewRef = useRef(null);
   const musicSoundRef = useRef(null);
@@ -447,16 +451,15 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation, isVisible 
             )}
           </View>
         </View>
-        {isOwner && (
-          <TouchableOpacity onPress={() => Alert.alert("Delete Post", "Remove this post?", [
-            { text: t('cancel'), style: "cancel" },
-            { text: t('delete'), style: "destructive", onPress: async () => {
-              try { await api.delete(`/posts/${post.id}`); onUpdate?.(); } catch {}
-            }},
-          ])}>
-            <Ionicons name="ellipsis-horizontal" size={20} color={theme.muted} />
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity
+          style={pc.menuBtn}
+          onPress={() => setShowMenu(true)}
+          activeOpacity={0.7}
+        >
+          <View style={[pc.menuDots, { backgroundColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]}>
+            <Ionicons name="ellipsis-horizontal" size={18} color={theme.text} />
+          </View>
+        </TouchableOpacity>
       </View>
 
       {/* Collaborators bottom sheet */}
@@ -693,6 +696,129 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation, isVisible 
 
       <SharePostModal visible={showShare} postId={post.id} onClose={() => setShowShare(false)} />
 
+      {/* Post Menu Modal */}
+      <Modal visible={showMenu} transparent animationType="fade" onRequestClose={() => setShowMenu(false)}>
+        <TouchableOpacity style={pc.menuOverlay} activeOpacity={1} onPress={() => setShowMenu(false)}>
+          <View style={[pc.menuSheet, { backgroundColor: theme.bgCard }]}>
+            <View style={[pc.menuHandle, { backgroundColor: theme.border }]} />
+            
+            {/* Post to Family Story */}
+            <TouchableOpacity
+              style={pc.menuItem}
+              onPress={async () => {
+                setShowMenu(false);
+                try {
+                  const { data } = await api.get('/family/my-families');
+                  setFamilies(data.families || []);
+                  if (data.families?.length > 0) {
+                    setShowFamilyPicker(true);
+                  } else {
+                    Alert.alert('No Families', 'You need to join a family first');
+                  }
+                } catch {
+                  Alert.alert('Error', 'Failed to load families');
+                }
+              }}
+            >
+              <View style={[pc.menuIconWrap, { backgroundColor: 'rgba(124,58,237,0.12)' }]}>
+                <Ionicons name="people" size={20} color="#7c3aed" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <AppText style={[pc.menuItemTitle, { color: theme.text }]}>Post to Family Story</AppText>
+                <AppText style={[pc.menuItemSub, { color: theme.muted }]}>Share this with your family</AppText>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={theme.muted} />
+            </TouchableOpacity>
+
+            {isOwner && (
+              <>
+                <View style={[pc.menuDivider, { backgroundColor: theme.border }]} />
+                
+                {/* Delete Post */}
+                <TouchableOpacity
+                  style={pc.menuItem}
+                  onPress={() => {
+                    setShowMenu(false);
+                    Alert.alert("Delete Post", "Remove this post?", [
+                      { text: t('cancel'), style: "cancel" },
+                      { text: t('delete'), style: "destructive", onPress: async () => {
+                        try { await api.delete(`/posts/${post.id}`); onUpdate?.(); } catch {}
+                      }},
+                    ]);
+                  }}
+                >
+                  <View style={[pc.menuIconWrap, { backgroundColor: 'rgba(239,68,68,0.12)' }]}>
+                    <Ionicons name="trash-outline" size={20} color="#ef4444" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <AppText style={[pc.menuItemTitle, { color: '#ef4444' }]}>Delete Post</AppText>
+                    <AppText style={[pc.menuItemSub, { color: theme.muted }]}>Remove from your feed</AppText>
+                  </View>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Family Picker Modal */}
+      <Modal visible={showFamilyPicker} transparent animationType="slide" onRequestClose={() => setShowFamilyPicker(false)}>
+        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.6)' }}>
+          <View style={[pc.familySheet, { backgroundColor: theme.bgCard }]}>
+            <View style={[pc.menuHandle, { backgroundColor: theme.border }]} />
+            <AppText style={[pc.familySheetTitle, { color: theme.text }]}>Post to Family</AppText>
+            <AppText style={[pc.familySheetSub, { color: theme.muted }]}>Choose which family to share with</AppText>
+            
+            <ScrollView style={{ maxHeight: 400 }} showsVerticalScrollIndicator={false}>
+              {families.map(f => (
+                <TouchableOpacity
+                  key={f.id}
+                  style={[pc.familyRow, { borderBottomColor: theme.border }]}
+                  onPress={async () => {
+                    setPostingToFamily(true);
+                    try {
+                      await api.post(`/posts/${post.id}/post-to-family`, { family_id: f.id });
+                      setShowFamilyPicker(false);
+                      Alert.alert('Success', `Posted to ${f.name}`);
+                    } catch (err) {
+                      Alert.alert('Error', err.response?.data?.error || 'Failed to post to family');
+                    } finally {
+                      setPostingToFamily(false);
+                    }
+                  }}
+                  disabled={postingToFamily}
+                >
+                  <View style={pc.familyAvatar}>
+                    {f.avatar_url
+                      ? <Image source={{ uri: f.avatar_url }} style={{ width: 48, height: 48, borderRadius: 24 }} />
+                      : <LinearGradient colors={[f.theme_color || '#7c3aed', '#3b82f6']} style={pc.familyAvatarGrad}>
+                          <Ionicons name="people" size={22} color="#fff" />
+                        </LinearGradient>}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <AppText style={[pc.familyName, { color: theme.text }]}>{f.name}</AppText>
+                    <AppText style={[pc.familyRole, { color: theme.muted }]}>
+                      {f.my_role === 'owner' ? '👑 Owner' : f.my_role === 'admin' ? '⚙️ Admin' : '👤 Member'}
+                      {f.member_count ? ` · ${f.member_count} members` : ''}
+                    </AppText>
+                  </View>
+                  {postingToFamily
+                    ? <ActivityIndicator size="small" color={colors.primary} />
+                    : <Ionicons name="chevron-forward" size={18} color={theme.muted} />}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            
+            <TouchableOpacity
+              style={[pc.familyCancelBtn, { borderColor: theme.border2 }]}
+              onPress={() => setShowFamilyPicker(false)}
+            >
+              <AppText style={{ color: theme.muted, fontWeight: '600' }}>Cancel</AppText>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       {/* Comments Modal */}
       <Modal visible={showComments} animationType="slide" transparent>
         <View style={pc.commentsOverlay}>
@@ -794,6 +920,25 @@ const pc = StyleSheet.create({
   collabRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 10 },
   collabAvatar: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   collabCloseBtn: { margin: 16, padding: 14, borderRadius: 12, borderWidth: 1, alignItems: 'center' },
+  menuBtn: { padding: 4 },
+  menuDots: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  menuOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
+  menuSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 36 },
+  menuHandle: { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginTop: 10, marginBottom: 20 },
+  menuItem: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 20, paddingVertical: 14 },
+  menuIconWrap: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  menuItemTitle: { fontSize: 15, fontWeight: '700' },
+  menuItemSub: { fontSize: 12, marginTop: 2 },
+  menuDivider: { height: 0.5, marginVertical: 8, marginHorizontal: 20 },
+  familySheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 36, paddingTop: 12 },
+  familySheetTitle: { fontSize: 18, fontWeight: '800', paddingHorizontal: 20, marginBottom: 4 },
+  familySheetSub: { fontSize: 13, paddingHorizontal: 20, marginBottom: 16 },
+  familyRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 0.5 },
+  familyAvatar: { width: 48, height: 48, borderRadius: 24, overflow: 'hidden' },
+  familyAvatarGrad: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
+  familyName: { fontSize: 15, fontWeight: '700' },
+  familyRole: { fontSize: 12, marginTop: 2 },
+  familyCancelBtn: { margin: 16, padding: 14, borderRadius: 12, borderWidth: 1, alignItems: 'center' },
   hashtagsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingHorizontal: 14, marginBottom: 6 },
   hashtagChip: { fontSize: 13, color: '#3b82f6', fontWeight: '600' },
   viewComments: { paddingHorizontal: 14, color: colors.muted, fontSize: 13, marginBottom: 4 },
