@@ -1065,6 +1065,35 @@ def test_endpoint():
         "headers": dict(request.headers),
         "data": request.get_json(silent=True) if request.method == "POST" else None
     })
+
+
+@auth_bp.route("/admin/reset-password", methods=["POST"])
+def admin_reset_password():
+    """Emergency password reset - REMOVE IN PRODUCTION"""
+    data = request.json or {}
+    secret = data.get("secret")
+    email = data.get("email", "").strip().lower()
+    new_password = data.get("new_password", "")
+    
+    # Simple secret check - use your JWT_SECRET_KEY
+    if secret != os.getenv("JWT_SECRET_KEY"):
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    if not email or not new_password:
+        return jsonify({"error": "email and new_password required"}), 400
+    
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    
+    user.password = bcrypt.generate_password_hash(new_password).decode("utf-8")
+    db.session.commit()
+    
+    return jsonify({
+        "message": "Password reset successfully",
+        "email": email,
+        "user_id": user.id
+    })
 def test_email():
     """Test email configuration"""
     config_info = {
