@@ -2,6 +2,7 @@
 """
 Database Migration Script for KinsCribe
 Adds missing columns to existing PostgreSQL database on Render
+Updated: 2024 - Added is_archived, is_highlighted columns
 """
 
 import os
