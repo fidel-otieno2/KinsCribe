@@ -25,10 +25,10 @@ def current_user():
 
 
 def require_family(user):
+    """Check if user is in a family - returns error only if explicitly required."""
     if not user:
         return jsonify({"error": "User not found"}), 404
-    if not user.family_id:
-        return jsonify({"error": "You must join a family first"}), 403
+    # Don't enforce family requirement - let endpoints decide
     return None
 
 
@@ -77,9 +77,8 @@ def _validate_family_membership(user, target_family_id):
 @jwt_required()
 def create_story():
     user = current_user()
-    err = require_family(user)
-    if err:
-        return err
+    if not user:
+        return jsonify({"error": "User not found"}), 404
 
     media_url = None
     media_type = "text"
@@ -108,17 +107,15 @@ def create_story():
     # Parse story date
     parsed_date = _parse_story_date(data.get("story_date"))
 
-    # Validate family membership
-    target_family_id = data.get("family_id")
+    # Validate family membership - only if family_id is provided
+    final_family_id = None
     if target_family_id:
-        try:
-            target_family_id = int(target_family_id)
-        except (ValueError, TypeError):
-            target_family_id = None
-    
-    final_family_id = _validate_family_membership(user, target_family_id)
-    if final_family_id is None:
-        return jsonify({"error": "You are not a member of that family"}), 403
+        final_family_id = _validate_family_membership(user, target_family_id)
+        if final_family_id is None:
+            return jsonify({"error": "You are not a member of that family"}), 403
+    elif user.family_id:
+        # Use user's default family if they have one
+        final_family_id = user.family_id
 
     # Create story
     try:
@@ -161,9 +158,10 @@ def create_story():
 @jwt_required()
 def family_stories():
     user = current_user()
-    err = require_family(user)
-    if err:
-        return err
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    if not user.family_id:
+        return jsonify({"stories": []}), 200  # Return empty list instead of error
     # Support filtering by a specific family_id (must be a member)
     family_id = request.args.get('family_id', user.family_id, type=int)
     from models.family import FamilyMember
@@ -182,9 +180,21 @@ def family_stories():
 @jwt_required()
 def family_feed():
     user = current_user()
-    err = require_family(user)
-    if err:
-        return err
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    if not user.family_id:
+        # Show user's own stories if they're not in a family
+        stories = Story.query.filter_by(user_id=user.id, is_archived=False)\
+            .order_by(Story.created_at.desc()).limit(100).all()
+        user_liked = {l.story_id for l in Like.query.filter_by(user_id=user.id).all()}
+        user_saved = {s.story_id for s in SavedStory.query.filter_by(user_id=user.id).all()}
+        result = []
+        for s in stories:
+            d = s.to_dict()
+            d["liked_by_me"] = s.id in user_liked
+            d["saved_by_me"] = s.id in user_saved
+            result.append(d)
+        return jsonify({"stories": result})
     # Show stories from ALL families the user belongs to
     from models.family import FamilyMember
     memberships = FamilyMember.query.filter_by(user_id=user.id).all()
@@ -211,9 +221,13 @@ def family_feed():
 @jwt_required()
 def timeline():
     user = current_user()
-    err = require_family(user)
-    if err:
-        return err
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    if not user.family_id:
+        # Show user's own stories if no family
+        stories = Story.query.filter_by(user_id=user.id)\
+            .order_by(Story.story_date.asc().nullslast(), Story.created_at.desc()).all()
+        return jsonify({"stories": [s.to_dict() for s in stories]})
     stories = Story.query.filter_by(family_id=user.family_id)\
         .order_by(Story.story_date.asc().nullslast(), Story.created_at.desc()).all()
     return jsonify({"stories": [s.to_dict() for s in stories]})
