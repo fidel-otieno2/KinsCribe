@@ -56,6 +56,10 @@ def run_migrations():
             "ALTER TABLE stories ADD COLUMN IF NOT EXISTS story_date DATE",
             "ALTER TABLE stories ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW()",
             "ALTER TABLE stories ADD COLUMN IF NOT EXISTS repost_count INTEGER DEFAULT 0",
+            "ALTER TABLE stories ADD COLUMN IF NOT EXISTS is_archived BOOLEAN DEFAULT FALSE",
+            "ALTER TABLE stories ADD COLUMN IF NOT EXISTS is_highlighted BOOLEAN DEFAULT FALSE",
+            "ALTER TABLE stories ADD COLUMN IF NOT EXISTS archived_at TIMESTAMP",
+            "ALTER TABLE stories ADD COLUMN IF NOT EXISTS highlighted_at TIMESTAMP",
             
             # Conversations table migrations
             "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS name VARCHAR(100)",

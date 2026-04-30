@@ -266,10 +266,13 @@ class Storybook(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text, nullable=True)
+    cover_image = db.Column(db.String(300), nullable=True)
     compiled_content = db.Column(db.Text, nullable=True)
     story_ids = db.Column(db.String(500), nullable=False)
     pdf_url = db.Column(db.String(300), nullable=True)
     privacy = db.Column(db.String(20), default="family")
+    theme = db.Column(db.String(20), default="sepia")  # sepia|night|classic
+    font_size = db.Column(db.String(10), default="medium")  # small|medium|large
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     family_id = db.Column(db.Integer, db.ForeignKey("families.id"), nullable=False)
@@ -277,9 +280,151 @@ class Storybook(db.Model):
     def to_dict(self):
         return {
             "id": self.id, "title": self.title, "description": self.description,
+            "cover_image": self.cover_image,
             "compiled_content": self.compiled_content,
             "story_ids": [int(i) for i in self.story_ids.split(",") if i],
             "pdf_url": self.pdf_url, "privacy": self.privacy,
+            "theme": self.theme, "font_size": self.font_size,
             "user_id": self.user_id, "family_id": self.family_id,
+            "created_at": utc_iso(self.created_at)
+        }
+
+
+class StoryCollection(db.Model):
+    """Themed story collections (chapters)"""
+    __tablename__ = "story_collections"
+    id = db.Column(db.Integer, primary_key=True)
+    family_id = db.Column(db.Integer, db.ForeignKey("families.id"), nullable=False)
+    created_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    title = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    cover_image = db.Column(db.String(300), nullable=True)
+    is_collaborative = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        from models.user import User
+        creator = User.query.get(self.created_by)
+        # Count stories in this collection
+        story_count = db.session.query(db.func.count(CollectionStory.id)).filter_by(
+            collection_id=self.id
+        ).scalar() or 0
+        return {
+            "id": self.id, "family_id": self.family_id,
+            "title": self.title, "description": self.description,
+            "cover_image": self.cover_image,
+            "is_collaborative": self.is_collaborative,
+            "created_by": self.created_by,
+            "creator_name": creator.name if creator else None,
+            "story_count": story_count,
+            "created_at": utc_iso(self.created_at)
+        }
+
+
+class CollectionStory(db.Model):
+    """Stories within a collection"""
+    __tablename__ = "collection_stories"
+    id = db.Column(db.Integer, primary_key=True)
+    collection_id = db.Column(db.Integer, db.ForeignKey("story_collections.id"), nullable=False)
+    story_id = db.Column(db.Integer, db.ForeignKey("stories.id"), nullable=False)
+    added_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    order_index = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    __table_args__ = (db.UniqueConstraint("collection_id", "story_id"),)
+
+
+class TimeLockedStory(db.Model):
+    """Stories that unlock on a future date"""
+    __tablename__ = "time_locked_stories"
+    id = db.Column(db.Integer, primary_key=True)
+    story_id = db.Column(db.Integer, db.ForeignKey("stories.id"), nullable=False, unique=True)
+    unlock_date = db.Column(db.DateTime, nullable=False)
+    unlock_message = db.Column(db.Text, nullable=True)
+    is_unlocked = db.Column(db.Boolean, default=False)
+    unlocked_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            "id": self.id, "story_id": self.story_id,
+            "unlock_date": utc_iso(self.unlock_date),
+            "unlock_message": self.unlock_message,
+            "is_unlocked": self.is_unlocked,
+            "unlocked_at": utc_iso(self.unlocked_at) if self.unlocked_at else None,
+            "created_at": utc_iso(self.created_at)
+        }
+
+
+class StoryContributor(db.Model):
+    """Multi-author story contributors"""
+    __tablename__ = "story_contributors"
+    id = db.Column(db.Integer, primary_key=True)
+    story_id = db.Column(db.Integer, db.ForeignKey("stories.id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    contribution = db.Column(db.Text, nullable=True)
+    order_index = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    __table_args__ = (db.UniqueConstraint("story_id", "user_id"),)
+
+    def to_dict(self):
+        from models.user import User
+        u = User.query.get(self.user_id)
+        return {
+            "id": self.id, "story_id": self.story_id,
+            "user_id": self.user_id,
+            "user_name": u.name if u else None,
+            "user_avatar": u.avatar_url if u else None,
+            "contribution": self.contribution,
+            "order_index": self.order_index,
+            "created_at": utc_iso(self.created_at)
+        }
+
+
+class StoryReaction(db.Model):
+    """Threaded reactions to stories"""
+    __tablename__ = "story_reactions"
+    id = db.Column(db.Integer, primary_key=True)
+    story_id = db.Column(db.Integer, db.ForeignKey("stories.id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    reaction_type = db.Column(db.String(30), default="comment")  # comment|photo|memory
+    text = db.Column(db.Text, nullable=True)
+    media_url = db.Column(db.String(300), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        from models.user import User
+        u = User.query.get(self.user_id)
+        return {
+            "id": self.id, "story_id": self.story_id,
+            "user_id": self.user_id,
+            "user_name": u.name if u else None,
+            "user_avatar": u.avatar_url if u else None,
+            "reaction_type": self.reaction_type,
+            "text": self.text, "media_url": self.media_url,
+            "created_at": utc_iso(self.created_at)
+        }
+
+
+class StoryAudioRecording(db.Model):
+    """Audio recordings attached to stories"""
+    __tablename__ = "story_audio_recordings"
+    id = db.Column(db.Integer, primary_key=True)
+    story_id = db.Column(db.Integer, db.ForeignKey("stories.id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    audio_url = db.Column(db.String(300), nullable=False)
+    duration_seconds = db.Column(db.Integer, nullable=True)
+    transcript = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        from models.user import User
+        u = User.query.get(self.user_id)
+        return {
+            "id": self.id, "story_id": self.story_id,
+            "user_id": self.user_id,
+            "user_name": u.name if u else None,
+            "audio_url": self.audio_url,
+            "duration_seconds": self.duration_seconds,
+            "transcript": self.transcript,
             "created_at": utc_iso(self.created_at)
         }

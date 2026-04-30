@@ -27,6 +27,12 @@ class Story(db.Model):
     privacy = db.Column(db.String(20), default="family")
     repost_count = db.Column(db.Integer, default=0)
     is_announcement = db.Column(db.Boolean, default=False)
+    
+    # Multi-author support
+    is_collaborative = db.Column(db.Boolean, default=False)
+    
+    # Family tree tagging
+    tagged_tree_node_id = db.Column(db.Integer, db.ForeignKey("family_tree_nodes.id"), nullable=True)
 
     # Archive & Highlights
     is_archived = db.Column(db.Boolean, default=False)

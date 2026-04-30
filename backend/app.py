@@ -267,6 +267,82 @@ def _run_migrations():
         # Stories — family_name denorm not needed (join), but ensure family_id index
         "CREATE INDEX IF NOT EXISTS idx_stories_family_id ON stories(family_id)",
         "CREATE INDEX IF NOT EXISTS idx_stories_user_family ON stories(user_id, family_id)",
+        "ALTER TABLE stories ADD COLUMN IF NOT EXISTS is_collaborative BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE stories ADD COLUMN IF NOT EXISTS tagged_tree_node_id INTEGER",
+        # Storybook tables
+        "ALTER TABLE storybooks ADD COLUMN IF NOT EXISTS cover_image VARCHAR(300)",
+        "ALTER TABLE storybooks ADD COLUMN IF NOT EXISTS theme VARCHAR(20) DEFAULT 'sepia'",
+        "ALTER TABLE storybooks ADD COLUMN IF NOT EXISTS font_size VARCHAR(10) DEFAULT 'medium'",
+        """
+        CREATE TABLE IF NOT EXISTS story_collections (
+            id SERIAL PRIMARY KEY,
+            family_id INTEGER NOT NULL REFERENCES families(id) ON DELETE CASCADE,
+            created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            title VARCHAR(200) NOT NULL,
+            description TEXT,
+            cover_image VARCHAR(300),
+            is_collaborative BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT NOW()
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS collection_stories (
+            id SERIAL PRIMARY KEY,
+            collection_id INTEGER NOT NULL REFERENCES story_collections(id) ON DELETE CASCADE,
+            story_id INTEGER NOT NULL REFERENCES stories(id) ON DELETE CASCADE,
+            added_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            order_index INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT NOW(),
+            UNIQUE(collection_id, story_id)
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS time_locked_stories (
+            id SERIAL PRIMARY KEY,
+            story_id INTEGER NOT NULL REFERENCES stories(id) ON DELETE CASCADE UNIQUE,
+            unlock_date TIMESTAMP NOT NULL,
+            unlock_message TEXT,
+            is_unlocked BOOLEAN DEFAULT FALSE,
+            unlocked_at TIMESTAMP,
+            created_at TIMESTAMP DEFAULT NOW()
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS story_contributors (
+            id SERIAL PRIMARY KEY,
+            story_id INTEGER NOT NULL REFERENCES stories(id) ON DELETE CASCADE,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            contribution TEXT,
+            order_index INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT NOW(),
+            UNIQUE(story_id, user_id)
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS story_reactions (
+            id SERIAL PRIMARY KEY,
+            story_id INTEGER NOT NULL REFERENCES stories(id) ON DELETE CASCADE,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            reaction_type VARCHAR(30) DEFAULT 'comment',
+            text TEXT,
+            media_url VARCHAR(300),
+            created_at TIMESTAMP DEFAULT NOW()
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS story_audio_recordings (
+            id SERIAL PRIMARY KEY,
+            story_id INTEGER NOT NULL REFERENCES stories(id) ON DELETE CASCADE,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            audio_url VARCHAR(300) NOT NULL,
+            duration_seconds INTEGER,
+            transcript TEXT,
+            created_at TIMESTAMP DEFAULT NOW()
+        )
+        """,
+        "CREATE INDEX IF NOT EXISTS idx_time_locked_unlock_date ON time_locked_stories(unlock_date, is_unlocked)",
+        "CREATE INDEX IF NOT EXISTS idx_stories_story_date ON stories(story_date)",
+        "CREATE INDEX IF NOT EXISTS idx_stories_tagged_node ON stories(tagged_tree_node_id)",
         # Call logs table
         """
         CREATE TABLE IF NOT EXISTS call_logs (
