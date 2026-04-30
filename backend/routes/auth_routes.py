@@ -470,9 +470,16 @@ def login():
         if not user:
             print(f"[LOGIN] No user found with email: {email}")
             return jsonify({"error": "No account found with this email"}), 401
-        if user.google_id and not user.password:
-            print(f"[LOGIN] User is Google-only account")
-            return jsonify({"error": "This account uses Google Sign-In. Please tap \"Continue with Google\"."}), 401
+        
+        # Allow login with password even if Google ID exists, as long as password is set
+        if not user.password:
+            print(f"[LOGIN] User has no password set")
+            if user.google_id:
+                return jsonify({"error": "This account uses Google Sign-In. Please tap \"Continue with Google\"."}), 401
+            elif user.apple_id:
+                return jsonify({"error": "This account uses Apple Sign-In. Please use Apple to sign in."}), 401
+            else:
+                return jsonify({"error": "No password set for this account"}), 401
         
         print(f"[LOGIN] Checking password hash")
         hash_start = time.time()
