@@ -186,8 +186,11 @@ def family_feed():
     family_ids = [fm.family_id for fm in memberships]
     if user.family_id and user.family_id not in family_ids:
         family_ids.append(user.family_id)
-    stories = Story.query.filter(Story.family_id.in_(family_ids))\
-        .order_by(Story.created_at.desc()).limit(100).all()
+    # Exclude archived stories from feed
+    stories = Story.query.filter(
+        Story.family_id.in_(family_ids),
+        Story.is_archived == False
+    ).order_by(Story.created_at.desc()).limit(100).all()
     user_liked = {l.story_id for l in Like.query.filter_by(user_id=user.id).all()}
     user_saved = {s.story_id for s in SavedStory.query.filter_by(user_id=user.id).all()}
     result = []

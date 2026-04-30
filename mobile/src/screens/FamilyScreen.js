@@ -110,11 +110,19 @@ function FamilyFeedTab({ navigation, myRole, familyId, familyName }) {
 
   const toggleArchive = async (story) => {
     const wasArchived = story.is_archived;
-    setStories(prev => prev.map(s => s.id === story.id ? { ...s, is_archived: !wasArchived } : s));
+    // Remove from feed immediately if archiving
+    if (!wasArchived) {
+      setStories(prev => prev.filter(s => s.id !== story.id));
+    }
     try {
       await api.post(`/stories/${story.id}/archive`);
+      // Refresh to get updated list
+      fetchStories();
     } catch {
-      setStories(prev => prev.map(s => s.id === story.id ? { ...s, is_archived: wasArchived } : s));
+      // Revert on error
+      if (!wasArchived) {
+        setStories(prev => [...prev, story]);
+      }
     }
   };
 
@@ -397,6 +405,24 @@ function FamilyFeedTab({ navigation, myRole, familyId, familyName }) {
             <View style={ft.viewerCaption}>
               <AppText style={ft.viewerTitle}>{viewer.title}</AppText>
               {viewer.content ? <AppText style={ft.viewerContent}>{viewer.content}</AppText> : null}
+              {/* Action buttons in viewer */}
+              <View style={ft.viewerActions}>
+                {viewer.is_highlighted && (viewer.user_id === user?.id || myRole === 'admin') && (
+                  <TouchableOpacity
+                    style={ft.viewerActionBtn}
+                    onPress={async () => {
+                      try {
+                        await api.post(`/stories/${viewer.id}/highlight`);
+                        setHighlights(prev => prev.filter(h => h.id !== viewer.id));
+                        setViewer(null);
+                      } catch {}
+                    }}
+                  >
+                    <Ionicons name="star-outline" size={18} color="#fff" />
+                    <AppText style={ft.viewerActionText}>Remove Highlight</AppText>
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
           ) : null}
         </View>
@@ -516,6 +542,9 @@ const ft = StyleSheet.create({
   viewerCaption: { padding: 20 },
   viewerTitle: { fontSize: 18, fontWeight: '700', color: '#fff', marginBottom: 6 },
   viewerContent: { fontSize: 14, color: 'rgba(255,255,255,0.7)', lineHeight: 20 },
+  viewerActions: { flexDirection: 'row', gap: 12, marginTop: 16 },
+  viewerActionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20 },
+  viewerActionText: { color: '#fff', fontSize: 14, fontWeight: '600' },
   // Comments
   commentsOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
   commentsSheet: { backgroundColor: colors.bgCard || colors.bgSecondary, borderTopLeftRadius: 24, borderTopRightRadius: 24, height: '70%' },

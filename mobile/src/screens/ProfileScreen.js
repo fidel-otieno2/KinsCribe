@@ -53,6 +53,7 @@ export default function ProfileScreen({ navigation }) {
   const [listModal, setListModal] = useState({ visible: false, type: null, data: [], loading: false });
   const [myStories, setMyStories] = useState([]);
   const [archivedStories, setArchivedStories] = useState([]);
+  const [archivedViewer, setArchivedViewer] = useState(null);
   const [family, setFamily] = useState(null);
   const [myGroups, setMyGroups] = useState({ admin_groups: [], member_groups: [] });
   const [familyPostsGroup, setFamilyPostsGroup] = useState(null); // selected group for family tab
@@ -105,7 +106,9 @@ export default function ProfileScreen({ navigation }) {
   }, [user]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
-  useFocusEffect(useCallback(() => { fetchAll(); }, [fetchAll]));
+  useFocusEffect(useCallback(() => { 
+    fetchAll(); 
+  }, [fetchAll]));
 
   const fetchFamilyPosts = useCallback(async (group) => {
     if (!group || !user) return;
@@ -858,7 +861,7 @@ export default function ProfileScreen({ navigation }) {
                     key={item.id}
                     style={s.gridItem}
                     activeOpacity={0.85}
-                    onPress={() => navigation.navigate('Family')}
+                    onPress={() => setArchivedViewer(item)}
                   >
                     {item.media_url ? (
                       <Image source={{ uri: item.media_url }} style={s.gridImg} resizeMode="cover" />
@@ -921,6 +924,40 @@ export default function ProfileScreen({ navigation }) {
         )}
         <View style={{ height: 100 }} />
       </ScrollView>
+
+      {/* Archived Story Viewer Modal */}
+      <Modal visible={!!archivedViewer} transparent animationType="fade" onRequestClose={() => setArchivedViewer(null)}>
+        <View style={s.archivedViewerOverlay}>
+          <TouchableOpacity style={s.archivedViewerClose} onPress={() => setArchivedViewer(null)}>
+            <Ionicons name="close" size={28} color="#fff" />
+          </TouchableOpacity>
+          {archivedViewer?.media_url && (
+            <Image source={{ uri: archivedViewer.media_url }} style={s.archivedViewerImg} resizeMode="contain" />
+          )}
+          <View style={s.archivedViewerInfo}>
+            <AppText style={s.archivedViewerTitle}>{archivedViewer?.title}</AppText>
+            {archivedViewer?.content && <AppText style={s.archivedViewerContent}>{archivedViewer.content}</AppText>}
+            <TouchableOpacity
+              style={[s.unarchiveBtn, { opacity: 0.9 }]}
+              onPress={async () => {
+                try {
+                  await api.post(`/stories/${archivedViewer.id}/archive`);
+                  setArchivedStories(prev => prev.filter(s => s.id !== archivedViewer.id));
+                  setArchivedViewer(null);
+                  success('Story unarchived - check Family feed');
+                  // Refresh to update counts
+                  setTimeout(() => fetchAll(), 500);
+                } catch {
+                  error('Failed to unarchive');
+                }
+              }}
+            >
+              <Ionicons name="archive-outline" size={18} color="#fff" />
+              <AppText style={s.unarchiveBtnText}>Unarchive Story</AppText>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -1048,4 +1085,12 @@ const s = StyleSheet.create({
   familyStoryBadge: { position: 'absolute', top: 5, right: 5, backgroundColor: 'rgba(16,185,129,0.85)', borderRadius: 6, padding: 3 },
   archivedBadge: { position: 'absolute', top: 5, right: 5, backgroundColor: 'rgba(245,158,11,0.85)', borderRadius: 6, padding: 3 },
   emptySub: { fontSize: 13, color: colors.dim, textAlign: 'center', marginTop: 4, lineHeight: 19 },
+  archivedViewerOverlay: { flex: 1, backgroundColor: '#000', justifyContent: 'center' },
+  archivedViewerClose: { position: 'absolute', top: 52, right: 16, zIndex: 10, padding: 8, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 20 },
+  archivedViewerImg: { width: '100%', height: '70%' },
+  archivedViewerInfo: { padding: 20 },
+  archivedViewerTitle: { fontSize: 20, fontWeight: '800', color: '#fff', marginBottom: 8 },
+  archivedViewerContent: { fontSize: 14, color: 'rgba(255,255,255,0.7)', lineHeight: 20, marginBottom: 16 },
+  unarchiveBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(245,158,11,0.9)', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 20, alignSelf: 'flex-start' },
+  unarchiveBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
 });
