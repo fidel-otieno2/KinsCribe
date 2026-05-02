@@ -289,10 +289,10 @@ export default function FamilyBudgetScreen({ navigation }) {
       </ScrollView>
 
       <Modal visible={showAdd} transparent animationType="slide" onRequestClose={() => setShowAdd(false)}>
-        <BlurView intensity={20} tint="dark" style={{ flex: 1, justifyContent: 'flex-end' }}>
-          <View style={s.addSheet}>
-            <LinearGradient colors={['rgba(124,58,237,0.1)', '#0f172a']} style={StyleSheet.absoluteFill} />
-            <View style={s.modalHandle} />
+        <BlurView intensity={40} tint="dark" style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.7)' }}>
+          <View style={[s.addSheet, { backgroundColor: isDark ? '#0f172a' : '#1e293b' }]}>
+            <LinearGradient colors={isDark ? ['rgba(124,58,237,0.15)', '#0f172a'] : ['rgba(124,58,237,0.1)', '#1e293b']} style={StyleSheet.absoluteFill} />
+            <View style={[s.modalHandle, { backgroundColor: theme.border }]} />
             <AppText style={[s.modalTitle, { color: theme.text }]}>{editingEntry ? 'Edit Entry' : 'Add Entry'}</AppText>
 
             <View style={s.typeToggle}>
@@ -364,7 +364,7 @@ const s = StyleSheet.create({
   empty: { alignItems: 'center', marginTop: 40, gap: 8 },
   emptyTitle: { fontSize: 16, fontWeight: '700', color: colors.text },
   emptySub: { fontSize: 13, color: colors.muted },
-  addSheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, overflow: 'hidden', padding: 24, paddingBottom: 40 },
+  addSheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, overflow: 'hidden', padding: 24, paddingBottom: 40, borderWidth: 1, borderColor: 'rgba(124,58,237,0.3)' },
   modalHandle: { width: 40, height: 4, backgroundColor: colors.border, borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
   modalTitle: { fontSize: 20, fontWeight: '800', color: colors.text, marginBottom: 16 },
   typeToggle: { flexDirection: 'row', gap: 10, marginBottom: 16 },
