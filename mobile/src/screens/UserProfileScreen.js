@@ -223,12 +223,12 @@ export default function UserProfileScreen({ route, navigation }) {
             <AppText style={s.statLabel}>{t('posts')}</AppText>
           </View>
           <View style={s.stat}>
-            <AppText style={s.statNum}>{profile?.connection_count || 0}</AppText>
-            <AppText style={s.statLabel}>{t('connections')}</AppText>
+            <AppText style={s.statNum}>{profile?.follower_count || 0}</AppText>
+            <AppText style={s.statLabel}>Followers</AppText>
           </View>
           <View style={s.stat}>
-            <AppText style={s.statNum}>{profile?.interest_count || 0}</AppText>
-            <AppText style={s.statLabel}>{t('interests')}</AppText>
+            <AppText style={s.statNum}>{profile?.following_count || 0}</AppText>
+            <AppText style={s.statLabel}>Following</AppText>
           </View>
         </View>
       </View>
@@ -251,7 +251,7 @@ export default function UserProfileScreen({ route, navigation }) {
         {profile?.bio && <AppText style={s.bio}>{profile.bio}</AppText>}
         {followsYou && <AppText style={s.followsYouBadge}>{t('follows_you')}</AppText>}
         {mutualCount > 0 && (
-          <AppText style={s.mutualText}>{mutualCount} mutual connection{mutualCount !== 1 ? 's' : ''}</AppText>
+          <AppText style={s.mutualText}>{mutualCount} mutual follower{mutualCount !== 1 ? 's' : ''}</AppText>
         )}
       </View>
 

@@ -18,10 +18,10 @@ def get_user_profile(user_id):
     current_id = int(get_jwt_identity())
     user = User.query.get_or_404(user_id)
     d = user.to_dict()
-    # Add connection count / interest count
+    # Add follower count / following count
     from models.social import Connection
-    d["connection_count"] = Connection.query.filter_by(following_id=user_id, status="accepted").count()
-    d["interest_count"] = Connection.query.filter_by(follower_id=user_id, status="accepted").count()
+    d["follower_count"] = Connection.query.filter_by(following_id=user_id, status="accepted").count()
+    d["following_count"] = Connection.query.filter_by(follower_id=user_id, status="accepted").count()
     return jsonify({"user": d})
 
 
@@ -44,20 +44,20 @@ def toggle_connection(user_id):
         # Cancel follow / unfollow / withdraw request
         db.session.delete(existing)
         db.session.commit()
-        return jsonify({"connected": False, "status": None})
+        return jsonify({"following": False, "status": None})
 
     # If target account is private → send a pending follow request
     if target.is_private:
         conn = Connection(follower_id=current.id, following_id=user_id, status="pending")
         db.session.add(conn)
         db.session.commit()
-        return jsonify({"connected": False, "status": "pending", "requested": True})
+        return jsonify({"following": False, "status": "pending", "requested": True})
 
     # Public account → accept immediately
     conn = Connection(follower_id=current.id, following_id=user_id, status="accepted")
     db.session.add(conn)
     db.session.commit()
-    return jsonify({"connected": True, "status": "accepted"})
+    return jsonify({"following": True, "status": "accepted"})
 
 
 @connection_bp.route("/<int:user_id>/status", methods=["GET"])
@@ -73,9 +73,9 @@ def connection_status(user_id):
     ).first() is not None
 
     if conn is None:
-        return jsonify({"connected": False, "status": None, "follows_you": follows_you})
+        return jsonify({"following": False, "status": None, "follows_you": follows_you})
     return jsonify({
-        "connected": conn.status == "accepted",
+        "following": conn.status == "accepted",
         "status": conn.status,
         "follows_you": follows_you,
         "requested": conn.status == "pending",
@@ -130,26 +130,26 @@ def decline_request(conn_id):
     return jsonify({"message": "Request declined"})
 
 
-@connection_bp.route("/<int:user_id>/connections", methods=["GET"])
+@connection_bp.route("/<int:user_id>/followers", methods=["GET"])
 @jwt_required()
-def get_connections(user_id):
-    """People who are accepted followers of this user"""
+def get_followers(user_id):
+    """People who are following this user"""
     rows = Connection.query.filter_by(following_id=user_id, status="accepted").all()
     users = []
     current_id = int(get_jwt_identity())
     for r in rows:
         u = User.query.get(r.follower_id)
         if u:
-            is_connected = Connection.query.filter_by(
+            is_following = Connection.query.filter_by(
                 follower_id=current_id, following_id=u.id, status="accepted"
             ).first() is not None
-            users.append({**u.to_dict(), "is_connected": is_connected})
-    return jsonify({"connections": users})
+            users.append({**u.to_dict(), "is_following": is_following})
+    return jsonify({"followers": users})
 
 
-@connection_bp.route("/<int:user_id>/interests", methods=["GET"])
+@connection_bp.route("/<int:user_id>/following", methods=["GET"])
 @jwt_required()
-def get_interests(user_id):
+def get_following(user_id):
     """People this user is following (accepted)"""
     rows = Connection.query.filter_by(follower_id=user_id, status="accepted").all()
     users = []
@@ -157,17 +157,17 @@ def get_interests(user_id):
     for r in rows:
         u = User.query.get(r.following_id)
         if u:
-            is_connected = Connection.query.filter_by(
+            is_following = Connection.query.filter_by(
                 follower_id=current_id, following_id=u.id, status="accepted"
             ).first() is not None
-            users.append({**u.to_dict(), "is_connected": is_connected})
-    return jsonify({"interests": users})
+            users.append({**u.to_dict(), "is_following": is_following})
+    return jsonify({"following": users})
 
 
 @connection_bp.route("/suggestions", methods=["GET"])
 @jwt_required()
 def suggestions():
-    """Suggest users not yet connected to"""
+    """Suggest users not yet following"""
     current = me()
     already = {c.following_id for c in Connection.query.filter_by(follower_id=current.id).all()}
     already.add(current.id)
@@ -202,8 +202,8 @@ def search_users():
         ).first()
         result.append({
             **u.to_dict(),
-            "is_connected": conn.status == "accepted" if conn else False,
-            "connection_status": conn.status if conn else None,
+            "is_following": conn.status == "accepted" if conn else False,
+            "follow_status": conn.status if conn else None,
         })
     return jsonify({"users": result})
 
@@ -279,8 +279,8 @@ def block_status(user_id):
 
 @connection_bp.route("/<int:user_id>/mutual", methods=["GET"])
 @jwt_required()
-def mutual_connections(user_id):
-    """Count mutual connections between current user and target user."""
+def mutual_followers(user_id):
+    """Count mutual followers between current user and target user."""
     current_id = int(get_jwt_identity())
     my_following = {c.following_id for c in Connection.query.filter_by(follower_id=current_id, status="accepted").all()}
     their_following = {c.following_id for c in Connection.query.filter_by(follower_id=user_id, status="accepted").all()}

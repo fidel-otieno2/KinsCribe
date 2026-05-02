@@ -25,21 +25,21 @@ function Avatar({ uri, name, size = 48 }) {
 export default function ConnectionCRMScreen({ navigation }) {
   const { user } = useAuth();
   const { t } = useTranslation();
-  const [connections, setConnections] = useState([]);
-  const [interests, setInterests] = useState([]);
+  const [followers, setFollowers] = useState([]);
+  const [following, setFollowing] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState('connections'); // connections | interests
+  const [tab, setTab] = useState('followers'); // followers | following
   const [query, setQuery] = useState('');
 
   const fetchAll = useCallback(async () => {
     if (!user) return;
     try {
-      const [connRes, intRes] = await Promise.all([
-        api.get(`/connections/${user.id}/connections`).catch(() => ({ data: { connections: [] } })),
-        api.get(`/connections/${user.id}/interests`).catch(() => ({ data: { interests: [] } })),
+      const [followersRes, followingRes] = await Promise.all([
+        api.get(`/connections/${user.id}/followers`).catch(() => ({ data: { followers: [] } })),
+        api.get(`/connections/${user.id}/following`).catch(() => ({ data: { following: [] } })),
       ]);
-      setConnections(connRes.data.connections || []);
-      setInterests(intRes.data.interests || []);
+      setFollowers(followersRes.data.followers || []);
+      setFollowing(followingRes.data.following || []);
     } catch {} finally { setLoading(false); }
   }, [user]);
 
@@ -47,11 +47,11 @@ export default function ConnectionCRMScreen({ navigation }) {
 
   const handleRemove = (userId, name) => {
     Alert.alert(
-      'Remove Connection',
-      `Remove ${name} from your connections?`,
+      'Unfollow',
+      `Unfollow ${name}?`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Remove', style: 'destructive', onPress: async () => {
+        { text: 'Unfollow', style: 'destructive', onPress: async () => {
           try {
             await api.post(`/connections/${userId}/toggle`);
             fetchAll();
@@ -61,7 +61,7 @@ export default function ConnectionCRMScreen({ navigation }) {
     );
   };
 
-  const data = (tab === 'connections' ? connections : interests)
+  const data = (tab === 'followers' ? followers : following)
     .filter(u => !query || u.name?.toLowerCase().includes(query.toLowerCase()) || u.username?.toLowerCase().includes(query.toLowerCase()));
 
   const renderItem = ({ item }) => (
@@ -88,7 +88,7 @@ export default function ConnectionCRMScreen({ navigation }) {
         >
           <Ionicons name="chatbubble-outline" size={18} color={colors.primary} />
         </TouchableOpacity>
-        {tab === 'connections' && (
+        {tab === 'following' && (
           <TouchableOpacity style={s.removeBtn} onPress={() => handleRemove(item.id, item.name)}>
             <Ionicons name="person-remove-outline" size={18} color="#f87171" />
           </TouchableOpacity>
@@ -110,14 +110,14 @@ export default function ConnectionCRMScreen({ navigation }) {
 
       {/* Tabs */}
       <View style={s.tabRow}>
-        <TouchableOpacity style={[s.tabBtn, tab === 'connections' && s.tabBtnActive]} onPress={() => setTab('connections')}>
-          <AppText style={[s.tabText, tab === 'connections' && s.tabTextActive]}>
-            Connections ({connections.length})
+        <TouchableOpacity style={[s.tabBtn, tab === 'followers' && s.tabBtnActive]} onPress={() => setTab('followers')}>
+          <AppText style={[s.tabText, tab === 'followers' && s.tabTextActive]}>
+            Followers ({followers.length})
           </AppText>
         </TouchableOpacity>
-        <TouchableOpacity style={[s.tabBtn, tab === 'interests' && s.tabBtnActive]} onPress={() => setTab('interests')}>
-          <AppText style={[s.tabText, tab === 'interests' && s.tabTextActive]}>
-            Following ({interests.length})
+        <TouchableOpacity style={[s.tabBtn, tab === 'following' && s.tabBtnActive]} onPress={() => setTab('following')}>
+          <AppText style={[s.tabText, tab === 'following' && s.tabTextActive]}>
+            Following ({following.length})
           </AppText>
         </TouchableOpacity>
       </View>
@@ -146,7 +146,7 @@ export default function ConnectionCRMScreen({ navigation }) {
           ListEmptyComponent={
             <View style={s.empty}>
               <Ionicons name="people-outline" size={48} color={colors.dim} />
-              <AppText style={s.emptyText}>{query ? 'No results' : tab === 'connections' ? 'No connections yet' : 'Not following anyone yet'}</AppText>
+              <AppText style={s.emptyText}>{query ? 'No results' : tab === 'followers' ? 'No followers yet' : 'Not following anyone yet'}</AppText>
             </View>
           }
         />

@@ -841,8 +841,13 @@ export default function FamilyScreen({ navigation }) {
   const fetchFamily = useCallback(async () => {
     try {
       const { data } = await api.get('/family/my-family');
-      console.log('Family data received:', data.family);
+      console.log('=== FAMILY DATA DEBUG ===');
+      console.log('Full family object:', JSON.stringify(data.family, null, 2));
+      console.log('Family name:', data.family?.name);
       console.log('Family avatar_url:', data.family?.avatar_url);
+      console.log('Family motto:', data.family?.motto);
+      console.log('Family description:', data.family?.description);
+      console.log('========================');
       setFamily(data.family);
       const memberList = data.members || [];
       setMembers(memberList);
@@ -915,9 +920,12 @@ export default function FamilyScreen({ navigation }) {
               <AppText style={s.familyDescription} numberOfLines={2}>{family.description}</AppText>
             )}
             
-            {!family?.description && !family?.motto && (
+            {/* Show member count or placeholder */}
+            {!family?.motto && !family?.description ? (
               <AppText style={s.memberCount}>{members.length} members</AppText>
-            )}
+            ) : !family?.description && family?.motto ? (
+              <AppText style={s.memberCount}>{members.length} members</AppText>
+            ) : null}
           </View>
         </TouchableOpacity>
         

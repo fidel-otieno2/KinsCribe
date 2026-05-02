@@ -131,7 +131,7 @@ def _get_all_notifications(user):
                     "created_at": comment.created_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 })
 
-    # ── 4. New connections / follow requests ─────────────────
+    # ── 4. New followers / follow requests ─────────────────
     for conn in Connection.query.filter_by(following_id=user.id).order_by(Connection.id.desc()).limit(20).all():
         actor = User.query.get(conn.follower_id)
         if actor:
@@ -139,7 +139,7 @@ def _get_all_notifications(user):
                 notifs.append({
                     "id": f"follow_request-{conn.id}",
                     "type": "follow_request",
-                    "source": "connection",
+                    "source": "follow",
                     "actor_name": actor.name,
                     "actor_avatar": actor.avatar_url,
                     "actor_id": actor.id,
@@ -150,13 +150,13 @@ def _get_all_notifications(user):
                 })
             else:
                 notifs.append({
-                    "id": f"connection-{conn.id}",
-                    "type": "connection",
-                    "source": "connection",
+                    "id": f"follow-{conn.id}",
+                    "type": "follow",
+                    "source": "follow",
                     "actor_name": actor.name,
                     "actor_avatar": actor.avatar_url,
                     "actor_id": actor.id,
-                    "title": f"{actor.name} connected with you",
+                    "title": f"{actor.name} followed you",
                     "body": f"@{actor.username}" if actor.username else "",
                     "created_at": conn.created_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 })

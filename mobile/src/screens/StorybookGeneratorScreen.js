@@ -45,10 +45,10 @@ export default function StorybookGeneratorScreen({ navigation }) {
   };
 
   const generateStorybook = async () => {
-    if (selected.length < 3) return info('Select at least 3 stories to generate a storybook');
+    if (selected.length < 1) return info('Select at least 1 story to generate a storybook');
     setGenerating(true);
     try {
-      const res = await api.post("/storybooks", {
+      const res = await api.post("/storybooks/generate", {
         story_ids: selected,
         title: `Family Memories ${new Date().getFullYear()}`,
       });
@@ -117,7 +117,7 @@ export default function StorybookGeneratorScreen({ navigation }) {
         <TouchableOpacity
           style={s.btnContent}
           onPress={generateStorybook}
-          disabled={generating || selected.length < 3}
+          disabled={generating || selected.length < 1}
         >
           {generating ? (
             <ActivityIndicator color="#fff" />

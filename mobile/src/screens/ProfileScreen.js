@@ -50,7 +50,7 @@ export default function ProfileScreen({ navigation }) {
   const [uploading, setUploading] = useState(false);
   const [showQR, setShowQR] = useState(false);
   const [feedLayout, setFeedLayout] = useState('grid'); // 'grid' | 'list'
-  const [stats, setStats] = useState({ posts: 0, connections: 0, interests: 0 });
+  const [stats, setStats] = useState({ posts: 0, followers: 0, following: 0 });
   const [listModal, setListModal] = useState({ visible: false, type: null, data: [], loading: false });
   const [myStories, setMyStories] = useState([]);
   const [archivedStories, setArchivedStories] = useState([]);
@@ -100,8 +100,8 @@ export default function ProfileScreen({ navigation }) {
         .catch(() => {});
       setStats({
         posts: allPosts.length,
-        connections: user.connection_count || 0,
-        interests: user.interest_count || 0,
+        followers: user.follower_count || 0,
+        following: user.following_count || 0,
       });
     } catch {} finally {
       setLoading(false);
@@ -161,11 +161,11 @@ export default function ProfileScreen({ navigation }) {
   const openList = async (type) => {
     setListModal({ visible: true, type, data: [], loading: true });
     try {
-      const endpoint = type === 'connections'
-        ? `/connections/${user.id}/connections`
-        : `/connections/${user.id}/interests`;
+      const endpoint = type === 'followers'
+        ? `/connections/${user.id}/followers`
+        : `/connections/${user.id}/following`;
+      const key = type === 'followers' ? 'followers' : 'following';
       const res = await api.get(endpoint);
-      const key = type === 'connections' ? 'connections' : 'interests';
       setListModal(prev => ({ ...prev, data: res.data[key] || [], loading: false }));
     } catch {
       setListModal(prev => ({ ...prev, loading: false }));
@@ -336,13 +336,13 @@ export default function ProfileScreen({ navigation }) {
             <AppText style={[s.statNum, { color: theme.text }]}>{stats.posts}</AppText>
             <AppText style={[s.statLabel, { color: theme.muted }]}>{t('posts')}</AppText>
           </View>
-          <TouchableOpacity style={s.stat} onPress={() => openList('connections')}>
-            <AppText style={[s.statNum, { color: theme.text }]}>{stats.connections}</AppText>
-            <AppText style={[s.statLabel, { color: theme.muted }]}>{t('connections')}</AppText>
+          <TouchableOpacity style={s.stat} onPress={() => openList('followers')}>
+            <AppText style={[s.statNum, { color: theme.text }]}>{stats.followers}</AppText>
+            <AppText style={[s.statLabel, { color: theme.muted }]}>Followers</AppText>
           </TouchableOpacity>
-          <TouchableOpacity style={s.stat} onPress={() => openList('interests')}>
-            <AppText style={[s.statNum, { color: theme.text }]}>{stats.interests}</AppText>
-            <AppText style={[s.statLabel, { color: theme.muted }]}>{t('interests')}</AppText>
+          <TouchableOpacity style={s.stat} onPress={() => openList('following')}>
+            <AppText style={[s.statNum, { color: theme.text }]}>{stats.following}</AppText>
+            <AppText style={[s.statLabel, { color: theme.muted }]}>Following</AppText>
           </TouchableOpacity>
         </View>
       </View>
@@ -539,7 +539,7 @@ export default function ProfileScreen({ navigation }) {
           <View style={[s.modalSheet, { backgroundColor: theme.bgCard }]}>
             <View style={[s.modalHeader, { borderBottomColor: theme.border }]}>
               <AppText style={[s.modalTitle, { color: theme.text }]}>
-                {listModal.type === 'connections' ? t('connections') : t('interests')}
+                {listModal.type === 'followers' ? 'Followers' : 'Following'}
               </AppText>
               <TouchableOpacity onPress={() => setListModal(prev => ({ ...prev, visible: false }))} style={s.modalClose}>
                 <Ionicons name="close" size={22} color={theme.muted} />
