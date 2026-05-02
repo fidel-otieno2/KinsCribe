@@ -24,6 +24,60 @@ def me():
 
 # ── Family Tree ───────────────────────────────────────────────
 
+@extras_bp.route("/tree/auto-generate", methods=["POST"])
+@jwt_required()
+def auto_generate_tree():
+    """Auto-generate family tree from family members"""
+    user = me()
+    if not user.family_id:
+        return jsonify({"error": "Not in a family"}), 403
+    
+    from models.family import FamilyMember
+    
+    # Get all family members
+    members = FamilyMember.query.filter_by(family_id=user.family_id).all()
+    if not members:
+        return jsonify({"error": "No family members found"}), 404
+    
+    # Clear existing tree nodes for this family
+    FamilyTreeNode.query.filter_by(family_id=user.family_id).delete()
+    
+    # Create nodes for each member
+    created_nodes = []
+    for idx, member in enumerate(members):
+        member_user = User.query.get(member.user_id)
+        if not member_user:
+            continue
+            
+        # Determine generation based on role or position
+        # Current user is generation 0, admins might be parents (-1)
+        generation = 0
+        if member.role == 'admin' and member.user_id != user.id:
+            generation = -1  # Parents/older generation
+        elif member.user_id == user.id:
+            generation = 0  # Current user
+        
+        node = FamilyTreeNode(
+            family_id=user.family_id,
+            user_id=member.user_id,
+            display_name=member_user.name,
+            display_avatar=member_user.avatar_url,
+            relationship_label='You' if member.user_id == user.id else 'Family Member',
+            generation=generation,
+            parent_node_id=None,
+            is_deceased=False
+        )
+        db.session.add(node)
+        created_nodes.append(node)
+    
+    db.session.commit()
+    
+    return jsonify({
+        "nodes": [n.to_dict() for n in created_nodes],
+        "message": f"Generated tree with {len(created_nodes)} members"
+    }), 201
+
+
 @extras_bp.route("/tree", methods=["GET"])
 @jwt_required()
 def get_tree():
@@ -65,6 +119,27 @@ def add_tree_node():
     return jsonify({"node": node.to_dict()}), 201
 
 
+@extras_bp.route("/tree/<int:node_id>/set-parent", methods=["POST"])
+@jwt_required()
+def set_node_parent(node_id):
+    """Set parent relationship for a node"""
+    node = FamilyTreeNode.query.get_or_404(node_id)
+    data = request.get_json() or {}
+    parent_id = data.get("parent_node_id")
+    
+    if parent_id:
+        parent = FamilyTreeNode.query.get(parent_id)
+        if parent and parent.family_id == node.family_id:
+            node.parent_node_id = parent_id
+            # Auto-adjust generation
+            node.generation = parent.generation + 1
+    else:
+        node.parent_node_id = None
+    
+    db.session.commit()
+    return jsonify({"node": node.to_dict()})
+
+
 @extras_bp.route("/tree/<int:node_id>", methods=["PUT"])
 @jwt_required()
 def update_tree_node(node_id):
@@ -82,10 +157,46 @@ def update_tree_node(node_id):
     return jsonify({"node": node.to_dict()})
 
 
+@extras_bp.route("/tree/<int:node_id>/set-partner", methods=["POST"])
+@jwt_required()
+def set_node_partner(node_id):
+    """Set partner relationship for a node"""
+    node = FamilyTreeNode.query.get_or_404(node_id)
+    data = request.get_json() or {}
+    partner_id = data.get("partner_node_id")
+    
+    if partner_id:
+        partner = FamilyTreeNode.query.get(partner_id)
+        if partner and partner.family_id == node.family_id:
+            node.partner_node_id = partner_id
+            # Set reciprocal relationship
+            partner.partner_node_id = node_id
+            # Partners should be in same generation
+            partner.generation = node.generation
+    else:
+        # Clear partner relationship
+        if node.partner_node_id:
+            old_partner = FamilyTreeNode.query.get(node.partner_node_id)
+            if old_partner:
+                old_partner.partner_node_id = None
+        node.partner_node_id = None
+    
+    db.session.commit()
+    return jsonify({"node": node.to_dict()})
+
+
 @extras_bp.route("/tree/<int:node_id>", methods=["DELETE"])
 @jwt_required()
 def delete_tree_node(node_id):
     node = FamilyTreeNode.query.get_or_404(node_id)
+    # Clear partner relationships
+    if node.partner_node_id:
+        partner = FamilyTreeNode.query.get(node.partner_node_id)
+        if partner:
+            partner.partner_node_id = None
+    # Update children to remove parent reference
+    for child in node.children:
+        child.parent_node_id = None
     db.session.delete(node)
     db.session.commit()
     return jsonify({"message": "Deleted"})
@@ -139,6 +250,39 @@ def create_event():
     db.session.add(event)
     db.session.commit()
     return jsonify({"event": event.to_dict()}), 201
+
+
+@extras_bp.route("/calendar/<int:event_id>", methods=["PUT"])
+@jwt_required()
+def update_event(event_id):
+    event = FamilyEvent.query.get_or_404(event_id)
+    data = request.get_json() or {}
+    
+    # Update fields
+    if "title" in data:
+        event.title = data["title"]
+    if "description" in data:
+        event.description = data["description"]
+    if "event_type" in data:
+        event.event_type = data["event_type"]
+    if "color" in data:
+        event.color = data["color"]
+    if "is_recurring" in data:
+        event.is_recurring = data["is_recurring"]
+    if "recurrence" in data:
+        event.recurrence = data["recurrence"]
+    
+    # Update dates
+    try:
+        if "event_date" in data:
+            event.event_date = datetime.fromisoformat(data["event_date"])
+        if "end_date" in data:
+            event.end_date = datetime.fromisoformat(data["end_date"]) if data["end_date"] else None
+    except:
+        return jsonify({"error": "Invalid date format"}), 400
+    
+    db.session.commit()
+    return jsonify({"event": event.to_dict()})
 
 
 @extras_bp.route("/calendar/<int:event_id>", methods=["DELETE"])

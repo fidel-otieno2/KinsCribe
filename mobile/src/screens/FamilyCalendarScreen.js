@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   View, StyleSheet, TouchableOpacity, ScrollView,
   ActivityIndicator, Alert, TextInput, Modal, Dimensions,
+  Platform,
 } from 'react-native';
 import AppText from '../components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -13,6 +14,7 @@ import { useTranslation } from '../i18n';
 import { colors, radius } from '../theme';
 import Toast from '../components/Toast';
 import useToast from '../hooks/useToast';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 const { width } = Dimensions.get('window');
 const DAY_SIZE = (width - 32 - 24) / 7;
@@ -25,22 +27,230 @@ const EVENT_TYPES = [
   { key: 'anniversary', label: '💍 Anniversary', color: '#f59e0b' },
   { key: 'event', label: '📅 Event', color: '#7c3aed' },
   { key: 'milestone', label: '🏆 Milestone', color: '#10b981' },
+  { key: 'appointment', label: '🏥 Appointment', color: '#3b82f6' },
+  { key: 'vacation', label: '✈️ Vacation', color: '#06b6d4' },
+  { key: 'meeting', label: '👥 Meeting', color: '#8b5cf6' },
 ];
 
-function AddEventModal({ visible, onClose, onSave, selectedDate }) {
+function EventDetailsModal({ visible, onClose, event, onDelete, onEdit }) {
+  const { theme } = useTheme();
+  
+  if (!event) return null;
+  
+  const eventType = EVENT_TYPES.find(t => t.key === event.event_type) || EVENT_TYPES[2];
+  const eventDate = new Date(event.event_date);
+  
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <TouchableOpacity 
+        style={m.overlay} 
+        activeOpacity={1} 
+        onPress={onClose}
+      >
+        <BlurView intensity={30} tint="dark" style={m.overlay}>
+          <TouchableOpacity 
+            activeOpacity={1} 
+            style={m.detailsCard}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <LinearGradient 
+              colors={[`${event.color}22`, 'rgba(15,23,42,0.95)']} 
+              style={StyleSheet.absoluteFill} 
+            />
+            
+            {/* Header */}
+            <View style={[m.detailsHeader, { borderBottomColor: theme.border }]}>
+              <View style={[m.eventTypeIcon, { backgroundColor: `${event.color}33` }]}>
+                <AppText style={{ fontSize: 24 }}>{eventType.label.split(' ')[0]}</AppText>
+              </View>
+              <TouchableOpacity onPress={onClose} style={m.closeBtn}>
+                <Ionicons name="close" size={24} color={theme.text} />
+              </TouchableOpacity>
+            </View>
+            
+            {/* Content */}
+            <ScrollView style={m.detailsContent} showsVerticalScrollIndicator={false}>
+              <AppText style={[m.detailsTitle, { color: theme.text }]}>{event.title}</AppText>
+              
+              <View style={m.detailsRow}>
+                <Ionicons name="calendar-outline" size={20} color={event.color} />
+                <View style={{ flex: 1 }}>
+                  <AppText style={[m.detailsLabel, { color: theme.muted }]}>Date & Time</AppText>
+                  <AppText style={[m.detailsValue, { color: theme.text }]}>
+                    {eventDate.toLocaleDateString('en-US', { 
+                      weekday: 'long', 
+                      month: 'long', 
+                      day: 'numeric', 
+                      year: 'numeric' 
+                    })}
+                  </AppText>
+                  <AppText style={[m.detailsValue, { color: theme.muted, fontSize: 13 }]}>
+                    {eventDate.toLocaleTimeString('en-US', { 
+                      hour: '2-digit', 
+                      minute: '2-digit' 
+                    })}
+                  </AppText>
+                </View>
+              </View>
+              
+              {event.description && (
+                <View style={m.detailsRow}>
+                  <Ionicons name="document-text-outline" size={20} color={event.color} />
+                  <View style={{ flex: 1 }}>
+                    <AppText style={[m.detailsLabel, { color: theme.muted }]}>Description</AppText>
+                    <AppText style={[m.detailsValue, { color: theme.text }]}>
+                      {event.description}
+                    </AppText>
+                  </View>
+                </View>
+              )}
+              
+              <View style={m.detailsRow}>
+                <Ionicons name="pricetag-outline" size={20} color={event.color} />
+                <View style={{ flex: 1 }}>
+                  <AppText style={[m.detailsLabel, { color: theme.muted }]}>Type</AppText>
+                  <AppText style={[m.detailsValue, { color: theme.text }]}>
+                    {eventType.label}
+                  </AppText>
+                </View>
+              </View>
+              
+              {event.is_recurring && (
+                <View style={m.detailsRow}>
+                  <Ionicons name="repeat-outline" size={20} color={event.color} />
+                  <View style={{ flex: 1 }}>
+                    <AppText style={[m.detailsLabel, { color: theme.muted }]}>Recurring</AppText>
+                    <AppText style={[m.detailsValue, { color: theme.text }]}>
+                      Repeats {event.recurrence || 'yearly'}
+                    </AppText>
+                  </View>
+                </View>
+              )}
+              
+              {event.creator_name && (
+                <View style={m.detailsRow}>
+                  <Ionicons name="person-outline" size={20} color={event.color} />
+                  <View style={{ flex: 1 }}>
+                    <AppText style={[m.detailsLabel, { color: theme.muted }]}>Created by</AppText>
+                    <AppText style={[m.detailsValue, { color: theme.text }]}>
+                      {event.creator_name}
+                    </AppText>
+                  </View>
+                </View>
+              )}
+            </ScrollView>
+            
+            {/* Actions */}
+            <View style={[m.detailsActions, { borderTopColor: theme.border }]}>
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <TouchableOpacity 
+                  style={[m.actionBtn, { flex: 1, backgroundColor: 'rgba(124,58,237,0.1)' }]}
+                  onPress={() => {
+                    onClose();
+                    onEdit(event);
+                  }}
+                >
+                  <Ionicons name="create-outline" size={20} color={colors.primary} />
+                  <AppText style={[m.actionBtnText, { color: colors.primary }]}>Edit</AppText>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[m.actionBtn, { flex: 1, backgroundColor: 'rgba(239,68,68,0.1)' }]}
+                  onPress={() => {
+                    onClose();
+                    onDelete(event);
+                  }}
+                >
+                  <Ionicons name="trash-outline" size={20} color="#ef4444" />
+                  <AppText style={[m.actionBtnText, { color: '#ef4444' }]}>Delete</AppText>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </TouchableOpacity>
+        </BlurView>
+      </TouchableOpacity>
+    </Modal>
+  );
+}
+
+function AddEventModal({ visible, onClose, onSave, selectedDate, editEvent }) {
   const { theme } = useTheme();
   const { t } = useTranslation();
   const { toast, hide, info } = useToast();
-  const [form, setForm] = useState({ title: '', description: '', event_type: 'event', color: '#7c3aed', is_recurring: false, recurrence: 'yearly' });
+  const [form, setForm] = useState({ 
+    title: '', 
+    description: '', 
+    event_type: 'event', 
+    color: '#7c3aed', 
+    is_recurring: false, 
+    recurrence: 'yearly',
+    time: new Date(),
+    showTimePicker: false,
+  });
   const [loading, setLoading] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  // Load edit event data
+  useEffect(() => {
+    if (editEvent) {
+      const eventDate = new Date(editEvent.event_date);
+      setForm({
+        title: editEvent.title || '',
+        description: editEvent.description || '',
+        event_type: editEvent.event_type || 'event',
+        color: editEvent.color || '#7c3aed',
+        is_recurring: editEvent.is_recurring || false,
+        recurrence: editEvent.recurrence || 'yearly',
+        time: eventDate,
+        showTimePicker: false,
+      });
+    } else {
+      setForm({
+        title: '',
+        description: '',
+        event_type: 'event',
+        color: '#7c3aed',
+        is_recurring: false,
+        recurrence: 'yearly',
+        time: new Date(),
+        showTimePicker: false,
+      });
+    }
+  }, [editEvent, visible]);
 
   const handleSave = async () => {
     if (!form.title.trim()) return info('Please enter an event title');
     setLoading(true);
     try {
-      await onSave({ ...form, event_date: selectedDate?.toISOString() });
-      setForm({ title: '', description: '', event_type: 'event', color: '#7c3aed', is_recurring: false, recurrence: 'yearly' });
+      // Combine selected date with chosen time
+      const eventDateTime = editEvent ? new Date(editEvent.event_date) : new Date(selectedDate);
+      eventDateTime.setHours(form.time.getHours());
+      eventDateTime.setMinutes(form.time.getMinutes());
+      
+      const eventData = { 
+        ...form, 
+        event_date: eventDateTime.toISOString(),
+        showTimePicker: undefined, // Remove UI state
+        time: undefined, // Remove UI state
+      };
+      
+      if (editEvent) {
+        // Update existing event
+        await api.put(`/extras/calendar/${editEvent.id}`, eventData);
+      } else {
+        // Create new event
+        await onSave(eventData);
+      }
+      
+      setForm({ 
+        title: '', 
+        description: '', 
+        event_type: 'event', 
+        color: '#7c3aed', 
+        is_recurring: false, 
+        recurrence: 'yearly',
+        time: new Date(),
+        showTimePicker: false,
+      });
       onClose();
     } catch {} finally { setLoading(false); }
   };
@@ -76,6 +286,30 @@ function AddEventModal({ visible, onClose, onSave, selectedDate }) {
             <AppText style={m.recurringLabel}>Repeat yearly (e.g. birthdays)</AppText>
           </TouchableOpacity>
 
+          <AppText style={m.label}>Time</AppText>
+          <TouchableOpacity 
+            style={[m.input, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: theme.bgCard, borderColor: theme.border2 }]}
+            onPress={() => set('showTimePicker', true)}
+          >
+            <AppText style={{ color: theme.text }}>
+              {form.time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+            </AppText>
+            <Ionicons name="time-outline" size={20} color={theme.muted} />
+          </TouchableOpacity>
+
+          {form.showTimePicker && (
+            <DateTimePicker
+              value={form.time}
+              mode="time"
+              is24Hour={false}
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              onChange={(event, selectedTime) => {
+                set('showTimePicker', Platform.OS === 'ios');
+                if (selectedTime) set('time', selectedTime);
+              }}
+            />
+          )}
+
           <TouchableOpacity style={m.saveBtn} onPress={handleSave} disabled={loading}>
             <LinearGradient colors={['#7c3aed', '#3b82f6']} style={m.saveBtnGrad}>
               {loading ? <ActivityIndicator color="#fff" size="small" /> : <AppText style={m.saveBtnText}>Save Event</AppText>}
@@ -91,7 +325,7 @@ function AddEventModal({ visible, onClose, onSave, selectedDate }) {
 }
 
 const m = StyleSheet.create({
-  overlay: { flex: 1, justifyContent: 'flex-end' },
+  overlay: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
   sheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, overflow: 'hidden', padding: 24, paddingBottom: 40 },
   handle: { width: 40, height: 4, backgroundColor: colors.border, borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
   title: { fontSize: 20, fontWeight: '800', color: colors.text, marginBottom: 4 },
@@ -110,6 +344,70 @@ const m = StyleSheet.create({
   saveBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
   cancelBtn: { alignItems: 'center', paddingVertical: 8 },
   cancelText: { color: colors.muted, fontSize: 14 },
+  closeBtn: { padding: 4 },
+  // Event Details Modal
+  detailsCard: { 
+    width: '100%', 
+    maxWidth: 400,
+    maxHeight: '80%',
+    borderRadius: radius.xl, 
+    overflow: 'hidden',
+    backgroundColor: 'rgba(15,23,42,0.95)',
+  },
+  detailsHeader: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'space-between',
+    padding: 20,
+    borderBottomWidth: 1,
+  },
+  eventTypeIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  detailsContent: {
+    padding: 20,
+  },
+  detailsTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    marginBottom: 24,
+  },
+  detailsRow: {
+    flexDirection: 'row',
+    gap: 16,
+    marginBottom: 20,
+  },
+  detailsLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  detailsValue: {
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  detailsActions: {
+    padding: 20,
+    borderTopWidth: 1,
+  },
+  actionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    padding: 14,
+    borderRadius: radius.md,
+  },
+  actionBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
 });
 
 export default function FamilyCalendarScreen({ navigation }) {
@@ -125,6 +423,9 @@ export default function FamilyCalendarScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [selectedDate, setSelectedDate] = useState(null);
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [showEventDetails, setShowEventDetails] = useState(false);
+  const [editingEvent, setEditingEvent] = useState(null);
 
   const fetchEvents = useCallback(async () => {
     try {
@@ -142,8 +443,23 @@ export default function FamilyCalendarScreen({ navigation }) {
   useEffect(() => { fetchEvents(); }, [fetchEvents]);
 
   const addEvent = async (eventData) => {
-    const { data } = await api.post('/extras/calendar', eventData);
-    setEvents(prev => [...prev, data.event]);
+    try {
+      if (editingEvent) {
+        // Update existing event
+        await api.put(`/extras/calendar/${editingEvent.id}`, eventData);
+        success('Event updated successfully!');
+        setEditingEvent(null);
+      } else {
+        // Create new event
+        const { data } = await api.post('/extras/calendar', eventData);
+        setEvents(prev => [...prev, data.event]);
+        success('Event added successfully!');
+      }
+      fetchEvents(); // Refresh to get updated data
+    } catch (err) {
+      error(editingEvent ? 'Failed to update event' : 'Failed to add event');
+      throw err;
+    }
   };
 
   const deleteEvent = (event) => {
@@ -153,7 +469,11 @@ export default function FamilyCalendarScreen({ navigation }) {
         try {
           await api.delete(`/extras/calendar/${event.id}`);
           setEvents(prev => prev.filter(e => e.id !== event.id));
-        } catch {}
+          setUpcoming(prev => prev.filter(e => e.id !== event.id));
+          success('Event deleted');
+        } catch {
+          error('Failed to delete event');
+        }
       }},
     ]);
   };
@@ -264,12 +584,22 @@ export default function FamilyCalendarScreen({ navigation }) {
           <View style={s.section}>
             <AppText style={[s.sectionTitle, { color: theme.muted }]}>Upcoming Events</AppText>
             {upcoming.map(event => (
-              <TouchableOpacity key={event.id} style={[s.eventRow, { borderBottomColor: theme.border }]} onLongPress={() => deleteEvent(event)} activeOpacity={0.8}>
+              <TouchableOpacity 
+                key={event.id} 
+                style={[s.eventRow, { borderBottomColor: theme.border }]} 
+                onPress={() => {
+                  setSelectedEvent(event);
+                  setShowEventDetails(true);
+                }}
+                activeOpacity={0.8}
+              >
                 <View style={[s.eventColorBar, { backgroundColor: event.color || theme.primary }]} />
                 <View style={{ flex: 1 }}>
                   <AppText style={[s.eventTitle, { color: theme.text }]}>{event.title}</AppText>
                   <AppText style={[s.eventDate, { color: theme.muted }]}>
                     {new Date(event.event_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                    {' · '}
+                    {new Date(event.event_date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                     {event.is_recurring && ' · Yearly'}
                   </AppText>
                 </View>
@@ -286,18 +616,26 @@ export default function FamilyCalendarScreen({ navigation }) {
           <View style={s.section}>
             <AppText style={[s.sectionTitle, { color: theme.muted }]}>{MONTHS[currentMonth]} Events</AppText>
             {events.map(event => (
-              <TouchableOpacity key={event.id} style={[s.eventRow, { borderBottomColor: theme.border }]} onLongPress={() => deleteEvent(event)} activeOpacity={0.8}>
+              <TouchableOpacity 
+                key={event.id} 
+                style={[s.eventRow, { borderBottomColor: theme.border }]} 
+                onPress={() => {
+                  setSelectedEvent(event);
+                  setShowEventDetails(true);
+                }}
+                activeOpacity={0.8}
+              >
                 <View style={[s.eventColorBar, { backgroundColor: event.color || theme.primary }]} />
                 <View style={{ flex: 1 }}>
                   <AppText style={[s.eventTitle, { color: theme.text }]}>{event.title}</AppText>
                   <AppText style={[s.eventDate, { color: theme.muted }]}>
                     {new Date(event.event_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    {event.description ? ` · ${event.description}` : ''}
+                    {' · '}
+                    {new Date(event.event_date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                    {event.description ? ` · ${event.description.substring(0, 30)}${event.description.length > 30 ? '...' : ''}` : ''}
                   </AppText>
                 </View>
-                <TouchableOpacity onPress={() => deleteEvent(event)} style={{ padding: 8 }}>
-                  <Ionicons name="trash-outline" size={16} color={theme.dim} />
-                </TouchableOpacity>
+                <Ionicons name="chevron-forward" size={20} color={theme.dim} />
               </TouchableOpacity>
             ))}
           </View>
@@ -313,9 +651,25 @@ export default function FamilyCalendarScreen({ navigation }) {
 
       <AddEventModal
         visible={showAdd}
-        onClose={() => setShowAdd(false)}
+        onClose={() => {
+          setShowAdd(false);
+          setEditingEvent(null);
+        }}
         onSave={addEvent}
         selectedDate={selectedDate}
+        editEvent={editingEvent}
+      />
+      
+      <EventDetailsModal
+        visible={showEventDetails}
+        onClose={() => setShowEventDetails(false)}
+        event={selectedEvent}
+        onDelete={deleteEvent}
+        onEdit={(event) => {
+          setEditingEvent(event);
+          setSelectedDate(new Date(event.event_date));
+          setShowAdd(true);
+        }}
       />
     </View>
   );
