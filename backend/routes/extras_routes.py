@@ -27,12 +27,17 @@ def me():
 @extras_bp.route("/tree/auto-generate", methods=["POST"])
 @jwt_required()
 def auto_generate_tree():
-    """Auto-generate family tree from family members"""
+    """Auto-generate family tree from family members (admin only)"""
     user = me()
     if not user.family_id:
         return jsonify({"error": "Not in a family"}), 403
     
     from models.family import FamilyMember
+    
+    # Check if user is admin
+    member = FamilyMember.query.filter_by(user_id=user.id, family_id=user.family_id).first()
+    if not member or member.role != 'admin':
+        return jsonify({"error": "Only admins can generate the family tree"}), 403
     
     # Get all family members
     members = FamilyMember.query.filter_by(family_id=user.family_id).all()
@@ -94,6 +99,12 @@ def add_tree_node():
     user = me()
     if not user.family_id:
         return jsonify({"error": "Not in a family"}), 403
+    
+    # Check if user is admin
+    from models.family import FamilyMember
+    member = FamilyMember.query.filter_by(user_id=user.id, family_id=user.family_id).first()
+    if not member or member.role != 'admin':
+        return jsonify({"error": "Only admins can add members to the tree"}), 403
     data = request.get_json() or {}
     birth = None
     death = None
@@ -122,7 +133,15 @@ def add_tree_node():
 @extras_bp.route("/tree/<int:node_id>/set-parent", methods=["POST"])
 @jwt_required()
 def set_node_parent(node_id):
-    """Set parent relationship for a node"""
+    """Set parent relationship for a node (admin only)"""
+    user = me()
+    
+    # Check if user is admin
+    from models.family import FamilyMember
+    member = FamilyMember.query.filter_by(user_id=user.id, family_id=user.family_id).first()
+    if not member or member.role != 'admin':
+        return jsonify({"error": "Only admins can modify the tree"}), 403
+    
     node = FamilyTreeNode.query.get_or_404(node_id)
     data = request.get_json() or {}
     parent_id = data.get("parent_node_id")
@@ -143,6 +162,14 @@ def set_node_parent(node_id):
 @extras_bp.route("/tree/<int:node_id>", methods=["PUT"])
 @jwt_required()
 def update_tree_node(node_id):
+    user = me()
+    
+    # Check if user is admin
+    from models.family import FamilyMember
+    member = FamilyMember.query.filter_by(user_id=user.id, family_id=user.family_id).first()
+    if not member or member.role != 'admin':
+        return jsonify({"error": "Only admins can modify the tree"}), 403
+    
     node = FamilyTreeNode.query.get_or_404(node_id)
     data = request.get_json() or {}
     for field in ("display_name", "display_avatar", "relationship_label",
@@ -160,7 +187,15 @@ def update_tree_node(node_id):
 @extras_bp.route("/tree/<int:node_id>/set-partner", methods=["POST"])
 @jwt_required()
 def set_node_partner(node_id):
-    """Set partner relationship for a node"""
+    """Set partner relationship for a node (admin only)"""
+    user = me()
+    
+    # Check if user is admin
+    from models.family import FamilyMember
+    member = FamilyMember.query.filter_by(user_id=user.id, family_id=user.family_id).first()
+    if not member or member.role != 'admin':
+        return jsonify({"error": "Only admins can modify the tree"}), 403
+    
     node = FamilyTreeNode.query.get_or_404(node_id)
     data = request.get_json() or {}
     partner_id = data.get("partner_node_id")
@@ -188,6 +223,14 @@ def set_node_partner(node_id):
 @extras_bp.route("/tree/<int:node_id>", methods=["DELETE"])
 @jwt_required()
 def delete_tree_node(node_id):
+    user = me()
+    
+    # Check if user is admin
+    from models.family import FamilyMember
+    member = FamilyMember.query.filter_by(user_id=user.id, family_id=user.family_id).first()
+    if not member or member.role != 'admin':
+        return jsonify({"error": "Only admins can remove members from the tree"}), 403
+    
     node = FamilyTreeNode.query.get_or_404(node_id)
     # Clear partner relationships
     if node.partner_node_id:
@@ -225,6 +268,8 @@ def get_events():
 @extras_bp.route("/calendar", methods=["POST"])
 @jwt_required()
 def create_event():
+    from models.family import FamilyMember
+    from models.notifications import Notification
     user = me()
     if not user.family_id:
         return jsonify({"error": "Not in a family"}), 403
@@ -249,6 +294,27 @@ def create_event():
     )
     db.session.add(event)
     db.session.commit()
+    
+    # Send notification to all family members
+    members = FamilyMember.query.filter_by(family_id=user.family_id).all()
+    for member in members:
+        if member.user_id != user.id:  # Don't notify creator
+            notif = Notification(
+                user_id=member.user_id,
+                from_user_id=user.id,
+                type="calendar_event",
+                title=f"New {event.event_type}: {event.title}",
+                message=f"{user.name} created a new event on {event.event_date.strftime('%b %d, %Y at %I:%M %p')}",
+                data=json.dumps({
+                    "event_id": event.id,
+                    "event_type": event.event_type,
+                    "event_date": event.event_date.isoformat(),
+                    "title": event.title
+                })
+            )
+            db.session.add(notif)
+    db.session.commit()
+    
     return jsonify({"event": event.to_dict()}), 201
 
 

@@ -14,7 +14,6 @@ import { useTranslation } from '../i18n';
 import { colors, radius } from '../theme';
 import Toast from '../components/Toast';
 import useToast from '../hooks/useToast';
-import DateTimePicker from '@react-native-community/datetimepicker';
 
 const { width } = Dimensions.get('window');
 const DAY_SIZE = (width - 32 - 24) / 7;
@@ -183,8 +182,9 @@ function AddEventModal({ visible, onClose, onSave, selectedDate, editEvent }) {
     color: '#7c3aed', 
     is_recurring: false, 
     recurrence: 'yearly',
-    time: new Date(),
-    showTimePicker: false,
+    hour: '12',
+    minute: '00',
+    period: 'PM',
   });
   const [loading, setLoading] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -193,6 +193,11 @@ function AddEventModal({ visible, onClose, onSave, selectedDate, editEvent }) {
   useEffect(() => {
     if (editEvent) {
       const eventDate = new Date(editEvent.event_date);
+      const hours = eventDate.getHours();
+      const minutes = eventDate.getMinutes();
+      const period = hours >= 12 ? 'PM' : 'AM';
+      const displayHour = hours % 12 || 12;
+      
       setForm({
         title: editEvent.title || '',
         description: editEvent.description || '',
@@ -200,10 +205,17 @@ function AddEventModal({ visible, onClose, onSave, selectedDate, editEvent }) {
         color: editEvent.color || '#7c3aed',
         is_recurring: editEvent.is_recurring || false,
         recurrence: editEvent.recurrence || 'yearly',
-        time: eventDate,
-        showTimePicker: false,
+        hour: displayHour.toString().padStart(2, '0'),
+        minute: minutes.toString().padStart(2, '0'),
+        period: period,
       });
     } else {
+      const now = new Date();
+      const hours = now.getHours();
+      const minutes = now.getMinutes();
+      const period = hours >= 12 ? 'PM' : 'AM';
+      const displayHour = hours % 12 || 12;
+      
       setForm({
         title: '',
         description: '',
@@ -211,8 +223,9 @@ function AddEventModal({ visible, onClose, onSave, selectedDate, editEvent }) {
         color: '#7c3aed',
         is_recurring: false,
         recurrence: 'yearly',
-        time: new Date(),
-        showTimePicker: false,
+        hour: displayHour.toString().padStart(2, '0'),
+        minute: minutes.toString().padStart(2, '0'),
+        period: period,
       });
     }
   }, [editEvent, visible]);
@@ -223,14 +236,23 @@ function AddEventModal({ visible, onClose, onSave, selectedDate, editEvent }) {
     try {
       // Combine selected date with chosen time
       const eventDateTime = editEvent ? new Date(editEvent.event_date) : new Date(selectedDate);
-      eventDateTime.setHours(form.time.getHours());
-      eventDateTime.setMinutes(form.time.getMinutes());
+      
+      // Convert 12-hour format to 24-hour
+      let hours = parseInt(form.hour);
+      if (form.period === 'PM' && hours !== 12) hours += 12;
+      if (form.period === 'AM' && hours === 12) hours = 0;
+      
+      eventDateTime.setHours(hours);
+      eventDateTime.setMinutes(parseInt(form.minute));
       
       const eventData = { 
-        ...form, 
+        title: form.title,
+        description: form.description,
+        event_type: form.event_type,
+        color: form.color,
+        is_recurring: form.is_recurring,
+        recurrence: form.recurrence,
         event_date: eventDateTime.toISOString(),
-        showTimePicker: undefined, // Remove UI state
-        time: undefined, // Remove UI state
       };
       
       if (editEvent) {
@@ -241,6 +263,12 @@ function AddEventModal({ visible, onClose, onSave, selectedDate, editEvent }) {
         await onSave(eventData);
       }
       
+      const now = new Date();
+      const currentHours = now.getHours();
+      const currentMinutes = now.getMinutes();
+      const currentPeriod = currentHours >= 12 ? 'PM' : 'AM';
+      const currentDisplayHour = currentHours % 12 || 12;
+      
       setForm({ 
         title: '', 
         description: '', 
@@ -248,8 +276,9 @@ function AddEventModal({ visible, onClose, onSave, selectedDate, editEvent }) {
         color: '#7c3aed', 
         is_recurring: false, 
         recurrence: 'yearly',
-        time: new Date(),
-        showTimePicker: false,
+        hour: currentDisplayHour.toString().padStart(2, '0'),
+        minute: currentMinutes.toString().padStart(2, '0'),
+        period: currentPeriod,
       });
       onClose();
     } catch {} finally { setLoading(false); }
@@ -257,12 +286,22 @@ function AddEventModal({ visible, onClose, onSave, selectedDate, editEvent }) {
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <BlurView intensity={20} tint="dark" style={m.overlay}>
-        <View style={m.sheet}>
-          <LinearGradient colors={['rgba(124,58,237,0.1)', '#0f172a']} style={StyleSheet.absoluteFill} />
-          <View style={m.handle} />
-          <AppText style={m.title}>Add Event</AppText>
-          {selectedDate && <AppText style={m.dateLabel}>{selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</AppText>}
+      <View style={m.modalOverlay}>
+        <TouchableOpacity 
+          style={StyleSheet.absoluteFill} 
+          activeOpacity={1} 
+          onPress={onClose}
+        />
+        <BlurView intensity={90} tint="dark" style={m.sheetContainer}>
+          <View style={m.sheet}>
+            <LinearGradient 
+              colors={editEvent ? ['rgba(59,130,246,0.15)', 'rgba(15,23,42,0.98)'] : ['rgba(124,58,237,0.15)', 'rgba(15,23,42,0.98)']} 
+              style={StyleSheet.absoluteFill} 
+            />
+            <View style={m.handle} />
+            <AppText style={m.title}>{editEvent ? 'Edit Event' : 'Add Event'}</AppText>
+            {selectedDate && !editEvent && <AppText style={m.dateLabel}>{selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</AppText>}
+            {editEvent && <AppText style={m.dateLabel}>Editing: {editEvent.title}</AppText>}
 
           <AppText style={m.label}>Event Type</AppText>
           <View style={m.typeRow}>
@@ -287,28 +326,47 @@ function AddEventModal({ visible, onClose, onSave, selectedDate, editEvent }) {
           </TouchableOpacity>
 
           <AppText style={m.label}>Time</AppText>
-          <TouchableOpacity 
-            style={[m.input, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: theme.bgCard, borderColor: theme.border2 }]}
-            onPress={() => set('showTimePicker', true)}
-          >
-            <AppText style={{ color: theme.text }}>
-              {form.time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-            </AppText>
-            <Ionicons name="time-outline" size={20} color={theme.muted} />
-          </TouchableOpacity>
-
-          {form.showTimePicker && (
-            <DateTimePicker
-              value={form.time}
-              mode="time"
-              is24Hour={false}
-              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-              onChange={(event, selectedTime) => {
-                set('showTimePicker', Platform.OS === 'ios');
-                if (selectedTime) set('time', selectedTime);
+          <View style={m.timeRow}>
+            <TextInput
+              style={[m.timeInput, { backgroundColor: theme.bgCard, color: theme.text, borderColor: theme.border2 }]}
+              value={form.hour}
+              onChangeText={(v) => {
+                const num = parseInt(v) || 0;
+                if (num >= 1 && num <= 12) set('hour', v.padStart(2, '0'));
               }}
+              keyboardType="number-pad"
+              maxLength={2}
+              placeholder="12"
+              placeholderTextColor={theme.dim}
             />
-          )}
+            <AppText style={[m.timeSeparator, { color: theme.text }]}>:</AppText>
+            <TextInput
+              style={[m.timeInput, { backgroundColor: theme.bgCard, color: theme.text, borderColor: theme.border2 }]}
+              value={form.minute}
+              onChangeText={(v) => {
+                const num = parseInt(v) || 0;
+                if (num >= 0 && num <= 59) set('minute', v.padStart(2, '0'));
+              }}
+              keyboardType="number-pad"
+              maxLength={2}
+              placeholder="00"
+              placeholderTextColor={theme.dim}
+            />
+            <View style={m.periodButtons}>
+              <TouchableOpacity
+                style={[m.periodBtn, form.period === 'AM' && m.periodBtnActive]}
+                onPress={() => set('period', 'AM')}
+              >
+                <AppText style={[m.periodBtnText, form.period === 'AM' && m.periodBtnTextActive]}>AM</AppText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[m.periodBtn, form.period === 'PM' && m.periodBtnActive]}
+                onPress={() => set('period', 'PM')}
+              >
+                <AppText style={[m.periodBtnText, form.period === 'PM' && m.periodBtnTextActive]}>PM</AppText>
+              </TouchableOpacity>
+            </View>
+          </View>
 
           <TouchableOpacity style={m.saveBtn} onPress={handleSave} disabled={loading}>
             <LinearGradient colors={['#7c3aed', '#3b82f6']} style={m.saveBtnGrad}>
@@ -320,13 +378,28 @@ function AddEventModal({ visible, onClose, onSave, selectedDate, editEvent }) {
           </TouchableOpacity>
         </View>
       </BlurView>
+    </View>
     </Modal>
   );
 }
 
 const m = StyleSheet.create({
-  overlay: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
-  sheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, overflow: 'hidden', padding: 24, paddingBottom: 40 },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    justifyContent: 'flex-end',
+  },
+  sheetContainer: {
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    overflow: 'hidden',
+    maxHeight: '90%',
+  },
+  sheet: { 
+    padding: 24, 
+    paddingBottom: 40,
+    backgroundColor: 'rgba(15,23,42,0.95)',
+  },
   handle: { width: 40, height: 4, backgroundColor: colors.border, borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
   title: { fontSize: 20, fontWeight: '800', color: colors.text, marginBottom: 4 },
   dateLabel: { fontSize: 13, color: colors.primary, fontWeight: '600', marginBottom: 16 },
@@ -339,6 +412,14 @@ const m = StyleSheet.create({
   checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: colors.border2, alignItems: 'center', justifyContent: 'center' },
   checkboxActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   recurringLabel: { fontSize: 14, color: colors.text },
+  timeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 20 },
+  timeInput: { width: 60, height: 50, borderRadius: radius.md, borderWidth: 1, textAlign: 'center', fontSize: 18, fontWeight: '700' },
+  timeSeparator: { fontSize: 24, fontWeight: '700' },
+  periodButtons: { flexDirection: 'row', gap: 6, marginLeft: 8 },
+  periodBtn: { paddingHorizontal: 16, paddingVertical: 12, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border2, backgroundColor: 'rgba(30,41,59,0.6)' },
+  periodBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  periodBtnText: { fontSize: 14, fontWeight: '700', color: colors.muted },
+  periodBtnTextActive: { color: '#fff' },
   saveBtn: { borderRadius: radius.md, overflow: 'hidden', marginBottom: 10 },
   saveBtnGrad: { paddingVertical: 14, alignItems: 'center' },
   saveBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
@@ -346,13 +427,22 @@ const m = StyleSheet.create({
   cancelText: { color: colors.muted, fontSize: 14 },
   closeBtn: { padding: 4 },
   // Event Details Modal
+  overlay: { 
+    flex: 1, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    padding: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+  },
   detailsCard: { 
     width: '100%', 
     maxWidth: 400,
     maxHeight: '80%',
     borderRadius: radius.xl, 
     overflow: 'hidden',
-    backgroundColor: 'rgba(15,23,42,0.95)',
+    backgroundColor: 'rgba(15,23,42,0.98)',
+    borderWidth: 1,
+    borderColor: 'rgba(124,58,237,0.3)',
   },
   detailsHeader: { 
     flexDirection: 'row', 

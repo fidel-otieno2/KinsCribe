@@ -24,3 +24,4 @@ pyotp==2.9.0
 qrcode==7.4.2
 Pillow==10.4.0
 twilio==9.3.6
+APScheduler==3.10.4

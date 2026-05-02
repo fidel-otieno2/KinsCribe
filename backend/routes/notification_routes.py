@@ -213,7 +213,31 @@ def _get_all_notifications(user):
     for mention_notif in _mention_store.get(user.id, []):
         notifs.append(mention_notif)
 
-    # ── 8. Collab invite notifications ───────────────────────────────────────────────
+    # ── 8. Calendar event notifications ───────────────────────
+    try:
+        from models.notifications import Notification as NotificationModel
+        calendar_notifs = NotificationModel.query.filter(
+            NotificationModel.user_id == user.id,
+            NotificationModel.type.in_(['calendar_event', 'event_reminder', 'daily_events'])
+        ).order_by(NotificationModel.created_at.desc()).limit(20).all()
+        
+        for notif in calendar_notifs:
+            notifs.append({
+                "id": f"calendar_notif-{notif.id}",
+                "type": notif.type,
+                "source": "calendar",
+                "actor_name": notif.from_user.name if notif.from_user else "KinsCribe",
+                "actor_avatar": notif.from_user.avatar_url if notif.from_user else None,
+                "actor_id": notif.from_user_id,
+                "title": notif.title,
+                "body": notif.message,
+                "data": notif.data,
+                "created_at": notif.created_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            })
+    except Exception:
+        pass
+
+    # ── 9. Collab invite notifications ───────────────────────────────────────────────
     try:
         from models.social import PostCollaborator
         pending_collabs = PostCollaborator.query.filter_by(user_id=user.id, status='pending').all()
@@ -241,7 +265,7 @@ def _get_all_notifications(user):
     except Exception:
         pass
 
-    # ── 9. Family invite notifications ───────────────────────
+    # ── 10. Family invite notifications ───────────────────────
     try:
         from models.family import FamilyInvite
         pending_invites = FamilyInvite.query.filter_by(invited_user_id=user.id, status="pending").all()

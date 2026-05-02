@@ -70,6 +70,12 @@ def create_app():
 
     with app.app_context():
         _safe_migrate()
+        # Start event reminder scheduler
+        try:
+            from scheduler import start_scheduler
+            start_scheduler(app)
+        except Exception as e:
+            print(f"Scheduler start error: {e}")
 
     @app.errorhandler(Exception)
     def handle_exception(e):

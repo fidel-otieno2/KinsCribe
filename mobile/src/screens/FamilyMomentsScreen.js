@@ -44,6 +44,17 @@ export default function FamilyMomentsScreen({ route, navigation }) {
   const [moments, setMoments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [visiblePostId, setVisiblePostId] = useState(null);
+
+  const viewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 60,
+  }).current;
+
+  const onViewableItemsChanged = useRef(({ viewableItems }) => {
+    if (viewableItems.length > 0) {
+      setVisiblePostId(viewableItems[0].item.id);
+    }
+  }).current;
 
   const fetchData = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -62,7 +73,13 @@ export default function FamilyMomentsScreen({ route, navigation }) {
     }
   }, [familyId]);
 
-  useFocusEffect(useCallback(() => { fetchData(); }, [fetchData]));
+  useFocusEffect(useCallback(() => {
+    fetchData();
+    // Cleanup: stop videos when leaving screen
+    return () => {
+      setVisiblePostId(null);
+    };
+  }, [fetchData]));
 
   // Group moments by user for story-viewer style bubbles at top
   const byUser = moments.reduce((acc, m) => {
@@ -177,6 +194,8 @@ export default function FamilyMomentsScreen({ route, navigation }) {
             numColumns={3}
             contentContainerStyle={s.postsGrid}
             showsVerticalScrollIndicator={false}
+            onViewableItemsChanged={onViewableItemsChanged}
+            viewabilityConfig={viewabilityConfig}
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
@@ -184,51 +203,58 @@ export default function FamilyMomentsScreen({ route, navigation }) {
                 tintColor="#7c3aed"
               />
             }
-            renderItem={({ item: post }) => (
-              <TouchableOpacity
-                style={s.gridItem}
-                onPress={() => navigation.navigate('StoryDetail', { storyId: post.id })}
-                activeOpacity={0.85}
-              >
-                {post.media_url && post.media_type === 'image' ? (
-                  <Image source={{ uri: post.media_url }} style={s.gridImg} resizeMode="cover" />
-                ) : post.media_url && post.media_type === 'video' ? (
-                  <View style={s.gridImg}>
-                    <Video
-                      source={{ uri: post.media_url }}
-                      style={s.gridImg}
-                      resizeMode={ResizeMode.COVER}
-                      shouldPlay={false}
-                      isMuted
-                    />
-                    <View style={s.videoOverlay}>
-                      <Ionicons name="play-circle" size={32} color="#fff" />
+            renderItem={({ item: post }) => {
+              const isVisible = visiblePostId === post.id;
+              return (
+                <TouchableOpacity
+                  style={s.gridItem}
+                  onPress={() => navigation.navigate('StoryDetail', { storyId: post.id })}
+                  activeOpacity={0.85}
+                >
+                  {post.media_url && post.media_type === 'image' ? (
+                    <Image source={{ uri: post.media_url }} style={s.gridImg} resizeMode="cover" />
+                  ) : post.media_url && post.media_type === 'video' ? (
+                    <View style={s.gridImg}>
+                      <Video
+                        source={{ uri: post.media_url }}
+                        style={s.gridImg}
+                        resizeMode={ResizeMode.COVER}
+                        shouldPlay={isVisible}
+                        isLooping
+                        isMuted
+                        useNativeControls={false}
+                      />
+                      {!isVisible && (
+                        <View style={s.videoOverlay}>
+                          <Ionicons name="play-circle" size={32} color="#fff" />
+                        </View>
+                      )}
                     </View>
-                  </View>
-                ) : (
-                  <LinearGradient colors={['#7c3aed', '#3b82f6']} style={s.gridImg}>
-                    <AppText style={s.gridText} numberOfLines={4}>{post.title || post.content}</AppText>
-                  </LinearGradient>
-                )}
-                {/* Author badge */}
-                <View style={s.authorBadge}>
-                  {post.author_avatar ? (
-                    <Image source={{ uri: post.author_avatar }} style={s.authorAvatar} />
                   ) : (
-                    <View style={[s.authorAvatar, { backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }]}>
-                      <AppText style={{ color: '#fff', fontSize: 8, fontWeight: '800' }}>{post.author_name?.[0]}</AppText>
+                    <LinearGradient colors={['#7c3aed', '#3b82f6']} style={s.gridImg}>
+                      <AppText style={s.gridText} numberOfLines={4}>{post.title || post.content}</AppText>
+                    </LinearGradient>
+                  )}
+                  {/* Author badge */}
+                  <View style={s.authorBadge}>
+                    {post.author_avatar ? (
+                      <Image source={{ uri: post.author_avatar }} style={s.authorAvatar} />
+                    ) : (
+                      <View style={[s.authorAvatar, { backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }]}>
+                        <AppText style={{ color: '#fff', fontSize: 8, fontWeight: '800' }}>{post.author_name?.[0]}</AppText>
+                      </View>
+                    )}
+                  </View>
+                  {/* Like count */}
+                  {post.like_count > 0 && (
+                    <View style={s.likesBadge}>
+                      <Ionicons name="heart" size={10} color="#fff" />
+                      <AppText style={s.likesBadgeText}>{post.like_count}</AppText>
                     </View>
                   )}
-                </View>
-                {/* Like count */}
-                {post.like_count > 0 && (
-                  <View style={s.likesBadge}>
-                    <Ionicons name="heart" size={10} color="#fff" />
-                    <AppText style={s.likesBadgeText}>{post.like_count}</AppText>
-                  </View>
-                )}
-              </TouchableOpacity>
-            )}
+                </TouchableOpacity>
+              );
+            }}
           />
         )
       ) : moments.length === 0 ? (

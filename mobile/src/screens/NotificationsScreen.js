@@ -38,6 +38,9 @@ const TYPE_CONFIG = {
   family_invite:    { icon: 'home',             color: '#10b981', bg: 'rgba(16,185,129,0.18)',   label: 'invited you to join their family', source: 'Family',     sourceBg: '#064e3b', sourceColor: '#34d399' },
   family_invite_accepted: { icon: 'checkmark-circle', color: '#10b981', bg: 'rgba(16,185,129,0.18)', label: 'accepted your family invitation', source: 'Family', sourceBg: '#064e3b', sourceColor: '#34d399' },
   story_mention:    { icon: 'at',               color: '#7c3aed', bg: 'rgba(124,58,237,0.18)',   label: 'mentioned you in a story',       source: 'Story',        sourceBg: '#3b0764', sourceColor: '#a78bfa' },
+  calendar_event:   { icon: 'calendar',         color: '#3b82f6', bg: 'rgba(59,130,246,0.18)',   label: 'created a calendar event',       source: 'Calendar',     sourceBg: '#1e3a8a', sourceColor: '#60a5fa' },
+  event_reminder:   { icon: 'alarm',            color: '#f59e0b', bg: 'rgba(245,158,11,0.18)',   label: 'event reminder',                 source: 'Calendar',     sourceBg: '#78350f', sourceColor: '#fbbf24' },
+  daily_events:     { icon: 'today',            color: '#10b981', bg: 'rgba(16,185,129,0.18)',   label: 'today\'s events',                 source: 'Calendar',     sourceBg: '#064e3b', sourceColor: '#34d399' },
 };
 
 function Avatar({ url, name, size = 48 }) {
@@ -285,6 +288,8 @@ export default function NotificationsScreen({ navigation }) {
       navigation.navigate('UserProfile', { userId: item.actor_id, userName: item.actor_name, userAvatar: item.actor_avatar });
     } else if (item.type === 'message') {
       navigation.navigate('Main', { screen: 'Messages' });
+    } else if (item.source === 'calendar' || item.type === 'calendar_event' || item.type === 'event_reminder' || item.type === 'daily_events') {
+      navigation.navigate('FamilyCalendar');
     }
   };
 

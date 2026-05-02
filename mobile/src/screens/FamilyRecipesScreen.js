@@ -207,7 +207,7 @@ export default function FamilyRecipesScreen({ navigation }) {
       )}
 
       <Modal visible={showAdd} transparent animationType="slide" onRequestClose={() => setShowAdd(false)}>
-        <BlurView intensity={20} tint="dark" style={{ flex: 1, justifyContent: 'flex-end' }}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)' }}>
           <View style={s.addSheet}>
             <LinearGradient colors={['rgba(124,58,237,0.1)', '#0f172a']} style={StyleSheet.absoluteFill} />
             <View style={s.modalHandle} />
@@ -240,7 +240,7 @@ export default function FamilyRecipesScreen({ navigation }) {
               </TouchableOpacity>
             </ScrollView>
           </View>
-        </BlurView>
+        </View>
       </Modal>
     </View>
   );
@@ -260,7 +260,7 @@ const s = StyleSheet.create({
   empty: { alignItems: 'center', marginTop: 60, gap: 10 },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: colors.text },
   emptySub: { fontSize: 14, color: colors.muted },
-  addSheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, overflow: 'hidden', padding: 24, paddingBottom: 40, maxHeight: '90%' },
+  addSheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, overflow: 'hidden', padding: 24, paddingBottom: 40, maxHeight: '90%', backgroundColor: '#0f172a' },
   modalHandle: { width: 40, height: 4, backgroundColor: colors.border, borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
   modalTitle: { fontSize: 20, fontWeight: '800', color: colors.text, marginBottom: 16 },
   imgPicker: { width: '100%', height: 140, borderRadius: radius.lg, backgroundColor: 'rgba(30,41,59,0.8)', borderWidth: 1.5, borderColor: colors.border2, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', marginBottom: 14, overflow: 'hidden', gap: 8 },
