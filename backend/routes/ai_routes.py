@@ -111,6 +111,17 @@ def generate_caption():
             "count": len(captions)
         })
         
+    except openai.AuthenticationError as e:
+        print(f"OpenAI authentication error: {e}")
+        return jsonify({
+            "error": "AI service unavailable",
+            "message": "OpenAI API key is not configured. Please add credits to use AI features.",
+            "fallback_captions": [
+                "Capturing moments that matter ✨",
+                "Making memories with the ones I love ❤️",
+                "Another beautiful day 🌟"
+            ]
+        }), 503
     except openai.RateLimitError as e:
         print(f"OpenAI quota exceeded: {e}")
         return jsonify({

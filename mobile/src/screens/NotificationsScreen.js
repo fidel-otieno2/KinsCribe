@@ -30,7 +30,7 @@ const TYPE_CONFIG = {
   post_like:        { icon: 'heart',            color: '#e11d48', bg: 'rgba(225,29,72,0.18)',    label: 'liked your post',                source: 'Post',         sourceBg: '#1e3a8a', sourceColor: '#60a5fa' },
   post_comment:     { icon: 'chatbubble',       color: '#3b82f6', bg: 'rgba(59,130,246,0.18)',   label: 'commented on your post',         source: 'Post',         sourceBg: '#1e3a8a', sourceColor: '#60a5fa' },
   post_share:       { icon: 'paper-plane',      color: '#06b6d4', bg: 'rgba(6,182,212,0.18)',    label: 'shared your post',               source: 'Post',         sourceBg: '#1e3a8a', sourceColor: '#60a5fa' },
-  connection:       { icon: 'person-add',       color: '#10b981', bg: 'rgba(16,185,129,0.18)',   label: 'connected with you',             source: 'Connection',   sourceBg: '#064e3b', sourceColor: '#34d399' },
+  follow:           { icon: 'person-add',       color: '#10b981', bg: 'rgba(16,185,129,0.18)',   label: 'followed you',                   source: 'Follow',       sourceBg: '#064e3b', sourceColor: '#34d399' },
   follow_request:   { icon: 'person-add',       color: '#f59e0b', bg: 'rgba(245,158,11,0.18)',   label: 'wants to follow you',            source: 'Follow Request', sourceBg: '#78350f', sourceColor: '#fbbf24' },
   message:          { icon: 'chatbubbles',      color: '#f59e0b', bg: 'rgba(245,158,11,0.18)',   label: 'sent you a message',             source: 'Message',      sourceBg: '#78350f', sourceColor: '#fbbf24' },
   birthday:         { icon: 'gift',             color: '#f59e0b', bg: 'rgba(245,158,11,0.18)',   label: '',                               source: 'Birthday',     sourceBg: '#78350f', sourceColor: '#fbbf24' },
@@ -167,7 +167,7 @@ const TABS = [
   { key: 'requests',    labelKey: 'requests',      icon: 'person-add' },
   { key: 'family',      labelKey: 'family',        icon: 'people' },
   { key: 'posts',       labelKey: 'posts',         icon: 'grid' },
-  { key: 'connections', labelKey: 'people',        icon: 'person' },
+  { key: 'follows',     labelKey: 'people',        icon: 'person' },
   { key: 'messages',    labelKey: 'messages',      icon: 'chatbubbles' },
 ];
 
@@ -281,7 +281,7 @@ export default function NotificationsScreen({ navigation }) {
     }
     if (item.source === 'family_story' && item.story_id) {
       navigation.navigate('Family');
-    } else if (item.source === 'connection' && item.actor_id) {
+    } else if (item.source === 'follow' && item.actor_id) {
       navigation.navigate('UserProfile', { userId: item.actor_id, userName: item.actor_name, userAvatar: item.actor_avatar });
     } else if (item.type === 'message') {
       navigation.navigate('Main', { screen: 'Messages' });
@@ -319,7 +319,7 @@ export default function NotificationsScreen({ navigation }) {
     if (tab === 'requests') return n.type === 'follow_request' || n.type === 'collab_invite' || n.type === 'family_invite';
     if (tab === 'family') return n.source === 'family_story' || n.source === 'family';
     if (tab === 'posts') return n.source === 'post';
-    if (tab === 'connections') return n.type === 'connection';
+    if (tab === 'follows') return n.type === 'follow';
     if (tab === 'messages') return n.type === 'message';
     return true;
   });
@@ -329,7 +329,7 @@ export default function NotificationsScreen({ navigation }) {
     requests: notifications.filter(n => n.type === 'follow_request' || n.type === 'collab_invite' || n.type === 'family_invite').length,
     family: notifications.filter(n => !n.is_read && (n.source === 'family_story' || n.source === 'family')).length,
     posts: notifications.filter(n => !n.is_read && n.source === 'post').length,
-    connections: notifications.filter(n => !n.is_read && n.type === 'connection').length,
+    follows: notifications.filter(n => !n.is_read && n.type === 'follow').length,
     messages: notifications.filter(n => !n.is_read && n.type === 'message').length,
   };
 
