@@ -49,9 +49,23 @@ class User(db.Model):
     def to_dict(self):
         try:
             from models.social import Connection
-            connection_count = Connection.query.filter_by(following_id=self.id).count()
-            interest_count = Connection.query.filter_by(follower_id=self.id).count()
-        except Exception:
+            # Followers: people who follow me (their follower_id points to me)
+            followers_count = Connection.query.filter_by(
+                following_id=self.id,
+                status='accepted'
+            ).count()
+            # Following: people I follow (my follower_id points to them)
+            following_count = Connection.query.filter_by(
+                follower_id=self.id,
+                status='accepted'
+            ).count()
+            # Legacy names for backwards compatibility
+            connection_count = followers_count
+            interest_count = following_count
+        except Exception as e:
+            print(f"Error calculating follower counts: {e}")
+            followers_count = 0
+            following_count = 0
             connection_count = 0
             interest_count = 0
         try:
@@ -80,8 +94,10 @@ class User(db.Model):
             "two_factor_enabled": self.two_factor_enabled,
             "has_password": bool(self.password),
             "family_id": self.family_id,
-            "connection_count": connection_count,
-            "interest_count": interest_count,
+            "connection_count": connection_count,  # Legacy: followers
+            "interest_count": interest_count,  # Legacy: following
+            "followers_count": followers_count,
+            "following_count": following_count,
             "is_premium": self.is_premium or False,
             "premium_plan": self.premium_plan,
             "premium_expires_at": utc_iso(self.premium_expires_at) if self.premium_expires_at else None,
