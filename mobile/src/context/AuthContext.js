@@ -207,6 +207,23 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const registerNewAccount = async (userData, accessToken, refreshToken) => {
+    // Save current session first if exists
+    if (user) {
+      const currentToken = await AsyncStorage.getItem('access_token');
+      const currentRefresh = await AsyncStorage.getItem('refresh_token');
+      await _saveAccountToList(user, currentToken, currentRefresh);
+    }
+
+    // Set new account as active
+    await AsyncStorage.setItem('access_token', accessToken);
+    await AsyncStorage.setItem('refresh_token', refreshToken);
+    await AsyncStorage.setItem(ACTIVE_ACCOUNT_KEY, userData.id.toString());
+    setUser(userData);
+    await _saveAccountToList(userData, accessToken, refreshToken);
+    return userData;
+  };
+
   const logout = async () => {
     if (!user) return;
 
@@ -261,6 +278,7 @@ export function AuthProvider({ children }) {
       user, loading, savedAccounts: getAllAccounts(),
       login, loginWithGoogle, logout,
       switchAccount, addAccount, removeAccount, refreshUser,
+      registerNewAccount,
     }}>
       {children}
     </AuthContext.Provider>

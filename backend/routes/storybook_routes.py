@@ -97,10 +97,18 @@ def auto_generate_memory_book():
 
 
 @storybook_bp.route("/", methods=["GET"])
+@storybook_bp.route("/family", methods=["GET"])
 @jwt_required()
 def list_storybooks():
     """List all storybooks for the family"""
     user = me()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    
+    # Handle users without families
+    if not user.family_id:
+        return jsonify({"storybooks": []})
+    
     books = Storybook.query.filter_by(family_id=user.family_id).order_by(
         Storybook.created_at.desc()
     ).all()

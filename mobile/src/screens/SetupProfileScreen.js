@@ -446,7 +446,18 @@ export default function SetupProfileScreen({ navigation }) {
   const done = async () => {
     try {
       await refreshUser();
-    } catch {}
+      // Navigate back to main app after profile setup
+      navigation.reset({ 
+        index: 0, 
+        routes: [{ name: 'Main', params: { screen: 'Feed' } }] 
+      });
+    } catch {
+      // If refresh fails, still navigate to main app
+      navigation.reset({ 
+        index: 0, 
+        routes: [{ name: 'Main', params: { screen: 'Feed' } }] 
+      });
+    }
   };
 
   return (
