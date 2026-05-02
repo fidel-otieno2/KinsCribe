@@ -358,6 +358,105 @@ def voice_to_story():
 
 # ============ AI "ASK THE FAMILY" ============
 
+@ai_bp.route("/family-chat", methods=["POST"])
+@jwt_required()
+def family_chat():
+    """
+    Conversational AI chat about family stories and history.
+    Maintains conversation context.
+    """
+    user = me()
+    data = request.json or {}
+    message = data.get("message", "").strip()
+    history = data.get("history", [])  # Previous messages for context
+    
+    if not message:
+        return jsonify({"error": "Message is required"}), 400
+    
+    try:
+        # Get family stories as context
+        stories = Story.query.filter_by(family_id=user.family_id).order_by(
+            Story.story_date.desc().nullslast()
+        ).limit(50).all()
+        
+        if not stories:
+            return jsonify({
+                "response": "I don't have any family stories to reference yet. Start adding stories to build your family history, and I'll be able to help you explore them!",
+                "relevant_stories": []
+            })
+        
+        # Build context from stories
+        context_stories = []
+        for story in stories:
+            story_text = story.enhanced_text or story.content or story.transcript or ""
+            if story_text:
+                context_stories.append({
+                    "id": story.id,
+                    "title": story.title,
+                    "date": str(story.story_date) if story.story_date else "Unknown",
+                    "content": story_text[:400]
+                })
+        
+        context_str = "\n\n".join([
+            f"Story: {s['title']} ({s['date']})\n{s['content']}"
+            for s in context_stories[:15]
+        ])
+        
+        # Build conversation messages
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    f"You are a helpful family historian assistant for the {user.family.name if user.family else 'family'}. "
+                    "Answer questions about the family using the provided stories. "
+                    "Be warm, conversational, and personal. If you find relevant information, "
+                    "mention which story it's from. If you can't find the answer, say so honestly. "
+                    "Keep responses concise (2-3 paragraphs max).\n\n"
+                    f"Family Stories:\n{context_str}"
+                )
+            }
+        ]
+        
+        # Add conversation history (last 5 messages)
+        for msg in history[-5:]:
+            messages.append({
+                "role": msg.get("role", "user"),
+                "content": msg.get("content", "")
+            })
+        
+        # Add current message
+        messages.append({"role": "user", "content": message})
+        
+        # Get AI response
+        response = openai.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=messages,
+            temperature=0.7,
+            max_tokens=500
+        )
+        
+        ai_response = response.choices[0].message.content.strip()
+        
+        return jsonify({
+            "response": ai_response,
+            "message": message
+        })
+        
+    except openai.RateLimitError:
+        return jsonify({
+            "error": "AI service quota exceeded",
+            "response": "I'm currently unavailable due to API limits. Please try again later or contact support."
+        }), 503
+    except Exception as e:
+        print(f"Family chat error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            "error": "Chat unavailable",
+            "response": "I'm having trouble responding right now. Please try again."
+        }), 500
+
+
 @ai_bp.route("/ask-family", methods=["POST"])
 @jwt_required()
 def ask_family():
