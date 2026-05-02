@@ -289,7 +289,13 @@ export default function NotificationsScreen({ navigation }) {
     } else if (item.type === 'message') {
       navigation.navigate('Main', { screen: 'Messages' });
     } else if (item.source === 'calendar' || item.type === 'calendar_event' || item.type === 'event_reminder' || item.type === 'daily_events') {
-      navigation.navigate('FamilyCalendar');
+      // Extract event ID from notification data
+      let eventId = null;
+      try {
+        const data = typeof item.data === 'string' ? JSON.parse(item.data) : item.data;
+        eventId = data?.event_id;
+      } catch {}
+      navigation.navigate('FamilyCalendar', { eventId });
     }
   };
 

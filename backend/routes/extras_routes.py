@@ -3,7 +3,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from extensions import db
 from models.user import User
 from models.extras import (FamilyTreeNode, FamilyEvent, FamilyRecipe, FamilyTask,
-                            FamilyBudget, PostInsight, CloseFriend, ScheduledPost,
+                            FamilyBudget, BudgetGoal, PostInsight, CloseFriend, ScheduledPost,
                             VerifiedBadge)
 from models.social import Post, Connection, MessageRequest
 from datetime import datetime, date
@@ -32,7 +32,9 @@ def auto_generate_tree():
     if not user.family_id:
         return jsonify({"error": "Not in a family"}), 403
     
-    from models.family import FamilyMember
+    from models.family import FamilyMember, Family
+    from models.notifications import Notification
+    import json
     
     # Check if user is admin
     member = FamilyMember.query.filter_by(user_id=user.id, family_id=user.family_id).first()
@@ -77,6 +79,22 @@ def auto_generate_tree():
     
     db.session.commit()
     
+    # Send notification to all family members except the creator
+    family = Family.query.get(user.family_id)
+    for member in members:
+        if member.user_id != user.id:
+            notif = Notification(
+                user_id=member.user_id,
+                from_user_id=user.id,
+                type="family_tree",
+                title=f"Family Tree Created",
+                message=f"{user.name} created the {family.name} family tree with {len(created_nodes)} members.",
+                data=json.dumps({"family_id": user.family_id, "action": "tree_created"})
+            )
+            db.session.add(notif)
+    
+    db.session.commit()
+    
     return jsonify({
         "nodes": [n.to_dict() for n in created_nodes],
         "message": f"Generated tree with {len(created_nodes)} members"
@@ -101,7 +119,10 @@ def add_tree_node():
         return jsonify({"error": "Not in a family"}), 403
     
     # Check if user is admin
-    from models.family import FamilyMember
+    from models.family import FamilyMember, Family
+    from models.notifications import Notification
+    import json
+    
     member = FamilyMember.query.filter_by(user_id=user.id, family_id=user.family_id).first()
     if not member or member.role != 'admin':
         return jsonify({"error": "Only admins can add members to the tree"}), 403
@@ -127,6 +148,24 @@ def add_tree_node():
     )
     db.session.add(node)
     db.session.commit()
+    
+    # Send notification to all family members except the creator
+    family = Family.query.get(user.family_id)
+    members = FamilyMember.query.filter_by(family_id=user.family_id).all()
+    for fam_member in members:
+        if fam_member.user_id != user.id:
+            notif = Notification(
+                user_id=fam_member.user_id,
+                from_user_id=user.id,
+                type="family_tree",
+                title=f"Family Tree Updated",
+                message=f"{user.name} added {node.display_name} to the {family.name} family tree.",
+                data=json.dumps({"family_id": user.family_id, "node_id": node.id, "action": "member_added"})
+            )
+            db.session.add(notif)
+    
+    db.session.commit()
+    
     return jsonify({"node": node.to_dict()}), 201
 
 
@@ -226,12 +265,17 @@ def delete_tree_node(node_id):
     user = me()
     
     # Check if user is admin
-    from models.family import FamilyMember
+    from models.family import FamilyMember, Family
+    from models.notifications import Notification
+    import json
+    
     member = FamilyMember.query.filter_by(user_id=user.id, family_id=user.family_id).first()
     if not member or member.role != 'admin':
         return jsonify({"error": "Only admins can remove members from the tree"}), 403
     
     node = FamilyTreeNode.query.get_or_404(node_id)
+    node_name = node.display_name
+    
     # Clear partner relationships
     if node.partner_node_id:
         partner = FamilyTreeNode.query.get(node.partner_node_id)
@@ -242,6 +286,24 @@ def delete_tree_node(node_id):
         child.parent_node_id = None
     db.session.delete(node)
     db.session.commit()
+    
+    # Send notification to all family members except the deleter
+    family = Family.query.get(user.family_id)
+    members = FamilyMember.query.filter_by(family_id=user.family_id).all()
+    for fam_member in members:
+        if fam_member.user_id != user.id:
+            notif = Notification(
+                user_id=fam_member.user_id,
+                from_user_id=user.id,
+                type="family_tree",
+                title=f"Family Tree Updated",
+                message=f"{user.name} removed {node_name} from the {family.name} family tree.",
+                data=json.dumps({"family_id": user.family_id, "action": "member_removed"})
+            )
+            db.session.add(notif)
+    
+    db.session.commit()
+    
     return jsonify({"message": "Deleted"})
 
 
@@ -360,6 +422,100 @@ def delete_event(event_id):
     return jsonify({"message": "Deleted"})
 
 
+@extras_bp.route("/calendar/<int:event_id>/reactions", methods=["GET"])
+@jwt_required()
+def get_event_reactions(event_id):
+    """Get all reactions for an event"""
+    from models.extras import EventReaction
+    reactions = EventReaction.query.filter_by(event_id=event_id).all()
+    return jsonify({"reactions": [r.to_dict() for r in reactions]})
+
+
+@extras_bp.route("/calendar/<int:event_id>/reactions", methods=["POST"])
+@jwt_required()
+def add_event_reaction(event_id):
+    """Add or update reaction to an event"""
+    from models.extras import EventReaction
+    user = me()
+    data = request.get_json() or {}
+    reaction_type = data.get("reaction", "❤️")
+    
+    # Check if user already reacted
+    existing = EventReaction.query.filter_by(event_id=event_id, user_id=user.id).first()
+    if existing:
+        existing.reaction = reaction_type
+        existing.created_at = datetime.utcnow()
+    else:
+        reaction = EventReaction(
+            event_id=event_id,
+            user_id=user.id,
+            reaction=reaction_type
+        )
+        db.session.add(reaction)
+    
+    db.session.commit()
+    reactions = EventReaction.query.filter_by(event_id=event_id).all()
+    return jsonify({"reactions": [r.to_dict() for r in reactions]})
+
+
+@extras_bp.route("/calendar/<int:event_id>/reactions/<int:reaction_id>", methods=["DELETE"])
+@jwt_required()
+def delete_event_reaction(event_id, reaction_id):
+    """Remove reaction from event"""
+    from models.extras import EventReaction
+    reaction = EventReaction.query.get_or_404(reaction_id)
+    if reaction.user_id != int(get_jwt_identity()):
+        return jsonify({"error": "Not authorized"}), 403
+    db.session.delete(reaction)
+    db.session.commit()
+    return jsonify({"message": "Deleted"})
+
+
+@extras_bp.route("/calendar/<int:event_id>/comments", methods=["GET"])
+@jwt_required()
+def get_event_comments(event_id):
+    """Get all comments for an event"""
+    from models.extras import EventComment
+    comments = EventComment.query.filter_by(event_id=event_id).order_by(EventComment.created_at.desc()).all()
+    return jsonify({"comments": [c.to_dict() for c in comments]})
+
+
+@extras_bp.route("/calendar/<int:event_id>/comments", methods=["POST"])
+@jwt_required()
+def add_event_comment(event_id):
+    """Add comment to an event"""
+    from models.extras import EventComment
+    user = me()
+    data = request.get_json() or {}
+    text = data.get("text", "").strip()
+    
+    if not text:
+        return jsonify({"error": "Comment text required"}), 400
+    
+    comment = EventComment(
+        event_id=event_id,
+        user_id=user.id,
+        text=text
+    )
+    db.session.add(comment)
+    db.session.commit()
+    
+    return jsonify({"comment": comment.to_dict()}), 201
+
+
+@extras_bp.route("/calendar/<int:event_id>/comments/<int:comment_id>", methods=["DELETE"])
+@jwt_required()
+def delete_event_comment(event_id, comment_id):
+    """Delete comment from event"""
+    from models.extras import EventComment
+    comment = EventComment.query.get_or_404(comment_id)
+    if comment.user_id != int(get_jwt_identity()):
+        return jsonify({"error": "Not authorized"}), 403
+    db.session.delete(comment)
+    db.session.commit()
+    return jsonify({"message": "Deleted"})
+
+
 @extras_bp.route("/calendar/upcoming", methods=["GET"])
 @jwt_required()
 def upcoming_events():
@@ -428,6 +584,24 @@ def create_recipe():
         category=data.get("category"), tags=data.get("tags")
     )
     db.session.add(recipe)
+    db.session.flush()
+
+    # Send notifications to all family members
+    from models.family import FamilyMember
+    from models.notifications import Notification
+    family_members = FamilyMember.query.filter_by(family_id=user.family_id).all()
+    for member in family_members:
+        if member.user_id != user.id:  # Don't notify the creator
+            notif = Notification(
+                user_id=member.user_id,
+                type="recipe",
+                title=f"New Recipe: {recipe.title}",
+                message=f"{user.name} shared a new recipe",
+                data=json.dumps({"recipe_id": recipe.id, "family_id": user.family_id}),
+                action_url=f"/family/recipes/{recipe.id}"
+            )
+            db.session.add(notif)
+    
     db.session.commit()
     return jsonify({"recipe": recipe.to_dict()}), 201
 
@@ -441,6 +615,120 @@ def delete_recipe(recipe_id):
     db.session.delete(recipe)
     db.session.commit()
     return jsonify({"message": "Deleted"})
+
+
+@extras_bp.route("/recipes/<int:recipe_id>", methods=["GET"])
+@jwt_required()
+def get_recipe(recipe_id):
+    recipe = FamilyRecipe.query.get_or_404(recipe_id)
+    return jsonify({"recipe": recipe.to_dict()})
+
+
+@extras_bp.route("/recipes/<int:recipe_id>/react", methods=["POST"])
+@jwt_required()
+def react_to_recipe(recipe_id):
+    from models.extras import RecipeReaction
+    user = me()
+    recipe = FamilyRecipe.query.get_or_404(recipe_id)
+    data = request.get_json() or {}
+    reaction_type = data.get("reaction_type", "like")  # like, love, yum
+    
+    # Check if already reacted
+    existing = RecipeReaction.query.filter_by(
+        recipe_id=recipe_id, user_id=user.id
+    ).first()
+    
+    if existing:
+        if existing.reaction_type == reaction_type:
+            # Remove reaction
+            db.session.delete(existing)
+            db.session.commit()
+            return jsonify({"reacted": False})
+        else:
+            # Update reaction
+            existing.reaction_type = reaction_type
+            db.session.commit()
+            return jsonify({"reacted": True, "reaction_type": reaction_type})
+    
+    # Add new reaction
+    reaction = RecipeReaction(
+        recipe_id=recipe_id,
+        user_id=user.id,
+        reaction_type=reaction_type
+    )
+    db.session.add(reaction)
+    db.session.commit()
+    
+    # Notify recipe author
+    if recipe.user_id != user.id:
+        from models.notifications import Notification
+        notif = Notification(
+            user_id=recipe.user_id,
+            type="recipe_reaction",
+            title=f"{user.name} reacted to your recipe",
+            message=f"{reaction_type.capitalize()} on {recipe.title}",
+            data=json.dumps({"recipe_id": recipe_id, "user_id": user.id}),
+            action_url=f"/family/recipes/{recipe_id}"
+        )
+        db.session.add(notif)
+        db.session.commit()
+    
+    return jsonify({"reacted": True, "reaction_type": reaction_type})
+
+
+@extras_bp.route("/recipes/<int:recipe_id>/reactions", methods=["GET"])
+@jwt_required()
+def get_recipe_reactions(recipe_id):
+    from models.extras import RecipeReaction
+    reactions = RecipeReaction.query.filter_by(recipe_id=recipe_id).all()
+    return jsonify({"reactions": [r.to_dict() for r in reactions]})
+
+
+@extras_bp.route("/recipes/<int:recipe_id>/comments", methods=["POST"])
+@jwt_required()
+def comment_on_recipe(recipe_id):
+    from models.extras import RecipeComment
+    user = me()
+    recipe = FamilyRecipe.query.get_or_404(recipe_id)
+    data = request.get_json() or {}
+    text = data.get("text", "").strip()
+    
+    if not text:
+        return jsonify({"error": "Comment text required"}), 400
+    
+    comment = RecipeComment(
+        recipe_id=recipe_id,
+        user_id=user.id,
+        text=text
+    )
+    db.session.add(comment)
+    db.session.commit()
+    
+    # Notify recipe author
+    if recipe.user_id != user.id:
+        from models.notifications import Notification
+        notif = Notification(
+            user_id=recipe.user_id,
+            type="recipe_comment",
+            title=f"{user.name} commented on your recipe",
+            message=text[:100],
+            data=json.dumps({"recipe_id": recipe_id, "comment_id": comment.id}),
+            action_url=f"/family/recipes/{recipe_id}"
+        )
+        db.session.add(notif)
+        db.session.commit()
+    
+    return jsonify({"comment": comment.to_dict()}), 201
+
+
+@extras_bp.route("/recipes/<int:recipe_id>/comments", methods=["GET"])
+@jwt_required()
+def get_recipe_comments(recipe_id):
+    from models.extras import RecipeComment
+    comments = RecipeComment.query.filter_by(recipe_id=recipe_id).order_by(
+        RecipeComment.created_at.desc()
+    ).all()
+    return jsonify({"comments": [c.to_dict() for c in comments]})
 
 
 # ── Family Tasks ──────────────────────────────────────────────
@@ -507,18 +795,52 @@ def get_budget():
         return jsonify({"error": "Not in a family"}), 403
     month = request.args.get("month", type=int, default=datetime.utcnow().month)
     year = request.args.get("year", type=int, default=datetime.utcnow().year)
-    entries = FamilyBudget.query.filter(
+    search = request.args.get("search", "")
+    category = request.args.get("category")
+    entry_type = request.args.get("entry_type")
+    
+    q = FamilyBudget.query.filter(
         FamilyBudget.family_id == user.family_id,
         db.extract("month", FamilyBudget.date) == month,
         db.extract("year", FamilyBudget.date) == year
-    ).order_by(FamilyBudget.date.desc()).all()
+    )
+    
+    if search:
+        q = q.filter(FamilyBudget.title.ilike(f"%{search}%"))
+    if category:
+        q = q.filter_by(category=category)
+    if entry_type:
+        q = q.filter_by(entry_type=entry_type)
+    
+    entries = q.order_by(FamilyBudget.date.desc()).all()
     total_income = sum(e.amount for e in entries if e.entry_type == "income")
     total_expense = sum(e.amount for e in entries if e.entry_type == "expense")
+    
+    # Category breakdown
+    category_breakdown = {}
+    for e in entries:
+        if e.entry_type == "expense" and e.category:
+            category_breakdown[e.category] = category_breakdown.get(e.category, 0) + e.amount
+    
+    # Get budget goals
+    goals = BudgetGoal.query.filter_by(family_id=user.family_id).all()
+    goals_dict = {g.category: g.to_dict() for g in goals}
+    
+    # Calculate goal progress
+    for cat, spent in category_breakdown.items():
+        if cat in goals_dict:
+            limit = goals_dict[cat]["monthly_limit"]
+            goals_dict[cat]["spent"] = spent
+            goals_dict[cat]["percentage"] = round((spent / limit) * 100, 1) if limit > 0 else 0
+            goals_dict[cat]["remaining"] = limit - spent
+    
     return jsonify({
         "entries": [e.to_dict() for e in entries],
         "total_income": total_income,
         "total_expense": total_expense,
-        "balance": total_income - total_expense
+        "balance": total_income - total_expense,
+        "category_breakdown": category_breakdown,
+        "goals": list(goals_dict.values())
     })
 
 
@@ -528,21 +850,70 @@ def add_budget_entry():
     user = me()
     if not user.family_id:
         return jsonify({"error": "Not in a family"}), 403
-    data = request.get_json() or {}
+    
+    # Handle file upload
+    attachment_url = None
+    if "attachment" in request.files:
+        result = cloudinary.uploader.upload(request.files["attachment"], folder="kinscribe/budget")
+        attachment_url = result["secure_url"]
+    
+    # Get data from JSON or form
+    if request.is_json:
+        data = request.get_json() or {}
+    else:
+        data = request.form.to_dict()
+    
     entry_date = date.today()
     try:
         if data.get("date"): entry_date = datetime.strptime(data["date"], "%Y-%m-%d").date()
     except: pass
+    
     entry = FamilyBudget(
         family_id=user.family_id, user_id=user.id,
         title=data["title"], amount=float(data["amount"]),
         category=data.get("category", "other"),
         entry_type=data.get("entry_type", "expense"),
-        date=entry_date, notes=data.get("notes")
+        date=entry_date, notes=data.get("notes"),
+        attachment_url=attachment_url or data.get("attachment_url"),
+        is_recurring=data.get("is_recurring", False),
+        recurrence=data.get("recurrence"),
+        currency=data.get("currency", "USD")
     )
     db.session.add(entry)
     db.session.commit()
     return jsonify({"entry": entry.to_dict()}), 201
+
+
+@extras_bp.route("/budget/<int:entry_id>", methods=["PUT"])
+@jwt_required()
+def update_budget_entry(entry_id):
+    entry = FamilyBudget.query.get_or_404(entry_id)
+    data = request.get_json() or {}
+    
+    if "title" in data:
+        entry.title = data["title"]
+    if "amount" in data:
+        entry.amount = float(data["amount"])
+    if "category" in data:
+        entry.category = data["category"]
+    if "entry_type" in data:
+        entry.entry_type = data["entry_type"]
+    if "notes" in data:
+        entry.notes = data["notes"]
+    if "is_recurring" in data:
+        entry.is_recurring = data["is_recurring"]
+    if "recurrence" in data:
+        entry.recurrence = data["recurrence"]
+    if "currency" in data:
+        entry.currency = data["currency"]
+    
+    try:
+        if "date" in data:
+            entry.date = datetime.strptime(data["date"], "%Y-%m-%d").date()
+    except: pass
+    
+    db.session.commit()
+    return jsonify({"entry": entry.to_dict()})
 
 
 @extras_bp.route("/budget/<int:entry_id>", methods=["DELETE"])
@@ -552,6 +923,112 @@ def delete_budget_entry(entry_id):
     db.session.delete(entry)
     db.session.commit()
     return jsonify({"message": "Deleted"})
+
+
+@extras_bp.route("/budget/goals", methods=["GET"])
+@jwt_required()
+def get_budget_goals():
+    user = me()
+    if not user.family_id:
+        return jsonify({"error": "Not in a family"}), 403
+    goals = BudgetGoal.query.filter_by(family_id=user.family_id).all()
+    return jsonify({"goals": [g.to_dict() for g in goals]})
+
+
+@extras_bp.route("/budget/goals", methods=["POST"])
+@jwt_required()
+def set_budget_goal():
+    user = me()
+    if not user.family_id:
+        return jsonify({"error": "Not in a family"}), 403
+    data = request.get_json() or {}
+    
+    # Check if goal exists
+    existing = BudgetGoal.query.filter_by(
+        family_id=user.family_id,
+        category=data["category"]
+    ).first()
+    
+    if existing:
+        existing.monthly_limit = float(data["monthly_limit"])
+        existing.alert_threshold = float(data.get("alert_threshold", 80.0))
+        db.session.commit()
+        return jsonify({"goal": existing.to_dict()})
+    
+    goal = BudgetGoal(
+        family_id=user.family_id,
+        category=data["category"],
+        monthly_limit=float(data["monthly_limit"]),
+        alert_threshold=float(data.get("alert_threshold", 80.0)),
+        created_by=user.id
+    )
+    db.session.add(goal)
+    db.session.commit()
+    return jsonify({"goal": goal.to_dict()}), 201
+
+
+@extras_bp.route("/budget/goals/<int:goal_id>", methods=["DELETE"])
+@jwt_required()
+def delete_budget_goal(goal_id):
+    goal = BudgetGoal.query.get_or_404(goal_id)
+    db.session.delete(goal)
+    db.session.commit()
+    return jsonify({"message": "Deleted"})
+
+
+@extras_bp.route("/budget/analytics", methods=["GET"])
+@jwt_required()
+def budget_analytics():
+    user = me()
+    if not user.family_id:
+        return jsonify({"error": "Not in a family"}), 403
+    
+    year = request.args.get("year", type=int, default=datetime.utcnow().year)
+    
+    # Get all entries for the year
+    entries = FamilyBudget.query.filter(
+        FamilyBudget.family_id == user.family_id,
+        db.extract("year", FamilyBudget.date) == year
+    ).all()
+    
+    # Monthly trend
+    monthly_data = {}
+    for i in range(1, 13):
+        monthly_data[i] = {"income": 0, "expense": 0, "balance": 0}
+    
+    for e in entries:
+        m = e.date.month
+        if e.entry_type == "income":
+            monthly_data[m]["income"] += e.amount
+        else:
+            monthly_data[m]["expense"] += e.amount
+        monthly_data[m]["balance"] = monthly_data[m]["income"] - monthly_data[m]["expense"]
+    
+    # Category totals
+    category_totals = {}
+    for e in entries:
+        if e.entry_type == "expense" and e.category:
+            category_totals[e.category] = category_totals.get(e.category, 0) + e.amount
+    
+    # Top expenses
+    top_expenses = sorted(
+        [e for e in entries if e.entry_type == "expense"],
+        key=lambda x: x.amount,
+        reverse=True
+    )[:10]
+    
+    return jsonify({
+        "monthly_trend": [{
+            "month": m,
+            "income": monthly_data[m]["income"],
+            "expense": monthly_data[m]["expense"],
+            "balance": monthly_data[m]["balance"]
+        } for m in range(1, 13)],
+        "category_totals": category_totals,
+        "top_expenses": [e.to_dict() for e in top_expenses],
+        "total_income": sum(e.amount for e in entries if e.entry_type == "income"),
+        "total_expense": sum(e.amount for e in entries if e.entry_type == "expense")
+    })
 
 
 # ── Post Insights ─────────────────────────────────────────────

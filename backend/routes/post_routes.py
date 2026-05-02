@@ -569,6 +569,34 @@ def post_to_family(post_id):
             family_id=family_id
         )
         db.session.add(story)
+        db.session.flush()
+        
+        # Send notifications to all family members except the poster
+        from models.notifications import Notification
+        from models.family import Family
+        
+        family = Family.query.get(family_id)
+        family_members = FamilyMember.query.filter_by(family_id=family_id).all()
+        
+        for member in family_members:
+            if member.user_id != user.id:  # Don't notify the person who posted
+                notification = Notification(
+                    user_id=member.user_id,
+                    from_user_id=user.id,
+                    type="new_family_story",
+                    title=f"{user.name} shared a post to {family.name}",
+                    message=post.caption[:100] if post.caption else "Check out this post!",
+                    data=json.dumps({
+                        "story_id": story.id,
+                        "post_id": post_id,
+                        "family_id": family_id,
+                        "family_name": family.name,
+                        "media_url": post.media_url,
+                        "media_type": post.media_type,
+                    })
+                )
+                db.session.add(notification)
+        
         db.session.commit()
         return jsonify({"message": "Posted to family", "story": story.to_dict()}), 201
     except Exception as e:

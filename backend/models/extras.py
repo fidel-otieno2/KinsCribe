@@ -122,6 +122,11 @@ class FamilyRecipe(db.Model):
         try:
             if self.ingredients: ingredients = json.loads(self.ingredients)
         except: pass
+        
+        # Get reaction and comment counts
+        reaction_count = RecipeReaction.query.filter_by(recipe_id=self.id).count()
+        comment_count = RecipeComment.query.filter_by(recipe_id=self.id).count()
+        
         return {
             "id": self.id, "family_id": self.family_id, "user_id": self.user_id,
             "title": self.title, "description": self.description,
@@ -130,6 +135,8 @@ class FamilyRecipe(db.Model):
             "servings": self.servings, "category": self.category, "tags": self.tags,
             "author_name": u.name if u else None,
             "author_avatar": u.avatar_url if u else None,
+            "reaction_count": reaction_count,
+            "comment_count": comment_count,
             "created_at": utc_iso(self.created_at)
         }
 
@@ -178,7 +185,12 @@ class FamilyBudget(db.Model):
     entry_type = db.Column(db.String(10), default="expense")  # income|expense
     date = db.Column(db.Date, default=datetime.utcnow)
     notes = db.Column(db.Text, nullable=True)
+    attachment_url = db.Column(db.String(300), nullable=True)
+    is_recurring = db.Column(db.Boolean, default=False)
+    recurrence = db.Column(db.String(20), nullable=True)  # monthly|weekly|yearly
+    currency = db.Column(db.String(10), default="USD")
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     def to_dict(self):
         from models.user import User
@@ -189,7 +201,35 @@ class FamilyBudget(db.Model):
             "entry_type": self.entry_type,
             "date": utc_iso(self.date) if self.date else None,
             "notes": self.notes,
+            "attachment_url": self.attachment_url,
+            "is_recurring": self.is_recurring,
+            "recurrence": self.recurrence,
+            "currency": self.currency,
             "author_name": u.name if u else None,
+            "author_avatar": u.avatar_url if u else None,
+            "created_at": utc_iso(self.created_at),
+            "updated_at": utc_iso(self.updated_at)
+        }
+
+
+class BudgetGoal(db.Model):
+    """Monthly budget goals per category"""
+    __tablename__ = "budget_goals"
+    id = db.Column(db.Integer, primary_key=True)
+    family_id = db.Column(db.Integer, db.ForeignKey("families.id"), nullable=False)
+    category = db.Column(db.String(50), nullable=False)
+    monthly_limit = db.Column(db.Float, nullable=False)
+    alert_threshold = db.Column(db.Float, default=80.0)  # Alert at 80% of limit
+    created_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    __table_args__ = (db.UniqueConstraint("family_id", "category"),)
+
+    def to_dict(self):
+        return {
+            "id": self.id, "family_id": self.family_id,
+            "category": self.category, "monthly_limit": self.monthly_limit,
+            "alert_threshold": self.alert_threshold,
+            "created_by": self.created_by,
             "created_at": utc_iso(self.created_at)
         }
 
@@ -426,5 +466,98 @@ class StoryAudioRecording(db.Model):
             "audio_url": self.audio_url,
             "duration_seconds": self.duration_seconds,
             "transcript": self.transcript,
+            "created_at": utc_iso(self.created_at)
+        }
+
+
+class EventReaction(db.Model):
+    """Reactions to calendar events"""
+    __tablename__ = "event_reactions"
+    id = db.Column(db.Integer, primary_key=True)
+    event_id = db.Column(db.Integer, db.ForeignKey("family_events.id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    reaction = db.Column(db.String(10), default="❤️")  # emoji reaction
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    __table_args__ = (db.UniqueConstraint("event_id", "user_id"),)
+
+    def to_dict(self):
+        from models.user import User
+        u = User.query.get(self.user_id)
+        return {
+            "id": self.id,
+            "event_id": self.event_id,
+            "user_id": self.user_id,
+            "user_name": u.name if u else None,
+            "user_avatar": u.avatar_url if u else None,
+            "reaction": self.reaction,
+            "created_at": utc_iso(self.created_at)
+        }
+
+
+class EventComment(db.Model):
+    """Comments on calendar events"""
+    __tablename__ = "event_comments"
+    id = db.Column(db.Integer, primary_key=True)
+    event_id = db.Column(db.Integer, db.ForeignKey("family_events.id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    text = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        from models.user import User
+        u = User.query.get(self.user_id)
+        return {
+            "id": self.id,
+            "event_id": self.event_id,
+            "user_id": self.user_id,
+            "user_name": u.name if u else None,
+            "user_avatar": u.avatar_url if u else None,
+            "text": self.text,
+            "created_at": utc_iso(self.created_at)
+        }
+
+
+class RecipeReaction(db.Model):
+    """Reactions to family recipes"""
+    __tablename__ = "recipe_reactions"
+    id = db.Column(db.Integer, primary_key=True)
+    recipe_id = db.Column(db.Integer, db.ForeignKey("family_recipes.id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    reaction_type = db.Column(db.String(20), default="like")  # like, love, yum
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        from models.user import User
+        u = User.query.get(self.user_id)
+        return {
+            "id": self.id,
+            "recipe_id": self.recipe_id,
+            "user_id": self.user_id,
+            "user_name": u.name if u else None,
+            "user_avatar": u.avatar_url if u else None,
+            "reaction_type": self.reaction_type,
+            "created_at": utc_iso(self.created_at)
+        }
+
+
+class RecipeComment(db.Model):
+    """Comments on family recipes"""
+    __tablename__ = "recipe_comments"
+    id = db.Column(db.Integer, primary_key=True)
+    recipe_id = db.Column(db.Integer, db.ForeignKey("family_recipes.id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    text = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        from models.user import User
+        u = User.query.get(self.user_id)
+        return {
+            "id": self.id,
+            "recipe_id": self.recipe_id,
+            "user_id": self.user_id,
+            "user_name": u.name if u else None,
+            "user_avatar": u.avatar_url if u else None,
+            "text": self.text,
             "created_at": utc_iso(self.created_at)
         }

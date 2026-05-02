@@ -21,6 +21,9 @@ const CATEGORIES = [
   { key: 'entertainment', label: 'Fun', icon: '🎉', color: '#7c3aed' },
   { key: 'health', label: 'Health', icon: '💊', color: '#10b981' },
   { key: 'education', label: 'Education', icon: '📚', color: '#06b6d4' },
+  { key: 'shopping', label: 'Shopping', icon: '🛍️', color: '#ec4899' },
+  { key: 'housing', label: 'Housing', icon: '🏠', color: '#8b5cf6' },
+  { key: 'savings', label: 'Savings', icon: '💰', color: '#14b8a6' },
   { key: 'other', label: 'Other', icon: '📦', color: '#94a3b8' },
 ];
 
@@ -38,6 +41,10 @@ export default function FamilyBudgetScreen({ navigation }) {
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({ title: '', amount: '', category: 'other', entry_type: 'expense', notes: '' });
   const [saving, setSaving] = useState(false);
+  const [editingEntry, setEditingEntry] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterCategory, setFilterCategory] = useState('all');
+  const [showFilters, setShowFilters] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const fetchBudget = useCallback(async () => {
@@ -53,17 +60,50 @@ export default function FamilyBudgetScreen({ navigation }) {
     if (!form.title.trim() || !form.amount) return info('Please enter a title and amount');
     setSaving(true);
     try {
-      const res = await api.post('/extras/budget', { ...form, amount: parseFloat(form.amount) });
-      setData(prev => ({
-        ...prev,
-        entries: [res.data.entry, ...prev.entries],
-        total_income: form.entry_type === 'income' ? prev.total_income + parseFloat(form.amount) : prev.total_income,
-        total_expense: form.entry_type === 'expense' ? prev.total_expense + parseFloat(form.amount) : prev.total_expense,
-        balance: form.entry_type === 'income' ? prev.balance + parseFloat(form.amount) : prev.balance - parseFloat(form.amount),
-      }));
+      if (editingEntry) {
+        // Update existing entry
+        const res = await api.put(`/extras/budget/${editingEntry.id}`, { ...form, amount: parseFloat(form.amount) });
+        setData(prev => {
+          const oldEntry = prev.entries.find(e => e.id === editingEntry.id);
+          const entries = prev.entries.map(e => e.id === editingEntry.id ? res.data.entry : e);
+          
+          // Recalculate totals
+          let newIncome = prev.total_income;
+          let newExpense = prev.total_expense;
+          
+          // Remove old entry amounts
+          if (oldEntry.entry_type === 'income') newIncome -= oldEntry.amount;
+          else newExpense -= oldEntry.amount;
+          
+          // Add new entry amounts
+          if (res.data.entry.entry_type === 'income') newIncome += res.data.entry.amount;
+          else newExpense += res.data.entry.amount;
+          
+          return {
+            ...prev,
+            entries,
+            total_income: newIncome,
+            total_expense: newExpense,
+            balance: newIncome - newExpense,
+          };
+        });
+        success('Entry updated successfully');
+      } else {
+        // Create new entry
+        const res = await api.post('/extras/budget', { ...form, amount: parseFloat(form.amount) });
+        setData(prev => ({
+          ...prev,
+          entries: [res.data.entry, ...prev.entries],
+          total_income: form.entry_type === 'income' ? prev.total_income + parseFloat(form.amount) : prev.total_income,
+          total_expense: form.entry_type === 'expense' ? prev.total_expense + parseFloat(form.amount) : prev.total_expense,
+          balance: form.entry_type === 'income' ? prev.balance + parseFloat(form.amount) : prev.balance - parseFloat(form.amount),
+        }));
+        success('Entry added successfully');
+      }
       setShowAdd(false);
+      setEditingEntry(null);
       setForm({ title: '', amount: '', category: 'other', entry_type: 'expense', notes: '' });
-    } catch { error('Failed to save entry. Try again.'); }finally { setSaving(false); }
+    } catch { error('Failed to save entry. Try again.'); } finally { setSaving(false); }
   };
 
   const deleteEntry = (entry) => {
@@ -79,15 +119,43 @@ export default function FamilyBudgetScreen({ navigation }) {
             total_expense: entry.entry_type === 'expense' ? prev.total_expense - entry.amount : prev.total_expense,
             balance: entry.entry_type === 'income' ? prev.balance - entry.amount : prev.balance + entry.amount,
           }));
-        } catch {}
+          success('Entry deleted');
+        } catch { error('Failed to delete entry'); }
       }},
     ]);
+  };
+
+  const editEntry = (entry) => {
+    setEditingEntry(entry);
+    setForm({
+      title: entry.title,
+      amount: entry.amount.toString(),
+      category: entry.category,
+      entry_type: entry.entry_type,
+      notes: entry.notes || '',
+    });
+    setShowAdd(true);
   };
 
   const prevMonth = () => { if (month === 1) { setMonth(12); setYear(y => y - 1); } else setMonth(m => m - 1); };
   const nextMonth = () => { if (month === 12) { setMonth(1); setYear(y => y + 1); } else setMonth(m => m + 1); };
 
   const getCatInfo = (key) => CATEGORIES.find(c => c.key === key) || CATEGORIES[CATEGORIES.length - 1];
+
+  // Filter and search entries
+  const filteredEntries = data.entries.filter(entry => {
+    const matchesSearch = entry.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         entry.notes?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory = filterCategory === 'all' || entry.category === filterCategory;
+    return matchesSearch && matchesCategory;
+  });
+
+  // Calculate category breakdown
+  const categoryBreakdown = CATEGORIES.map(cat => {
+    const catEntries = data.entries.filter(e => e.category === cat.key && e.entry_type === 'expense');
+    const total = catEntries.reduce((sum, e) => sum + e.amount, 0);
+    return { ...cat, total, count: catEntries.length };
+  }).filter(c => c.total > 0).sort((a, b) => b.total - a.total);
 
   return (
     <View style={[s.container, { backgroundColor: theme.bg }]}>
@@ -96,7 +164,12 @@ export default function FamilyBudgetScreen({ navigation }) {
       <View style={[s.header, { borderBottomColor: theme.border }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}><Ionicons name="arrow-back" size={24} color={theme.text} /></TouchableOpacity>
         <AppText style={[s.headerTitle, { color: theme.text }]}>Family Budget</AppText>
-        <TouchableOpacity style={s.addBtn} onPress={() => setShowAdd(true)}><Ionicons name="add" size={22} color="#fff" /></TouchableOpacity>
+        <TouchableOpacity style={s.iconBtn} onPress={() => setShowFilters(!showFilters)}>
+          <Ionicons name="options-outline" size={20} color={theme.text} />
+        </TouchableOpacity>
+        <TouchableOpacity style={s.addBtn} onPress={() => { setEditingEntry(null); setForm({ title: '', amount: '', category: 'other', entry_type: 'expense', notes: '' }); setShowAdd(true); }}>
+          <Ionicons name="add" size={22} color="#fff" />
+        </TouchableOpacity>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
@@ -106,6 +179,49 @@ export default function FamilyBudgetScreen({ navigation }) {
           <AppText style={[s.monthTitle, { color: theme.text }]}>{MONTHS[month - 1]} {year}</AppText>
           <TouchableOpacity onPress={nextMonth} style={s.navBtn}><Ionicons name="chevron-forward" size={22} color={theme.text} /></TouchableOpacity>
         </View>
+
+        {/* Search bar */}
+        <View style={[s.searchContainer, { backgroundColor: theme.bgCard, borderColor: theme.border2 }]}>
+          <Ionicons name="search" size={18} color={theme.muted} />
+          <TextInput
+            style={[s.searchInput, { color: theme.text }]}
+            placeholder="Search transactions..."
+            placeholderTextColor={theme.dim}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <Ionicons name="close-circle" size={18} color={theme.muted} />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Category filters */}
+        {showFilters && (
+          <View style={s.filtersContainer}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16 }}>
+                <TouchableOpacity
+                  style={[s.filterChip, { backgroundColor: theme.bgCard, borderColor: theme.border2 }, filterCategory === 'all' && { borderColor: colors.primary, backgroundColor: `${colors.primary}22` }]}
+                  onPress={() => setFilterCategory('all')}
+                >
+                  <AppText style={[s.filterChipText, { color: theme.muted }, filterCategory === 'all' && { color: colors.primary }]}>All</AppText>
+                </TouchableOpacity>
+                {CATEGORIES.map(c => (
+                  <TouchableOpacity
+                    key={c.key}
+                    style={[s.filterChip, { backgroundColor: theme.bgCard, borderColor: theme.border2 }, filterCategory === c.key && { borderColor: c.color, backgroundColor: `${c.color}22` }]}
+                    onPress={() => setFilterCategory(c.key)}
+                  >
+                    <AppText>{c.icon}</AppText>
+                    <AppText style={[s.filterChipText, { color: theme.muted }, filterCategory === c.key && { color: c.color }]}>{c.label}</AppText>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+          </View>
+        )}
 
         {/* Summary cards */}
         <View style={s.summaryRow}>

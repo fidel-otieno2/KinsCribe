@@ -216,6 +216,8 @@ def _get_all_notifications(user):
     # ── 8. Calendar event notifications ───────────────────────
     try:
         from models.notifications import Notification as NotificationModel
+        
+        # Get calendar notifications
         calendar_notifs = NotificationModel.query.filter(
             NotificationModel.user_id == user.id,
             NotificationModel.type.in_(['calendar_event', 'event_reminder', 'daily_events'])
@@ -232,6 +234,31 @@ def _get_all_notifications(user):
                 "title": notif.title,
                 "body": notif.message,
                 "data": notif.data,
+                "created_at": notif.created_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            })
+        
+        # Get new_family_story notifications from Notification model
+        family_story_notifs = NotificationModel.query.filter(
+            NotificationModel.user_id == user.id,
+            NotificationModel.type == 'new_family_story'
+        ).order_by(NotificationModel.created_at.desc()).limit(20).all()
+        
+        for notif in family_story_notifs:
+            data = json.loads(notif.data) if notif.data else {}
+            notifs.append({
+                "id": f"family_story_notif-{notif.id}",
+                "type": notif.type,
+                "source": "family_story",
+                "actor_name": notif.from_user.name if notif.from_user else "Someone",
+                "actor_avatar": notif.from_user.avatar_url if notif.from_user else None,
+                "actor_id": notif.from_user_id,
+                "title": notif.title,
+                "body": notif.message,
+                "story_id": data.get("story_id"),
+                "post_id": data.get("post_id"),
+                "family_id": data.get("family_id"),
+                "story_media": data.get("media_url"),
+                "story_media_type": data.get("media_type"),
                 "created_at": notif.created_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
             })
     except Exception:

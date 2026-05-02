@@ -14,6 +14,7 @@ import { useTranslation } from '../i18n';
 import { colors, radius } from '../theme';
 import Toast from '../components/Toast';
 import useToast from '../hooks/useToast';
+import EventDetailsModal from '../components/EventDetailsModal';
 
 const { width } = Dimensions.get('window');
 const DAY_SIZE = (width - 32 - 24) / 7;
@@ -30,146 +31,6 @@ const EVENT_TYPES = [
   { key: 'vacation', label: '✈️ Vacation', color: '#06b6d4' },
   { key: 'meeting', label: '👥 Meeting', color: '#8b5cf6' },
 ];
-
-function EventDetailsModal({ visible, onClose, event, onDelete, onEdit }) {
-  const { theme } = useTheme();
-  
-  if (!event) return null;
-  
-  const eventType = EVENT_TYPES.find(t => t.key === event.event_type) || EVENT_TYPES[2];
-  const eventDate = new Date(event.event_date);
-  
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <TouchableOpacity 
-        style={m.overlay} 
-        activeOpacity={1} 
-        onPress={onClose}
-      >
-        <BlurView intensity={30} tint="dark" style={m.overlay}>
-          <TouchableOpacity 
-            activeOpacity={1} 
-            style={m.detailsCard}
-            onPress={(e) => e.stopPropagation()}
-          >
-            <LinearGradient 
-              colors={[`${event.color}22`, 'rgba(15,23,42,0.95)']} 
-              style={StyleSheet.absoluteFill} 
-            />
-            
-            {/* Header */}
-            <View style={[m.detailsHeader, { borderBottomColor: theme.border }]}>
-              <View style={[m.eventTypeIcon, { backgroundColor: `${event.color}33` }]}>
-                <AppText style={{ fontSize: 24 }}>{eventType.label.split(' ')[0]}</AppText>
-              </View>
-              <TouchableOpacity onPress={onClose} style={m.closeBtn}>
-                <Ionicons name="close" size={24} color={theme.text} />
-              </TouchableOpacity>
-            </View>
-            
-            {/* Content */}
-            <ScrollView style={m.detailsContent} showsVerticalScrollIndicator={false}>
-              <AppText style={[m.detailsTitle, { color: theme.text }]}>{event.title}</AppText>
-              
-              <View style={m.detailsRow}>
-                <Ionicons name="calendar-outline" size={20} color={event.color} />
-                <View style={{ flex: 1 }}>
-                  <AppText style={[m.detailsLabel, { color: theme.muted }]}>Date & Time</AppText>
-                  <AppText style={[m.detailsValue, { color: theme.text }]}>
-                    {eventDate.toLocaleDateString('en-US', { 
-                      weekday: 'long', 
-                      month: 'long', 
-                      day: 'numeric', 
-                      year: 'numeric' 
-                    })}
-                  </AppText>
-                  <AppText style={[m.detailsValue, { color: theme.muted, fontSize: 13 }]}>
-                    {eventDate.toLocaleTimeString('en-US', { 
-                      hour: '2-digit', 
-                      minute: '2-digit' 
-                    })}
-                  </AppText>
-                </View>
-              </View>
-              
-              {event.description && (
-                <View style={m.detailsRow}>
-                  <Ionicons name="document-text-outline" size={20} color={event.color} />
-                  <View style={{ flex: 1 }}>
-                    <AppText style={[m.detailsLabel, { color: theme.muted }]}>Description</AppText>
-                    <AppText style={[m.detailsValue, { color: theme.text }]}>
-                      {event.description}
-                    </AppText>
-                  </View>
-                </View>
-              )}
-              
-              <View style={m.detailsRow}>
-                <Ionicons name="pricetag-outline" size={20} color={event.color} />
-                <View style={{ flex: 1 }}>
-                  <AppText style={[m.detailsLabel, { color: theme.muted }]}>Type</AppText>
-                  <AppText style={[m.detailsValue, { color: theme.text }]}>
-                    {eventType.label}
-                  </AppText>
-                </View>
-              </View>
-              
-              {event.is_recurring && (
-                <View style={m.detailsRow}>
-                  <Ionicons name="repeat-outline" size={20} color={event.color} />
-                  <View style={{ flex: 1 }}>
-                    <AppText style={[m.detailsLabel, { color: theme.muted }]}>Recurring</AppText>
-                    <AppText style={[m.detailsValue, { color: theme.text }]}>
-                      Repeats {event.recurrence || 'yearly'}
-                    </AppText>
-                  </View>
-                </View>
-              )}
-              
-              {event.creator_name && (
-                <View style={m.detailsRow}>
-                  <Ionicons name="person-outline" size={20} color={event.color} />
-                  <View style={{ flex: 1 }}>
-                    <AppText style={[m.detailsLabel, { color: theme.muted }]}>Created by</AppText>
-                    <AppText style={[m.detailsValue, { color: theme.text }]}>
-                      {event.creator_name}
-                    </AppText>
-                  </View>
-                </View>
-              )}
-            </ScrollView>
-            
-            {/* Actions */}
-            <View style={[m.detailsActions, { borderTopColor: theme.border }]}>
-              <View style={{ flexDirection: 'row', gap: 10 }}>
-                <TouchableOpacity 
-                  style={[m.actionBtn, { flex: 1, backgroundColor: 'rgba(124,58,237,0.1)' }]}
-                  onPress={() => {
-                    onClose();
-                    onEdit(event);
-                  }}
-                >
-                  <Ionicons name="create-outline" size={20} color={colors.primary} />
-                  <AppText style={[m.actionBtnText, { color: colors.primary }]}>Edit</AppText>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[m.actionBtn, { flex: 1, backgroundColor: 'rgba(239,68,68,0.1)' }]}
-                  onPress={() => {
-                    onClose();
-                    onDelete(event);
-                  }}
-                >
-                  <Ionicons name="trash-outline" size={20} color="#ef4444" />
-                  <AppText style={[m.actionBtnText, { color: '#ef4444' }]}>Delete</AppText>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </TouchableOpacity>
-        </BlurView>
-      </TouchableOpacity>
-    </Modal>
-  );
-}
 
 function AddEventModal({ visible, onClose, onSave, selectedDate, editEvent }) {
   const { theme } = useTheme();
@@ -426,84 +287,14 @@ const m = StyleSheet.create({
   cancelBtn: { alignItems: 'center', paddingVertical: 8 },
   cancelText: { color: colors.muted, fontSize: 14 },
   closeBtn: { padding: 4 },
-  // Event Details Modal
-  overlay: { 
-    flex: 1, 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    padding: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-  },
-  detailsCard: { 
-    width: '100%', 
-    maxWidth: 400,
-    maxHeight: '80%',
-    borderRadius: radius.xl, 
-    overflow: 'hidden',
-    backgroundColor: 'rgba(15,23,42,0.98)',
-    borderWidth: 1,
-    borderColor: 'rgba(124,58,237,0.3)',
-  },
-  detailsHeader: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    justifyContent: 'space-between',
-    padding: 20,
-    borderBottomWidth: 1,
-  },
-  eventTypeIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  detailsContent: {
-    padding: 20,
-  },
-  detailsTitle: {
-    fontSize: 24,
-    fontWeight: '800',
-    marginBottom: 24,
-  },
-  detailsRow: {
-    flexDirection: 'row',
-    gap: 16,
-    marginBottom: 20,
-  },
-  detailsLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 6,
-  },
-  detailsValue: {
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  detailsActions: {
-    padding: 20,
-    borderTopWidth: 1,
-  },
-  actionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    padding: 14,
-    borderRadius: radius.md,
-  },
-  actionBtnText: {
-    fontSize: 15,
-    fontWeight: '700',
-  },
+  // Event Details Modal - removed, now in separate component
 });
 
-export default function FamilyCalendarScreen({ navigation }) {
+export default function FamilyCalendarScreen({ navigation, route }) {
   const { theme, isDark } = useTheme();
   const { t } = useTranslation();
   const { toast, hide, success, error } = useToast();
+  const { eventId } = route.params || {};
   const today = new Date();
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
@@ -527,8 +318,17 @@ export default function FamilyCalendarScreen({ navigation }) {
       setEvents(eventsRes.data.events || []);
       setOnThisDay(onThisDayRes.data.stories || []);
       setUpcoming(upcomingRes.data.events || []);
+      
+      // If eventId provided from notification, open that event
+      if (eventId) {
+        const event = [...eventsRes.data.events, ...upcomingRes.data.events].find(e => e.id === eventId);
+        if (event) {
+          setSelectedEvent(event);
+          setShowEventDetails(true);
+        }
+      }
     } catch {} finally { setLoading(false); }
-  }, [currentMonth, currentYear]);
+  }, [currentMonth, currentYear, eventId]);
 
   useEffect(() => { fetchEvents(); }, [fetchEvents]);
 
@@ -760,6 +560,7 @@ export default function FamilyCalendarScreen({ navigation }) {
           setSelectedDate(new Date(event.event_date));
           setShowAdd(true);
         }}
+        theme={theme}
       />
     </View>
   );

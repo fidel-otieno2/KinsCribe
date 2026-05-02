@@ -394,6 +394,26 @@ def _run_migrations():
             created_at TIMESTAMP DEFAULT NOW()
         )
         """,
+        # Event reactions and comments
+        """
+        CREATE TABLE IF NOT EXISTS event_reactions (
+            id SERIAL PRIMARY KEY,
+            event_id INTEGER NOT NULL REFERENCES family_events(id) ON DELETE CASCADE,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            reaction VARCHAR(10) DEFAULT '❤️',
+            created_at TIMESTAMP DEFAULT NOW(),
+            UNIQUE(event_id, user_id)
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS event_comments (
+            id SERIAL PRIMARY KEY,
+            event_id INTEGER NOT NULL REFERENCES family_events(id) ON DELETE CASCADE,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            text TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT NOW()
+        )
+        """,
     ]
 
     try:

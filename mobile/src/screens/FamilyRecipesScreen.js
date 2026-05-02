@@ -73,6 +73,9 @@ export default function FamilyRecipesScreen({ navigation }) {
   const [imageUri, setImageUri] = useState(null);
   const [saving, setSaving] = useState(false);
   const [selected, setSelected] = useState(null);
+  const [showComments, setShowComments] = useState(false);
+  const [comments, setComments] = useState([]);
+  const [commentText, setCommentText] = useState('');
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -135,6 +138,39 @@ export default function FamilyRecipesScreen({ navigation }) {
     ]);
   };
 
+  const handleReaction = async (type) => {
+    try {
+      await api.post(`/extras/recipes/${selected.id}/react`, { reaction_type: type });
+      const { data } = await api.get(`/extras/recipes/${selected.id}`);
+      setSelected(data.recipe);
+      setRecipes(prev => prev.map(r => r.id === selected.id ? data.recipe : r));
+    } catch {}
+  };
+
+  const loadComments = async () => {
+    try {
+      const { data } = await api.get(`/extras/recipes/${selected.id}/comments`);
+      setComments(data.comments || []);
+    } catch {}
+  };
+
+  const postComment = async () => {
+    if (!commentText.trim()) return;
+    try {
+      const { data } = await api.post(`/extras/recipes/${selected.id}/comments`, { text: commentText });
+      setComments(prev => [data.comment, ...prev]);
+      setCommentText('');
+      const recipeData = await api.get(`/extras/recipes/${selected.id}`);
+      setSelected(recipeData.data.recipe);
+    } catch {}
+  };
+
+  useEffect(() => {
+    if (selected && showComments) {
+      loadComments();
+    }
+  }, [selected, showComments]);
+
   if (selected) {
     return (
       <View style={[s.container, { backgroundColor: theme.bg }]}>
@@ -147,6 +183,22 @@ export default function FamilyRecipesScreen({ navigation }) {
           {selected.image_url && <Image source={{ uri: selected.image_url }} style={{ width: '100%', height: 220, borderRadius: radius.lg, marginBottom: 16 }} resizeMode="cover" />}
           <AppText style={[s.recipeTitle, { color: theme.text }]}>{selected.title}</AppText>
           <AppText style={[s.recipeAuthor, { color: theme.muted }]}>by {selected.author_name}</AppText>
+          
+          {/* Reactions */}
+          <View style={s.reactionsRow}>
+            <TouchableOpacity style={s.reactionBtn} onPress={() => handleReaction('like')}>
+              <Ionicons name="heart" size={20} color="#e11d48" />
+              <AppText style={[s.reactionText, { color: theme.text }]}>{selected.reaction_count || 0}</AppText>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.reactionBtn} onPress={() => handleReaction('yum')}>
+              <AppText style={{ fontSize: 20 }}>😋</AppText>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.reactionBtn} onPress={() => setShowComments(true)}>
+              <Ionicons name="chatbubble-outline" size={20} color={theme.text} />
+              <AppText style={[s.reactionText, { color: theme.text }]}>{selected.comment_count || 0}</AppText>
+            </TouchableOpacity>
+          </View>
+          
           {selected.description && <AppText style={[s.recipeDesc, { color: theme.muted }]}>{selected.description}</AppText>}
           {selected.ingredients?.length > 0 && (
             <>
@@ -166,6 +218,45 @@ export default function FamilyRecipesScreen({ navigation }) {
             </>
           )}
         </ScrollView>
+        
+        {/* Comments Modal */}
+        <Modal visible={showComments} transparent animationType="slide" onRequestClose={() => setShowComments(false)}>
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' }}>
+            <View style={[s.commentsSheet, { backgroundColor: theme.bgCard }]}>
+              <View style={s.modalHandle} />
+              <AppText style={[s.modalTitle, { color: theme.text }]}>Comments</AppText>
+              <FlatList
+                data={comments}
+                keyExtractor={c => String(c.id)}
+                style={{ maxHeight: 300 }}
+                renderItem={({ item }) => (
+                  <View style={s.commentRow}>
+                    <View style={[s.commentAvatar, { backgroundColor: theme.primary }]}>
+                      {item.user_avatar ? <Image source={{ uri: item.user_avatar }} style={{ width: 32, height: 32, borderRadius: 16 }} /> : <AppText style={{ color: '#fff', fontWeight: '700' }}>{item.user_name?.[0]}</AppText>}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <AppText style={[s.commentName, { color: theme.text }]}>{item.user_name}</AppText>
+                      <AppText style={[s.commentText, { color: theme.muted }]}>{item.text}</AppText>
+                    </View>
+                  </View>
+                )}
+                ListEmptyComponent={<AppText style={{ color: theme.muted, textAlign: 'center', marginTop: 20 }}>No comments yet</AppText>}
+              />
+              <View style={s.commentInputRow}>
+                <TextInput
+                  style={[s.commentInput, { backgroundColor: theme.bgSecondary, color: theme.text }]}
+                  placeholder="Add a comment..."
+                  placeholderTextColor={theme.dim}
+                  value={commentText}
+                  onChangeText={setCommentText}
+                />
+                <TouchableOpacity onPress={postComment} disabled={!commentText.trim()}>
+                  <Ionicons name="send" size={22} color={commentText.trim() ? theme.primary : theme.dim} />
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </View>
     );
   }
@@ -279,4 +370,14 @@ const s = StyleSheet.create({
   ingredientDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primary },
   ingredientText: { fontSize: 14, color: colors.text },
   instructions: { fontSize: 14, color: colors.muted, lineHeight: 22 },
+  reactionsRow: { flexDirection: 'row', alignItems: 'center', gap: 16, marginVertical: 12, paddingVertical: 8, borderTopWidth: 0.5, borderBottomWidth: 0.5, borderColor: colors.border },
+  reactionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, backgroundColor: 'rgba(124,58,237,0.1)' },
+  reactionText: { fontSize: 13, fontWeight: '600', color: colors.text },
+  commentsSheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 40, maxHeight: '80%' },
+  commentRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
+  commentAvatar: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  commentName: { fontSize: 13, fontWeight: '700', marginBottom: 2 },
+  commentText: { fontSize: 13, lineHeight: 18 },
+  commentInputRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 16, paddingTop: 16, borderTopWidth: 0.5, borderColor: colors.border },
+  commentInput: { flex: 1, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20, fontSize: 14 },
 });
