@@ -223,11 +223,11 @@ export default function UserProfileScreen({ route, navigation }) {
             <AppText style={s.statLabel}>{t('posts')}</AppText>
           </View>
           <View style={s.stat}>
-            <AppText style={s.statNum}>{profile?.follower_count || 0}</AppText>
+            <AppText style={s.statNum}>{profile?.followers_count || profile?.follower_count || profile?.connection_count || 0}</AppText>
             <AppText style={s.statLabel}>Followers</AppText>
           </View>
           <View style={s.stat}>
-            <AppText style={s.statNum}>{profile?.following_count || 0}</AppText>
+            <AppText style={s.statNum}>{profile?.following_count || profile?.interest_count || 0}</AppText>
             <AppText style={s.statLabel}>Following</AppText>
           </View>
         </View>

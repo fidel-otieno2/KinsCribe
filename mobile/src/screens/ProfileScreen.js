@@ -51,6 +51,20 @@ export default function ProfileScreen({ navigation }) {
   const [showQR, setShowQR] = useState(false);
   const [feedLayout, setFeedLayout] = useState('grid'); // 'grid' | 'list'
   const [stats, setStats] = useState({ posts: 0, followers: 0, following: 0 });
+
+  // Debug: Log user data to see what fields are available
+  useEffect(() => {
+    if (user) {
+      console.log('=== USER DATA DEBUG ===');
+      console.log('User ID:', user.id);
+      console.log('followers_count:', user.followers_count);
+      console.log('following_count:', user.following_count);
+      console.log('connection_count:', user.connection_count);
+      console.log('interest_count:', user.interest_count);
+      console.log('follower_count:', user.follower_count);
+      console.log('======================');
+    }
+  }, [user]);
   const [listModal, setListModal] = useState({ visible: false, type: null, data: [], loading: false });
   const [myStories, setMyStories] = useState([]);
   const [archivedStories, setArchivedStories] = useState([]);
@@ -100,8 +114,8 @@ export default function ProfileScreen({ navigation }) {
         .catch(() => {});
       setStats({
         posts: allPosts.length,
-        followers: user.follower_count || 0,
-        following: user.following_count || 0,
+        followers: user.followers_count || user.follower_count || user.connection_count || 0,
+        following: user.following_count || user.interest_count || 0,
       });
     } catch {} finally {
       setLoading(false);
