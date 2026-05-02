@@ -946,6 +946,9 @@ def get_budget():
 @extras_bp.route("/budget", methods=["POST"])
 @jwt_required()
 def add_budget_entry():
+    from models.family import FamilyMember, Family
+    from models.notifications import Notification
+    
     user = me()
     if not user.family_id:
         return jsonify({"error": "Not in a family"}), 403
@@ -979,6 +982,31 @@ def add_budget_entry():
         currency=data.get("currency", "USD")
     )
     db.session.add(entry)
+    db.session.flush()
+    
+    # Send notifications to all family members except the creator
+    family = Family.query.get(user.family_id)
+    family_members = FamilyMember.query.filter_by(family_id=user.family_id).all()
+    
+    for member in family_members:
+        if member.user_id != user.id:  # Don't notify the person who added the entry
+            notification = Notification(
+                user_id=member.user_id,
+                from_user_id=user.id,
+                type="budget_entry",
+                title=f"{user.name} added a budget entry",
+                message=f"{entry.entry_type.capitalize()}: ${entry.amount:.2f} - {entry.title}",
+                data=json.dumps({
+                    "budget_id": entry.id,
+                    "family_id": user.family_id,
+                    "family_name": family.name,
+                    "entry_type": entry.entry_type,
+                    "amount": entry.amount,
+                    "category": entry.category,
+                })
+            )
+            db.session.add(notification)
+    
     db.session.commit()
     return jsonify({"entry": entry.to_dict()}), 201
 
@@ -1020,6 +1048,139 @@ def update_budget_entry(entry_id):
 def delete_budget_entry(entry_id):
     entry = FamilyBudget.query.get_or_404(entry_id)
     db.session.delete(entry)
+    db.session.commit()
+    return jsonify({"message": "Deleted"})
+
+
+@extras_bp.route("/budget/<int:entry_id>/reactions", methods=["GET"])
+@jwt_required()
+def get_budget_reactions(entry_id):
+    """Get all reactions for a budget entry"""
+    from models.extras import BudgetReaction
+    reactions = BudgetReaction.query.filter_by(budget_id=entry_id).all()
+    return jsonify({"reactions": [r.to_dict() for r in reactions]})
+
+
+@extras_bp.route("/budget/<int:entry_id>/reactions", methods=["POST"])
+@jwt_required()
+def add_budget_reaction(entry_id):
+    """Add or update reaction to a budget entry"""
+    from models.extras import BudgetReaction
+    user = me()
+    data = request.get_json() or {}
+    reaction_type = data.get("reaction", "👍")
+    
+    # Check if user already reacted
+    existing = BudgetReaction.query.filter_by(budget_id=entry_id, user_id=user.id).first()
+    if existing:
+        if existing.reaction == reaction_type:
+            # Remove reaction if same
+            db.session.delete(existing)
+            db.session.commit()
+            reactions = BudgetReaction.query.filter_by(budget_id=entry_id).all()
+            return jsonify({"reacted": False, "reactions": [r.to_dict() for r in reactions]})
+        else:
+            # Update reaction
+            existing.reaction = reaction_type
+            existing.created_at = datetime.utcnow()
+    else:
+        reaction = BudgetReaction(
+            budget_id=entry_id,
+            user_id=user.id,
+            reaction=reaction_type
+        )
+        db.session.add(reaction)
+    
+    db.session.commit()
+    
+    # Notify budget entry creator
+    entry = FamilyBudget.query.get(entry_id)
+    if entry and entry.user_id != user.id:
+        from models.notifications import Notification
+        notif = Notification(
+            user_id=entry.user_id,
+            from_user_id=user.id,
+            type="budget_reaction",
+            title=f"{user.name} reacted to your budget entry",
+            message=f"{reaction_type} on {entry.title}",
+            data=json.dumps({"budget_id": entry_id, "reaction": reaction_type})
+        )
+        db.session.add(notif)
+        db.session.commit()
+    
+    reactions = BudgetReaction.query.filter_by(budget_id=entry_id).all()
+    return jsonify({"reacted": True, "reactions": [r.to_dict() for r in reactions]})
+
+
+@extras_bp.route("/budget/<int:entry_id>/reactions/<int:reaction_id>", methods=["DELETE"])
+@jwt_required()
+def delete_budget_reaction(entry_id, reaction_id):
+    """Remove reaction from budget entry"""
+    from models.extras import BudgetReaction
+    reaction = BudgetReaction.query.get_or_404(reaction_id)
+    if reaction.user_id != int(get_jwt_identity()):
+        return jsonify({"error": "Not authorized"}), 403
+    db.session.delete(reaction)
+    db.session.commit()
+    return jsonify({"message": "Deleted"})
+
+
+@extras_bp.route("/budget/<int:entry_id>/comments", methods=["GET"])
+@jwt_required()
+def get_budget_comments(entry_id):
+    """Get all comments for a budget entry"""
+    from models.extras import BudgetComment
+    comments = BudgetComment.query.filter_by(budget_id=entry_id).order_by(BudgetComment.created_at.desc()).all()
+    return jsonify({"comments": [c.to_dict() for c in comments]})
+
+
+@extras_bp.route("/budget/<int:entry_id>/comments", methods=["POST"])
+@jwt_required()
+def add_budget_comment(entry_id):
+    """Add comment to a budget entry"""
+    from models.extras import BudgetComment
+    user = me()
+    data = request.get_json() or {}
+    text = data.get("text", "").strip()
+    
+    if not text:
+        return jsonify({"error": "Comment text required"}), 400
+    
+    comment = BudgetComment(
+        budget_id=entry_id,
+        user_id=user.id,
+        text=text
+    )
+    db.session.add(comment)
+    db.session.commit()
+    
+    # Notify budget entry creator
+    entry = FamilyBudget.query.get(entry_id)
+    if entry and entry.user_id != user.id:
+        from models.notifications import Notification
+        notif = Notification(
+            user_id=entry.user_id,
+            from_user_id=user.id,
+            type="budget_comment",
+            title=f"{user.name} commented on your budget entry",
+            message=text[:100],
+            data=json.dumps({"budget_id": entry_id, "comment_id": comment.id})
+        )
+        db.session.add(notif)
+        db.session.commit()
+    
+    return jsonify({"comment": comment.to_dict()}), 201
+
+
+@extras_bp.route("/budget/<int:entry_id>/comments/<int:comment_id>", methods=["DELETE"])
+@jwt_required()
+def delete_budget_comment(entry_id, comment_id):
+    """Delete comment from budget entry"""
+    from models.extras import BudgetComment
+    comment = BudgetComment.query.get_or_404(comment_id)
+    if comment.user_id != int(get_jwt_identity()):
+        return jsonify({"error": "Not authorized"}), 403
+    db.session.delete(comment)
     db.session.commit()
     return jsonify({"message": "Deleted"})
 
