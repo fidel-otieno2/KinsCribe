@@ -5,16 +5,15 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  Alert,
+  Image,
 } from "react-native";
 import AppText from '../components/AppText';
 import { useTranslation } from '../i18n';
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import GlassCard from "../components/GlassCard";
 import { useAuth } from "../context/AuthContext";
 import api from "../api/axios";
-import StoryCard from "../components/StoryCard";
+
 import { colors } from "../theme";
 import Toast from '../components/Toast';
 import useToast from '../hooks/useToast';
@@ -86,26 +85,91 @@ export default function StorybookGeneratorScreen({ navigation }) {
           <TouchableOpacity
             style={s.storyItem}
             onPress={() => toggleSelect(item.id)}
+            activeOpacity={0.95}
           >
-            <GlassCard style={s.storyCard}>
-              <View style={s.storyHeader}>
+            <View style={s.card}>
+              {/* Selection Checkbox */}
+              <View style={s.selectCheckbox}>
                 <View
                   style={[
-                    s.selectIcon,
-                    selected.includes(item.id) && s.selectIconActive,
+                    s.checkbox,
+                    selected.includes(item.id) && s.checkboxActive,
                   ]}
                 >
-                  <Ionicons
-                    name="checkmark-circle"
-                    size={20}
-                    color={
-                      selected.includes(item.id) ? "#10b981" : "transparent"
-                    }
-                  />
+                  {selected.includes(item.id) && (
+                    <Ionicons name="checkmark" size={16} color="#fff" />
+                  )}
                 </View>
-                <StoryCard story={item} />
               </View>
-            </GlassCard>
+
+              {/* Header */}
+              <View style={s.header}>
+                <View style={s.avatarRing}>
+                  <View style={s.avatarInner}>
+                    {item.author_avatar ? (
+                      <Image
+                        source={{ uri: item.author_avatar }}
+                        style={s.avatarImg}
+                      />
+                    ) : (
+                      <AppText style={s.avatarLetter}>
+                        {item.author_name?.[0]?.toUpperCase() || "?"}
+                      </AppText>
+                    )}
+                  </View>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <AppText style={s.authorName}>{item.author_name}</AppText>
+                  <View style={s.metaRow}>
+                    {item.location && (
+                      <>
+                        <Ionicons name="location-outline" size={11} color={colors.muted} />
+                        <AppText style={s.metaText}>{item.location}</AppText>
+                        <AppText style={s.dot}>·</AppText>
+                      </>
+                    )}
+                    <AppText style={s.metaText}>
+                      {new Date(item.created_at).toLocaleDateString()}
+                    </AppText>
+                  </View>
+                </View>
+              </View>
+
+              {/* Media */}
+              {item.media_url && (
+                <Image
+                  source={{ uri: item.media_url }}
+                  style={s.media}
+                  resizeMode="cover"
+                />
+              )}
+
+              {/* Caption */}
+              {item.caption && (
+                <View style={s.captionWrap}>
+                  <AppText style={s.caption} numberOfLines={2}>
+                    <AppText style={s.captionName}>{item.author_name} </AppText>
+                    {item.caption}
+                  </AppText>
+                </View>
+              )}
+
+              {/* Stats */}
+              <View style={s.stats}>
+                {item.like_count > 0 && (
+                  <View style={s.statItem}>
+                    <Ionicons name="heart" size={14} color="#e11d48" />
+                    <AppText style={s.statText}>{item.like_count}</AppText>
+                  </View>
+                )}
+                {item.comment_count > 0 && (
+                  <View style={s.statItem}>
+                    <Ionicons name="chatbubble" size={14} color={colors.muted} />
+                    <AppText style={s.statText}>{item.comment_count}</AppText>
+                  </View>
+                )}
+              </View>
+            </View>
           </TouchableOpacity>
         )}
       />
@@ -159,29 +223,126 @@ const s = StyleSheet.create({
     fontWeight: "600",
   },
   list: {
-    padding: 16,
+    padding: 0,
     paddingBottom: 100,
   },
   storyItem: {
-    marginBottom: 12,
+    marginBottom: 0,
   },
-  storyCard: {
-    padding: 12,
+  card: {
+    backgroundColor: colors.bg,
+    borderBottomWidth: 0.5,
+    borderBottomColor: colors.border,
+    position: "relative",
   },
-  storyHeader: {
-    flexDirection: "row",
+  selectCheckbox: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    zIndex: 10,
   },
-  selectIcon: {
-    marginRight: 12,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "rgba(16,185,129,0.1)",
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.5)",
+    backgroundColor: "rgba(0,0,0,0.3)",
     alignItems: "center",
     justifyContent: "center",
   },
-  selectIconActive: {
-    backgroundColor: "#10b98120",
+  checkboxActive: {
+    backgroundColor: "#10b981",
+    borderColor: "#10b981",
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 10,
+  },
+  avatarRing: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    padding: 2,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.primary,
+  },
+  avatarInner: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    overflow: "hidden",
+    backgroundColor: colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: colors.bg,
+  },
+  avatarImg: {
+    width: "100%",
+    height: "100%",
+  },
+  avatarLetter: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 13,
+  },
+  authorName: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: colors.text,
+  },
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    marginTop: 1,
+  },
+  metaText: {
+    fontSize: 11,
+    color: colors.muted,
+  },
+  dot: {
+    fontSize: 11,
+    color: colors.dim,
+  },
+  media: {
+    width: "100%",
+    height: 400,
+    backgroundColor: "#000",
+  },
+  captionWrap: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  caption: {
+    fontSize: 13,
+    color: colors.text,
+    lineHeight: 18,
+  },
+  captionName: {
+    fontWeight: "700",
+  },
+  stats: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+    paddingHorizontal: 14,
+    paddingBottom: 12,
+  },
+  statItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  statText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: colors.text,
   },
   generateBtn: {
     position: "absolute",
