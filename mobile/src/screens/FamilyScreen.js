@@ -16,6 +16,7 @@ import { colors, radius } from '../theme';
 import Toast from '../components/Toast';
 import useToast from '../hooks/useToast';
 import { HexAvatar } from './StoryViewerScreen';
+import VideoPlayer from '../components/VideoPlayer';
 
 const { width } = Dimensions.get('window');
 
@@ -60,6 +61,7 @@ function FamilyFeedTab({ navigation, myRole, familyId, familyName }) {
   const [showComments, setShowComments] = useState(null);
   // Moments/stories bubbles
   const [moments, setMoments] = useState([]);
+  const [visibleStoryId, setVisibleStoryId] = useState(null);
 
   const fetchStories = () => {
     Promise.all([
@@ -156,11 +158,31 @@ function FamilyFeedTab({ navigation, myRole, familyId, familyName }) {
     } catch {} finally { setPostingComment(false); }
   };
 
+  const onViewableItemsChanged = useRef(({ viewableItems }) => {
+    if (viewableItems.length > 0) {
+      const visibleStory = viewableItems.find(item => item.item?.media_type === 'video');
+      setVisibleStoryId(visibleStory?.item?.id || null);
+    }
+  }).current;
+
+  const viewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 60,
+  }).current;
+
   if (loading) return <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />;
 
   return (
-    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+    <>
+    <FlatList
+      data={stories}
+      keyExtractor={(item) => String(item.id)}
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={{ paddingBottom: 100 }}
+      onViewableItemsChanged={onViewableItemsChanged}
+      viewabilityConfig={viewabilityConfig}
+      ListHeaderComponent={
 
+      <View>
       {/* ── MOMENTS / STORY BUBBLES ROW ── */}
       <View style={ft.storiesWrap}>
         <View style={ft.storiesHeader}>
@@ -254,8 +276,17 @@ function FamilyFeedTab({ navigation, myRole, familyId, familyName }) {
                 )}
                 {h.media_url && h.media_type === 'video' && (
                   <View style={ft.highlightThumb}>
-                    <LinearGradient colors={['rgba(124,58,237,0.4)', 'rgba(59,130,246,0.3)']} style={StyleSheet.absoluteFill} />
-                    <Ionicons name="play-circle" size={32} color="#fff" />
+                    <Image 
+                      source={{ uri: h.media_url.includes('cloudinary.com') 
+                        ? h.media_url.replace('/video/upload/', '/video/upload/so_0,f_jpg/') 
+                        : h.media_url 
+                      }} 
+                      style={StyleSheet.absoluteFill} 
+                      resizeMode="cover" 
+                    />
+                    <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.3)', alignItems: 'center', justifyContent: 'center' }]}>
+                      <Ionicons name="play-circle" size={32} color="#fff" />
+                    </View>
                   </View>
                 )}
                 {!h.media_url && (
@@ -294,13 +325,17 @@ function FamilyFeedTab({ navigation, myRole, familyId, familyName }) {
         </View>
       )}
 
-      {stories.length === 0 ? (
+      </View>{/* end padding wrapper */}
+      </View>
+      }
+      ListEmptyComponent={
         <View style={ft.empty}>
           <Ionicons name="library-outline" size={48} color={colors.dim} />
           <AppText style={ft.emptyTitle}>{t('no_family_stories')}</AppText>
           <AppText style={ft.emptySub}>{t('share_first_memory')}</AppText>
         </View>
-      ) : stories.map(story => (
+      }
+      renderItem={({ item: story }) => (
         <View key={story.id} style={ft.card}>
           {/* Badges for archived/highlighted */}
           {(story.is_archived || story.is_highlighted) && (
@@ -341,16 +376,20 @@ function FamilyFeedTab({ navigation, myRole, familyId, familyName }) {
           {story.content ? <AppText style={ft.content} numberOfLines={3}>{story.content}</AppText> : null}
 
           {/* Media — tappable for full screen */}
-          {story.media_url && (
+          {story.media_url && story.media_type === 'video' ? (
+            <View style={ft.videoCard}>
+              <VideoPlayer
+                uri={story.media_url}
+                isVisible={visibleStoryId === story.id}
+                feedMode
+                onPress={() => setViewer(story)}
+              />
+            </View>
+          ) : story.media_url ? (
             <TouchableOpacity onPress={() => setViewer(story)} activeOpacity={0.9}>
               <Image source={{ uri: story.media_url }} style={ft.media} resizeMode="cover" />
-              {story.media_type === 'video' && (
-                <View style={ft.playOverlay}>
-                  <Ionicons name="play-circle" size={52} color="rgba(255,255,255,0.9)" />
-                </View>
-              )}
             </TouchableOpacity>
-          )}
+          ) : null}
 
           {/* Actions — like, comment, archive, highlight */}
           <View style={ft.actions}>
@@ -390,46 +429,14 @@ function FamilyFeedTab({ navigation, myRole, familyId, familyName }) {
             )}
           </View>
         </View>
-      ))}
+      )}
+    />
 
-      {/* Full-screen media viewer */}
-      <Modal visible={!!viewer} transparent animationType="fade" onRequestClose={() => setViewer(null)}>
-        <View style={ft.viewerOverlay}>
-          <TouchableOpacity style={ft.viewerClose} onPress={() => setViewer(null)}>
-            <Ionicons name="close" size={28} color="#fff" />
-          </TouchableOpacity>
-          {viewer?.media_url && (
-            <Image source={{ uri: viewer.media_url }} style={ft.viewerImg} resizeMode="contain" />
-          )}
-          {viewer?.title ? (
-            <View style={ft.viewerCaption}>
-              <AppText style={ft.viewerTitle}>{viewer.title}</AppText>
-              {viewer.content ? <AppText style={ft.viewerContent}>{viewer.content}</AppText> : null}
-              {/* Action buttons in viewer */}
-              <View style={ft.viewerActions}>
-                {viewer.is_highlighted && (viewer.user_id === user?.id || myRole === 'admin') && (
-                  <TouchableOpacity
-                    style={ft.viewerActionBtn}
-                    onPress={async () => {
-                      try {
-                        await api.post(`/stories/${viewer.id}/highlight`);
-                        setHighlights(prev => prev.filter(h => h.id !== viewer.id));
-                        setViewer(null);
-                      } catch {}
-                    }}
-                  >
-                    <Ionicons name="star-outline" size={18} color="#fff" />
-                    <AppText style={ft.viewerActionText}>Remove Highlight</AppText>
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
-          ) : null}
-        </View>
-      </Modal>
+    {/* Full-screen media viewer */}
+    <MediaViewer visible={!!viewer} story={viewer} onClose={() => setViewer(null)} myRole={myRole} user={user} />
 
-      {/* Comments modal */}
-      <Modal visible={!!showComments} animationType="slide" transparent onRequestClose={() => setShowComments(null)}>
+    {/* Comments modal */}
+    <Modal visible={!!showComments} animationType="slide" transparent onRequestClose={() => setShowComments(null)}>
         <View style={ft.commentsOverlay}>
           <View style={ft.commentsSheet}>
             <View style={ft.commentsHandle} />
@@ -482,8 +489,69 @@ function FamilyFeedTab({ navigation, myRole, familyId, familyName }) {
           </View>
         </View>
       </Modal>
-      </View>{/* end padding wrapper */}
-    </ScrollView>
+    </>
+  );
+}
+
+function MediaViewer({ visible, story, onClose, myRole, user }) {
+  const { Video, ResizeMode } = require('expo-av');
+  const videoRef = useRef(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  useEffect(() => {
+    if (visible && story?.media_type === 'video') {
+      setIsPlaying(true);
+    } else {
+      setIsPlaying(false);
+    }
+  }, [visible, story]);
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={ft.viewerOverlay}>
+        <TouchableOpacity style={ft.viewerClose} onPress={onClose}>
+          <Ionicons name="close" size={28} color="#fff" />
+        </TouchableOpacity>
+        
+        {story?.media_url && story?.media_type === 'video' ? (
+          <Video
+            ref={videoRef}
+            source={{ uri: story.media_url }}
+            style={{ width: '100%', height: '75%' }}
+            resizeMode={ResizeMode.CONTAIN}
+            shouldPlay={isPlaying}
+            isLooping
+            useNativeControls
+          />
+        ) : story?.media_url ? (
+          <Image source={{ uri: story.media_url }} style={ft.viewerImg} resizeMode="contain" />
+        ) : null}
+        
+        {story?.title ? (
+          <View style={ft.viewerCaption}>
+            <AppText style={ft.viewerTitle}>{story.title}</AppText>
+            {story.content ? <AppText style={ft.viewerContent}>{story.content}</AppText> : null}
+            {/* Action buttons in viewer */}
+            <View style={ft.viewerActions}>
+              {story.is_highlighted && (story.user_id === user?.id || myRole === 'admin') && (
+                <TouchableOpacity
+                  style={ft.viewerActionBtn}
+                  onPress={async () => {
+                    try {
+                      await api.post(`/stories/${story.id}/highlight`);
+                      onClose();
+                    } catch {}
+                  }}
+                >
+                  <Ionicons name="star-outline" size={18} color="#fff" />
+                  <AppText style={ft.viewerActionText}>Remove Highlight</AppText>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        ) : null}
+      </View>
+    </Modal>
   );
 }
 
@@ -530,8 +598,8 @@ const ft = StyleSheet.create({
   groupBadgeText: { fontSize: 10, color: '#10b981', fontWeight: '700', maxWidth: 80 },
   title: { fontSize: 16, fontWeight: '700', color: colors.text, marginBottom: 6 },
   content: { fontSize: 14, color: colors.muted, lineHeight: 20, marginBottom: 10 },
+  videoCard: { width: '100%', backgroundColor: '#000', marginBottom: 10 },
   media: { width: '100%', height: 200, borderRadius: radius.md, marginBottom: 10 },
-  playOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 10, alignItems: 'center', justifyContent: 'center' },
   actions: { flexDirection: 'row', gap: 20, paddingTop: 8, borderTopWidth: 0.5, borderTopColor: colors.border, marginTop: 4 },
   actionItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   actionText: { fontSize: 13, color: colors.muted, fontWeight: '600' },
@@ -803,15 +871,43 @@ export default function FamilyScreen({ navigation }) {
 
       {/* Header */}
       <View style={s.header}>
-        <View style={s.headerLeft}>
-          <LinearGradient colors={['#7c3aed', '#3b82f6']} style={s.familyIcon}>
-            <Ionicons name="people" size={20} color="#fff" />
-          </LinearGradient>
-          <TouchableOpacity onPress={() => navigation.navigate('FamilyProfile')} activeOpacity={0.75}>
-            <AppText style={s.familyName}>{family?.name || 'My Family'}</AppText>
-            <AppText style={s.memberCount}>{members.length} members{myRole === 'admin' ? ' · tap to edit' : ''}</AppText>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity 
+          style={s.headerLeft}
+          onPress={() => navigation.navigate('FamilyProfile')} 
+          activeOpacity={0.75}
+        >
+          {/* Family Avatar */}
+          <View style={s.familyAvatarWrap}>
+            {family?.avatar_url ? (
+              <Image source={{ uri: family.avatar_url }} style={s.familyAvatar} />
+            ) : (
+              <LinearGradient colors={['#7c3aed', '#3b82f6']} style={s.familyAvatar}>
+                <Ionicons name="people" size={24} color="#fff" />
+              </LinearGradient>
+            )}
+          </View>
+          
+          {/* Family Info */}
+          <View style={s.familyInfo}>
+            <View style={s.familyNameRow}>
+              <AppText style={s.familyName} numberOfLines={1}>{family?.name || 'My Family'}</AppText>
+              {myRole === 'admin' && (
+                <Ionicons name="create-outline" size={14} color={colors.primary} />
+              )}
+            </View>
+            
+            {family?.motto ? (
+              <AppText style={s.familyMotto} numberOfLines={1}>"{family.motto}"</AppText>
+            ) : (
+              <AppText style={s.memberCount}>{members.length} members</AppText>
+            )}
+            
+            {family?.description && (
+              <AppText style={s.familyDescription} numberOfLines={1}>{family.description}</AppText>
+            )}
+          </View>
+        </TouchableOpacity>
+        
         <View style={s.headerRight}>
           <TouchableOpacity
             style={s.aiBtnWrap}
@@ -820,7 +916,7 @@ export default function FamilyScreen({ navigation }) {
           >
             <LinearGradient colors={['#7c3aed', '#3b82f6']} style={s.aiBtn}>
               <Ionicons name="sparkles" size={15} color="#fff" />
-              <AppText style={s.aiBtnText}>Family AI</AppText>
+              <AppText style={s.aiBtnText}>AI</AppText>
             </LinearGradient>
           </TouchableOpacity>
           <TouchableOpacity style={s.chatBtn} onPress={() => navigation.navigate('Storybooks')}>
@@ -897,10 +993,27 @@ export default function FamilyScreen({ navigation }) {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 52, paddingHorizontal: 16, paddingBottom: 14, borderBottomWidth: 0.5, borderBottomColor: colors.border },
-  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  familyIcon: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  familyName: { fontSize: 18, fontWeight: '800', color: colors.text },
-  memberCount: { fontSize: 12, color: colors.muted, marginTop: 1 },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, maxWidth: '70%' },
+  familyAvatarWrap: { 
+    width: 56, 
+    height: 56, 
+    borderRadius: 16, 
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: 'rgba(124,58,237,0.3)',
+    shadowColor: '#7c3aed',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  familyAvatar: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
+  familyInfo: { flex: 1, gap: 2 },
+  familyNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  familyName: { fontSize: 18, fontWeight: '800', color: colors.text, flex: 1 },
+  familyMotto: { fontSize: 11, color: '#a78bfa', fontStyle: 'italic', fontWeight: '600' },
+  familyDescription: { fontSize: 11, color: colors.muted, marginTop: 1 },
+  memberCount: { fontSize: 11, color: colors.muted },
   headerRight: { flexDirection: 'row', gap: 8 },
   chatBtn: { width: 38, height: 38, borderRadius: 12, backgroundColor: 'rgba(30,41,59,0.8)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border2 },
   aiBtnWrap: { borderRadius: 20, overflow: 'hidden' },

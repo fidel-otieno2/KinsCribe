@@ -106,6 +106,44 @@ def create_family():
     return jsonify({"family": family.to_dict()}), 201
 
 
+@family_bp.route("/preview", methods=["POST"])
+@jwt_required()
+def preview_family_by_code():
+    """Preview family info by invite code before joining."""
+    code = request.json.get("invite_code")
+    if not code:
+        return jsonify({"error": "invite_code required"}), 400
+    
+    family = Family.query.filter_by(invite_code=code.upper()).first()
+    if not family:
+        return jsonify({"error": "Invalid invite code"}), 404
+    
+    # Get member count and preview members
+    fm_list = FamilyMember.query.filter_by(family_id=family.id).limit(6).all()
+    preview_members = []
+    for fm in fm_list:
+        u = User.query.get(fm.user_id)
+        if u:
+            preview_members.append({
+                "id": u.id,
+                "name": u.name.split()[0],  # first name only
+                "avatar_url": u.avatar_url,
+            })
+    
+    return jsonify({
+        "family": {
+            "id": family.id,
+            "name": family.name,
+            "description": family.description,
+            "motto": family.motto,
+            "avatar_url": family.avatar_url,
+            "member_count": FamilyMember.query.filter_by(family_id=family.id).count(),
+            "created_at": family.created_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        },
+        "preview_members": preview_members,
+    })
+
+
 @family_bp.route("/join", methods=["POST"])
 @jwt_required()
 def join_family():

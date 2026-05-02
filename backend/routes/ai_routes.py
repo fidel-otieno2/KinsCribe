@@ -111,6 +111,17 @@ def generate_caption():
             "count": len(captions)
         })
         
+    except openai.RateLimitError as e:
+        print(f"OpenAI quota exceeded: {e}")
+        return jsonify({
+            "error": "AI service quota exceeded",
+            "message": "Please add credits to your OpenAI account to use AI features",
+            "fallback_captions": [
+                "Capturing moments that matter ✨",
+                "Making memories with the ones I love ❤️",
+                "Another beautiful day 🌟"
+            ]
+        }), 503
     except Exception as e:
         print(f"Caption generation error: {e}")
         import traceback

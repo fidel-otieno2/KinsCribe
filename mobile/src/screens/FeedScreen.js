@@ -45,6 +45,26 @@ function JoinFamilyModal({ visible, onClose, onJoined }) {
   const [familyName, setFamilyName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [familyPreview, setFamilyPreview] = useState(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+
+  const handlePreview = async (inviteCode) => {
+    if (!inviteCode || inviteCode.length < 8) {
+      setFamilyPreview(null);
+      return;
+    }
+    setLoadingPreview(true);
+    setError("");
+    try {
+      const { data } = await api.post('/family/preview', { invite_code: inviteCode });
+      setFamilyPreview(data);
+    } catch (err) {
+      setFamilyPreview(null);
+      setError(err.response?.data?.error || "Invalid invite code");
+    } finally {
+      setLoadingPreview(false);
+    }
+  };
 
   const handleJoin = async () => {
     if (!code.trim()) return setError("Enter an invite code");
@@ -75,89 +95,171 @@ function JoinFamilyModal({ visible, onClose, onJoined }) {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <BlurView intensity={20} tint="dark" style={jf.overlay}>
-        <View style={jf.sheet}>
-          <LinearGradient colors={["rgba(124,58,237,0.15)", "#0f172a"]} style={StyleSheet.absoluteFill} />
-          <View style={jf.handle} />
-          <TouchableOpacity style={jf.closeBtn} onPress={onClose}>
-            <Ionicons name="close" size={22} color={theme.muted} />
-          </TouchableOpacity>
-
-          <LinearGradient colors={["#7c3aed", "#3b82f6"]} style={jf.iconWrap}>
-            <Ionicons name={mode === 'join' ? 'key' : 'people'} size={28} color="#fff" />
-          </LinearGradient>
-          <AppText style={jf.title}>{mode === 'join' ? 'Join a Family' : 'Create a Family'}</AppText>
-          <AppText style={jf.sub}>
-            {mode === 'join' 
-              ? 'Enter the 8-character invite code from your family admin'
-              : 'Start your own family group and invite members'}
-          </AppText>
-
-          {/* Mode Toggle */}
-          <View style={jf.modeToggle}>
-            <TouchableOpacity
-              style={[jf.modeBtn, mode === 'join' && jf.modeBtnActive]}
-              onPress={() => { setMode('join'); setError(''); }}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="key-outline" size={16} color={mode === 'join' ? '#fff' : theme.muted} />
-              <AppText style={[jf.modeBtnText, mode === 'join' && jf.modeBtnTextActive]}>Join</AppText>
+        <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-end' }}>
+          <View style={jf.sheet}>
+            <LinearGradient colors={["rgba(124,58,237,0.15)", "#0f172a"]} style={StyleSheet.absoluteFill} />
+            <View style={jf.handle} />
+            <TouchableOpacity style={jf.closeBtn} onPress={onClose}>
+              <Ionicons name="close" size={22} color={theme.muted} />
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[jf.modeBtn, mode === 'create' && jf.modeBtnActive]}
-              onPress={() => { setMode('create'); setError(''); }}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="add-circle-outline" size={16} color={mode === 'create' ? '#fff' : theme.muted} />
-              <AppText style={[jf.modeBtnText, mode === 'create' && jf.modeBtnTextActive]}>Create</AppText>
-            </TouchableOpacity>
-          </View>
 
-          {error ? (
-            <View style={jf.errorBox}>
-              <Ionicons name="alert-circle" size={14} color="#f87171" />
-              <AppText style={jf.errorText}>{error}</AppText>
+            <LinearGradient colors={["#7c3aed", "#3b82f6"]} style={jf.iconWrap}>
+              <Ionicons name={mode === 'join' ? 'key' : 'people'} size={28} color="#fff" />
+            </LinearGradient>
+            <AppText style={jf.title}>{mode === 'join' ? 'Join a Family' : 'Create a Family'}</AppText>
+            <AppText style={jf.sub}>
+              {mode === 'join' 
+                ? 'Enter the 8-character invite code from your family admin'
+                : 'Start your own family group and invite members'}
+            </AppText>
+
+            {/* Mode Toggle */}
+            <View style={jf.modeToggle}>
+              <TouchableOpacity
+                style={[jf.modeBtn, mode === 'join' && jf.modeBtnActive]}
+                onPress={() => { setMode('join'); setError(''); setFamilyPreview(null); }}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="key-outline" size={16} color={mode === 'join' ? '#fff' : theme.muted} />
+                <AppText style={[jf.modeBtnText, mode === 'join' && jf.modeBtnTextActive]}>Join</AppText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[jf.modeBtn, mode === 'create' && jf.modeBtnActive]}
+                onPress={() => { setMode('create'); setError(''); setFamilyPreview(null); }}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="add-circle-outline" size={16} color={mode === 'create' ? '#fff' : theme.muted} />
+                <AppText style={[jf.modeBtnText, mode === 'create' && jf.modeBtnTextActive]}>Create</AppText>
+              </TouchableOpacity>
             </View>
-          ) : null}
 
-          {mode === 'join' ? (
-            <>
-              <TextInput
-                style={jf.codeInput}
-                placeholder="AB12CD34"
-                placeholderTextColor={colors.dim}
-                autoCapitalize="characters"
-                value={code}
-                onChangeText={v => { setCode(v.toUpperCase()); setError(""); }}
-                maxLength={8}
-              />
-              <TouchableOpacity style={jf.joinBtn} onPress={handleJoin} disabled={loading} activeOpacity={0.85}>
-                <LinearGradient colors={["#7c3aed", "#3b82f6"]} style={jf.joinBtnGrad}>
-                  {loading
-                    ? <ActivityIndicator color="#fff" size="small" />
-                    : <AppText style={jf.joinBtnText}>Join Family</AppText>}
-                </LinearGradient>
-              </TouchableOpacity>
-            </>
-          ) : (
-            <>
-              <TextInput
-                style={jf.nameInput}
-                placeholder="Family Name"
-                placeholderTextColor={colors.dim}
-                value={familyName}
-                onChangeText={v => { setFamilyName(v); setError(""); }}
-                maxLength={50}
-              />
-              <TouchableOpacity style={jf.joinBtn} onPress={handleCreate} disabled={loading} activeOpacity={0.85}>
-                <LinearGradient colors={["#7c3aed", "#3b82f6"]} style={jf.joinBtnGrad}>
-                  {loading
-                    ? <ActivityIndicator color="#fff" size="small" />
-                    : <AppText style={jf.joinBtnText}>Create Family</AppText>}
-                </LinearGradient>
-              </TouchableOpacity>
-            </>
-          )}
-        </View>
+            {error ? (
+              <View style={jf.errorBox}>
+                <Ionicons name="alert-circle" size={14} color="#f87171" />
+                <AppText style={jf.errorText}>{error}</AppText>
+              </View>
+            ) : null}
+
+            {mode === 'join' ? (
+              <>
+                <TextInput
+                  style={jf.codeInput}
+                  placeholder="AB12CD34"
+                  placeholderTextColor={colors.dim}
+                  autoCapitalize="characters"
+                  value={code}
+                  onChangeText={v => { 
+                    const upper = v.toUpperCase();
+                    setCode(upper); 
+                    setError(""); 
+                    if (upper.length === 8) handlePreview(upper);
+                    else setFamilyPreview(null);
+                  }}
+                  maxLength={8}
+                />
+
+                {/* Family Preview Card */}
+                {loadingPreview && (
+                  <View style={jf.previewCard}>
+                    <ActivityIndicator color={colors.primary} />
+                  </View>
+                )}
+
+                {familyPreview && !loadingPreview && (
+                  <View style={jf.previewCard}>
+                    <LinearGradient colors={['rgba(124,58,237,0.1)', 'rgba(59,130,246,0.05)']} style={StyleSheet.absoluteFill} />
+                    
+                    {/* Family Avatar & Info */}
+                    <View style={jf.previewHeader}>
+                      <View style={jf.previewAvatarWrap}>
+                        {familyPreview.family.avatar_url ? (
+                          <Image source={{ uri: familyPreview.family.avatar_url }} style={jf.previewAvatar} />
+                        ) : (
+                          <LinearGradient colors={['#7c3aed', '#3b82f6']} style={jf.previewAvatar}>
+                            <Ionicons name="people" size={32} color="#fff" />
+                          </LinearGradient>
+                        )}
+                      </View>
+                      <View style={jf.previewInfo}>
+                        <AppText style={jf.previewName}>{familyPreview.family.name}</AppText>
+                        <AppText style={jf.previewMemberCount}>
+                          {familyPreview.family.member_count} {familyPreview.family.member_count === 1 ? 'member' : 'members'}
+                        </AppText>
+                      </View>
+                    </View>
+
+                    {/* Motto */}
+                    {familyPreview.family.motto && (
+                      <View style={jf.previewMotto}>
+                        <Ionicons name="quote" size={14} color="#a78bfa" />
+                        <AppText style={jf.previewMottoText}>"{familyPreview.family.motto}"</AppText>
+                      </View>
+                    )}
+
+                    {/* Description */}
+                    {familyPreview.family.description && (
+                      <AppText style={jf.previewDescription}>{familyPreview.family.description}</AppText>
+                    )}
+
+                    {/* Preview Members */}
+                    {familyPreview.preview_members?.length > 0 && (
+                      <View style={jf.previewMembers}>
+                        <AppText style={jf.previewMembersLabel}>Members</AppText>
+                        <View style={jf.previewMembersRow}>
+                          {familyPreview.preview_members.map((m, i) => (
+                            <View key={i} style={jf.previewMemberItem}>
+                              {m.avatar_url ? (
+                                <Image source={{ uri: m.avatar_url }} style={jf.previewMemberAvatar} />
+                              ) : (
+                                <View style={[jf.previewMemberAvatar, { backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }]}>
+                                  <AppText style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>{m.name[0]}</AppText>
+                                </View>
+                              )}
+                              <AppText style={jf.previewMemberName} numberOfLines={1}>{m.name}</AppText>
+                            </View>
+                          ))}
+                          {familyPreview.family.member_count > 6 && (
+                            <View style={jf.previewMemberItem}>
+                              <View style={[jf.previewMemberAvatar, { backgroundColor: 'rgba(124,58,237,0.2)', alignItems: 'center', justifyContent: 'center' }]}>
+                                <AppText style={{ color: colors.primary, fontSize: 10, fontWeight: '700' }}>+{familyPreview.family.member_count - 6}</AppText>
+                              </View>
+                            </View>
+                          )}
+                        </View>
+                      </View>
+                    )}
+                  </View>
+                )}
+
+                <TouchableOpacity style={jf.joinBtn} onPress={handleJoin} disabled={loading || !familyPreview} activeOpacity={0.85}>
+                  <LinearGradient colors={["#7c3aed", "#3b82f6"]} style={jf.joinBtnGrad}>
+                    {loading
+                      ? <ActivityIndicator color="#fff" size="small" />
+                      : <AppText style={jf.joinBtnText}>Join {familyPreview?.family.name || 'Family'}</AppText>}
+                  </LinearGradient>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <TextInput
+                  style={jf.nameInput}
+                  placeholder="Family Name"
+                  placeholderTextColor={colors.dim}
+                  value={familyName}
+                  onChangeText={v => { setFamilyName(v); setError(""); }}
+                  maxLength={50}
+                />
+                <TouchableOpacity style={jf.joinBtn} onPress={handleCreate} disabled={loading} activeOpacity={0.85}>
+                  <LinearGradient colors={["#7c3aed", "#3b82f6"]} style={jf.joinBtnGrad}>
+                    {loading
+                      ? <ActivityIndicator color="#fff" size="small" />
+                      : <AppText style={jf.joinBtnText}>Create Family</AppText>}
+                  </LinearGradient>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </ScrollView>
       </BlurView>
     </Modal>
   );
@@ -165,7 +267,7 @@ function JoinFamilyModal({ visible, onClose, onJoined }) {
 
 const jf = StyleSheet.create({
   overlay: { flex: 1, justifyContent: "flex-end" },
-  sheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, overflow: "hidden", padding: 24, paddingBottom: 48 },
+  sheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, overflow: "hidden", padding: 24, paddingBottom: 48, maxHeight: '90%' },
   handle: { width: 40, height: 4, backgroundColor: colors.border, borderRadius: 2, alignSelf: "center", marginBottom: 16 },
   closeBtn: { position: "absolute", top: 20, right: 20, padding: 4, zIndex: 10 },
   iconWrap: { width: 60, height: 60, borderRadius: 20, alignItems: "center", justifyContent: "center", alignSelf: "center", marginBottom: 16 },
@@ -180,6 +282,22 @@ const jf = StyleSheet.create({
   errorText: { color: "#f87171", fontSize: 12, flex: 1 },
   codeInput: { backgroundColor: "rgba(30,41,59,0.9)", borderWidth: 1.5, borderColor: "rgba(124,58,237,0.4)", borderRadius: radius.md, padding: 16, color: "#a78bfa", fontSize: 26, fontWeight: "800", letterSpacing: 10, textAlign: "center", marginBottom: 16 },
   nameInput: { backgroundColor: "rgba(30,41,59,0.9)", borderWidth: 1.5, borderColor: "rgba(124,58,237,0.4)", borderRadius: radius.md, padding: 16, color: colors.text, fontSize: 16, fontWeight: "600", marginBottom: 16 },
+  previewCard: { backgroundColor: 'rgba(30,41,59,0.6)', borderRadius: radius.lg, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(124,58,237,0.3)', overflow: 'hidden', minHeight: 100, justifyContent: 'center' },
+  previewHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
+  previewAvatarWrap: { width: 64, height: 64, borderRadius: 16, overflow: 'hidden', borderWidth: 2, borderColor: 'rgba(124,58,237,0.4)' },
+  previewAvatar: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
+  previewInfo: { flex: 1 },
+  previewName: { fontSize: 18, fontWeight: '800', color: colors.text, marginBottom: 2 },
+  previewMemberCount: { fontSize: 12, color: colors.muted, fontWeight: '600' },
+  previewMotto: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(124,58,237,0.15)', paddingHorizontal: 12, paddingVertical: 8, borderRadius: radius.md, marginBottom: 10 },
+  previewMottoText: { fontSize: 12, color: '#a78bfa', fontStyle: 'italic', fontWeight: '600', flex: 1 },
+  previewDescription: { fontSize: 13, color: colors.text, lineHeight: 19, marginBottom: 12 },
+  previewMembers: { marginTop: 4 },
+  previewMembersLabel: { fontSize: 11, color: colors.muted, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 },
+  previewMembersRow: { flexDirection: 'row', gap: 12, flexWrap: 'wrap' },
+  previewMemberItem: { alignItems: 'center', width: 50 },
+  previewMemberAvatar: { width: 40, height: 40, borderRadius: 20, marginBottom: 4 },
+  previewMemberName: { fontSize: 10, color: colors.muted, textAlign: 'center', fontWeight: '600' },
   joinBtn: { borderRadius: radius.md, overflow: "hidden" },
   joinBtnGrad: { paddingVertical: 15, alignItems: "center" },
   joinBtnText: { color: "#fff", fontWeight: "700", fontSize: 16 },
@@ -567,14 +685,13 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation, isVisible 
 
         if (isVideoPost) {
           return (
-            <View style={pc.videoCard}>
-              <VideoPlayer
-                uri={mediaList[0].url}
-                isVisible={isVisible}
-                feedMode
-                onPress={() => navigation.navigate('Reels', { startPostId: post.id })}
-              />
-            </View>
+            <VideoPlayer
+              uri={mediaList[0].url}
+              isVisible={isVisible}
+              feedMode
+              onPress={() => navigation.navigate('Reels', { startPostId: post.id })}
+              style={pc.videoCard}
+            />
           );
         }
 
@@ -768,34 +885,36 @@ const PostCard = memo(function PostCard({ post, onUpdate, navigation, isVisible 
           <View style={[pc.menuSheet, { backgroundColor: theme.bgCard }]}>
             <View style={[pc.menuHandle, { backgroundColor: theme.border }]} />
             
-            {/* Post to Family Story */}
-            <TouchableOpacity
-              style={pc.menuItem}
-              onPress={async () => {
-                setShowMenu(false);
-                try {
-                  const { data } = await api.get('/family/my-families');
-                  setFamilies(data.families || []);
-                  if (data.families?.length > 0) {
-                    setShowFamilyPicker(true);
-                  } else {
-                    Alert.alert('No Families', 'You need to join a family first');
+            {/* Post to Family Story - Only show for post owner */}
+            {isOwner && (
+              <TouchableOpacity
+                style={pc.menuItem}
+                onPress={async () => {
+                  setShowMenu(false);
+                  try {
+                    const { data } = await api.get('/family/my-families');
+                    setFamilies(data.families || []);
+                    if (data.families?.length > 0) {
+                      setShowFamilyPicker(true);
+                    } else {
+                      Alert.alert('No Families', 'You need to join a family first');
+                    }
+                  } catch (err) {
+                    console.log('Load families error:', err.response?.data || err.message);
+                    Alert.alert('Error', err.response?.data?.error || 'Failed to load families. Please try again.');
                   }
-                } catch (err) {
-                  console.log('Load families error:', err.response?.data || err.message);
-                  Alert.alert('Error', err.response?.data?.error || 'Failed to load families. Please try again.');
-                }
-              }}
-            >
-              <View style={[pc.menuIconWrap, { backgroundColor: 'rgba(124,58,237,0.12)' }]}>
-                <Ionicons name="people" size={20} color="#7c3aed" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <AppText style={[pc.menuItemTitle, { color: theme.text }]}>Post to Family Story</AppText>
-                <AppText style={[pc.menuItemSub, { color: theme.muted }]}>Share this with your family</AppText>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={theme.muted} />
-            </TouchableOpacity>
+                }}
+              >
+                <View style={[pc.menuIconWrap, { backgroundColor: 'rgba(124,58,237,0.12)' }]}>
+                  <Ionicons name="people" size={20} color="#7c3aed" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <AppText style={[pc.menuItemTitle, { color: theme.text }]}>Post to Family Story</AppText>
+                  <AppText style={[pc.menuItemSub, { color: theme.muted }]}>Share this with your family</AppText>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={theme.muted} />
+              </TouchableOpacity>
+            )}
 
             {isOwner && (
               <>
@@ -962,7 +1081,7 @@ const pc = StyleSheet.create({
   metaText: { fontSize: 11, color: colors.muted },
   sponsoredLabel: { fontSize: 10, color: '#f59e0b', fontWeight: '700', backgroundColor: 'rgba(245,158,11,0.12)', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 },
   dot: { fontSize: 11, color: colors.dim },
-  videoCard: { width, backgroundColor: '#000' },
+  videoCard: { width, height: width * 1.5, backgroundColor: '#000' },
   media: { width, height: width },
   actions: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 10, paddingVertical: 8 },
   actionsLeft: { flexDirection: "row", gap: 4 },
@@ -1362,73 +1481,65 @@ export default function FeedScreen({ navigation }) {
       <StatusBar style={isDark ? 'light' : 'dark'} />
 
       {/* Header */}
-      <LinearGradient
-        colors={[theme.mode === 'dark' ? '#1C1A14' : '#F5F0E8', 'transparent']}
-        style={s.headerGrad}
-      >
-        <View style={[s.header, { borderBottomColor: theme.border }]}>
-
-          {/* LEFT — Logo */}
-          <View style={s.logoWrap}>
-            <View style={s.logoImgWrap}>
-              <Image
-                source={require("../../assets/kinscribe-logo.png")}
-                style={s.logoIcon}
-                resizeMode="cover"
-              />
-            </View>
-            <View>
-              <AppText style={[s.logo, { color: theme.text }]}>KinsCribe</AppText>
-              <AppText style={[s.logoSub, { color: theme.muted }]}>Family Network</AppText>
-            </View>
+      <View style={[s.header, { borderBottomColor: theme.border, backgroundColor: theme.bg }]}>
+        {/* LEFT — Logo */}
+        <View style={s.logoWrap}>
+          <View style={s.logoImgWrap}>
+            <Image
+              source={require("../../assets/kinscribe-logo.png")}
+              style={s.logoIcon}
+              resizeMode="cover"
+            />
           </View>
-
-          {/* RIGHT — Buttons */}
-          <View style={s.headerRight}>
-
-            {/* Notifications */}
-            <TouchableOpacity
-              onPress={() => navigation.navigate("Notifications")}
-              style={[s.headerBtn, { backgroundColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }]}
-            >
-              <Ionicons name="notifications-outline" size={20} color={theme.text} />
-              {unreadCount > 0 && (
-                <View style={s.badge}>
-                  <AppText style={s.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</AppText>
-                </View>
-              )}
-            </TouchableOpacity>
-
-            {/* Switch Account */}
-            <TouchableOpacity
-              onPress={() => navigation.navigate("AccountSwitcher")}
-              style={s.switchAvatarBtn}
-            >
-              {user?.avatar_url
-                ? <Image source={{ uri: user.avatar_url }} style={s.switchAvatarImg} />
-                : <View style={[s.switchAvatarImg, { backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }]}>
-                    <AppText style={{ color: '#fff', fontWeight: '800', fontSize: 12 }}>{user?.name?.[0]?.toUpperCase()}</AppText>
-                  </View>}
-              <View style={s.switchDot} />
-            </TouchableOpacity>
-
-            {/* AI Button */}
-            <TouchableOpacity
-              onPress={() => navigation.navigate("FeedAI")}
-              style={s.aiBtn}
-            >
-              <LinearGradient
-                colors={['#7C3AED', '#3b82f6']}
-                style={s.aiBtnGrad}
-              >
-                <Ionicons name="sparkles" size={16} color="#fff" />
-                <AppText style={s.aiBtnText}>AI</AppText>
-              </LinearGradient>
-            </TouchableOpacity>
-
+          <View>
+            <AppText style={[s.logo, { color: theme.text }]}>KinsCribe</AppText>
+            <AppText style={[s.logoSub, { color: theme.muted }]}>Family Network</AppText>
           </View>
         </View>
-      </LinearGradient>
+
+        {/* RIGHT — Buttons */}
+        <View style={s.headerRight}>
+          {/* Notifications */}
+          <TouchableOpacity
+            onPress={() => navigation.navigate("Notifications")}
+            style={[s.headerBtn, { backgroundColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }]}
+          >
+            <Ionicons name="notifications-outline" size={20} color={theme.text} />
+            {unreadCount > 0 && (
+              <View style={s.badge}>
+                <AppText style={s.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</AppText>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          {/* Switch Account */}
+          <TouchableOpacity
+            onPress={() => navigation.navigate("AccountSwitcher")}
+            style={s.switchAvatarBtn}
+          >
+            {user?.avatar_url
+              ? <Image source={{ uri: user.avatar_url }} style={s.switchAvatarImg} />
+              : <View style={[s.switchAvatarImg, { backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }]}>
+                  <AppText style={{ color: '#fff', fontWeight: '800', fontSize: 12 }}>{user?.name?.[0]?.toUpperCase()}</AppText>
+                </View>}
+            <View style={s.switchDot} />
+          </TouchableOpacity>
+
+          {/* AI Button */}
+          <TouchableOpacity
+            onPress={() => navigation.navigate("FeedAI")}
+            style={s.aiBtn}
+          >
+            <LinearGradient
+              colors={['#7C3AED', '#3b82f6']}
+              style={s.aiBtnGrad}
+            >
+              <Ionicons name="sparkles" size={16} color="#fff" />
+              <AppText style={s.aiBtnText}>AI</AppText>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      </View>
 
       {loading ? (
         <View style={s.loadingWrap}>
@@ -1440,7 +1551,7 @@ export default function FeedScreen({ navigation }) {
           keyExtractor={keyExtractor}
           renderItem={renderPost}
           ListHeaderComponent={<ListHeader />}
-          contentContainerStyle={{ paddingBottom: 110 }}
+          contentContainerStyle={{ paddingBottom: 110, flexGrow: 1 }}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -1599,9 +1710,6 @@ export default function FeedScreen({ navigation }) {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
 
-  headerGrad: {
-    paddingTop: 0,
-  },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",

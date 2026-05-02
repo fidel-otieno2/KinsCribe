@@ -135,6 +135,120 @@ def run_migrations():
             "ALTER TABLE public_stories ADD COLUMN IF NOT EXISTS is_moment BOOLEAN DEFAULT FALSE",
             "ALTER TABLE public_stories ADD COLUMN IF NOT EXISTS family_id INTEGER REFERENCES families(id) ON DELETE SET NULL",
             "CREATE INDEX IF NOT EXISTS idx_public_stories_family ON public_stories(family_id)",
+
+            # Story collections — themed groupings of stories
+            """
+            CREATE TABLE IF NOT EXISTS story_collections (
+                id SERIAL PRIMARY KEY,
+                family_id INTEGER NOT NULL REFERENCES families(id) ON DELETE CASCADE,
+                name VARCHAR(100) NOT NULL,
+                description TEXT,
+                cover_image VARCHAR(300),
+                created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                created_at TIMESTAMP DEFAULT NOW(),
+                updated_at TIMESTAMP DEFAULT NOW()
+            )
+            """,
+            "CREATE INDEX IF NOT EXISTS idx_collections_family ON story_collections(family_id)",
+
+            # Story collection items — stories within collections
+            """
+            CREATE TABLE IF NOT EXISTS story_collection_items (
+                id SERIAL PRIMARY KEY,
+                collection_id INTEGER NOT NULL REFERENCES story_collections(id) ON DELETE CASCADE,
+                story_id INTEGER NOT NULL REFERENCES stories(id) ON DELETE CASCADE,
+                added_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                added_at TIMESTAMP DEFAULT NOW(),
+                UNIQUE(collection_id, story_id)
+            )
+            """,
+            "CREATE INDEX IF NOT EXISTS idx_collection_items_collection ON story_collection_items(collection_id)",
+            "CREATE INDEX IF NOT EXISTS idx_collection_items_story ON story_collection_items(story_id)",
+
+            # Story authors — multi-author story support
+            """
+            CREATE TABLE IF NOT EXISTS story_authors (
+                id SERIAL PRIMARY KEY,
+                story_id INTEGER NOT NULL REFERENCES stories(id) ON DELETE CASCADE,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                section_order INTEGER NOT NULL,
+                section_content TEXT,
+                section_media TEXT,
+                added_at TIMESTAMP DEFAULT NOW(),
+                UNIQUE(story_id, user_id, section_order)
+            )
+            """,
+            "CREATE INDEX IF NOT EXISTS idx_story_authors_story ON story_authors(story_id)",
+            "CREATE INDEX IF NOT EXISTS idx_story_authors_user ON story_authors(user_id)",
+
+            # Story reactions — threaded reactions with notes and media
+            """
+            CREATE TABLE IF NOT EXISTS story_reactions (
+                id SERIAL PRIMARY KEY,
+                story_id INTEGER NOT NULL REFERENCES stories(id) ON DELETE CASCADE,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                reaction_type VARCHAR(50),
+                note TEXT,
+                media_url VARCHAR(300),
+                parent_reaction_id INTEGER REFERENCES story_reactions(id) ON DELETE CASCADE,
+                created_at TIMESTAMP DEFAULT NOW(),
+                updated_at TIMESTAMP DEFAULT NOW()
+            )
+            """,
+            "CREATE INDEX IF NOT EXISTS idx_story_reactions_story ON story_reactions(story_id)",
+            "CREATE INDEX IF NOT EXISTS idx_story_reactions_user ON story_reactions(user_id)",
+            "CREATE INDEX IF NOT EXISTS idx_story_reactions_parent ON story_reactions(parent_reaction_id)",
+
+            # Stories — add multi-author flag
+            "ALTER TABLE stories ADD COLUMN IF NOT EXISTS is_multi_author BOOLEAN DEFAULT FALSE",
+
+            # Time-locked stories — unlock on future dates
+            "ALTER TABLE stories ADD COLUMN IF NOT EXISTS is_time_locked BOOLEAN DEFAULT FALSE",
+            "ALTER TABLE stories ADD COLUMN IF NOT EXISTS unlock_date TIMESTAMP",
+            "ALTER TABLE stories ADD COLUMN IF NOT EXISTS unlock_event VARCHAR(100)",
+            "ALTER TABLE stories ADD COLUMN IF NOT EXISTS is_unlocked BOOLEAN DEFAULT FALSE",
+            "ALTER TABLE stories ADD COLUMN IF NOT EXISTS unlocked_at TIMESTAMP",
+            "CREATE INDEX IF NOT EXISTS idx_stories_unlock_date ON stories(unlock_date) WHERE is_time_locked = TRUE AND is_unlocked = FALSE",
+
+            # Audio preservation — voice recordings attached to stories
+            "ALTER TABLE stories ADD COLUMN IF NOT EXISTS audio_url VARCHAR(300)",
+            "ALTER TABLE stories ADD COLUMN IF NOT EXISTS audio_duration INTEGER",
+            "ALTER TABLE stories ADD COLUMN IF NOT EXISTS audio_transcript TEXT",
+            "ALTER TABLE stories ADD COLUMN IF NOT EXISTS recorded_by INTEGER REFERENCES users(id) ON DELETE SET NULL",
+
+            # Archive exports — track family data exports
+            """
+            CREATE TABLE IF NOT EXISTS archive_exports (
+                id SERIAL PRIMARY KEY,
+                family_id INTEGER NOT NULL REFERENCES families(id) ON DELETE CASCADE,
+                requested_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                export_format VARCHAR(20) DEFAULT 'zip',
+                status VARCHAR(20) DEFAULT 'pending',
+                file_url VARCHAR(500),
+                file_size_mb DECIMAL(10,2),
+                stories_count INTEGER DEFAULT 0,
+                media_count INTEGER DEFAULT 0,
+                requested_at TIMESTAMP DEFAULT NOW(),
+                completed_at TIMESTAMP,
+                expires_at TIMESTAMP,
+                download_count INTEGER DEFAULT 0
+            )
+            """,
+            "CREATE INDEX IF NOT EXISTS idx_archive_exports_family ON archive_exports(family_id)",
+            "CREATE INDEX IF NOT EXISTS idx_archive_exports_user ON archive_exports(requested_by)",
+
+            # Time-lock notifications — track who gets notified when stories unlock
+            """
+            CREATE TABLE IF NOT EXISTS time_lock_notifications (
+                id SERIAL PRIMARY KEY,
+                story_id INTEGER NOT NULL REFERENCES stories(id) ON DELETE CASCADE,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                notified BOOLEAN DEFAULT FALSE,
+                notified_at TIMESTAMP,
+                UNIQUE(story_id, user_id)
+            )
+            """,
+            "CREATE INDEX IF NOT EXISTS idx_timelock_notif_story ON time_lock_notifications(story_id)",
         ]
         
         print(f"🚀 Running {len(migrations)} migrations...")

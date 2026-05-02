@@ -18,6 +18,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Toast from '../components/Toast';
 import useToast from '../hooks/useToast';
 import QRCode from 'react-native-qrcode-svg';
+import VideoPlayer from '../components/VideoPlayer';
 import ProfileGroupsSection from '../components/ProfileGroupsSection';
 
 const { width } = Dimensions.get('window');
@@ -61,6 +62,9 @@ export default function ProfileScreen({ navigation }) {
   const [familyPostsLoading, setFamilyPostsLoading] = useState(false);
   const [addHighlight, setAddHighlight] = useState({ visible: false, title: '', selected: [], saving: false });
   const [viewHighlight, setViewHighlight] = useState({ visible: false, highlight: null, index: 0 });
+
+
+
 
   const fetchAll = useCallback(async () => {
     if (!user) return;
@@ -224,34 +228,37 @@ export default function ProfileScreen({ navigation }) {
     } catch {}
   };
 
-  const videoThumb = (url) => {
-    if (!url) return null;
-    return url
-      .replace('/video/upload/', '/video/upload/so_0,w_400/')
-      .replace(/\.(mp4|mov|avi|webm)(\?.*)?$/, '.jpg');
+  const getVideoThumbnail = (videoUrl) => {
+    if (!videoUrl) return null;
+    // Cloudinary video thumbnail: replace video/upload/ with video/upload/so_0/ to get first frame
+    if (videoUrl.includes('cloudinary.com')) {
+      return videoUrl.replace('/video/upload/', '/video/upload/so_0,f_jpg/');
+    }
+    return videoUrl;
   };
 
-  const renderGridItem = (item) => {
+  const renderGridItem = (item, isArchived = false) => {
     const isVideo = item.media_type === 'video';
-    const thumbUri = isVideo ? videoThumb(item.media_url) : item.media_url;
+    const thumbnailUrl = isVideo ? getVideoThumbnail(item.media_url) : item.media_url;
+    
     return (
       <TouchableOpacity key={item.id} style={s.gridItem} activeOpacity={0.85}
         onPress={() => navigation.navigate('PostDetail', { postId: item.id })}>
-        {thumbUri ? (
-          <Image source={{ uri: thumbUri }} style={s.gridImg} resizeMode="cover" />
+        {thumbnailUrl ? (
+          <Image source={{ uri: thumbnailUrl }} style={s.gridImg} resizeMode="cover" />
         ) : (
           <View style={[s.gridImg, s.gridText, { backgroundColor: theme.bgSecondary }]}>
             <AppText style={[s.gridCaption, { color: theme.text }]} numberOfLines={4}>{item.caption}</AppText>
           </View>
         )}
-        {item.media_type === 'carousel' && (
-          <View style={s.carouselBadge}>
-            <Ionicons name="copy-outline" size={12} color="#fff" />
-          </View>
-        )}
         {isVideo && (
           <View style={s.videoBadge}>
             <Ionicons name="play" size={14} color="#fff" />
+          </View>
+        )}
+        {item.media_type === 'carousel' && (
+          <View style={s.carouselBadge}>
+            <Ionicons name="copy-outline" size={12} color="#fff" />
           </View>
         )}
         {item.like_count > 0 && (
@@ -674,11 +681,21 @@ export default function ProfileScreen({ navigation }) {
                 ))}
               </View>
               {/* Media */}
-              <Image
-                source={{ uri: viewHighlight.highlight.items[viewHighlight.index]?.media_url }}
-                style={s.hlViewerImg}
-                resizeMode="contain"
-              />
+              {viewHighlight.highlight.items[viewHighlight.index]?.media_type === 'video' ? (
+                <VideoPlayer
+                  uri={viewHighlight.highlight.items[viewHighlight.index]?.media_url}
+                  isVisible={viewHighlight.visible}
+                  feedMode={false}
+                  authorName={user?.name}
+                  authorAvatar={user?.avatar_url}
+                />
+              ) : (
+                <Image
+                  source={{ uri: viewHighlight.highlight.items[viewHighlight.index]?.media_url }}
+                  style={s.hlViewerImg}
+                  resizeMode="contain"
+                />
+              )}
               {/* Title */}
               <View style={s.hlViewerHeader}>
                 <View style={[s.hlViewerAvatar, { backgroundColor: theme.primary }]}>
@@ -821,10 +838,19 @@ export default function ProfileScreen({ navigation }) {
                           onPress={() => navigation.navigate('Family')}
                         >
                           {item.media_url ? (
-                            <Image source={{ uri: item.media_url }} style={s.gridImg} resizeMode="cover" />
+                            <Image 
+                              source={{ uri: item.media_type === 'video' ? getVideoThumbnail(item.media_url) : item.media_url }} 
+                              style={s.gridImg} 
+                              resizeMode="cover" 
+                            />
                           ) : (
                             <View style={[s.gridImg, s.gridText, { backgroundColor: theme.bgSecondary }]}>
                               <AppText style={[s.gridCaption, { color: theme.text }]} numberOfLines={3}>{item.title}</AppText>
+                            </View>
+                          )}
+                          {item.media_type === 'video' && (
+                            <View style={s.videoBadge}>
+                              <Ionicons name="play" size={14} color="#fff" />
                             </View>
                           )}
                           <View style={s.familyStoryBadge}>
@@ -864,10 +890,19 @@ export default function ProfileScreen({ navigation }) {
                     onPress={() => setArchivedViewer(item)}
                   >
                     {item.media_url ? (
-                      <Image source={{ uri: item.media_url }} style={s.gridImg} resizeMode="cover" />
+                      <Image 
+                        source={{ uri: item.media_type === 'video' ? getVideoThumbnail(item.media_url) : item.media_url }} 
+                        style={s.gridImg} 
+                        resizeMode="cover" 
+                      />
                     ) : (
                       <View style={[s.gridImg, s.gridText, { backgroundColor: theme.bgSecondary }]}>
                         <AppText style={[s.gridCaption, { color: theme.text }]} numberOfLines={3}>{item.title}</AppText>
+                      </View>
+                    )}
+                    {item.media_type === 'video' && (
+                      <View style={s.videoBadge}>
+                        <Ionicons name="play" size={14} color="#fff" />
                       </View>
                     )}
                     <View style={s.archivedBadge}>
@@ -919,7 +954,7 @@ export default function ProfileScreen({ navigation }) {
           </View>
         ) : (
           <View style={s.grid}>
-            {currentData.map(item => renderGridItem(item))}
+            {currentData.map(item => renderGridItem(item, false))}
           </View>
         )}
         <View style={{ height: 100 }} />
@@ -931,9 +966,22 @@ export default function ProfileScreen({ navigation }) {
           <TouchableOpacity style={s.archivedViewerClose} onPress={() => setArchivedViewer(null)}>
             <Ionicons name="close" size={28} color="#fff" />
           </TouchableOpacity>
-          {archivedViewer?.media_url && (
+          {archivedViewer?.media_url && archivedViewer?.media_type === 'video' ? (
+            <VideoPlayer
+              uri={archivedViewer.media_url}
+              isVisible={!!archivedViewer}
+              feedMode={false}
+              liked={archivedViewer.liked_by_me}
+              likeCount={archivedViewer.like_count}
+              onComment={() => {}}
+              commentCount={archivedViewer.comment_count}
+              authorName={user?.name}
+              authorAvatar={user?.avatar_url}
+              caption={archivedViewer.content}
+            />
+          ) : archivedViewer?.media_url ? (
             <Image source={{ uri: archivedViewer.media_url }} style={s.archivedViewerImg} resizeMode="contain" />
-          )}
+          ) : null}
           <View style={s.archivedViewerInfo}>
             <AppText style={s.archivedViewerTitle}>{archivedViewer?.title}</AppText>
             {archivedViewer?.content && <AppText style={s.archivedViewerContent}>{archivedViewer.content}</AppText>}
@@ -1038,8 +1086,8 @@ const s = StyleSheet.create({
   tabBtn: { flex: 1, alignItems: 'center', paddingVertical: 11 },
   tabBtnActive: { borderBottomWidth: 1.5, borderBottomColor: colors.primary },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 1.5 },
-  gridItem: { width: GRID, height: GRID, position: 'relative' },
-  gridImg: { width: '100%', height: '100%' },
+  gridItem: { width: GRID, height: GRID, position: 'relative', overflow: 'hidden' },
+  gridImg: { width: '100%', height: '100%', backgroundColor: '#000' },
   gridText: { backgroundColor: colors.bgSecondary, alignItems: 'center', justifyContent: 'center', padding: 8 },
   gridCaption: { color: colors.text, fontSize: 11, textAlign: 'center' },
   carouselBadge: { position: 'absolute', top: 6, right: 6, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 4, padding: 3 },
