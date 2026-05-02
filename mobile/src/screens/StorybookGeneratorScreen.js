@@ -5,7 +5,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  Image,
 } from "react-native";
 import AppText from '../components/AppText';
 import { useTranslation } from '../i18n';
@@ -13,10 +12,12 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useAuth } from "../context/AuthContext";
 import api from "../api/axios";
-
 import { colors } from "../theme";
 import Toast from '../components/Toast';
 import useToast from '../hooks/useToast';
+
+// Import PostCard from FeedScreen
+import { PostCard } from './FeedScreen';
 
 export default function StorybookGeneratorScreen({ navigation }) {
   const { t } = useTranslation();
@@ -82,95 +83,33 @@ export default function StorybookGeneratorScreen({ navigation }) {
         keyExtractor={(item) => String(item.id)}
         contentContainerStyle={s.list}
         renderItem={({ item }) => (
-          <TouchableOpacity
-            style={s.storyItem}
-            onPress={() => toggleSelect(item.id)}
-            activeOpacity={0.95}
-          >
-            <View style={s.card}>
-              {/* Selection Checkbox */}
-              <View style={s.selectCheckbox}>
-                <View
-                  style={[
-                    s.checkbox,
-                    selected.includes(item.id) && s.checkboxActive,
-                  ]}
-                >
-                  {selected.includes(item.id) && (
-                    <Ionicons name="checkmark" size={16} color="#fff" />
-                  )}
-                </View>
-              </View>
-
-              {/* Header */}
-              <View style={s.header}>
-                <View style={s.avatarRing}>
-                  <View style={s.avatarInner}>
-                    {item.author_avatar ? (
-                      <Image
-                        source={{ uri: item.author_avatar }}
-                        style={s.avatarImg}
-                      />
-                    ) : (
-                      <AppText style={s.avatarLetter}>
-                        {item.author_name?.[0]?.toUpperCase() || "?"}
-                      </AppText>
-                    )}
-                  </View>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <AppText style={s.authorName}>{item.author_name}</AppText>
-                  <View style={s.metaRow}>
-                    {item.location && (
-                      <>
-                        <Ionicons name="location-outline" size={11} color={colors.muted} />
-                        <AppText style={s.metaText}>{item.location}</AppText>
-                        <AppText style={s.dot}>·</AppText>
-                      </>
-                    )}
-                    <AppText style={s.metaText}>
-                      {new Date(item.created_at).toLocaleDateString()}
-                    </AppText>
-                  </View>
-                </View>
-              </View>
-
-              {/* Media */}
-              {item.media_url && (
-                <Image
-                  source={{ uri: item.media_url }}
-                  style={s.media}
-                  resizeMode="cover"
-                />
-              )}
-
-              {/* Caption */}
-              {item.caption && (
-                <View style={s.captionWrap}>
-                  <AppText style={s.caption} numberOfLines={2}>
-                    <AppText style={s.captionName}>{item.author_name} </AppText>
-                    {item.caption}
-                  </AppText>
-                </View>
-              )}
-
-              {/* Stats */}
-              <View style={s.stats}>
-                {item.like_count > 0 && (
-                  <View style={s.statItem}>
-                    <Ionicons name="heart" size={14} color="#e11d48" />
-                    <AppText style={s.statText}>{item.like_count}</AppText>
-                  </View>
-                )}
-                {item.comment_count > 0 && (
-                  <View style={s.statItem}>
-                    <Ionicons name="chatbubble" size={14} color={colors.muted} />
-                    <AppText style={s.statText}>{item.comment_count}</AppText>
-                  </View>
+          <View style={s.postWrapper}>
+            {/* Selection Checkbox Overlay */}
+            <TouchableOpacity
+              style={s.selectOverlay}
+              onPress={() => toggleSelect(item.id)}
+              activeOpacity={0.9}
+            >
+              <View
+                style={[
+                  s.checkbox,
+                  selected.includes(item.id) && s.checkboxActive,
+                ]}
+              >
+                {selected.includes(item.id) && (
+                  <Ionicons name="checkmark" size={18} color="#fff" />
                 )}
               </View>
-            </View>
-          </TouchableOpacity>
+            </TouchableOpacity>
+
+            {/* Actual Post Card */}
+            <PostCard
+              post={item}
+              navigation={navigation}
+              onUpdate={() => {}}
+              isVisible={false}
+            />
+          </View>
         )}
       />
 
@@ -223,126 +162,36 @@ const s = StyleSheet.create({
     fontWeight: "600",
   },
   list: {
-    padding: 0,
     paddingBottom: 100,
   },
-  storyItem: {
-    marginBottom: 0,
+  postWrapper: {
+    position: 'relative',
   },
-  card: {
-    backgroundColor: colors.bg,
-    borderBottomWidth: 0.5,
-    borderBottomColor: colors.border,
-    position: "relative",
-  },
-  selectCheckbox: {
-    position: "absolute",
+  selectOverlay: {
+    position: 'absolute',
     top: 12,
     right: 12,
-    zIndex: 10,
+    zIndex: 100,
+    padding: 4,
   },
   checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.5)",
-    backgroundColor: "rgba(0,0,0,0.3)",
-    alignItems: "center",
-    justifyContent: "center",
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 2.5,
+    borderColor: 'rgba(255,255,255,0.8)',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
   },
   checkboxActive: {
-    backgroundColor: "#10b981",
-    borderColor: "#10b981",
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    gap: 10,
-  },
-  avatarRing: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    padding: 2,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.primary,
-  },
-  avatarInner: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    overflow: "hidden",
-    backgroundColor: colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 2,
-    borderColor: colors.bg,
-  },
-  avatarImg: {
-    width: "100%",
-    height: "100%",
-  },
-  avatarLetter: {
-    color: "#fff",
-    fontWeight: "700",
-    fontSize: 13,
-  },
-  authorName: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: colors.text,
-  },
-  metaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-    marginTop: 1,
-  },
-  metaText: {
-    fontSize: 11,
-    color: colors.muted,
-  },
-  dot: {
-    fontSize: 11,
-    color: colors.dim,
-  },
-  media: {
-    width: "100%",
-    height: 400,
-    backgroundColor: "#000",
-  },
-  captionWrap: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  caption: {
-    fontSize: 13,
-    color: colors.text,
-    lineHeight: 18,
-  },
-  captionName: {
-    fontWeight: "700",
-  },
-  stats: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 16,
-    paddingHorizontal: 14,
-    paddingBottom: 12,
-  },
-  statItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  statText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: colors.text,
+    backgroundColor: '#10b981',
+    borderColor: '#10b981',
   },
   generateBtn: {
     position: "absolute",

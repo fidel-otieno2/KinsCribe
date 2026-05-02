@@ -136,13 +136,24 @@ export default function AccountSwitcherScreen({ navigation }) {
     
     setCreateLoading(true);
     try {
+      console.log('📝 Creating account with:', { 
+        name: createForm.name, 
+        username: createForm.username, 
+        email: createForm.email 
+      });
+      
       const { data } = await api.post('/auth/register', createForm);
+      
+      console.log('✅ Registration response:', data);
+      
       if (data.requires_otp) {
         // OTP verification required
+        console.log('📧 OTP required, showing verification modal');
         setCreateStep(2);
         startCooldown();
       } else {
         // No OTP required - account created and logged in
+        console.log('✅ Account created without OTP, logging in');
         await registerNewAccount(data.user, data.access_token, data.refresh_token);
         setShowCreateModal(false);
         resetCreateForm();
@@ -150,8 +161,12 @@ export default function AccountSwitcherScreen({ navigation }) {
         navigation.navigate('SetupProfile');
       }
     } catch (err) {
-      setCreateError(err.response?.data?.error || 'Registration failed');
-    } finally { setCreateLoading(false); }
+      console.error('❌ Registration error:', err.response?.data || err.message);
+      const errorMsg = err.response?.data?.error || err.message || 'Registration failed';
+      setCreateError(errorMsg);
+    } finally { 
+      setCreateLoading(false); 
+    }
   };
 
   const handleOtpChange = (val, idx) => {
@@ -347,7 +362,14 @@ export default function AccountSwitcherScreen({ navigation }) {
                     {createError ? (
                       <View style={s.errorBox}>
                         <Ionicons name="alert-circle" size={16} color="#f87171" />
-                        <AppText style={s.errorText}>{createError}</AppText>
+                        <View style={{ flex: 1 }}>
+                          <AppText style={s.errorText}>{createError}</AppText>
+                          {createError.includes('already registered') && (
+                            <AppText style={[s.errorText, { fontSize: 11, marginTop: 4, opacity: 0.8 }]}>
+                              Tip: Use "Add Existing Account" to log in
+                            </AppText>
+                          )}
+                        </View>
                       </View>
                     ) : null}
 

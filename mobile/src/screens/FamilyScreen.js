@@ -841,6 +841,8 @@ export default function FamilyScreen({ navigation }) {
   const fetchFamily = useCallback(async () => {
     try {
       const { data } = await api.get('/family/my-family');
+      console.log('Family data received:', data.family);
+      console.log('Family avatar_url:', data.family?.avatar_url);
       setFamily(data.family);
       const memberList = data.members || [];
       setMembers(memberList);
@@ -879,7 +881,12 @@ export default function FamilyScreen({ navigation }) {
           {/* Family Avatar */}
           <View style={s.familyAvatarWrap}>
             {family?.avatar_url ? (
-              <Image source={{ uri: family.avatar_url }} style={s.familyAvatar} />
+              <Image 
+                source={{ uri: family.avatar_url }} 
+                style={s.familyAvatar}
+                onError={(e) => console.log('Avatar load error:', e.nativeEvent.error)}
+                onLoad={() => console.log('Avatar loaded successfully:', family.avatar_url)}
+              />
             ) : (
               <LinearGradient colors={['#7c3aed', '#3b82f6']} style={s.familyAvatar}>
                 <Ionicons name="people" size={24} color="#fff" />
@@ -896,14 +903,20 @@ export default function FamilyScreen({ navigation }) {
               )}
             </View>
             
-            {family?.motto ? (
-              <AppText style={s.familyMotto} numberOfLines={1}>"{family.motto}"</AppText>
-            ) : (
-              <AppText style={s.memberCount}>{members.length} members</AppText>
+            {family?.motto && (
+              <View style={s.mottoContainer}>
+                <Ionicons name="sparkles" size={10} color="#a78bfa" />
+                <AppText style={s.familyMotto} numberOfLines={1}>"{family.motto}"</AppText>
+                <Ionicons name="sparkles" size={10} color="#a78bfa" />
+              </View>
             )}
             
             {family?.description && (
-              <AppText style={s.familyDescription} numberOfLines={1}>{family.description}</AppText>
+              <AppText style={s.familyDescription} numberOfLines={2}>{family.description}</AppText>
+            )}
+            
+            {!family?.description && !family?.motto && (
+              <AppText style={s.memberCount}>{members.length} members</AppText>
             )}
           </View>
         </TouchableOpacity>
@@ -1008,11 +1021,34 @@ const s = StyleSheet.create({
     elevation: 4,
   },
   familyAvatar: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
-  familyInfo: { flex: 1, gap: 2 },
+  familyInfo: { flex: 1, gap: 3 },
   familyNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   familyName: { fontSize: 18, fontWeight: '800', color: colors.text, flex: 1 },
-  familyMotto: { fontSize: 11, color: '#a78bfa', fontStyle: 'italic', fontWeight: '600' },
-  familyDescription: { fontSize: 11, color: colors.muted, marginTop: 1 },
+  mottoContainer: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 4,
+    backgroundColor: 'rgba(124,58,237,0.08)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    alignSelf: 'flex-start',
+    borderWidth: 0.5,
+    borderColor: 'rgba(124,58,237,0.2)',
+  },
+  familyMotto: { 
+    fontSize: 10, 
+    color: '#a78bfa', 
+    fontStyle: 'italic', 
+    fontWeight: '600',
+    letterSpacing: 0.2,
+  },
+  familyDescription: { 
+    fontSize: 11, 
+    color: '#94a3b8', 
+    lineHeight: 15,
+    fontWeight: '500',
+  },
   memberCount: { fontSize: 11, color: colors.muted },
   headerRight: { flexDirection: 'row', gap: 8 },
   chatBtn: { width: 38, height: 38, borderRadius: 12, backgroundColor: 'rgba(30,41,59,0.8)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border2 },

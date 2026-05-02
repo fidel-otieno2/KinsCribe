@@ -396,7 +396,7 @@ const sp = StyleSheet.create({
 });
 
 // ── Post Card ──────────────────────────────────────────────────
-const PostCard = memo(function PostCard({ post, onUpdate, navigation, isVisible }) {
+export const PostCard = memo(function PostCard({ post, onUpdate, navigation, isVisible }) {
   const { user } = useAuth();
   const { theme } = useTheme();
   const { t } = useTranslation();
