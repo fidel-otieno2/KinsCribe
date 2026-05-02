@@ -358,6 +358,75 @@ def voice_to_story():
 
 # ============ AI "ASK THE FAMILY" ============
 
+@ai_bp.route("/chat", methods=["POST"])
+@jwt_required()
+def ai_chat():
+    """
+    General AI chat assistant for the app.
+    Helps with app features, suggestions, and general queries.
+    """
+    user = me()
+    data = request.json or {}
+    message = data.get("message", "").strip()
+    history = data.get("history", [])  # Previous messages for context
+    
+    if not message:
+        return jsonify({"error": "Message is required"}), 400
+    
+    try:
+        # Build conversation messages
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "You are a helpful AI assistant for KinsCribe, a family storytelling app. "
+                    "Help users with app features, give suggestions for stories to post, "
+                    "provide writing tips, and answer general questions. "
+                    "Be warm, friendly, and encouraging. Keep responses concise (2-3 paragraphs max)."
+                )
+            }
+        ]
+        
+        # Add conversation history (last 5 messages)
+        for msg in history[-5:]:
+            messages.append({
+                "role": msg.get("role", "user"),
+                "content": msg.get("content", "")
+            })
+        
+        # Add current message
+        messages.append({"role": "user", "content": message})
+        
+        # Get AI response
+        response = openai.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=messages,
+            temperature=0.7,
+            max_tokens=500
+        )
+        
+        ai_response = response.choices[0].message.content.strip()
+        
+        return jsonify({
+            "response": ai_response,
+            "message": message
+        })
+        
+    except openai.RateLimitError:
+        return jsonify({
+            "error": "AI service quota exceeded",
+            "response": "I'm currently unavailable due to API limits. Please try again later or contact support."
+        }), 503
+    except Exception as e:
+        print(f"AI chat error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            "error": "Chat unavailable",
+            "response": "I'm having trouble responding right now. Please try again."
+        }), 500
+
+
 @ai_bp.route("/family-chat", methods=["POST"])
 @jwt_required()
 def family_chat():

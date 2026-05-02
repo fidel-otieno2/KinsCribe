@@ -27,33 +27,35 @@ function Avatar({ uri, name, size = 52 }) {
   );
 }
 
-function ConnectButton({ userId, initialConnected, onToggle }) {
-  const [connected, setConnected] = useState(initialConnected);
+function FollowButton({ userId, initialFollowing, initialFollowsYou, onToggle }) {
+  const [following, setFollowing] = useState(initialFollowing);
   const [loading, setLoading] = useState(false);
 
   const toggle = async () => {
     setLoading(true);
     try {
       const { data } = await api.post(`/connections/${userId}/toggle`);
-      setConnected(data.connected);
-      onToggle?.(data.connected);
+      setFollowing(data.following);
+      onToggle?.(data.following);
     } catch {} finally { setLoading(false); }
   };
 
+  const buttonText = initialFollowsYou && !following ? 'Follow Back' : following ? 'Following' : 'Follow';
+
   return (
     <TouchableOpacity
-      style={[s.connectBtn, connected && s.connectedBtn]}
+      style={[s.followBtn, following && s.followingBtn]}
       onPress={toggle}
       disabled={loading}
       activeOpacity={0.8}
     >
       {loading ? (
-        <ActivityIndicator size="small" color={connected ? colors.muted : "#fff"} />
-      ) : connected ? (
-        <AppText style={s.connectedText}>Connected</AppText>
+        <ActivityIndicator size="small" color={following ? colors.muted : "#fff"} />
+      ) : following ? (
+        <AppText style={s.followingText}>{buttonText}</AppText>
       ) : (
-        <LinearGradient colors={["#7c3aed", "#3b82f6"]} style={s.connectGrad}>
-          <AppText style={s.connectText}>Connect</AppText>
+        <LinearGradient colors={["#7c3aed", "#3b82f6"]} style={s.followGrad}>
+          <AppText style={s.followText}>{buttonText}</AppText>
         </LinearGradient>
       )}
     </TouchableOpacity>
@@ -112,7 +114,7 @@ export default function SearchScreen({ navigation }) {
     } catch {} finally { setSearching(false); }
   };
 
-  const renderUser = (item, showConnect = true) => (
+  const renderUser = (item, showFollow = true) => (
     <TouchableOpacity
       key={item.id}
       style={[s.userRow, { borderBottomColor: theme.border }]}
@@ -123,10 +125,10 @@ export default function SearchScreen({ navigation }) {
       <View style={s.userInfo}>
         <AppText style={[s.userName, { color: theme.text }]}>{item.name}</AppText>
         <AppText style={[s.userHandle, { color: theme.muted }]}>@{item.username || "user"}</AppText>
-        {item.follows_you && <AppText style={[s.followsYou, { color: theme.primary }]}>Connects with you</AppText>}
+        {item.follows_you && <AppText style={[s.followsYou, { color: theme.primary }]}>Follows you</AppText>}
       </View>
-      {showConnect && (
-        <ConnectButton userId={item.id} initialConnected={item.is_connected} />
+      {showFollow && (
+        <FollowButton userId={item.id} initialFollowing={item.is_following} initialFollowsYou={item.follows_you} />
       )}
     </TouchableOpacity>
   );
@@ -288,11 +290,11 @@ const s = StyleSheet.create({
   userName: { fontSize: 15, fontWeight: "600", color: colors.text },
   userHandle: { fontSize: 13, color: colors.muted },
   followsYou: { fontSize: 11, color: colors.primary, fontWeight: "600", marginTop: 2 },
-  connectBtn: { borderRadius: radius.full, overflow: "hidden", minWidth: 90, height: 34 },
-  connectedBtn: { borderWidth: 1, borderColor: colors.border2, borderRadius: radius.full, alignItems: "center", justifyContent: "center", minWidth: 90, height: 34 },
-  connectGrad: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 16 },
-  connectText: { color: "#fff", fontWeight: "700", fontSize: 13 },
-  connectedText: { color: colors.muted, fontWeight: "600", fontSize: 13 },
+  followBtn: { borderRadius: radius.full, overflow: "hidden", minWidth: 90, height: 34 },
+  followingBtn: { borderWidth: 1, borderColor: colors.border2, borderRadius: radius.full, alignItems: "center", justifyContent: "center", minWidth: 90, height: 34 },
+  followGrad: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 16 },
+  followText: { color: "#fff", fontWeight: "700", fontSize: 13 },
+  followingText: { color: colors.muted, fontWeight: "600", fontSize: 13 },
   postsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 2 },
   postThumb: { width: GRID_SIZE, height: GRID_SIZE, position: 'relative', overflow: 'hidden', borderRadius: 4 },
   postThumbImg: { width: "100%", height: "100%", borderRadius: 4 },
