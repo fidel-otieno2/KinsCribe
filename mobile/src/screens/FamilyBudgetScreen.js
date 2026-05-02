@@ -306,6 +306,7 @@ export default function FamilyBudgetScreen({ navigation }) {
 
             <TextInput style={[s.input, { backgroundColor: theme.bgCard, color: theme.text, borderColor: theme.border2 }]} placeholder="Title *" placeholderTextColor={theme.dim} value={form.title} onChangeText={v => set('title', v)} />
             <TextInput style={[s.input, { backgroundColor: theme.bgCard, color: theme.text, borderColor: theme.border2 }]} placeholder="Amount *" placeholderTextColor={theme.dim} keyboardType="decimal-pad" value={form.amount} onChangeText={v => set('amount', v)} />
+            <TextInput style={[s.input, s.textArea, { backgroundColor: theme.bgCard, color: theme.text, borderColor: theme.border2 }]} placeholder="Notes (optional)" placeholderTextColor={theme.dim} value={form.notes} onChangeText={v => set('notes', v)} multiline numberOfLines={3} textAlignVertical="top" />
 
             <AppText style={[s.fieldLabel, { color: theme.muted }]}>Category</AppText>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
@@ -321,7 +322,7 @@ export default function FamilyBudgetScreen({ navigation }) {
 
             <TouchableOpacity style={s.saveBtn} onPress={saveEntry} disabled={saving}>
               <LinearGradient colors={form.entry_type === 'income' ? ['#10b981', '#059669'] : ['#e11d48', '#be123c']} style={s.saveBtnGrad}>
-                {saving ? <ActivityIndicator color="#fff" size="small" /> : <AppText style={s.saveBtnText}>Add {form.entry_type === 'income' ? 'Income' : 'Expense'}</AppText>}
+                {saving ? <ActivityIndicator color="#fff" size="small" /> : <AppText style={s.saveBtnText}>{editingEntry ? 'Update' : 'Add'} {form.entry_type === 'income' ? 'Income' : 'Expense'}</AppText>}
               </LinearGradient>
             </TouchableOpacity>
             <TouchableOpacity style={{ alignItems: 'center', paddingVertical: 12 }} onPress={() => setShowAdd(false)}>
@@ -339,6 +340,7 @@ const s = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', paddingTop: 52, paddingHorizontal: 16, paddingBottom: 14, borderBottomWidth: 0.5, borderBottomColor: colors.border },
   backBtn: { padding: 4 },
   headerTitle: { flex: 1, fontSize: 22, fontWeight: '800', color: colors.text, marginLeft: 8 },
+  iconBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginRight: 8 },
   addBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
   monthNav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14 },
   navBtn: { padding: 8 },
@@ -356,7 +358,9 @@ const s = StyleSheet.create({
   entryIcon: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   entryTitle: { fontSize: 15, fontWeight: '600', color: colors.text },
   entryMeta: { fontSize: 12, color: colors.muted, marginTop: 2 },
+  entryNotes: { fontSize: 11, color: colors.dim, marginTop: 2, fontStyle: 'italic' },
   entryAmount: { fontSize: 16, fontWeight: '700' },
+  entryDate: { fontSize: 11, color: colors.dim, marginTop: 2 },
   empty: { alignItems: 'center', marginTop: 40, gap: 8 },
   emptyTitle: { fontSize: 16, fontWeight: '700', color: colors.text },
   emptySub: { fontSize: 13, color: colors.muted },
@@ -372,6 +376,12 @@ const s = StyleSheet.create({
   fieldLabel: { fontSize: 11, color: colors.muted, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
   catChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: radius.full, borderWidth: 1, borderColor: colors.border2, backgroundColor: 'rgba(30,41,59,0.8)' },
   catChipText: { fontSize: 12, color: colors.muted, fontWeight: '600' },
+  searchContainer: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, marginBottom: 12, paddingHorizontal: 12, paddingVertical: 10, borderRadius: radius.md, borderWidth: 1 },
+  searchInput: { flex: 1, fontSize: 14, padding: 0 },
+  filtersContainer: { marginBottom: 12 },
+  filterChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: radius.full, borderWidth: 1 },
+  filterChipText: { fontSize: 12, fontWeight: '600' },
+  textArea: { height: 80, paddingTop: 13 },
   saveBtn: { borderRadius: radius.md, overflow: 'hidden', marginTop: 4 },
   saveBtnGrad: { paddingVertical: 14, alignItems: 'center' },
   saveBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
