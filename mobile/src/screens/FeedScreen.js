@@ -418,6 +418,7 @@ export const PostCard = memo(function PostCard({ post, onUpdate, navigation, isV
   const [showFamilyPicker, setShowFamilyPicker] = useState(false);
   const [families, setFamilies] = useState([]);
   const [postingToFamily, setPostingToFamily] = useState(null); // Changed to store family ID instead of boolean
+  const [sharedFamilyIds, setSharedFamilyIds] = useState([]); // Track which families this post has been shared to
   const lastTap = useRef(0);
   const scrollViewRef = useRef(null);
   const musicSoundRef = useRef(null);
@@ -892,9 +893,14 @@ export const PostCard = memo(function PostCard({ post, onUpdate, navigation, isV
                 onPress={async () => {
                   setShowMenu(false);
                   try {
-                    const { data } = await api.get('/family/my-families');
-                    setFamilies(data.families || []);
-                    if (data.families?.length > 0) {
+                    // Fetch families and which ones this post has been shared to
+                    const [familiesRes, sharedRes] = await Promise.all([
+                      api.get('/family/my-families'),
+                      api.get(`/posts/${post.id}/shared-families`)
+                    ]);
+                    setFamilies(familiesRes.data.families || []);
+                    setSharedFamilyIds(sharedRes.data.shared_family_ids || []);
+                    if (familiesRes.data.families?.length > 0) {
                       setShowFamilyPicker(true);
                     } else {
                       Alert.alert('No Families', 'You need to join a family first');
@@ -956,44 +962,62 @@ export const PostCard = memo(function PostCard({ post, onUpdate, navigation, isV
             <AppText style={[pc.familySheetSub, { color: theme.muted }]}>Choose which family to share with</AppText>
             
             <ScrollView style={{ maxHeight: 400 }} showsVerticalScrollIndicator={false}>
-              {families.map(f => (
-                <TouchableOpacity
-                  key={f.id}
-                  style={[pc.familyRow, { borderBottomColor: theme.border }]}
-                  onPress={async () => {
-                    setPostingToFamily(f.id); // Set to specific family ID
-                    try {
-                      await api.post(`/posts/${post.id}/post-to-family`, { family_id: f.id });
-                      setShowFamilyPicker(false);
-                      setPostingToFamily(null);
-                      Alert.alert('Success', `Posted to ${f.name}`);
-                    } catch (err) {
-                      console.log('Post to family error:', err.response?.data || err.message);
-                      setPostingToFamily(null);
-                      Alert.alert('Error', err.response?.data?.error || 'Failed to post to family');
-                    }
-                  }}
-                  disabled={postingToFamily !== null} // Disable all when any is posting
-                >
-                  <View style={pc.familyAvatar}>
-                    {f.avatar_url
-                      ? <Image source={{ uri: f.avatar_url }} style={{ width: 48, height: 48, borderRadius: 24 }} />
-                      : <LinearGradient colors={[f.theme_color || '#7c3aed', '#3b82f6']} style={pc.familyAvatarGrad}>
-                          <Ionicons name="people" size={22} color="#fff" />
-                        </LinearGradient>}
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <AppText style={[pc.familyName, { color: theme.text }]}>{f.name}</AppText>
-                    <AppText style={[pc.familyRole, { color: theme.muted }]}>
-                      {f.my_role === 'owner' ? '👑 Owner' : f.my_role === 'admin' ? '⚙️ Admin' : '👤 Member'}
-                      {f.member_count ? ` · ${f.member_count} members` : ''}
-                    </AppText>
-                  </View>
-                  {postingToFamily === f.id
-                    ? <ActivityIndicator size="small" color={colors.primary} />
-                    : <Ionicons name="chevron-forward" size={18} color={theme.muted} />}
-                </TouchableOpacity>
-              ))}
+              {families.map(f => {
+                const alreadyShared = sharedFamilyIds.includes(f.id);
+                return (
+                  <TouchableOpacity
+                    key={f.id}
+                    style={[pc.familyRow, { borderBottomColor: theme.border }, alreadyShared && pc.familyRowDisabled]}
+                    onPress={async () => {
+                      if (alreadyShared) {
+                        Alert.alert('Already Shared', `This post has already been shared to ${f.name}`);
+                        return;
+                      }
+                      setPostingToFamily(f.id);
+                      try {
+                        await api.post(`/posts/${post.id}/post-to-family`, { family_id: f.id });
+                        setShowFamilyPicker(false);
+                        setPostingToFamily(null);
+                        setSharedFamilyIds(prev => [...prev, f.id]); // Add to shared list
+                        Alert.alert('Success', `Posted to ${f.name}`);
+                      } catch (err) {
+                        console.log('Post to family error:', err.response?.data || err.message);
+                        setPostingToFamily(null);
+                        Alert.alert('Error', err.response?.data?.error || 'Failed to post to family');
+                      }
+                    }}
+                    disabled={postingToFamily !== null || alreadyShared}
+                  >
+                    <View style={pc.familyAvatar}>
+                      {f.avatar_url
+                        ? <Image source={{ uri: f.avatar_url }} style={{ width: 48, height: 48, borderRadius: 24, opacity: alreadyShared ? 0.5 : 1 }} />
+                        : <LinearGradient colors={[f.theme_color || '#7c3aed', '#3b82f6']} style={[pc.familyAvatarGrad, alreadyShared && { opacity: 0.5 }]}>
+                            <Ionicons name="people" size={22} color="#fff" />
+                          </LinearGradient>}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <AppText style={[pc.familyName, { color: theme.text, opacity: alreadyShared ? 0.5 : 1 }]}>{f.name}</AppText>
+                        {alreadyShared && (
+                          <View style={pc.sharedBadge}>
+                            <Ionicons name="checkmark-circle" size={12} color="#10b981" />
+                            <AppText style={pc.sharedBadgeText}>Shared</AppText>
+                          </View>
+                        )}
+                      </View>
+                      <AppText style={[pc.familyRole, { color: theme.muted, opacity: alreadyShared ? 0.5 : 1 }]}>
+                        {f.my_role === 'owner' ? '👑 Owner' : f.my_role === 'admin' ? '⚙️ Admin' : '👤 Member'}
+                        {f.member_count ? ` · ${f.member_count} members` : ''}
+                      </AppText>
+                    </View>
+                    {postingToFamily === f.id
+                      ? <ActivityIndicator size="small" color={colors.primary} />
+                      : alreadyShared
+                      ? <Ionicons name="checkmark-circle" size={22} color="#10b981" />
+                      : <Ionicons name="chevron-forward" size={18} color={theme.muted} />}
+                  </TouchableOpacity>
+                );
+              })}
             </ScrollView>
             
             <TouchableOpacity
@@ -1121,10 +1145,13 @@ const pc = StyleSheet.create({
   familySheetTitle: { fontSize: 18, fontWeight: '800', paddingHorizontal: 20, marginBottom: 4 },
   familySheetSub: { fontSize: 13, paddingHorizontal: 20, marginBottom: 16 },
   familyRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 0.5 },
+  familyRowDisabled: { opacity: 0.6 },
   familyAvatar: { width: 48, height: 48, borderRadius: 24, overflow: 'hidden' },
   familyAvatarGrad: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
   familyName: { fontSize: 15, fontWeight: '700' },
   familyRole: { fontSize: 12, marginTop: 2 },
+  sharedBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(16,185,129,0.15)', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(16,185,129,0.3)' },
+  sharedBadgeText: { fontSize: 10, fontWeight: '700', color: '#10b981' },
   familyCancelBtn: { margin: 16, padding: 14, borderRadius: 12, borderWidth: 1, alignItems: 'center' },
   hashtagsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingHorizontal: 14, marginBottom: 6 },
   hashtagChip: { fontSize: 13, color: '#3b82f6', fontWeight: '600' },

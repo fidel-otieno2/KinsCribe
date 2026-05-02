@@ -81,15 +81,22 @@ export default function UserProfileScreen({ route, navigation }) {
 
   const fetchAll = useCallback(async () => {
     try {
-      const [postsRes, statusRes, blockRes, mutualRes] = await Promise.all([
+      const [profileRes, postsRes, statusRes, blockRes, mutualRes] = await Promise.all([
+        api.get(`/connections/${userId}/profile`).catch(() => ({ data: { user: { id: userId, name: userName, avatar_url: userAvatar } } })),
         api.get(`/posts/user/${userId}`).catch(() => ({ data: { posts: [], is_private: false, locked: false } })),
         api.get(`/connections/${userId}/status`).catch(() => ({ data: { connected: false, status: null, follows_you: false } })),
         api.get(`/connections/${userId}/block-status`).catch(() => ({ data: { blocked: false } })),
         api.get(`/connections/${userId}/mutual`).catch(() => ({ data: { count: 0 } })),
       ]);
-      const searchRes = await api.get(`/connections/search?q=${userName || ''}`).catch(() => null);
-      const found = searchRes?.data?.users?.find(u => u.id === userId);
-      setProfile(found || { id: userId, name: userName, avatar_url: userAvatar });
+      
+      console.log('=== USER PROFILE DEBUG ===');
+      console.log('Profile data:', JSON.stringify(profileRes.data.user, null, 2));
+      console.log('Avatar URL:', profileRes.data.user?.avatar_url);
+      console.log('Bio:', profileRes.data.user?.bio);
+      console.log('Website:', profileRes.data.user?.website);
+      console.log('========================');
+      
+      setProfile(profileRes.data.user || { id: userId, name: userName, avatar_url: userAvatar });
       setPosts(postsRes.data.posts || []);
       setIsPrivate(postsRes.data.is_private || false);
       setLocked(postsRes.data.locked || false);
@@ -100,7 +107,9 @@ export default function UserProfileScreen({ route, navigation }) {
       api.get(`/family/user/${userId}/groups`)
         .then(r => setUserGroups({ admin_groups: r.data.admin_groups || [], member_groups: r.data.member_groups || [] }))
         .catch(() => {});
-    } catch {} finally { setLoading(false); }
+    } catch (e) {
+      console.error('Profile fetch error:', e);
+    } finally { setLoading(false); }
   }, [userId]);
 
   useFocusEffect(useCallback(() => { fetchAll(); }, [fetchAll]));
@@ -202,8 +211,8 @@ export default function UserProfileScreen({ route, navigation }) {
             { text: 'Report', onPress: () => Alert.alert('Reported', 'Thank you for your report.') },
             { text: 'Cancel', style: 'cancel' },
           ]
-        )} style={s.backBtn}>
-          <Ionicons name="ellipsis-horizontal" size={22} color={colors.muted} />
+        )} style={s.menuBtn}>
+          <Ionicons name="ellipsis-horizontal" size={24} color={colors.text} />
         </TouchableOpacity>
       </View>
 
@@ -249,6 +258,15 @@ export default function UserProfileScreen({ route, navigation }) {
         </View>
         {profile?.username && <AppText style={s.handle}>@{profile.username}</AppText>}
         {profile?.bio && <AppText style={s.bio}>{profile.bio}</AppText>}
+        {profile?.website && (
+          <TouchableOpacity onPress={() => {
+            const url = profile.website.startsWith('http') ? profile.website : `https://${profile.website}`;
+            // Open in browser
+            import('expo-linking').then(Linking => Linking.openURL(url));
+          }}>
+            <AppText style={s.website}>🔗 {profile.website}</AppText>
+          </TouchableOpacity>
+        )}
         {followsYou && <AppText style={s.followsYouBadge}>{t('follows_you')}</AppText>}
         {mutualCount > 0 && (
           <AppText style={s.mutualText}>{mutualCount} mutual follower{mutualCount !== 1 ? 's' : ''}</AppText>
@@ -521,6 +539,7 @@ const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 52, paddingHorizontal: 16, paddingBottom: 10 },
   backBtn: { padding: 4 },
+  menuBtn: { padding: 4, width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' },
   topName: { fontSize: 17, fontWeight: '700', color: colors.text },
   profileRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 14, gap: 20 },
   avatarRing: { width: 86, height: 86, borderRadius: 43, padding: 3, alignItems: 'center', justifyContent: 'center' },
@@ -535,6 +554,7 @@ const s = StyleSheet.create({
   name: { fontSize: 15, fontWeight: '700', color: colors.text },
   handle: { fontSize: 13, color: colors.muted, marginTop: 1 },
   bio: { fontSize: 13, color: colors.text, marginTop: 4, lineHeight: 18 },
+  website: { fontSize: 13, color: colors.primary, marginTop: 4, textDecorationLine: 'underline' },
   followsYouBadge: { fontSize: 11, color: colors.muted, fontWeight: '600', marginTop: 4, backgroundColor: 'rgba(255,255,255,0.07)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20, alignSelf: 'flex-start' },
   mutualText: { fontSize: 11, color: colors.dim, marginTop: 4 },
   momentsBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, marginBottom: 10, paddingHorizontal: 14, paddingVertical: 10, borderRadius: radius.md, borderWidth: 1, backgroundColor: 'rgba(196,163,90,0.06)' },

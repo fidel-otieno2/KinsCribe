@@ -540,11 +540,25 @@ def post_to_family(post_id):
     if not membership and user.family_id != family_id:
         return jsonify({"error": "You are not a member of that family"}), 403
     
+    # Check if this post has already been shared to this family
+    existing_story = Story.query.filter_by(
+        user_id=user.id,
+        family_id=family_id
+    ).filter(
+        Story.content.like(f"%post_id:{post_id}%")
+    ).first()
+    
+    if existing_story:
+        return jsonify({"error": "This post has already been shared to this family"}), 400
+    
     # Create family story from post
     try:
+        # Add post_id marker in content to track duplicates
+        content_with_marker = f"{post.caption or ''}\n<!-- post_id:{post_id} -->"
+        
         story = Story(
             title=f"Shared from feed",
-            content=post.caption or "",
+            content=content_with_marker,
             media_url=post.media_url,
             media_type=post.media_type,
             music_url=post.music_stream_url if hasattr(post, 'music_stream_url') else None,
@@ -560,3 +574,27 @@ def post_to_family(post_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": f"Failed to create story: {str(e)}"}), 500
+
+
+@post_bp.route("/<int:post_id>/shared-families", methods=["GET"])
+@jwt_required()
+def get_shared_families(post_id):
+    """Get list of families this post has been shared to."""
+    from models.story import Story
+    from models.family import Family
+    
+    user = me()
+    post = Post.query.get_or_404(post_id)
+    
+    # Only post owner can see this
+    if post.user_id != user.id:
+        return jsonify({"error": "Not authorized"}), 403
+    
+    # Find all stories created from this post
+    stories = Story.query.filter_by(user_id=user.id).filter(
+        Story.content.like(f"%post_id:{post_id}%")
+    ).all()
+    
+    shared_family_ids = [s.family_id for s in stories if s.family_id]
+    
+    return jsonify({"shared_family_ids": shared_family_ids})
