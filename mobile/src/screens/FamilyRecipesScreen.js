@@ -5,7 +5,6 @@ import {
 } from 'react-native';
 import AppText from '../components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import api from '../api/axios';
