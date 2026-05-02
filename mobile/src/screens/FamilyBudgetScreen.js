@@ -247,28 +247,41 @@ export default function FamilyBudgetScreen({ navigation }) {
 
         {/* Entries */}
         <View style={s.section}>
-          <AppText style={[s.sectionTitle, { color: theme.muted }]}>Transactions</AppText>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <AppText style={[s.sectionTitle, { color: theme.muted }]}>Transactions</AppText>
+            <AppText style={[s.sectionTitle, { color: theme.muted }]}>({filteredEntries.length})</AppText>
+          </View>
           {loading ? <ActivityIndicator color={theme.primary} style={{ marginTop: 20 }} /> :
-            data.entries.length === 0 ? (
+            filteredEntries.length === 0 ? (
               <View style={s.empty}>
                 <AppText style={{ fontSize: 40 }}>💰</AppText>
-                <AppText style={[s.emptyTitle, { color: theme.text }]}>No entries yet</AppText>
-                <AppText style={[s.emptySub, { color: theme.muted }]}>Track your family expenses and income</AppText>
+                <AppText style={[s.emptyTitle, { color: theme.text }]}>{searchQuery || filterCategory !== 'all' ? 'No matching entries' : 'No entries yet'}</AppText>
+                <AppText style={[s.emptySub, { color: theme.muted }]}>{searchQuery || filterCategory !== 'all' ? 'Try adjusting your filters' : 'Track your family expenses and income'}</AppText>
               </View>
-            ) : data.entries.map(entry => {
+            ) : filteredEntries.map(entry => {
               const cat = getCatInfo(entry.category);
               return (
-                <TouchableOpacity key={entry.id} style={[s.entryRow, { borderBottomColor: theme.border }]} onLongPress={() => deleteEntry(entry)} activeOpacity={0.8}>
+                <TouchableOpacity
+                  key={entry.id}
+                  style={[s.entryRow, { borderBottomColor: theme.border }]}
+                  onPress={() => editEntry(entry)}
+                  onLongPress={() => deleteEntry(entry)}
+                  activeOpacity={0.7}
+                >
                   <View style={[s.entryIcon, { backgroundColor: `${cat.color}22` }]}>
                     <AppText style={{ fontSize: 18 }}>{cat.icon}</AppText>
                   </View>
                   <View style={{ flex: 1 }}>
                     <AppText style={[s.entryTitle, { color: theme.text }]}>{entry.title}</AppText>
                     <AppText style={[s.entryMeta, { color: theme.muted }]}>{entry.author_name} · {cat.label}</AppText>
+                    {entry.notes && <AppText style={[s.entryNotes, { color: theme.dim }]} numberOfLines={1}>{entry.notes}</AppText>}
                   </View>
-                  <AppText style={[s.entryAmount, { color: entry.entry_type === 'income' ? '#10b981' : '#e11d48' }]}>
-                    {entry.entry_type === 'income' ? '+' : '-'}${entry.amount.toFixed(2)}
-                  </AppText>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <AppText style={[s.entryAmount, { color: entry.entry_type === 'income' ? '#10b981' : '#e11d48' }]}>
+                      {entry.entry_type === 'income' ? '+' : '-'}${entry.amount.toFixed(2)}
+                    </AppText>
+                    <AppText style={[s.entryDate, { color: theme.dim }]}>{new Date(entry.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</AppText>
+                  </View>
                 </TouchableOpacity>
               );
             })}
@@ -280,7 +293,7 @@ export default function FamilyBudgetScreen({ navigation }) {
           <View style={s.addSheet}>
             <LinearGradient colors={['rgba(124,58,237,0.1)', '#0f172a']} style={StyleSheet.absoluteFill} />
             <View style={s.modalHandle} />
-            <AppText style={[s.modalTitle, { color: theme.text }]}>Add Entry</AppText>
+            <AppText style={[s.modalTitle, { color: theme.text }]}>{editingEntry ? 'Edit Entry' : 'Add Entry'}</AppText>
 
             <View style={s.typeToggle}>
               <TouchableOpacity style={[s.typeBtn, { borderColor: theme.border2 }, form.entry_type === 'expense' && s.typeBtnExpense]} onPress={() => set('entry_type', 'expense')}>
