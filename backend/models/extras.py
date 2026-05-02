@@ -561,3 +561,50 @@ class RecipeComment(db.Model):
             "text": self.text,
             "created_at": utc_iso(self.created_at)
         }
+
+
+class BudgetReaction(db.Model):
+    """Reactions to budget entries"""
+    __tablename__ = "budget_reactions"
+    id = db.Column(db.Integer, primary_key=True)
+    budget_id = db.Column(db.Integer, db.ForeignKey("family_budget.id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    reaction = db.Column(db.String(10), default="👍")  # emoji reaction
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    __table_args__ = (db.UniqueConstraint("budget_id", "user_id"),)
+
+    def to_dict(self):
+        from models.user import User
+        u = User.query.get(self.user_id)
+        return {
+            "id": self.id,
+            "budget_id": self.budget_id,
+            "user_id": self.user_id,
+            "user_name": u.name if u else None,
+            "user_avatar": u.avatar_url if u else None,
+            "reaction": self.reaction,
+            "created_at": utc_iso(self.created_at)
+        }
+
+
+class BudgetComment(db.Model):
+    """Comments on budget entries"""
+    __tablename__ = "budget_comments"
+    id = db.Column(db.Integer, primary_key=True)
+    budget_id = db.Column(db.Integer, db.ForeignKey("family_budget.id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    text = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        from models.user import User
+        u = User.query.get(self.user_id)
+        return {
+            "id": self.id,
+            "budget_id": self.budget_id,
+            "user_id": self.user_id,
+            "user_name": u.name if u else None,
+            "user_avatar": u.avatar_url if u else None,
+            "text": self.text,
+            "created_at": utc_iso(self.created_at)
+        }

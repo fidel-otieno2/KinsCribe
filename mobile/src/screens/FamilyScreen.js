@@ -65,7 +65,7 @@ function FamilyFeedTab({ navigation, myRole, familyId, familyName }) {
 
   const fetchStories = () => {
     Promise.all([
-      api.get('/stories/feed').catch(() => ({ data: { stories: [] } })),
+      familyId ? api.get(`/stories/feed?family_id=${familyId}`).catch(() => ({ data: { stories: [] } })) : Promise.resolve({ data: { stories: [] } }),
       api.get('/family/announcements').catch(() => ({ data: { announcements: [] } })),
       familyId ? api.get(`/pstories/family/${familyId}/moments`).catch(() => ({ data: { moments: [] } })) : Promise.resolve({ data: { moments: [] } }),
       familyId ? api.get(`/stories/family/${familyId}/highlights`).catch(() => ({ data: { stories: [] } })) : Promise.resolve({ data: { stories: [] } }),

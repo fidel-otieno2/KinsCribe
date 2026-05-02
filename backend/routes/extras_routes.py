@@ -383,7 +383,15 @@ def create_event():
 @extras_bp.route("/calendar/<int:event_id>", methods=["PUT"])
 @jwt_required()
 def update_event(event_id):
+    user = me()
     event = FamilyEvent.query.get_or_404(event_id)
+    
+    # Check if user is admin or creator
+    from models.family import FamilyMember
+    member = FamilyMember.query.filter_by(user_id=user.id, family_id=event.family_id).first()
+    if not member or (member.role != 'admin' and event.created_by != user.id):
+        return jsonify({"error": "Only admins or event creator can edit events"}), 403
+    
     data = request.get_json() or {}
     
     # Update fields
@@ -416,7 +424,15 @@ def update_event(event_id):
 @extras_bp.route("/calendar/<int:event_id>", methods=["DELETE"])
 @jwt_required()
 def delete_event(event_id):
+    user = me()
     event = FamilyEvent.query.get_or_404(event_id)
+    
+    # Check if user is admin or creator
+    from models.family import FamilyMember
+    member = FamilyMember.query.filter_by(user_id=user.id, family_id=event.family_id).first()
+    if not member or (member.role != 'admin' and event.created_by != user.id):
+        return jsonify({"error": "Only admins or event creator can delete events"}), 403
+    
     db.session.delete(event)
     db.session.commit()
     return jsonify({"message": "Deleted"})
@@ -609,9 +625,15 @@ def create_recipe():
 @extras_bp.route("/recipes/<int:recipe_id>", methods=["DELETE"])
 @jwt_required()
 def delete_recipe(recipe_id):
+    user = me()
     recipe = FamilyRecipe.query.get_or_404(recipe_id)
-    if recipe.user_id != int(get_jwt_identity()):
-        return jsonify({"error": "Not authorized"}), 403
+    
+    # Check if user is admin or creator
+    from models.family import FamilyMember
+    member = FamilyMember.query.filter_by(user_id=user.id, family_id=recipe.family_id).first()
+    if not member or (member.role != 'admin' and recipe.user_id != user.id):
+        return jsonify({"error": "Only admins or recipe creator can delete recipes"}), 403
+    
     db.session.delete(recipe)
     db.session.commit()
     return jsonify({"message": "Deleted"})
@@ -1014,7 +1036,15 @@ def add_budget_entry():
 @extras_bp.route("/budget/<int:entry_id>", methods=["PUT"])
 @jwt_required()
 def update_budget_entry(entry_id):
+    user = me()
     entry = FamilyBudget.query.get_or_404(entry_id)
+    
+    # Check if user is admin or creator
+    from models.family import FamilyMember
+    member = FamilyMember.query.filter_by(user_id=user.id, family_id=entry.family_id).first()
+    if not member or (member.role != 'admin' and entry.user_id != user.id):
+        return jsonify({"error": "Only admins or entry creator can edit budget entries"}), 403
+    
     data = request.get_json() or {}
     
     if "title" in data:
@@ -1046,7 +1076,15 @@ def update_budget_entry(entry_id):
 @extras_bp.route("/budget/<int:entry_id>", methods=["DELETE"])
 @jwt_required()
 def delete_budget_entry(entry_id):
+    user = me()
     entry = FamilyBudget.query.get_or_404(entry_id)
+    
+    # Check if user is admin or creator
+    from models.family import FamilyMember
+    member = FamilyMember.query.filter_by(user_id=user.id, family_id=entry.family_id).first()
+    if not member or (member.role != 'admin' and entry.user_id != user.id):
+        return jsonify({"error": "Only admins or entry creator can delete budget entries"}), 403
+    
     db.session.delete(entry)
     db.session.commit()
     return jsonify({"message": "Deleted"})
@@ -1230,7 +1268,15 @@ def set_budget_goal():
 @extras_bp.route("/budget/goals/<int:goal_id>", methods=["DELETE"])
 @jwt_required()
 def delete_budget_goal(goal_id):
+    user = me()
     goal = BudgetGoal.query.get_or_404(goal_id)
+    
+    # Check if user is admin
+    from models.family import FamilyMember
+    member = FamilyMember.query.filter_by(user_id=user.id, family_id=goal.family_id).first()
+    if not member or member.role != 'admin':
+        return jsonify({"error": "Only admins can delete budget goals"}), 403
+    
     db.session.delete(goal)
     db.session.commit()
     return jsonify({"message": "Deleted"})

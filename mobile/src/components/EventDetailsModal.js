@@ -20,7 +20,7 @@ const EVENT_TYPES = [
   { key: 'meeting', label: '👥 Meeting', color: '#8b5cf6' },
 ];
 
-export default function EventDetailsModal({ visible, onClose, event, onDelete, onEdit, theme }) {
+export default function EventDetailsModal({ visible, onClose, event, onDelete, onEdit, theme, currentUser }) {
   const [reactions, setReactions] = useState([]);
   const [comments, setComments] = useState([]);
   const [commentText, setCommentText] = useState('');
@@ -265,30 +265,32 @@ export default function EventDetailsModal({ visible, onClose, event, onDelete, o
             </ScrollView>
             
             {/* Actions */}
-            <View style={[s.detailsActions, { borderTopColor: theme.border }]}>
-              <View style={{ flexDirection: 'row', gap: 10 }}>
-                <TouchableOpacity 
-                  style={[s.actionBtn, { flex: 1, backgroundColor: 'rgba(124,58,237,0.1)' }]}
-                  onPress={() => {
-                    onClose();
-                    onEdit(event);
-                  }}
-                >
-                  <Ionicons name="create-outline" size={20} color={colors.primary} />
-                  <AppText style={[s.actionBtnText, { color: colors.primary }]}>Edit</AppText>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[s.actionBtn, { flex: 1, backgroundColor: 'rgba(239,68,68,0.1)' }]}
-                  onPress={() => {
-                    onClose();
-                    onDelete(event);
-                  }}
-                >
-                  <Ionicons name="trash-outline" size={20} color="#ef4444" />
-                  <AppText style={[s.actionBtnText, { color: '#ef4444' }]}>Delete</AppText>
-                </TouchableOpacity>
+            {currentUser && (currentUser.role === 'admin' || event.created_by === currentUser.id) && (
+              <View style={[s.detailsActions, { borderTopColor: theme.border }]}>
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <TouchableOpacity 
+                    style={[s.actionBtn, { flex: 1, backgroundColor: 'rgba(124,58,237,0.1)' }]}
+                    onPress={() => {
+                      onClose();
+                      onEdit(event);
+                    }}
+                  >
+                    <Ionicons name="create-outline" size={20} color={colors.primary} />
+                    <AppText style={[s.actionBtnText, { color: colors.primary }]}>Edit</AppText>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[s.actionBtn, { flex: 1, backgroundColor: 'rgba(239,68,68,0.1)' }]}
+                    onPress={() => {
+                      onClose();
+                      onDelete(event);
+                    }}
+                  >
+                    <Ionicons name="trash-outline" size={20} color="#ef4444" />
+                    <AppText style={[s.actionBtnText, { color: '#ef4444' }]}>Delete</AppText>
+                  </TouchableOpacity>
+                </View>
               </View>
-            </View>
+            )}
           </TouchableOpacity>
         </BlurView>
       </TouchableOpacity>

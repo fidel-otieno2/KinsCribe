@@ -320,6 +320,35 @@ def _get_all_notifications(user):
     except Exception:
         pass
 
+    # ── 11. Budget notifications ───────────────────────
+    try:
+        from models.notifications import Notification as NotificationModel
+        budget_notifs = NotificationModel.query.filter(
+            NotificationModel.user_id == user.id,
+            NotificationModel.type.in_(['budget_entry', 'budget_reaction', 'budget_comment'])
+        ).order_by(NotificationModel.created_at.desc()).limit(20).all()
+        
+        for notif in budget_notifs:
+            data = json.loads(notif.data) if notif.data else {}
+            notifs.append({
+                "id": f"budget_notif-{notif.id}",
+                "type": notif.type,
+                "source": "budget",
+                "actor_name": notif.from_user.name if notif.from_user else "Someone",
+                "actor_avatar": notif.from_user.avatar_url if notif.from_user else None,
+                "actor_id": notif.from_user_id,
+                "title": notif.title,
+                "body": notif.message,
+                "budget_id": data.get("budget_id"),
+                "family_id": data.get("family_id"),
+                "entry_type": data.get("entry_type"),
+                "amount": data.get("amount"),
+                "category": data.get("category"),
+                "created_at": notif.created_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            })
+    except Exception:
+        pass
+
     notifs.sort(key=lambda x: x["created_at"], reverse=True)
     return notifs[:60]
 

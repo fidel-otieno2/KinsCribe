@@ -107,6 +107,9 @@ def create_story():
     # Parse story date
     parsed_date = _parse_story_date(data.get("story_date"))
 
+    # Get target family ID from request
+    target_family_id = data.get("family_id", type=int) if hasattr(data, 'get') else None
+    
     # Validate family membership - only if family_id is provided
     final_family_id = None
     if target_family_id:
@@ -160,19 +163,31 @@ def family_stories():
     user = current_user()
     if not user:
         return jsonify({"error": "User not found"}), 404
-    if not user.family_id:
-        return jsonify({"stories": []}), 200  # Return empty list instead of error
-    # Support filtering by a specific family_id (must be a member)
-    family_id = request.args.get('family_id', user.family_id, type=int)
+    
+    # Get family_id from query parameter - REQUIRED
+    family_id = request.args.get('family_id', type=int)
+    
+    if not family_id:
+        # If no family_id specified, use user's primary family
+        if not user.family_id:
+            return jsonify({"stories": []}), 200
+        family_id = user.family_id
+    
+    # Verify user is a member of the requested family
     from models.family import FamilyMember
-    if family_id != user.family_id:
-        membership = FamilyMember.query.filter_by(user_id=user.id, family_id=family_id).first()
-        if not membership:
-            return jsonify({"error": "Access denied"}), 403
+    is_member = (family_id == user.family_id) or bool(
+        FamilyMember.query.filter_by(user_id=user.id, family_id=family_id).first()
+    )
+    
+    if not is_member:
+        return jsonify({"error": "Access denied - not a member of this family"}), 403
+    
     limit = request.args.get('limit', 50, type=int)
-    # Exclude archived stories by default
+    
+    # CRITICAL: Only return stories from THIS specific family
     stories = Story.query.filter_by(family_id=family_id, is_archived=False)\
         .order_by(Story.created_at.desc()).limit(limit).all()
+    
     return jsonify({"stories": [s.to_dict() for s in stories]})
 
 
@@ -182,38 +197,51 @@ def family_feed():
     user = current_user()
     if not user:
         return jsonify({"error": "User not found"}), 404
-    if not user.family_id:
-        # Show user's own stories if they're not in a family
-        stories = Story.query.filter_by(user_id=user.id, is_archived=False)\
-            .order_by(Story.created_at.desc()).limit(100).all()
-        user_liked = {l.story_id for l in Like.query.filter_by(user_id=user.id).all()}
-        user_saved = {s.story_id for s in SavedStory.query.filter_by(user_id=user.id).all()}
-        result = []
-        for s in stories:
-            d = s.to_dict()
-            d["liked_by_me"] = s.id in user_liked
-            d["saved_by_me"] = s.id in user_saved
-            result.append(d)
-        return jsonify({"stories": result})
-    # Show stories from ALL families the user belongs to
+    
+    # CRITICAL FIX: Get specific family_id from query parameter
+    # This ensures we ONLY show stories from the family being viewed
+    family_id = request.args.get('family_id', type=int)
+    
+    if not family_id:
+        # If no family_id specified, use user's primary family
+        if not user.family_id:
+            # Show user's own stories if they're not in a family
+            stories = Story.query.filter_by(user_id=user.id, is_archived=False)\
+                .order_by(Story.created_at.desc()).limit(100).all()
+            user_liked = {l.story_id for l in Like.query.filter_by(user_id=user.id).all()}
+            user_saved = {s.story_id for s in SavedStory.query.filter_by(user_id=user.id).all()}
+            result = []
+            for s in stories:
+                d = s.to_dict()
+                d["liked_by_me"] = s.id in user_liked
+                d["saved_by_me"] = s.id in user_saved
+                result.append(d)
+            return jsonify({"stories": result})
+        family_id = user.family_id
+    
+    # Verify user is a member of the requested family
     from models.family import FamilyMember
-    memberships = FamilyMember.query.filter_by(user_id=user.id).all()
-    family_ids = [fm.family_id for fm in memberships]
-    if user.family_id and user.family_id not in family_ids:
-        family_ids.append(user.family_id)
-    # Exclude archived stories from feed
-    stories = Story.query.filter(
-        Story.family_id.in_(family_ids),
-        Story.is_archived == False
-    ).order_by(Story.created_at.desc()).limit(100).all()
+    is_member = (family_id == user.family_id) or bool(
+        FamilyMember.query.filter_by(user_id=user.id, family_id=family_id).first()
+    )
+    
+    if not is_member:
+        return jsonify({"error": "Access denied - not a member of this family"}), 403
+    
+    # CRITICAL: Only show stories from THIS specific family
+    stories = Story.query.filter_by(family_id=family_id, is_archived=False)\
+        .order_by(Story.created_at.desc()).limit(100).all()
+    
     user_liked = {l.story_id for l in Like.query.filter_by(user_id=user.id).all()}
     user_saved = {s.story_id for s in SavedStory.query.filter_by(user_id=user.id).all()}
+    
     result = []
     for s in stories:
         d = s.to_dict()
         d["liked_by_me"] = s.id in user_liked
         d["saved_by_me"] = s.id in user_saved
         result.append(d)
+    
     return jsonify({"stories": result})
 
 

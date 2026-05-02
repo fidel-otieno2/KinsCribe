@@ -10,6 +10,7 @@ import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../api/axios';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../i18n';
 import { colors, radius } from '../theme';
 import Toast from '../components/Toast';
@@ -294,6 +295,7 @@ export default function FamilyCalendarScreen({ navigation, route }) {
   const { theme, isDark } = useTheme();
   const { t } = useTranslation();
   const { toast, hide, success, error } = useToast();
+  const { user } = useAuth();
   const { eventId } = route.params || {};
   const today = new Date();
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
@@ -307,17 +309,23 @@ export default function FamilyCalendarScreen({ navigation, route }) {
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [showEventDetails, setShowEventDetails] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
+  const [userRole, setUserRole] = useState(null);
 
   const fetchEvents = useCallback(async () => {
     try {
-      const [eventsRes, onThisDayRes, upcomingRes] = await Promise.all([
+      const [eventsRes, onThisDayRes, upcomingRes, memberRes] = await Promise.all([
         api.get(`/extras/calendar?month=${currentMonth + 1}&year=${currentYear}`),
         api.get('/extras/on-this-day'),
         api.get('/extras/calendar/upcoming'),
+        api.get('/family/members'),
       ]);
       setEvents(eventsRes.data.events || []);
       setOnThisDay(onThisDayRes.data.stories || []);
       setUpcoming(upcomingRes.data.events || []);
+      
+      // Get current user's role
+      const currentMember = memberRes.data.members?.find(m => m.user_id === user?.id);
+      setUserRole(currentMember?.role || 'member');
       
       // If eventId provided from notification, open that event
       if (eventId) {
@@ -328,7 +336,7 @@ export default function FamilyCalendarScreen({ navigation, route }) {
         }
       }
     } catch {} finally { setLoading(false); }
-  }, [currentMonth, currentYear, eventId]);
+  }, [currentMonth, currentYear, eventId, user]);
 
   useEffect(() => { fetchEvents(); }, [fetchEvents]);
 
@@ -561,6 +569,7 @@ export default function FamilyCalendarScreen({ navigation, route }) {
           setShowAdd(true);
         }}
         theme={theme}
+        currentUser={{ id: user?.id, role: userRole }}
       />
     </View>
   );
