@@ -1,1 +1,1 @@
-web: python migrate.py && gunicorn app:app --timeout 120 --workers 1 --max-requests 1000
+web: python migrate.py && python migrate_recipe_interactions.py && gunicorn app:app --timeout 120 --workers 1 --max-requests 1000
