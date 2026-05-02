@@ -76,6 +76,10 @@ export default function FamilyRecipesScreen({ navigation }) {
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState([]);
   const [commentText, setCommentText] = useState('');
+  const [showShare, setShowShare] = useState(false);
+  const [shareUsers, setShareUsers] = useState([]);
+  const [selectedUsers, setSelectedUsers] = useState([]);
+  const [shareMessage, setShareMessage] = useState('');
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -171,6 +175,50 @@ export default function FamilyRecipesScreen({ navigation }) {
     }
   }, [selected, showComments]);
 
+  const loadShareUsers = async () => {
+    try {
+      const [familyRes, connectionsRes] = await Promise.all([
+        api.get('/family/members'),
+        api.get('/connections/list')
+      ]);
+      const family = (familyRes.data.members || []).map(m => ({ ...m, type: 'family' }));
+      const connections = (connectionsRes.data.connections || []).map(c => ({ ...c, type: 'connection' }));
+      setShareUsers([...family, ...connections]);
+    } catch {}
+  };
+
+  const handleShare = async () => {
+    if (selectedUsers.length === 0) return info('Select at least one person to share with');
+    try {
+      await api.post(`/extras/recipes/${selected.id}/share`, {
+        share_type: 'user',
+        user_ids: selectedUsers,
+        message: shareMessage || `Check out this recipe: ${selected.title}`
+      });
+      success('Recipe shared successfully!');
+      setShowShare(false);
+      setSelectedUsers([]);
+      setShareMessage('');
+    } catch (err) {
+      error(err.response?.data?.error || 'Failed to share recipe');
+    }
+  };
+
+  const shareToFeed = async () => {
+    try {
+      await api.post(`/extras/recipes/${selected.id}/share`, {
+        share_type: 'feed',
+        message: shareMessage || `Check out this delicious recipe: ${selected.title}`,
+        privacy: 'public'
+      });
+      success('Recipe shared to your feed!');
+      setShowShare(false);
+      setShareMessage('');
+    } catch (err) {
+      error(err.response?.data?.error || 'Failed to share recipe');
+    }
+  };
+
   if (selected) {
     return (
       <View style={[s.container, { backgroundColor: theme.bg }]}>
@@ -196,6 +244,10 @@ export default function FamilyRecipesScreen({ navigation }) {
             <TouchableOpacity style={s.reactionBtn} onPress={() => setShowComments(true)}>
               <Ionicons name="chatbubble-outline" size={20} color={theme.text} />
               <AppText style={[s.reactionText, { color: theme.text }]}>{selected.comment_count || 0}</AppText>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.reactionBtn} onPress={() => { loadShareUsers(); setShowShare(true); }}>
+              <Ionicons name="share-outline" size={20} color={theme.text} />
+              <AppText style={[s.reactionText, { color: theme.text }]}>Share</AppText>
             </TouchableOpacity>
           </View>
           
@@ -254,6 +306,76 @@ export default function FamilyRecipesScreen({ navigation }) {
                   <Ionicons name="send" size={22} color={commentText.trim() ? theme.primary : theme.dim} />
                 </TouchableOpacity>
               </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Share Modal */}
+        <Modal visible={showShare} transparent animationType="slide" onRequestClose={() => setShowShare(false)}>
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' }}>
+            <View style={[s.shareSheet, { backgroundColor: theme.bgCard }]}>
+              <View style={s.modalHandle} />
+              <AppText style={[s.modalTitle, { color: theme.text }]}>Share Recipe</AppText>
+              
+              {/* Share to Feed Button */}
+              <TouchableOpacity style={s.shareToFeedBtn} onPress={shareToFeed}>
+                <LinearGradient colors={['#7c3aed', '#3b82f6']} style={s.shareToFeedGrad}>
+                  <Ionicons name="globe-outline" size={20} color="#fff" />
+                  <AppText style={s.shareToFeedText}>Share to My Feed</AppText>
+                </LinearGradient>
+              </TouchableOpacity>
+
+              <View style={s.divider}>
+                <View style={[s.dividerLine, { backgroundColor: theme.border }]} />
+                <AppText style={[s.dividerText, { color: theme.muted }]}>or share with</AppText>
+                <View style={[s.dividerLine, { backgroundColor: theme.border }]} />
+              </View>
+
+              {/* Optional message */}
+              <TextInput
+                style={[s.shareMessageInput, { backgroundColor: theme.bgSecondary, color: theme.text, borderColor: theme.border2 }]}
+                placeholder="Add a message (optional)"
+                placeholderTextColor={theme.dim}
+                value={shareMessage}
+                onChangeText={setShareMessage}
+                multiline
+              />
+
+              {/* User list */}
+              <ScrollView style={{ maxHeight: 300 }} showsVerticalScrollIndicator={false}>
+                {shareUsers.map(u => (
+                  <TouchableOpacity
+                    key={u.id}
+                    style={[s.shareUserRow, selectedUsers.includes(u.id) && { backgroundColor: 'rgba(124,58,237,0.1)' }]}
+                    onPress={() => {
+                      setSelectedUsers(prev => 
+                        prev.includes(u.id) ? prev.filter(id => id !== u.id) : [...prev, u.id]
+                      );
+                    }}
+                  >
+                    <View style={[s.shareUserAvatar, { backgroundColor: theme.primary }]}>
+                      {u.avatar_url ? <Image source={{ uri: u.avatar_url }} style={{ width: 40, height: 40, borderRadius: 20 }} /> : <AppText style={{ color: '#fff', fontWeight: '700' }}>{u.name?.[0]}</AppText>}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <AppText style={[s.shareUserName, { color: theme.text }]}>{u.name}</AppText>
+                      <AppText style={[s.shareUserType, { color: theme.muted }]}>{u.type === 'family' ? 'Family' : 'Connection'}</AppText>
+                    </View>
+                    <View style={[s.checkbox, selectedUsers.includes(u.id) && s.checkboxActive]}>
+                      {selectedUsers.includes(u.id) && <Ionicons name="checkmark" size={16} color="#fff" />}
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              <TouchableOpacity style={s.shareBtn} onPress={handleShare} disabled={selectedUsers.length === 0}>
+                <LinearGradient colors={selectedUsers.length > 0 ? ['#7c3aed', '#3b82f6'] : ['#64748b', '#475569']} style={s.shareBtnGrad}>
+                  <AppText style={s.shareBtnText}>Share with {selectedUsers.length} {selectedUsers.length === 1 ? 'person' : 'people'}</AppText>
+                </LinearGradient>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={{ alignItems: 'center', paddingVertical: 12 }} onPress={() => setShowShare(false)}>
+                <AppText style={{ color: theme.muted }}>{t('cancel')}</AppText>
+              </TouchableOpacity>
             </View>
           </View>
         </Modal>
@@ -380,4 +502,21 @@ const s = StyleSheet.create({
   commentText: { fontSize: 13, lineHeight: 18 },
   commentInputRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 16, paddingTop: 16, borderTopWidth: 0.5, borderColor: colors.border },
   commentInput: { flex: 1, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20, fontSize: 14 },
+  shareSheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 40, maxHeight: '85%' },
+  shareToFeedBtn: { borderRadius: radius.md, overflow: 'hidden', marginBottom: 16 },
+  shareToFeedGrad: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14 },
+  shareToFeedText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  divider: { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 16 },
+  dividerLine: { flex: 1, height: 0.5, backgroundColor: colors.border },
+  dividerText: { fontSize: 12, color: colors.muted, textTransform: 'uppercase', fontWeight: '600' },
+  shareMessageInput: { backgroundColor: 'rgba(30,41,59,0.9)', borderWidth: 1, borderColor: colors.border2, borderRadius: radius.md, padding: 12, color: colors.text, fontSize: 14, marginBottom: 16, minHeight: 60, textAlignVertical: 'top' },
+  shareUserRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, paddingHorizontal: 4, borderRadius: radius.md, marginBottom: 8 },
+  shareUserAvatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  shareUserName: { fontSize: 14, fontWeight: '700', color: colors.text },
+  shareUserType: { fontSize: 11, color: colors.muted },
+  checkbox: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: colors.border2, alignItems: 'center', justifyContent: 'center' },
+  checkboxActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  shareBtn: { borderRadius: radius.md, overflow: 'hidden', marginTop: 16 },
+  shareBtnGrad: { paddingVertical: 14, alignItems: 'center' },
+  shareBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
 });

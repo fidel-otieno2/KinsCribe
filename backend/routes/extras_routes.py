@@ -731,6 +731,105 @@ def get_recipe_comments(recipe_id):
     return jsonify({"comments": [c.to_dict() for c in comments]})
 
 
+@extras_bp.route("/recipes/<int:recipe_id>/share", methods=["POST"])
+@jwt_required()
+def share_recipe(recipe_id):
+    """Share recipe with specific users or to feed"""
+    from models.social import Message, Conversation, ConversationParticipant
+    from models.notifications import Notification
+    user = me()
+    recipe = FamilyRecipe.query.get_or_404(recipe_id)
+    data = request.get_json() or {}
+    
+    share_type = data.get("share_type", "user")  # user | feed
+    user_ids = data.get("user_ids", [])  # List of user IDs to share with
+    message_text = data.get("message", f"Check out this recipe: {recipe.title}")
+    
+    shared_with = []
+    
+    if share_type == "user" and user_ids:
+        # Share via direct message
+        for target_user_id in user_ids:
+            target_user = User.query.get(target_user_id)
+            if not target_user:
+                continue
+            
+            # Find or create conversation
+            conv = Conversation.query.filter(
+                Conversation.type == "direct",
+                Conversation.id.in_(
+                    db.session.query(ConversationParticipant.conversation_id)
+                    .filter(ConversationParticipant.user_id == user.id)
+                )
+            ).filter(
+                Conversation.id.in_(
+                    db.session.query(ConversationParticipant.conversation_id)
+                    .filter(ConversationParticipant.user_id == target_user_id)
+                )
+            ).first()
+            
+            if not conv:
+                # Create new conversation
+                conv = Conversation(type="direct")
+                db.session.add(conv)
+                db.session.flush()
+                db.session.add(ConversationParticipant(conversation_id=conv.id, user_id=user.id))
+                db.session.add(ConversationParticipant(conversation_id=conv.id, user_id=target_user_id))
+            
+            # Send message with recipe
+            msg = Message(
+                conversation_id=conv.id,
+                sender_id=user.id,
+                text=message_text,
+                media_type="recipe",
+                media_url=recipe.image_url,
+                metadata=json.dumps({
+                    "recipe_id": recipe.id,
+                    "recipe_title": recipe.title,
+                    "recipe_image": recipe.image_url
+                })
+            )
+            db.session.add(msg)
+            
+            # Send notification
+            notif = Notification(
+                user_id=target_user_id,
+                type="recipe_share",
+                title=f"{user.name} shared a recipe",
+                message=recipe.title,
+                data=json.dumps({"recipe_id": recipe.id, "shared_by": user.id}),
+                action_url=f"/family/recipes/{recipe.id}"
+            )
+            db.session.add(notif)
+            shared_with.append({"user_id": target_user_id, "name": target_user.name})
+    
+    elif share_type == "feed":
+        # Share to personal feed as a post
+        from models.social import Post
+        post = Post(
+            user_id=user.id,
+            caption=f"🍽️ {message_text}",
+            media_url=recipe.image_url,
+            media_type="image" if recipe.image_url else "text",
+            privacy=data.get("privacy", "public"),
+            metadata=json.dumps({
+                "type": "recipe_share",
+                "recipe_id": recipe.id,
+                "recipe_title": recipe.title
+            })
+        )
+        db.session.add(post)
+        shared_with.append({"type": "feed", "post_id": post.id})
+    
+    db.session.commit()
+    
+    return jsonify({
+        "message": "Recipe shared successfully",
+        "shared_with": shared_with,
+        "share_count": len(shared_with)
+    }), 201
+
+
 # ── Family Tasks ──────────────────────────────────────────────
 
 @extras_bp.route("/tasks", methods=["GET"])
