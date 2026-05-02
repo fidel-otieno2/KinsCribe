@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
   View, FlatList, TouchableOpacity, StyleSheet,
-  Image, ActivityIndicator, StatusBar, TextInput, ScrollView, Dimensions,
+  Image, ActivityIndicator, StatusBar, TextInput, ScrollView, Dimensions, RefreshControl,
 } from "react-native";
 import AppText from '../components/AppText';
 import { Video, ResizeMode } from 'expo-av';
@@ -75,12 +75,23 @@ export default function SearchScreen({ navigation }) {
   const [exploreFilter, setExploreFilter] = useState('recent'); // recent|trending|popular
   const [trendingHashtags, setTrendingHashtags] = useState([]);
   const [hashtagQuery, setHashtagQuery] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
 
   useFocusEffect(useCallback(() => {
     fetchSuggestions();
     fetchExplorePosts();
     fetchTrending();
   }, [exploreFilter]));
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await Promise.all([
+      fetchSuggestions(),
+      fetchExplorePosts(),
+      fetchTrending()
+    ]);
+    setRefreshing(false);
+  }, [exploreFilter]);
 
   const fetchTrending = async () => {
     try {
@@ -160,7 +171,18 @@ export default function SearchScreen({ navigation }) {
         ) : null}
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+      <ScrollView 
+        showsVerticalScrollIndicator={false} 
+        contentContainerStyle={{ paddingBottom: 100 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={theme.primary}
+            colors={[theme.primary]}
+          />
+        }
+      >
         {query ? (
           // Search results
           <View style={s.section}>

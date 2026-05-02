@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   View, FlatList, TouchableOpacity, StyleSheet,
   TextInput, KeyboardAvoidingView, Platform, Image,
-  ActivityIndicator, StatusBar, Alert, Animated, ScrollView, Clipboard, Modal, Pressable,
+  ActivityIndicator, StatusBar, Alert, Animated, ScrollView, Clipboard, Modal, Pressable, Dimensions,
 } from "react-native";
 import AppText from '../components/AppText';
 import MessageBubble from '../components/MessageBubble';
@@ -18,6 +18,8 @@ import { Audio } from "expo-av";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
 import { colors, radius } from "../theme";
+
+const { width } = Dimensions.get('window');
 
 function timeStr(dateStr) {
   if (!dateStr) return '';
@@ -109,6 +111,7 @@ export default function ChatScreen({ route, navigation }) {
   const [convId, setConvId] = useState(initialConvId);
   const [messages, setMessages] = useState([]);
   const [pinnedMsg, setPinnedMsg] = useState(null);
+  const [familyData, setFamilyData] = useState(null);
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -126,6 +129,7 @@ export default function ChatScreen({ route, navigation }) {
   const [mediaComposer, setMediaComposer] = useState(null); // { uri, type }
   const [inputFocused, setInputFocused] = useState(false);
   const [showOptions, setShowOptions] = useState(false);
+  const [showFamilyInfo, setShowFamilyInfo] = useState(false);
   const [showMuteOptions, setMuteOptions] = useState(false);
   const [showBlockModal, setShowBlockModal] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
@@ -209,6 +213,15 @@ export default function ChatScreen({ route, navigation }) {
       .then(({ data }) => setParticipants(data.participants || []))
       .catch(() => {});
   }, [convId]);
+
+  // Load family data if family chat
+  useEffect(() => {
+    if (type === 'family') {
+      api.get('/family/my-family')
+        .then(({ data }) => setFamilyData(data.family))
+        .catch(() => {});
+    }
+  }, [type]);
 
   useEffect(() => {
     fetchMessages();
@@ -729,9 +742,13 @@ export default function ChatScreen({ route, navigation }) {
         </TouchableOpacity>
 
         {type === "family" ? (
-          <LinearGradient colors={["#7c3aed", "#3b82f6"]} style={cs.headerAvatar}>
-            <Ionicons name="people" size={20} color="#fff" />
-          </LinearGradient>
+          familyData?.avatar_url ? (
+            <Image source={{ uri: familyData.avatar_url }} style={cs.headerAvatar} />
+          ) : (
+            <LinearGradient colors={["#7c3aed", "#3b82f6"]} style={cs.headerAvatar}>
+              <Ionicons name="people" size={20} color="#fff" />
+            </LinearGradient>
+          )
         ) : (
           <Avatar uri={avatar} name={title} size={38} />
         )}
@@ -740,7 +757,9 @@ export default function ChatScreen({ route, navigation }) {
           style={cs.headerInfo}
           onPress={() => otherUserId && navigation.navigate("UserProfile", { userId: otherUserId, userName: title })}
         >
-          <AppText style={cs.headerTitle}>{title}</AppText>
+          <AppText style={cs.headerTitle}>
+            {type === "family" && familyData?.name ? `${familyData.name} Chat` : title}
+          </AppText>
           <AppText style={cs.headerSub}>
             {type === "family" ? t('family_group') :
               otherStatus?.status === "online" ? "🟢 Online" :
@@ -750,17 +769,35 @@ export default function ChatScreen({ route, navigation }) {
 
         {type === "family" && (
           <>
-            <TouchableOpacity onPress={() => navigation.navigate('Family')} style={{ padding: 4 }}>
-              <Ionicons name="information-circle-outline" size={24} color={colors.muted} />
+            <TouchableOpacity 
+              onPress={async () => {
+                try {
+                  const recentMsgs = messages.slice(-30).map(m => ({ sender_name: m.sender_name, text: m.text, media_url: m.media_url }));
+                  const { data } = await api.post('/ai/family-summary', { messages: recentMsgs });
+                  Alert.alert('💬 Family Chat Summary', data.summary || 'No summary available');
+                } catch { Alert.alert('Error', 'Failed to generate summary'); }
+              }} 
+              style={cs.summaryBtn}
+              activeOpacity={0.7}
+            >
+              <LinearGradient 
+                colors={['rgba(245,158,11,0.2)', 'rgba(251,191,36,0.15)']} 
+                style={cs.summaryBtnGrad}
+              >
+                <Ionicons name="sparkles" size={20} color="#fbbf24" />
+              </LinearGradient>
             </TouchableOpacity>
-            <TouchableOpacity onPress={async () => {
-              try {
-                const recentMsgs = messages.slice(-30).map(m => ({ sender_name: m.sender_name, text: m.text, media_url: m.media_url }));
-                const { data } = await api.post('/ai/family-summary', { messages: recentMsgs });
-                Alert.alert('💬 Family Chat Summary', data.summary || 'No summary available');
-              } catch { Alert.alert('Error', 'Failed to generate summary'); }
-            }} style={{ padding: 4 }}>
-              <Ionicons name="sparkles-outline" size={22} color="#f59e0b" />
+            <TouchableOpacity 
+              onPress={() => setShowFamilyInfo(true)} 
+              style={cs.familyInfoBtn}
+              activeOpacity={0.7}
+            >
+              <LinearGradient 
+                colors={['rgba(59,130,246,0.2)', 'rgba(124,58,237,0.15)']} 
+                style={cs.familyInfoBtnGrad}
+              >
+                <Ionicons name="information-circle" size={20} color="#60a5fa" />
+              </LinearGradient>
             </TouchableOpacity>
             <TouchableOpacity
               style={cs.headerIconBtn}
@@ -1531,6 +1568,184 @@ export default function ChatScreen({ route, navigation }) {
         </Pressable>
       </Modal>
 
+      {/* Family Info Modal */}
+      <Modal visible={showFamilyInfo} transparent animationType="slide" onRequestClose={() => setShowFamilyInfo(false)}>
+        <Pressable style={cs.familyInfoOverlay} onPress={() => setShowFamilyInfo(false)}>
+          <Pressable style={cs.familyInfoSheet}>
+            <View style={cs.familyInfoHandle} />
+            
+            {/* Header */}
+            <View style={cs.familyInfoHeader}>
+              <View style={cs.familyInfoHeaderLeft}>
+                {familyData?.avatar_url ? (
+                  <Image source={{ uri: familyData.avatar_url }} style={cs.familyInfoAvatar} />
+                ) : (
+                  <LinearGradient colors={['#7c3aed', '#3b82f6']} style={cs.familyInfoAvatar}>
+                    <Ionicons name="people" size={28} color="#fff" />
+                  </LinearGradient>
+                )}
+                <View style={{ flex: 1 }}>
+                  <AppText style={cs.familyInfoTitle}>{familyData?.name || 'Family'}</AppText>
+                  {familyData?.motto && (
+                    <View style={cs.familyMottoRow}>
+                      <Ionicons name="sparkles" size={10} color="#a78bfa" />
+                      <AppText style={cs.familyMottoText} numberOfLines={1}>"{familyData.motto}"</AppText>
+                    </View>
+                  )}
+                </View>
+              </View>
+              <TouchableOpacity onPress={() => setShowFamilyInfo(false)} style={cs.familyInfoClose}>
+                <Ionicons name="close" size={22} color={colors.muted} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={cs.familyInfoBody}>
+              {/* Description */}
+              {familyData?.description && (
+                <View style={cs.familyInfoSection}>
+                  <View style={cs.familyInfoSectionHeader}>
+                    <Ionicons name="document-text" size={16} color="#3b82f6" />
+                    <AppText style={cs.familyInfoSectionTitle}>About</AppText>
+                  </View>
+                  <AppText style={cs.familyInfoDescription}>{familyData.description}</AppText>
+                </View>
+              )}
+
+              {/* Stats */}
+              <View style={cs.familyStatsRow}>
+                <View style={cs.familyStatCard}>
+                  <LinearGradient colors={['rgba(124,58,237,0.15)', 'rgba(59,130,246,0.1)']} style={StyleSheet.absoluteFill} />
+                  <Ionicons name="people" size={24} color="#7c3aed" />
+                  <AppText style={cs.familyStatValue}>{familyData?.member_count || 0}</AppText>
+                  <AppText style={cs.familyStatLabel}>Members</AppText>
+                </View>
+                <View style={cs.familyStatCard}>
+                  <LinearGradient colors={['rgba(236,72,153,0.15)', 'rgba(124,58,237,0.1)']} style={StyleSheet.absoluteFill} />
+                  <Ionicons name="calendar" size={24} color="#ec4899" />
+                  <AppText style={cs.familyStatValue}>
+                    {familyData?.created_at ? new Date(familyData.created_at).getFullYear() : '—'}
+                  </AppText>
+                  <AppText style={cs.familyStatLabel}>Since</AppText>
+                </View>
+                <View style={cs.familyStatCard}>
+                  <LinearGradient colors={['rgba(16,185,129,0.15)', 'rgba(59,130,246,0.1)']} style={StyleSheet.absoluteFill} />
+                  <Ionicons name="shield-checkmark" size={24} color="#10b981" />
+                  <AppText style={cs.familyStatValue}>{familyData?.privacy || 'Private'}</AppText>
+                  <AppText style={cs.familyStatLabel}>Privacy</AppText>
+                </View>
+              </View>
+
+              {/* Quick Actions */}
+              <View style={cs.familyInfoSection}>
+                <View style={cs.familyInfoSectionHeader}>
+                  <Ionicons name="flash" size={16} color="#f59e0b" />
+                  <AppText style={cs.familyInfoSectionTitle}>Quick Actions</AppText>
+                </View>
+                <View style={cs.familyActionsGrid}>
+                  <TouchableOpacity 
+                    style={cs.familyActionBtn}
+                    onPress={() => {
+                      setShowFamilyInfo(false);
+                      navigation.navigate('FamilyTree');
+                    }}
+                  >
+                    <View style={[cs.familyActionIcon, { backgroundColor: 'rgba(124,58,237,0.12)' }]}>
+                      <Ionicons name="git-network" size={20} color="#7c3aed" />
+                    </View>
+                    <AppText style={cs.familyActionLabel}>Family Tree</AppText>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity 
+                    style={cs.familyActionBtn}
+                    onPress={() => {
+                      setShowFamilyInfo(false);
+                      navigation.navigate('FamilyCalendar');
+                    }}
+                  >
+                    <View style={[cs.familyActionIcon, { backgroundColor: 'rgba(59,130,246,0.12)' }]}>
+                      <Ionicons name="calendar" size={20} color="#3b82f6" />
+                    </View>
+                    <AppText style={cs.familyActionLabel}>Calendar</AppText>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity 
+                    style={cs.familyActionBtn}
+                    onPress={() => {
+                      setShowFamilyInfo(false);
+                      navigation.navigate('FamilyMoments', { familyId: familyData?.id, familyName: familyData?.name });
+                    }}
+                  >
+                    <View style={[cs.familyActionIcon, { backgroundColor: 'rgba(236,72,153,0.12)' }]}>
+                      <Ionicons name="sparkles" size={20} color="#ec4899" />
+                    </View>
+                    <AppText style={cs.familyActionLabel}>Moments</AppText>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity 
+                    style={cs.familyActionBtn}
+                    onPress={() => {
+                      setShowFamilyInfo(false);
+                      navigation.navigate('FamilyRecipes');
+                    }}
+                  >
+                    <View style={[cs.familyActionIcon, { backgroundColor: 'rgba(245,158,11,0.12)' }]}>
+                      <Ionicons name="restaurant" size={20} color="#f59e0b" />
+                    </View>
+                    <AppText style={cs.familyActionLabel}>Recipes</AppText>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity 
+                    style={cs.familyActionBtn}
+                    onPress={() => {
+                      setShowFamilyInfo(false);
+                      navigation.navigate('FamilyBudget');
+                    }}
+                  >
+                    <View style={[cs.familyActionIcon, { backgroundColor: 'rgba(16,185,129,0.12)' }]}>
+                      <Ionicons name="wallet" size={20} color="#10b981" />
+                    </View>
+                    <AppText style={cs.familyActionLabel}>Budget</AppText>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity 
+                    style={cs.familyActionBtn}
+                    onPress={() => {
+                      setShowFamilyInfo(false);
+                      navigation.navigate('Storybooks');
+                    }}
+                  >
+                    <View style={[cs.familyActionIcon, { backgroundColor: 'rgba(236,72,153,0.12)' }]}>
+                      <Ionicons name="book" size={20} color="#ec4899" />
+                    </View>
+                    <AppText style={cs.familyActionLabel}>Storybooks</AppText>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* View Full Profile Button */}
+              <TouchableOpacity 
+                style={cs.familyViewFullBtn}
+                onPress={() => {
+                  setShowFamilyInfo(false);
+                  navigation.navigate('Family');
+                }}
+                activeOpacity={0.85}
+              >
+                <LinearGradient 
+                  colors={['#7c3aed', '#3b82f6']} 
+                  start={{ x: 0, y: 0 }} 
+                  end={{ x: 1, y: 0 }}
+                  style={cs.familyViewFullGrad}
+                >
+                  <Ionicons name="arrow-forward-circle" size={20} color="#fff" />
+                  <AppText style={cs.familyViewFullText}>View Full Family Profile</AppText>
+                </LinearGradient>
+              </TouchableOpacity>
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       {/* Poll composer */}
       <Modal visible={showPollModal} transparent animationType="slide" onRequestClose={() => setShowPollModal(false)}>
         <Pressable style={cs.optionsOverlay} onPress={() => setShowPollModal(false)} />
@@ -1661,7 +1876,7 @@ const cs = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   header: { flexDirection: "row", alignItems: "center", paddingTop: 52, paddingBottom: 12, paddingHorizontal: 16, gap: 10, borderBottomWidth: 0.5, borderBottomColor: colors.border },
   backBtn: { padding: 6 },
-  headerAvatar: { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center" },
+  headerAvatar: { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center", overflow: 'hidden' },
   headerInfo: { flex: 1 },
   headerTitle: { fontSize: 16, fontWeight: "700", color: colors.text },
   headerSub: { fontSize: 12, color: colors.muted },
@@ -1674,6 +1889,30 @@ const cs = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 0.5,
     borderColor: 'rgba(255,255,255,0.1)',
+  },
+  familyInfoBtn: {
+    borderRadius: 17,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(59,130,246,0.3)',
+  },
+  familyInfoBtnGrad: {
+    width: 34,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  summaryBtn: {
+    borderRadius: 17,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(245,158,11,0.3)',
+  },
+  summaryBtnGrad: {
+    width: 34,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   messagesList: { padding: 8, paddingBottom: 8 },
   msgRow: {
@@ -2258,5 +2497,179 @@ const cs = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     color: '#e0245e',
+  },
+
+  // Family Info Modal
+  familyInfoOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    justifyContent: 'flex-end',
+  },
+  familyInfoSheet: {
+    backgroundColor: '#13131f',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    maxHeight: '85%',
+    borderTopWidth: 0.5,
+    borderTopColor: 'rgba(255,255,255,0.08)',
+  },
+  familyInfoHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  familyInfoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 0.5,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
+  },
+  familyInfoHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    flex: 1,
+  },
+  familyInfoAvatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(124,58,237,0.3)',
+  },
+  familyInfoTitle: {
+    fontSize: 19,
+    fontWeight: '800',
+    color: colors.text,
+    marginBottom: 2,
+  },
+  familyMottoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  familyMottoText: {
+    fontSize: 11,
+    color: '#a78bfa',
+    fontStyle: 'italic',
+    fontWeight: '600',
+    flex: 1,
+  },
+  familyInfoClose: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  familyInfoBody: {
+    padding: 20,
+    paddingBottom: 40,
+  },
+  familyInfoSection: {
+    marginBottom: 24,
+  },
+  familyInfoSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  familyInfoSectionTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.text,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  familyInfoDescription: {
+    fontSize: 14,
+    color: colors.muted,
+    lineHeight: 21,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  familyStatsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 24,
+  },
+  familyStatCard: {
+    flex: 1,
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.08)',
+    gap: 6,
+  },
+  familyStatValue: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: colors.text,
+    marginTop: 4,
+  },
+  familyStatLabel: {
+    fontSize: 11,
+    color: colors.muted,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  familyActionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  familyActionBtn: {
+    width: (width - 64) / 3,
+    alignItems: 'center',
+    gap: 8,
+  },
+  familyActionIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  familyActionLabel: {
+    fontSize: 11,
+    color: colors.text,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  familyViewFullBtn: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginTop: 8,
+  },
+  familyViewFullGrad: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingVertical: 16,
+  },
+  familyViewFullText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#fff',
   },
 });

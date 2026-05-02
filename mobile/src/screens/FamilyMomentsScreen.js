@@ -208,7 +208,7 @@ export default function FamilyMomentsScreen({ route, navigation }) {
               return (
                 <TouchableOpacity
                   style={s.gridItem}
-                  onPress={() => navigation.navigate('StoryDetail', { storyId: post.id })}
+                  onPress={() => navigation.navigate('PostDetail', { postId: post.id })}
                   activeOpacity={0.85}
                 >
                   {post.media_url && post.media_type === 'image' ? (

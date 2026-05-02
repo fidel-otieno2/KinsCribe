@@ -675,15 +675,15 @@ def get_story_prompts():
 def _compile_narrative(stories, title):
     """Use OpenAI to compile stories into a structured narrative."""
     try:
-        import openai
-        openai.api_key = os.getenv("OPENAI_API_KEY")
+        from openai import OpenAI
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
         story_texts = "\n\n".join([
             f"[{s.story_date or 'Unknown date'}] {s.title}:\n{s.enhanced_text or s.content or s.transcript or ''}"
             for s in stories
         ])
 
-        response = openai.chat.completions.create(
+        response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{
                 "role": "user",
@@ -719,15 +719,15 @@ def _generate_archive(book):
 def _ai_answer_question(question, stories):
     """AI answers questions about family using stories as context"""
     try:
-        import openai
-        openai.api_key = os.getenv("OPENAI_API_KEY")
+        from openai import OpenAI
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         
         context = "\n\n".join([
             f"{s.title} ({s.story_date}): {s.content or s.transcript or ''}"
             for s in stories[:50]  # Limit context
         ])
         
-        response = openai.chat.completions.create(
+        response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": "You are a family historian. Answer questions based on the family stories provided."},

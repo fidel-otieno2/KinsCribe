@@ -37,13 +37,23 @@ export default function StorybooksScreen() {
     );
 
   const renderStorybook = ({ item }) => (
-    <GlassCard style={s.item}>
-      <AppText style={s.title}>{item.title}</AppText>
-      <AppText style={s.subtitle}>
-        {item.story_ids.length} stories •{" "}
-        {new Date(item.created_at).toLocaleDateString()}
-      </AppText>
-    </GlassCard>
+    <TouchableOpacity
+      onPress={() => navigation.navigate('StorybookViewer', { storybookId: item.id })}
+      activeOpacity={0.8}
+    >
+      <GlassCard style={s.item}>
+        <View style={s.itemHeader}>
+          <View style={{ flex: 1 }}>
+            <AppText style={s.title}>{item.title}</AppText>
+            <AppText style={s.subtitle}>
+              {item.story_ids.length} {item.story_ids.length === 1 ? 'story' : 'stories'} •{" "}
+              {new Date(item.created_at).toLocaleDateString()}
+            </AppText>
+          </View>
+          <Ionicons name="chevron-forward" size={24} color={colors.muted} />
+        </View>
+      </GlassCard>
+    </TouchableOpacity>
   );
 
   return (
@@ -95,6 +105,11 @@ const s = StyleSheet.create({
   item: {
     padding: 20,
     marginBottom: 16,
+  },
+  itemHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
   title: {
     fontSize: 18,

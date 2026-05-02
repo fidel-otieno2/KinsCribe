@@ -27,6 +27,7 @@ export default function StorybookGeneratorScreen({ navigation }) {
   const [selected, setSelected] = useState([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [generationStep, setGenerationStep] = useState('');
 
   useEffect(() => {
     api
@@ -44,21 +45,46 @@ export default function StorybookGeneratorScreen({ navigation }) {
     );
   };
 
+  const selectAll = () => {
+    if (selected.length === stories.length) {
+      setSelected([]);
+    } else {
+      setSelected(stories.map(s => s.id));
+    }
+  };
+
   const generateStorybook = async () => {
     if (selected.length < 1) return info('Select at least 1 story to generate a storybook');
     setGenerating(true);
     try {
+      setGenerationStep('Gathering stories...');
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      setGenerationStep('AI is compiling your memories...');
       const res = await api.post("/storybooks/generate", {
         story_ids: selected,
         title: `Family Memories ${new Date().getFullYear()}`,
+        description: `A collection of ${selected.length} family stories`,
       });
-      success('Storybook generated!');
-      // Navigate to Storybooks screen to view it
+      
+      setGenerationStep('Finalizing storybook...');
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      success('Storybook generated successfully!');
+      setGenerationStep('');
+      
+      // Navigate to the newly created storybook
       setTimeout(() => {
-        navigation.navigate('Storybooks');
+        if (res.data?.storybook?.id) {
+          navigation.replace('StorybookViewer', { storybookId: res.data.storybook.id });
+        } else {
+          navigation.navigate('Storybooks');
+        }
       }, 500);
     } catch (err) {
-      error(err.response?.data?.error || 'Failed to generate storybook.');
+      console.error('Storybook generation error:', err);
+      setGenerationStep('');
+      error(err.response?.data?.error || 'Failed to generate storybook. Please try again.');
     } finally {
       setGenerating(false);
     }
@@ -78,7 +104,14 @@ export default function StorybookGeneratorScreen({ navigation }) {
       <View style={s.header}>
         <AppText style={s.title}>Create Storybook</AppText>
         <AppText style={s.subtitle}>Select stories for your family book</AppText>
-        <AppText style={s.count}>{selected.length} selected</AppText>
+        <View style={s.headerActions}>
+          <AppText style={s.count}>{selected.length} of {stories.length} selected</AppText>
+          <TouchableOpacity onPress={selectAll} style={s.selectAllBtn}>
+            <AppText style={s.selectAllText}>
+              {selected.length === stories.length ? 'Deselect All' : 'Select All'}
+            </AppText>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <FlatList
@@ -123,13 +156,18 @@ export default function StorybookGeneratorScreen({ navigation }) {
           disabled={generating || selected.length < 1}
         >
           {generating ? (
-            <ActivityIndicator color="#fff" />
+            <View style={{ alignItems: 'center', gap: 8 }}>
+              <ActivityIndicator color="#fff" />
+              {generationStep && (
+                <AppText style={[s.btnText, { fontSize: 13 }]}>{generationStep}</AppText>
+              )}
+            </View>
           ) : (
             <>
+              <Ionicons name="sparkles" size={20} color="#fff" />
               <AppText style={s.btnText}>
-                Generate Storybook ({selected.length}/10)
+                Generate with AI ({selected.length})
               </AppText>
-              <Ionicons name="book" size={20} color="#fff" />
             </>
           )}
         </TouchableOpacity>
@@ -161,8 +199,26 @@ const s = StyleSheet.create({
   count: {
     fontSize: 14,
     color: colors.text,
-    marginTop: 8,
     fontWeight: "600",
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 12,
+  },
+  selectAllBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(124,58,237,0.2)',
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  selectAllText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.primary,
   },
   list: {
     paddingBottom: 100,
@@ -203,6 +259,11 @@ const s = StyleSheet.create({
     right: 16,
     borderRadius: 16,
     overflow: "hidden",
+    shadowColor: '#7c3aed',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
   btnContent: {
     flexDirection: "row",

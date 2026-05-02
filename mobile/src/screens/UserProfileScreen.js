@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, StyleSheet, Image, TouchableOpacity,
-  ActivityIndicator, ScrollView, Dimensions, Alert, Modal,
+  ActivityIndicator, ScrollView, Dimensions, Alert, Modal, RefreshControl,
 } from 'react-native';
 import AppText from '../components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -72,6 +72,7 @@ export default function UserProfileScreen({ route, navigation }) {
   const [blocking, setBlocking] = useState(false);
   const [mutualCount, setMutualCount] = useState(0);
   const [userGroups, setUserGroups] = useState({ admin_groups: [], member_groups: [] });
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     if (userId === me?.id) {
@@ -113,6 +114,12 @@ export default function UserProfileScreen({ route, navigation }) {
   }, [userId]);
 
   useFocusEffect(useCallback(() => { fetchAll(); }, [fetchAll]));
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchAll();
+    setRefreshing(false);
+  }, [fetchAll]);
 
   const toggleConnect = async () => {
     setConnecting(true);
@@ -365,7 +372,18 @@ export default function UserProfileScreen({ route, navigation }) {
 
   return (
     <View style={s.container}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+      <ScrollView 
+        showsVerticalScrollIndicator={false} 
+        contentContainerStyle={{ paddingBottom: 100 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
+      >
         <Header />
         {/* Groups section — outside Header to keep open/close state stable */}
         <ProfileGroupsSection

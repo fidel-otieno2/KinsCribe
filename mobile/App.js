@@ -38,6 +38,7 @@ import NotificationsScreen from "./src/screens/NotificationsScreen";
 import SettingsScreen from "./src/screens/SettingsScreen";
 import StorybooksScreen from "./src/screens/StorybooksScreen";
 import StorybookGeneratorScreen from "./src/screens/StorybookGeneratorScreen";
+import StorybookViewerScreen from "./src/screens/StorybookViewerScreen";
 import FeedAI from "./src/screens/FeedAI";
 import MediaEditorScreen from "./src/screens/MediaEditorScreen";
 import VoiceRecorderScreen from "./src/screens/VoiceRecorderScreen";
@@ -449,6 +450,7 @@ function RootNavigator({ navigationRef }) {
           <Stack.Screen name="Settings" component={SettingsScreen} options={{ animation: "slide_from_right" }} />
           <Stack.Screen name="Storybooks" component={StorybooksScreen} options={{ animation: "slide_from_right" }} />
           <Stack.Screen name="StorybookGenerator" component={StorybookGeneratorScreen} options={{ animation: "slide_from_right" }} />
+          <Stack.Screen name="StorybookViewer" component={StorybookViewerScreen} options={{ animation: "slide_from_right", presentation: "modal" }} />
           <Stack.Screen name="AIProcessing" component={AIProcessingScreen} options={{ animation: "slide_from_bottom" }} />
           <Stack.Screen name="MediaEditor" component={MediaEditorScreen} options={{ animation: "slide_from_bottom" }} />
           <Stack.Screen name="VoiceRecorder" component={VoiceRecorderScreen} options={{ animation: "slide_from_bottom" }} />

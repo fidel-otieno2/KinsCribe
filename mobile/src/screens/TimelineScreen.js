@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import {
   View, FlatList, StyleSheet,
   ActivityIndicator, Image, TouchableOpacity
 } from 'react-native';
+import { Video, ResizeMode } from 'expo-av';
 import AppText from '../components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -11,10 +12,21 @@ import api from '../api/axios';
 import { useTranslation } from '../i18n';
 import { colors, radius, shadows } from '../theme';
 
-function TimelineStoryCard({ story }) {
+function TimelineStoryCard({ story, isVisible }) {
+  const videoRef = useRef(null);
   const date = story.story_date
     ? new Date(story.story_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
     : new Date(story.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+
+  useEffect(() => {
+    if (videoRef.current) {
+      if (isVisible) {
+        videoRef.current.playAsync();
+      } else {
+        videoRef.current.pauseAsync();
+      }
+    }
+  }, [isVisible]);
 
   return (
     <BlurView intensity={18} tint="dark" style={s.card}>
@@ -46,10 +58,17 @@ function TimelineStoryCard({ story }) {
           <Image source={{ uri: story.media_url }} style={s.thumbnail} resizeMode="cover" />
         )}
         {story.media_url && story.media_type === 'video' && (
-          <View style={s.videoThumb}>
-            <LinearGradient colors={['rgba(124,58,237,0.3)', 'rgba(59,130,246,0.2)']} style={StyleSheet.absoluteFill} />
-            <Ionicons name="play-circle" size={40} color="#fff" />
-            <AppText style={s.videoLabel}>Video Story</AppText>
+          <View style={s.videoContainer}>
+            <Video
+              ref={videoRef}
+              source={{ uri: story.media_url }}
+              style={s.thumbnail}
+              resizeMode={ResizeMode.COVER}
+              shouldPlay={isVisible}
+              isLooping
+              isMuted={false}
+              useNativeControls
+            />
           </View>
         )}
         {story.media_url && story.media_type === 'audio' && (
@@ -106,6 +125,25 @@ export default function TimelineScreen() {
   const [stats, setStats] = useState({ total: 0, earliest: null, latest: null });
   const [loading, setLoading] = useState(true);
   const [onThisDay, setOnThisDay] = useState([]);
+  const [visibleStoryId, setVisibleStoryId] = useState(null);
+
+  const viewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 50,
+  }).current;
+
+  const onViewableItemsChanged = useRef(({ viewableItems }) => {
+    if (viewableItems.length > 0) {
+      // Find first story with video in viewable items
+      for (const item of viewableItems) {
+        const [year, stories] = item.item;
+        const videoStory = stories.find(s => s.media_type === 'video');
+        if (videoStory) {
+          setVisibleStoryId(videoStory.id);
+          return;
+        }
+      }
+    }
+  }).current;
 
   useEffect(() => {
     api.get('/stories/feed').then(({ data }) => {
@@ -163,7 +201,7 @@ export default function TimelineScreen() {
       {/* Stories for this year */}
       <View style={s.storiesWrap}>
         {stories.map(story => (
-          <TimelineStoryCard key={story.id} story={story} />
+          <TimelineStoryCard key={story.id} story={story} isVisible={visibleStoryId === story.id} />
         ))}
       </View>
     </View>
@@ -237,6 +275,8 @@ export default function TimelineScreen() {
           renderItem={renderYear}
           contentContainerStyle={s.list}
           showsVerticalScrollIndicator={false}
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
         />
       )}
         </>
@@ -287,6 +327,7 @@ const s = StyleSheet.create({
   privacyText: { fontSize: 10, fontWeight: '600' },
 
   thumbnail: { width: '100%', height: 160, borderRadius: radius.md, marginBottom: 10 },
+  videoContainer: { width: '100%', height: 200, borderRadius: radius.md, marginBottom: 10, overflow: 'hidden', backgroundColor: '#000' },
   videoThumb: { width: '100%', height: 120, borderRadius: radius.md, marginBottom: 10, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', backgroundColor: 'rgba(30,41,59,0.8)', gap: 6 },
   videoLabel: { color: colors.muted, fontSize: 12 },
   audioThumb: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(124,58,237,0.1)', borderRadius: radius.sm, padding: 10, marginBottom: 10 },

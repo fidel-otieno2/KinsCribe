@@ -537,6 +537,76 @@ def family_chat():
         }), 500
 
 
+@ai_bp.route("/family-summary", methods=["POST"])
+@jwt_required()
+def family_summary():
+    """
+    Generate a summary of recent family chat messages.
+    """
+    user = me()
+    data = request.json or {}
+    messages = data.get("messages", [])
+    
+    if not messages:
+        return jsonify({"error": "No messages provided"}), 400
+    
+    try:
+        # Build message context
+        message_text = "\n".join([
+            f"{msg.get('sender_name', 'Unknown')}: {msg.get('text', '[Media]')}"
+            for msg in messages
+            if msg.get('text')
+        ])
+        
+        if not message_text.strip():
+            return jsonify({"summary": "No text messages to summarize. The chat contains only media."})
+        
+        # Generate summary with AI
+        response = openai.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are summarizing a family chat conversation. "
+                        "Create a brief, warm summary highlighting the main topics discussed, "
+                        "important updates, and the overall mood. Keep it to 2-3 sentences. "
+                        "Be conversational and family-friendly."
+                    )
+                },
+                {
+                    "role": "user",
+                    "content": f"Summarize this family chat:\n\n{message_text}"
+                }
+            ],
+            temperature=0.7,
+            max_tokens=200
+        )
+        
+        summary = response.choices[0].message.content.strip()
+        
+        return jsonify({"summary": summary})
+        
+    except openai.RateLimitError:
+        return jsonify({
+            "error": "AI service quota exceeded",
+            "summary": "Unable to generate summary due to API limits. The family has been chatting about various topics!"
+        }), 503
+    except openai.AuthenticationError:
+        return jsonify({
+            "error": "AI service unavailable",
+            "summary": "AI summary is currently unavailable. Please check your OpenAI API configuration."
+        }), 503
+    except Exception as e:
+        print(f"Family summary error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            "error": "Summary generation failed",
+            "summary": "Unable to generate summary at this time. The family has been actively chatting!"
+        }), 500
+
+
 @ai_bp.route("/ask-family", methods=["POST"])
 @jwt_required()
 def ask_family():

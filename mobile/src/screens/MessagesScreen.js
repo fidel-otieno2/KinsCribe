@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, FlatList, TouchableOpacity, StyleSheet,
   Image, ActivityIndicator, StatusBar, TextInput,
-  Alert, Animated, Dimensions,
+  Alert, Animated, Dimensions, RefreshControl,
 } from 'react-native';
 import AppText from '../components/AppText';
 import { useFocusEffect } from '@react-navigation/native';
@@ -69,6 +69,7 @@ export default function MessagesScreen({ navigation }) {
   const [requestCount, setRequestCount] = useState(0);
   const [openingDM, setOpeningDM] = useState(null);
   const [activeFilter, setActiveFilter] = useState('all');
+  const [refreshing, setRefreshing] = useState(false);
   const searchAnim = useRef(new Animated.Value(0)).current;
   const [searchFocused, setSearchFocused] = useState(false);
 
@@ -99,6 +100,13 @@ export default function MessagesScreen({ navigation }) {
     fetchConversations();
     api.get('/messages/family').then(({ data }) => setFamilyConv(data.conversation)).catch(() => {});
   }, []));
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchConversations();
+    api.get('/messages/family').then(({ data }) => setFamilyConv(data.conversation)).catch(() => {});
+    setRefreshing(false);
+  }, []);
 
   const handleSearch = async (q) => {
     setSearch(q);
@@ -315,6 +323,14 @@ export default function MessagesScreen({ navigation }) {
           keyExtractor={i => String(i.id)}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 100 }}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={theme.primary}
+              colors={[theme.primary]}
+            />
+          }
           ListHeaderComponent={
             <>
               {/* Family Chat Hero Card */}
