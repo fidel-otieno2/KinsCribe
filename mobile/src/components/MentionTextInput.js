@@ -71,15 +71,12 @@ export default function MentionTextInput({
 
   // Search for users when typing @mention
   const searchUsers = async (query) => {
-    if (!query || query.length < 1) {
-      setSuggestions([]);
-      return;
-    }
-
     setLoading(true);
     try {
+      // If no query, show all users (or recent/suggested users)
+      const searchQuery = query || '';
       const { data } = await api.get('/users/search', {
-        params: { q: query, limit: 10 },
+        params: { q: searchQuery, limit: 10 },
       });
       setSuggestions(data.users || []);
     } catch (error) {
@@ -119,7 +116,7 @@ export default function MentionTextInput({
 
     const beforeMention = value.substring(0, mention.start);
     const afterMention = value.substring(cursorPosition);
-    const mentionText = `@${user.username}`;
+    const mentionText = user.username; // No @ symbol
     const newText = beforeMention + mentionText + ' ' + afterMention;
     
     // Track this mention

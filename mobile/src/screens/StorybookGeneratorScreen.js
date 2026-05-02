@@ -52,8 +52,11 @@ export default function StorybookGeneratorScreen({ navigation }) {
         story_ids: selected,
         title: `Family Memories ${new Date().getFullYear()}`,
       });
-      success('Storybook generated! View it in Storybooks.');
-      navigation.goBack();
+      success('Storybook generated!');
+      // Navigate to Storybooks screen to view it
+      setTimeout(() => {
+        navigation.navigate('Storybooks');
+      }, 500);
     } catch (err) {
       error(err.response?.data?.error || 'Failed to generate storybook.');
     } finally {
